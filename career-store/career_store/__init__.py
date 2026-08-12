@@ -18,6 +18,7 @@ from .schemas import (
     TransactionResult,
     VerificationState,
 )
+from .store import CareerStore, openCareerStore
 
 __all__ = [
     "EVIDENCE_SCHEMA",
@@ -25,6 +26,7 @@ __all__ = [
     "FACT_SCHEMA",
     "SCHEMAS",
     "CareerFact",
+    "CareerStore",
     "ConflictRecord",
     "Evidence",
     "Fact",
@@ -36,4 +38,5 @@ __all__ = [
     "Result",
     "TransactionResult",
     "VerificationState",
+    "openCareerStore",
 ]
