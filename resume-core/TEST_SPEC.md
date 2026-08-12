@@ -32,6 +32,7 @@ Relevant contract surfaces:
 
 Future implementation may decompose internally, but tests should assume public APIs are the stable boundary:
 
+- shared DTO and JSON schema definitions in `resume_core.schemas`
 - schemas and type validation
 - resume normalization
 - job normalization
@@ -172,4 +173,3 @@ The E2E fixture must prove:
 - adversarial honesty rejection,
 - immutable base resume,
 - second-job use of persisted verified facts through supplied fact DTOs.
-

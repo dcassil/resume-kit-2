@@ -1,0 +1,272 @@
+{
+  "contract_version": 1,
+  "package": "resume-agent",
+  "purpose": "Proposal-only semantic and language adapter. Agent output may help extraction, questions, answer interpretation, equivalence suggestions, and rewrite proposals, but code-owned packages own truth, scoring, validation, persistence, mutation, and workflow decisions.",
+  "public_api": {
+    "module": "resume_agent",
+    "functions": [
+      "extractResumeSemantics",
+      "extractJobSemantics",
+      "generateClarificationQuestion",
+      "interpretUserAnswer",
+      "proposeRewrite"
+    ],
+    "style": "Functions may be synchronous or asynchronous. Every function returns schema-constrained proposal DTOs, never authoritative domain objects."
+  },
+  "forbidden_responsibilities": [
+    "official_score",
+    "match_scoring",
+    "sqlite_persistence",
+    "direct_file_mutation",
+    "resume_mutation_application",
+    "verification_authority",
+    "workflow_decision",
+    "rendering",
+    "plugin_presentation"
+  ],
+  "verification_states": [
+    "source_stated",
+    "user_verified",
+    "imported",
+    "inferred",
+    "unknown"
+  ],
+  "required_output_traits": [
+    "schema_version",
+    "proposal_type",
+    "proposals",
+    "source_evidence",
+    "uncertainty",
+    "requires_validation"
+  ],
+  "surfaces": [
+    {
+      "name": "extractResumeSemantics",
+      "description": "Extract resume semantics from raw text into schema-constrained proposals with source evidence. Must not invent absent facts or return a canonical final resume.",
+      "input_contract": {
+        "required": [
+          "rawText"
+        ],
+        "properties": {
+          "rawText": {
+            "type": "string",
+            "minLength": 1
+          },
+          "context": {
+            "type": "object"
+          }
+        }
+      },
+      "output_contract": {
+        "proposal_type": "resume_semantic_extraction",
+        "required_fields": [
+          "schema_version",
+          "proposal_type",
+          "fact_proposals",
+          "source_evidence",
+          "uncertainty",
+          "requires_validation"
+        ],
+        "must_not_include": [
+          "canonical_resume",
+          "working_resume",
+          "official_score",
+          "user_verified",
+          "unsupported_aws",
+          "unsupported_graphql",
+          "staff_title_inflation",
+          "unsupported_metrics",
+          "unsupported_management_scope"
+        ]
+      }
+    },
+    {
+      "name": "extractJobSemantics",
+      "description": "Extract job semantics into proposal DTOs for core validation. Requirements must retain source text and distinguish required, preferred, and contextual concepts.",
+      "input_contract": {
+        "required": [
+          "rawJobText"
+        ],
+        "properties": {
+          "rawJobText": {
+            "type": "string",
+            "minLength": 1
+          },
+          "context": {
+            "type": "object"
+          }
+        }
+      },
+      "output_contract": {
+        "proposal_type": "job_semantic_extraction",
+        "required_fields": [
+          "schema_version",
+          "proposal_type",
+          "job_title",
+          "company",
+          "seniority",
+          "requirements",
+          "terminology",
+          "source_evidence",
+          "uncertainty",
+          "requires_validation"
+        ],
+        "requirement_fields": [
+          "requirement_id",
+          "source_text",
+          "classification",
+          "normalized_terms"
+        ],
+        "classifications": [
+          "required",
+          "preferred",
+          "contextual"
+        ],
+        "must_not_include": [
+          "official_score",
+          "resolution_state_authority",
+          "workflow_transition",
+          "validated_job_model",
+          "missing_source_text"
+        ]
+      }
+    },
+    {
+      "name": "generateClarificationQuestion",
+      "description": "Phrase a targeted question for one code-selected unresolved requirement or tight cluster. The agent must not choose the requirement itself or ask broad fishing questions.",
+      "input_contract": {
+        "required": [
+          "context"
+        ],
+        "properties": {
+          "context": {
+            "type": "object",
+            "required": [
+              "selected_requirement_ids",
+              "topic",
+              "already_verified_fact_ids"
+            ]
+          }
+        }
+      },
+      "output_contract": {
+        "proposal_type": "clarification_question",
+        "required_fields": [
+          "schema_version",
+          "proposal_type",
+          "question",
+          "selected_requirement_ids",
+          "topic",
+          "already_verified_fact_ids",
+          "uncertainty",
+          "requires_validation"
+        ],
+        "must_not_include": [
+          "selected_next_topic",
+          "score_impact",
+          "workflow_transition"
+        ]
+      }
+    },
+    {
+      "name": "interpretUserAnswer",
+      "description": "Interpret a user answer into structured fact, evidence, relationship, and requirement-resolution proposals. Must not persist anything or mark verification final.",
+      "input_contract": {
+        "required": [
+          "answer",
+          "context"
+        ],
+        "properties": {
+          "answer": {
+            "type": "string",
+            "minLength": 1
+          },
+          "context": {
+            "type": "object",
+            "required": [
+              "selected_requirement_ids",
+              "topic"
+            ]
+          }
+        }
+      },
+      "output_contract": {
+        "proposal_type": "answer_interpretation",
+        "required_fields": [
+          "schema_version",
+          "proposal_type",
+          "requirement_resolution_proposals",
+          "fact_proposals",
+          "evidence_proposals",
+          "relationship_proposals",
+          "explicit_negative_facts",
+          "uncertainty",
+          "requires_validation"
+        ],
+        "must_not_include": [
+          "persisted",
+          "final_verification_state",
+          "user_verified_authority",
+          "sqlite",
+          "staff_title_employment_history"
+        ]
+      }
+    },
+    {
+      "name": "proposeRewrite",
+      "description": "Return ResumeChangeOperation proposals grounded in allowed facts, selected requirements, target terminology, and prohibited additions. Must never return a mutated full resume.",
+      "input_contract": {
+        "required": [
+          "context"
+        ],
+        "properties": {
+          "context": {
+            "type": "object",
+            "required": [
+              "original_text",
+              "allowed_facts",
+              "job_terminology",
+              "requirements",
+              "prohibited_additions",
+              "length_constraints",
+              "voice_constraints"
+            ]
+          }
+        }
+      },
+      "output_contract": {
+        "proposal_type": "rewrite_proposal",
+        "required_fields": [
+          "schema_version",
+          "proposal_type",
+          "operations",
+          "uncertainty",
+          "requires_validation"
+        ],
+        "operation_fields": [
+          "operation_id",
+          "operation_type",
+          "target_path",
+          "before",
+          "after",
+          "facts_used",
+          "requirements_targeted",
+          "terminology_changes",
+          "provenance",
+          "status"
+        ],
+        "must_not_include": [
+          "canonical_resume",
+          "working_resume",
+          "applied",
+          "official_score",
+          "unsupported_aws",
+          "unsupported_graphql",
+          "staff_title_inflation",
+          "unsupported_metrics",
+          "unsupported_management_scope"
+        ]
+      }
+    }
+  ]
+}

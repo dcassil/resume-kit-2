@@ -1,0 +1,1 @@
+Yes, around five years. I've built and maintained GraphQL APIs in production.

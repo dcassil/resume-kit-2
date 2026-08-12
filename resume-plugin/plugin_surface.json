@@ -1,0 +1,263 @@
+{
+  "contract_version": 1,
+  "package": "resume-plugin",
+  "purpose": "Optional host delivery adapter. The plugin registers host tools and skills, maps host conversations into CLI/domain workflows, and presents confirmations, diffs, reports, render results, and audit summaries without owning domain behavior.",
+  "public_api": {
+    "module": "resume_plugin",
+    "functions": [
+      "getPluginManifest",
+      "registerTools",
+      "mapConversationToWorkflow",
+      "presentConfirmationRequest",
+      "presentDiff",
+      "presentReport",
+      "presentAuditSummary"
+    ],
+    "style": "Functions may be synchronous or asynchronous. The plugin returns adapter DTOs and host tool registrations that call public CLI/workflow/domain APIs."
+  },
+  "allowed_dependencies": [
+    "resume-cli public command/workflow APIs",
+    "workflow public APIs",
+    "resume-core public report DTOs",
+    "career-mcp public tool abstractions",
+    "resume-render public result DTOs"
+  ],
+  "forbidden_responsibilities": [
+    "independent_scoring_algorithm",
+    "sqlite_schema_or_migration",
+    "ats_sanitation",
+    "mutation_logic",
+    "canonical_resume_or_job_schema",
+    "career_learning_behavior",
+    "rendering_truth",
+    "validation_bypass",
+    "private_package_internals"
+  ],
+  "required_version_fields": [
+    "plugin_version",
+    "underlying_package_versions",
+    "schema_versions",
+    "config_hash"
+  ],
+  "surfaces": [
+    {
+      "name": "getPluginManifest",
+      "description": "Return host/plugin manifest metadata, exposed skill/tool entry points, compatibility metadata, and underlying package/schema/config versions.",
+      "output_contract": {
+        "result_type": "PluginManifest",
+        "required_fields": [
+          "plugin_id",
+          "plugin_version",
+          "display_name",
+          "tools",
+          "skills",
+          "compatibility",
+          "underlying_package_versions",
+          "schema_versions",
+          "config_hash"
+        ],
+        "must_not_include": [
+          "scoring_algorithm",
+          "sqlite_schema",
+          "canonical_resume_schema",
+          "canonical_job_schema",
+          "mutation_logic"
+        ]
+      }
+    },
+    {
+      "name": "registerTools",
+      "description": "Register host tools that delegate to public CLI/workflow/domain APIs. Registration must not duplicate domain behavior.",
+      "input_contract": {
+        "required": [
+          "host"
+        ],
+        "properties": {
+          "host": {
+            "type": "object"
+          }
+        }
+      },
+      "output_contract": {
+        "result_type": "ToolRegistrationReport",
+        "required_fields": [
+          "status",
+          "registered_tools",
+          "workflow_mappings",
+          "underlying_package_versions",
+          "warnings"
+        ],
+        "tool_fields": [
+          "name",
+          "description",
+          "workflow_command",
+          "input_schema"
+        ]
+      }
+    },
+    {
+      "name": "mapConversationToWorkflow",
+      "description": "Map a host conversation/request into the equivalent CLI or workflow command without writing DB rows or mutating resume artifacts directly.",
+      "input_contract": {
+        "required": [
+          "message",
+          "context"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "context": {
+            "type": "object"
+          }
+        }
+      },
+      "output_contract": {
+        "result_type": "WorkflowMapping",
+        "required_fields": [
+          "status",
+          "workflow_command",
+          "arguments",
+          "confirmation_required",
+          "selected_requirement_ids",
+          "scope",
+          "warnings"
+        ],
+        "must_not_include": [
+          "sql",
+          "direct_db_write",
+          "raw_career_db_context",
+          "validation_bypass"
+        ]
+      }
+    },
+    {
+      "name": "presentConfirmationRequest",
+      "description": "Present a code-selected unresolved requirement or confirmation request, preserving selected requirement IDs and limiting context to what the user needs.",
+      "input_contract": {
+        "required": [
+          "request"
+        ],
+        "properties": {
+          "request": {
+            "type": "object",
+            "required": [
+              "selected_requirement_ids",
+              "question",
+              "fact_context"
+            ]
+          }
+        }
+      },
+      "output_contract": {
+        "result_type": "ConfirmationPresentation",
+        "required_fields": [
+          "status",
+          "selected_requirement_ids",
+          "prompt",
+          "fact_context_summary",
+          "sensitive_fields_omitted"
+        ],
+        "must_not_include": [
+          "raw_career_db_dump",
+          "unrelated_facts",
+          "sql",
+          "internal_provenance_metadata"
+        ]
+      }
+    },
+    {
+      "name": "presentDiff",
+      "description": "Present diffs from ResumeChangeOperation records, including accepted and rejected operations and reasons.",
+      "input_contract": {
+        "required": [
+          "operations"
+        ],
+        "properties": {
+          "operations": {
+            "type": "array"
+          }
+        }
+      },
+      "output_contract": {
+        "result_type": "DiffPresentation",
+        "required_fields": [
+          "status",
+          "applied_operations",
+          "rejected_operations",
+          "rejection_reasons",
+          "display"
+        ],
+        "must_not_include": [
+          "mutation_application",
+          "canonical_resume_schema"
+        ]
+      }
+    },
+    {
+      "name": "presentReport",
+      "description": "Present match, validation, and render/export reports with resolved, missing, preferred, and unresolved requirements clearly separated.",
+      "input_contract": {
+        "required": [
+          "report"
+        ],
+        "properties": {
+          "report": {
+            "type": "object"
+          }
+        }
+      },
+      "output_contract": {
+        "result_type": "ReportPresentation",
+        "required_fields": [
+          "status",
+          "resolved_requirements",
+          "missing_requirements",
+          "preferred_requirements",
+          "unresolved_requirements",
+          "render_results",
+          "warnings"
+        ],
+        "must_not_include": [
+          "scoring_formula",
+          "internal_provenance_metadata",
+          "sensitive_raw_data"
+        ]
+      }
+    },
+    {
+      "name": "presentAuditSummary",
+      "description": "Present audit summaries including versions, config hash, fact changes, operations, validations, outputs, and rejected operations without leaking unnecessary sensitive data.",
+      "input_contract": {
+        "required": [
+          "audit"
+        ],
+        "properties": {
+          "audit": {
+            "type": "object"
+          }
+        }
+      },
+      "output_contract": {
+        "result_type": "AuditPresentation",
+        "required_fields": [
+          "status",
+          "run_identity",
+          "config_hash",
+          "underlying_package_versions",
+          "schema_versions",
+          "fact_changes",
+          "operations",
+          "validations",
+          "outputs",
+          "sensitive_fields_omitted"
+        ],
+        "must_not_include": [
+          "raw_career_db_dump",
+          "internal_provenance_metadata",
+          "sensitive_raw_data"
+        ]
+      }
+    }
+  ]
+}

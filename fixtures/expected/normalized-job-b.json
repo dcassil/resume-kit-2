@@ -1,0 +1,11 @@
+{
+  "fixture_id": "normalized-job-b",
+  "schema_version": "expected-snapshot.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "required React, Node.js, GraphQL, AWS",
+    "preferred PostgreSQL and SaaS",
+    "AWS and GraphQL are intended to resolve from facts learned during Job A"
+  ]
+}

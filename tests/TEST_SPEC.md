@@ -35,6 +35,14 @@ tests/
 
 ## Required Gates
 
+Canonical current command:
+
+```sh
+python3 tools/run_tests.py --root .
+```
+
+This command installs the root package metadata in an isolated editable environment, verifies the runtime package layout, and runs the current executable contract and boundary suite.
+
 ### PR gate
 
 Run:
@@ -175,4 +183,3 @@ Release is blocked by:
 - lost learned facts between jobs,
 - duplicate questions for verified facts without legitimate reason,
 - false resolution of unresolved hard requirement.
-

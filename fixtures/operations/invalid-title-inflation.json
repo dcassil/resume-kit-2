@@ -1,0 +1,10 @@
+{
+  "fixture_id": "invalid-title-inflation",
+  "schema_version": "operation-fixture.v1",
+  "target_path": "/experience/0/title",
+  "before": "Senior Software Developer",
+  "after": "Staff Software Engineer",
+  "expected_status": "rejected",
+  "expected_reason": "title_inflation",
+  "notes": "Job A title cannot rewrite actual employment history."
+}

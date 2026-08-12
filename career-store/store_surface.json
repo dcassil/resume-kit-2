@@ -1,0 +1,195 @@
+{
+  "contract_version": 1,
+  "package": "career-store",
+  "purpose": "Durable SQLite-backed truth store for career facts, evidence, relationships, verification state, conflicts, job associations, confirmation history, migrations, and transactions.",
+  "public_api": {
+    "types": [
+      "CareerFact",
+      "Evidence",
+      "FactRelationship",
+      "VerificationState",
+      "ConflictRecord",
+      "JobAssociation",
+      "TransactionResult",
+      "MigrationState"
+    ],
+    "functions": [
+      "searchFacts",
+      "getFact",
+      "upsertFact",
+      "verifyFact",
+      "addEvidence",
+      "addRelationship",
+      "findCandidateMatches",
+      "recordJobMatch",
+      "findConflicts"
+    ]
+  },
+  "verification_states": [
+    "source_stated",
+    "user_verified",
+    "inferred",
+    "unknown",
+    "explicitly_missing",
+    "conflicted"
+  ],
+  "relationship_types": [
+    "alias",
+    "equivalent",
+    "related",
+    "contradicts"
+  ],
+  "resolution_states": [
+    "exact_match",
+    "alias_match",
+    "verified_fact_match",
+    "related_match",
+    "possible_match",
+    "unknown",
+    "explicitly_missing",
+    "conflicted"
+  ],
+  "forbidden_public_api": [
+    "executeSql",
+    "runQuery",
+    "rawQuery",
+    "queryDatabase",
+    "truncateTable",
+    "deleteEvidence",
+    "askUser",
+    "renderResume"
+  ],
+  "forbidden_dependencies": [
+    "resume-cli",
+    "career-mcp",
+    "resume-plugin",
+    "resume-render",
+    "resume-agent",
+    "terminal UI",
+    "LLM runtimes"
+  ],
+  "authority": [
+    "facts",
+    "evidence",
+    "relationships",
+    "verification_state",
+    "conflicts",
+    "job_associations",
+    "confirmation_history",
+    "preference_history",
+    "migrations",
+    "transactions"
+  ],
+  "must_not": [
+    "expose raw SQL execution",
+    "silently promote inferred facts to user_verified",
+    "ask natural-language questions",
+    "render resumes",
+    "change resume files",
+    "import delivery adapters"
+  ],
+  "surfaces": [
+    {
+      "name": "searchFacts",
+      "description": "Search facts by concept, normalized terms, aliases, and filters with deterministic ordering.",
+      "input_contract": {
+        "required_fields": ["query"],
+        "optional_fields": ["filters", "limit", "include_evidence"]
+      },
+      "output_contract": {
+        "required_fields": ["schema_version", "status", "facts", "query", "audit"],
+        "must_not_include": ["raw_sql", "connection", "internal_rows"]
+      }
+    },
+    {
+      "name": "getFact",
+      "description": "Fetch one fact with minimum necessary evidence, relationships, conflicts, and verification state.",
+      "input_contract": {
+        "required_fields": ["fact_id"]
+      },
+      "output_contract": {
+        "required_fields": ["schema_version", "status", "fact", "evidence", "relationships", "conflicts", "audit"],
+        "must_not_include": ["raw_sql", "connection"]
+      }
+    },
+    {
+      "name": "upsertFact",
+      "description": "Create or update a fact with dedupe, conflict detection, verification-state policy, and audit metadata.",
+      "input_contract": {
+        "required_fields": ["fact", "evidence", "source", "policy"]
+      },
+      "output_contract": {
+        "required_fields": ["schema_version", "status", "mutation_status", "fact_id", "verification_state", "conflicts", "confirmation_required", "audit"],
+        "must_not_include": ["raw_sql", "silent_user_verified_promotion"]
+      }
+    },
+    {
+      "name": "verifyFact",
+      "description": "Set fact verification state only through explicit policy and confirmation rules.",
+      "input_contract": {
+        "required_fields": ["fact_id", "verification_state", "confirmation", "source"]
+      },
+      "output_contract": {
+        "required_fields": ["schema_version", "status", "mutation_status", "fact_id", "verification_state", "conflicts", "confirmation_required", "audit"],
+        "must_not_include": ["raw_sql", "implicit_confirmation"]
+      }
+    },
+    {
+      "name": "addEvidence",
+      "description": "Append evidence to a fact without destructive overwrite.",
+      "input_contract": {
+        "required_fields": ["fact_id", "evidence", "source"]
+      },
+      "output_contract": {
+        "required_fields": ["schema_version", "status", "mutation_status", "fact_id", "verification_state", "conflicts", "confirmation_required", "audit"],
+        "must_not_include": ["raw_sql", "destructive_delete"]
+      }
+    },
+    {
+      "name": "addRelationship",
+      "description": "Add alias, equivalent, related, or contradiction relationships with policy and evidence/rationale.",
+      "input_contract": {
+        "required_fields": ["from_fact_id", "to_fact_id", "relationship_type", "evidence_or_rationale", "policy"]
+      },
+      "output_contract": {
+        "required_fields": ["schema_version", "status", "mutation_status", "fact_id", "relationship_id", "verification_state", "conflicts", "confirmation_required", "audit"],
+        "must_not_include": ["raw_sql", "related_as_equivalent_without_policy"]
+      }
+    },
+    {
+      "name": "findCandidateMatches",
+      "description": "Match job requirements to stored facts while distinguishing exact, alias, related, possible, unknown, missing, and conflicted states.",
+      "input_contract": {
+        "required_fields": ["requirements", "policy"],
+        "optional_fields": ["job_id", "include_evidence"]
+      },
+      "output_contract": {
+        "required_fields": ["schema_version", "status", "matches", "unresolved", "conflicts", "audit"],
+        "must_not_include": ["official_score", "raw_sql"]
+      }
+    },
+    {
+      "name": "recordJobMatch",
+      "description": "Record which facts were used for a job requirement without mutating resumes or polluting base state.",
+      "input_contract": {
+        "required_fields": ["job_id", "requirement_id", "fact_ids", "resolution_state"]
+      },
+      "output_contract": {
+        "required_fields": ["schema_version", "status", "mutation_status", "job_match_id", "audit"],
+        "must_not_include": ["resume_patch", "raw_sql"]
+      }
+    },
+    {
+      "name": "findConflicts",
+      "description": "Return contradictory facts and conflict details without overwriting truth history.",
+      "input_contract": {
+        "required_fields": ["fact_or_claim"],
+        "optional_fields": ["scope"]
+      },
+      "output_contract": {
+        "required_fields": ["schema_version", "status", "conflicts", "audit"],
+        "must_not_include": ["destructive_resolution", "raw_sql"]
+      }
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+Daniel Candidate
+Senior Software Developer
+
+Summary
+Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building “clean, reliable” product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps.
+
+Experience
+Example SaaS Co. - Senior Software Developer
+Jan 2018 - Present
+* Built React and TypeScript interfaces for multi-tenant SaaS workflows used by operations teams.
+* Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting.
+◦ Led a small team of three developers through delivery planning, code review, and release coordination.
+* Improved front-end reliability for responsive web apps across desktop and mobile browsers.
+
+AutomationWorks - Software Developer
+2013 to Dec 2017
+* Built Node.js services backed by PostgreSQL for workflow automation and data-processing tools.
+* Integrated Azure services for deployment, monitoring, and application operations.
+* Partnered with product and support teams to simplify internal processes and reduce manual handoffs.
+
+Skills
+React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, SaaS, workflow automation, responsive web apps, team leadership
+
+Education
+B.S. Computer Science

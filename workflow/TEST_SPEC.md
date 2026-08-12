@@ -33,6 +33,7 @@ No checkpoint may be skipped because an agent output appears plausible.
 
 Tests should expect workflow artifacts around:
 
+- shared run manifest DTO and JSON schema definitions in `workflow.schemas`
 - run manifest
 - stage state
 - checkpoints
@@ -143,4 +144,3 @@ The E2E workflow must prove:
 - second Job B run using same career DB,
 - optional preference learning boundaries,
 - interruption recovery.
-

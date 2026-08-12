@@ -1,0 +1,11 @@
+{
+  "fixture_id": "selection-plan",
+  "schema_version": "expected-snapshot.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "selection is deterministic for the same state and config",
+    "verified facts and requirement IDs are traceable",
+    "section and bullet limits come from config"
+  ]
+}

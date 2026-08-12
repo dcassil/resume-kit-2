@@ -1,0 +1,46 @@
+#!/usr/bin/env sh
+set -eu
+
+if [ -x tools/pre-commit-career-mcp-guardrails.sh ]; then
+  tools/pre-commit-career-mcp-guardrails.sh
+fi
+
+if [ -x tools/pre-commit-career-store-guardrails.sh ]; then
+  tools/pre-commit-career-store-guardrails.sh
+fi
+
+if [ -x tools/pre-commit-resume-core-guardrails.sh ]; then
+  tools/pre-commit-resume-core-guardrails.sh
+fi
+
+if [ -x tools/pre-commit-resume-agent-guardrails.sh ]; then
+  tools/pre-commit-resume-agent-guardrails.sh
+fi
+
+if [ -x tools/pre-commit-resume-render-guardrails.sh ]; then
+  tools/pre-commit-resume-render-guardrails.sh
+fi
+
+if [ -x tools/pre-commit-resume-cli-guardrails.sh ]; then
+  tools/pre-commit-resume-cli-guardrails.sh
+fi
+
+if [ -x tools/pre-commit-resume-plugin-guardrails.sh ]; then
+  tools/pre-commit-resume-plugin-guardrails.sh
+fi
+
+if [ -x tools/pre-commit-workflow-guardrails.sh ]; then
+  tools/pre-commit-workflow-guardrails.sh
+fi
+
+if [ -x tools/pre-commit-fixtures-guardrails.sh ]; then
+  tools/pre-commit-fixtures-guardrails.sh
+fi
+
+if [ -x tools/pre-commit-tests-guardrails.sh ]; then
+  tools/pre-commit-tests-guardrails.sh
+fi
+
+if [ -x tools/pre-commit-tools-guardrails.sh ]; then
+  tools/pre-commit-tools-guardrails.sh
+fi

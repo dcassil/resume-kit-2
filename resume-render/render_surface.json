@@ -1,0 +1,244 @@
+{
+  "contract_version": 1,
+  "package": "resume-render",
+  "purpose": "Semantic-neutral rendering layer for validated canonical resumes. It formats, exports, measures layout, and validates rendered output without changing career truth.",
+  "public_api": {
+    "module": "resume_render",
+    "functions": [
+      "renderMarkdown",
+      "renderDocx",
+      "renderPdf",
+      "measureLayout",
+      "validateRenderedOutput"
+    ],
+    "style": "Functions may be synchronous or asynchronous. Render functions return RenderResult DTOs; layout functions return LayoutReport DTOs; validation functions return RenderValidationReport DTOs."
+  },
+  "render_formats": [
+    "markdown",
+    "docx",
+    "pdf"
+  ],
+  "required_result_fields": [
+    "status",
+    "format",
+    "template_version",
+    "semantic_fingerprint",
+    "warnings"
+  ],
+  "non_responsibilities": [
+    "semantic_rewrite",
+    "relevance_selection",
+    "skill_addition",
+    "date_change",
+    "match_scoring",
+    "career_knowledge_query",
+    "resume_change_application",
+    "resume_file_mutation"
+  ],
+  "surfaces": [
+    {
+      "name": "renderMarkdown",
+      "description": "Render a validated canonical resume to Markdown/text while preserving semantic content, section order, titles, dates, skill names, and bullet meaning.",
+      "input_contract": {
+        "required": [
+          "resume",
+          "template"
+        ],
+        "properties": {
+          "resume": {
+            "type": "object"
+          },
+          "template": {
+            "type": "object"
+          }
+        }
+      },
+      "output_contract": {
+        "result_type": "RenderResult",
+        "format": "markdown",
+        "required_fields": [
+          "status",
+          "format",
+          "content",
+          "sections",
+          "template_version",
+          "semantic_fingerprint",
+          "warnings"
+        ],
+        "must_preserve": [
+          "employment_titles",
+          "dates",
+          "skills",
+          "bullets",
+          "section_order"
+        ],
+        "must_not_include": [
+          "internal_provenance_metadata",
+          "unsupported_aws",
+          "unsupported_graphql",
+          "staff_title_inflation",
+          "unsupported_metrics",
+          "unsupported_management_scope",
+          "official_score"
+        ]
+      }
+    },
+    {
+      "name": "renderDocx",
+      "description": "Render a validated canonical resume to DOCX while preserving semantic content and reporting template version metadata.",
+      "input_contract": {
+        "required": [
+          "resume",
+          "template"
+        ],
+        "properties": {
+          "resume": {
+            "type": "object"
+          },
+          "template": {
+            "type": "object"
+          }
+        }
+      },
+      "output_contract": {
+        "result_type": "RenderResult",
+        "format": "docx",
+        "required_fields": [
+          "status",
+          "format",
+          "artifact",
+          "sections",
+          "template_version",
+          "semantic_fingerprint",
+          "warnings"
+        ],
+        "must_preserve": [
+          "employment_titles",
+          "dates",
+          "skills",
+          "bullets",
+          "section_order"
+        ],
+        "must_not_include": [
+          "internal_provenance_metadata",
+          "semantic_rewrite",
+          "official_score"
+        ]
+      }
+    },
+    {
+      "name": "renderPdf",
+      "description": "Render a PDF artifact when the environment and template support it. Unsupported PDF output must be reported explicitly without breaking non-PDF release targets when policy allows.",
+      "input_contract": {
+        "required": [
+          "resume",
+          "template"
+        ],
+        "properties": {
+          "resume": {
+            "type": "object"
+          },
+          "template": {
+            "type": "object"
+          }
+        }
+      },
+      "output_contract": {
+        "result_type": "RenderResult",
+        "format": "pdf",
+        "required_fields": [
+          "status",
+          "format",
+          "template_version",
+          "semantic_fingerprint",
+          "warnings"
+        ],
+        "allowed_statuses": [
+          "ok",
+          "unsupported",
+          "error"
+        ],
+        "must_not_include": [
+          "semantic_rewrite",
+          "official_score"
+        ]
+      }
+    },
+    {
+      "name": "measureLayout",
+      "description": "Estimate pages and report layout pressure. Overflow returns constraints; renderer must not silently shorten content to fit.",
+      "input_contract": {
+        "required": [
+          "resume",
+          "template"
+        ],
+        "properties": {
+          "resume": {
+            "type": "object"
+          },
+          "template": {
+            "type": "object"
+          }
+        }
+      },
+      "output_contract": {
+        "result_type": "LayoutReport",
+        "required_fields": [
+          "status",
+          "estimated_pages",
+          "target_pages",
+          "required_reduction",
+          "constraints",
+          "warnings"
+        ],
+        "allowed_statuses": [
+          "fits",
+          "overflow",
+          "error"
+        ],
+        "overflow_required_fields": [
+          "estimated_pages",
+          "target_pages",
+          "required_reduction"
+        ]
+      }
+    },
+    {
+      "name": "validateRenderedOutput",
+      "description": "Validate rendered artifacts with parse-back/ATS checks and report missing text, unsupported characters, missing headings, unreadable output, or material semantic loss.",
+      "input_contract": {
+        "required": [
+          "file"
+        ],
+        "properties": {
+          "file": {
+            "type": [
+              "string",
+              "object"
+            ]
+          },
+          "expected_resume": {
+            "type": "object"
+          }
+        }
+      },
+      "output_contract": {
+        "result_type": "RenderValidationReport",
+        "required_fields": [
+          "status",
+          "format",
+          "text_extracted",
+          "missing_sections",
+          "unsupported_characters",
+          "semantic_differences",
+          "warnings"
+        ],
+        "allowed_statuses": [
+          "pass",
+          "fail",
+          "unsupported"
+        ]
+      }
+    }
+  ]
+}

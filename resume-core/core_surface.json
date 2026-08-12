@@ -1,0 +1,190 @@
+{
+  "contract_version": 1,
+  "package": "resume-core",
+  "purpose": "Deterministic domain truth engine for canonical resume/job schemas, normalization, scoring, selection, change validation/application, grounding, and final validation.",
+  "public_api": {
+    "types": [
+      "CanonicalResume",
+      "ResumeField",
+      "JobModel",
+      "JobRequirement",
+      "MatchResult",
+      "ResolutionState",
+      "ResumeChangeOperation",
+      "VerificationState"
+    ],
+    "functions": [
+      "normalizeResume",
+      "validateResume",
+      "sanitizeText",
+      "normalizeJobModel",
+      "scoreMatch",
+      "getUnresolvedRequirements",
+      "rankResumeContent",
+      "validateChange",
+      "applyChange",
+      "validateGrounding",
+      "validateFinalResume"
+    ]
+  },
+  "forbidden_dependencies": [
+    "resume-cli",
+    "career-mcp",
+    "resume-plugin",
+    "resume-render",
+    "resume-agent",
+    "career-store implementation",
+    "sqlite adapters",
+    "LLM runtimes",
+    "terminal UI"
+  ],
+  "authority": [
+    "canonical_schema_validation",
+    "resume_normalization",
+    "job_normalization",
+    "ats_sanitation",
+    "date_normalization",
+    "duplicate_detection",
+    "requirement_resolution",
+    "official_scoring",
+    "selection_planning",
+    "change_validation",
+    "change_application",
+    "grounding_validation",
+    "final_validation"
+  ],
+  "must_not": [
+    "read arbitrary resume/job files",
+    "write workspace resume artifacts directly",
+    "call LLMs or agent runtimes",
+    "call MCP tools",
+    "render output artifacts",
+    "persist career facts",
+    "advance workflow checkpoints"
+  ],
+  "surfaces": [
+    {
+      "name": "normalizeResume",
+      "description": "Normalize parsed resume input into a canonical resume without adding unsupported facts.",
+      "input_contract": {
+        "required_fields": ["source_resume", "config"],
+        "must_include": ["source_text_or_structured_resume"],
+        "must_not_include": ["file_path_only", "agent_authority"]
+      },
+      "output_contract": {
+        "required_fields": ["schema_version", "status", "canonical_resume", "warnings", "provenance_map"],
+        "must_not_include": ["unsupported_claims", "persistence_status", "rendered_output"]
+      }
+    },
+    {
+      "name": "validateResume",
+      "description": "Validate canonical resume shape, required fields, verification states, provenance, and semantic constraints.",
+      "input_contract": {
+        "required_fields": ["canonical_resume"]
+      },
+      "output_contract": {
+        "required_fields": ["schema_version", "status", "errors", "warnings"],
+        "must_not_include": ["traceback", "database_rows"]
+      }
+    },
+    {
+      "name": "sanitizeText",
+      "description": "Normalize ATS-hostile text characters and report unsupported controls without changing meaning.",
+      "input_contract": {
+        "required_fields": ["text"]
+      },
+      "output_contract": {
+        "required_fields": ["schema_version", "status", "text", "warnings"],
+        "must_not_include": ["new_claims"]
+      }
+    },
+    {
+      "name": "normalizeJobModel",
+      "description": "Normalize job requirements with deterministic requirement IDs, classifications, weights, source text, and normalized terms.",
+      "input_contract": {
+        "required_fields": ["source_job", "config"]
+      },
+      "output_contract": {
+        "required_fields": ["schema_version", "status", "job_model", "warnings"],
+        "must_not_include": ["resume_changes", "workflow_transition"]
+      }
+    },
+    {
+      "name": "scoreMatch",
+      "description": "Produce deterministic official match scoring and requirement-level explanations from supplied resume, job, fact DTOs, and config.",
+      "input_contract": {
+        "required_fields": ["canonical_resume", "job_model", "career_fact_dtos", "config"]
+      },
+      "output_contract": {
+        "required_fields": ["schema_version", "status", "match_result"],
+        "must_not_include": ["agent_reasoning_only_score", "database_queries"]
+      }
+    },
+    {
+      "name": "getUnresolvedRequirements",
+      "description": "Return unresolved requirements and continuation gates without advancing workflow state.",
+      "input_contract": {
+        "required_fields": ["match_result", "policy"]
+      },
+      "output_contract": {
+        "required_fields": ["schema_version", "status", "unresolved_requirements", "can_continue"],
+        "must_not_include": ["checkpoint_write", "user_question"]
+      }
+    },
+    {
+      "name": "rankResumeContent",
+      "description": "Build a deterministic selection plan/ranking while preserving configured structural limits and base resume immutability.",
+      "input_contract": {
+        "required_fields": ["canonical_resume", "job_model", "match_result", "config"]
+      },
+      "output_contract": {
+        "required_fields": ["schema_version", "status", "selection_plan", "ranked_content"],
+        "must_not_include": ["applied_resume", "agent_override"]
+      }
+    },
+    {
+      "name": "validateChange",
+      "description": "Validate proposed resume change operations against current content, linked requirements, linked facts, policy, and provenance.",
+      "input_contract": {
+        "required_fields": ["canonical_resume", "operation", "job_model", "career_fact_dtos", "policy"]
+      },
+      "output_contract": {
+        "required_fields": ["schema_version", "status", "operation_id", "validation_state", "errors", "grounding"],
+        "must_not_include": ["applied_resume", "persistence_status"]
+      }
+    },
+    {
+      "name": "applyChange",
+      "description": "Apply only validated resume change operations and return audit-ready application data.",
+      "input_contract": {
+        "required_fields": ["working_resume", "validated_operation"]
+      },
+      "output_contract": {
+        "required_fields": ["schema_version", "status", "working_resume", "operation_id", "audit"],
+        "must_not_include": ["base_resume_mutation", "unvalidated_operation"]
+      }
+    },
+    {
+      "name": "validateGrounding",
+      "description": "Verify final working resume claims are grounded in allowed source, fact, and operation provenance.",
+      "input_contract": {
+        "required_fields": ["working_resume", "career_fact_dtos", "applied_operations", "policy"]
+      },
+      "output_contract": {
+        "required_fields": ["schema_version", "status", "unsupported_claims", "missing_provenance", "warnings"],
+        "must_not_include": ["rendered_output", "database_writes"]
+      }
+    },
+    {
+      "name": "validateFinalResume",
+      "description": "Run final deterministic validation over a working resume and match result before rendering/export.",
+      "input_contract": {
+        "required_fields": ["working_resume", "job_model", "career_fact_dtos", "config"]
+      },
+      "output_contract": {
+        "required_fields": ["schema_version", "status", "final_resume", "match_result", "errors", "warnings"],
+        "must_not_include": ["rendered_output", "workflow_completion_write"]
+      }
+    }
+  ]
+}

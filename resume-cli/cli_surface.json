@@ -1,0 +1,305 @@
+{
+  "contract_version": 1,
+  "package": "resume-cli",
+  "purpose": "Local reference orchestrator. The CLI initializes workspaces, accepts inputs, calls package APIs in order, persists workflow artifacts, asks questions, shows reports, invokes render/export, and enforces checkpoints without duplicating domain ownership.",
+  "public_api": {
+    "module": "resume_cli",
+    "functions": [
+      "main"
+    ],
+    "entrypoint": "resume",
+    "style": "main(argv=None, cwd=None, stdin=None, stdout=None, stderr=None) returns a command result or process-style integer exit code. Commands may be synchronous or asynchronous behind the public entrypoint."
+  },
+  "required_commands": [
+    "resume init",
+    "resume ingest <file>",
+    "resume job ingest <file-or-url-text>",
+    "resume match",
+    "resume resolve",
+    "resume tailor",
+    "resume validate",
+    "resume export --format docx",
+    "resume run <resume> <job>",
+    "resume inspect fact <id>",
+    "resume inspect requirement <id>",
+    "resume audit"
+  ],
+  "expected_workspace": [
+    "config.json",
+    "resume/base.json",
+    "resume/working.json",
+    "job/current.json",
+    "data/career.db",
+    "operations/",
+    "reports/",
+    "output/"
+  ],
+  "canonical_checkpoints": [
+    "INIT",
+    "INGEST_RESUME",
+    "VALIDATE_BASE",
+    "EXTRACT_PERSIST_CAREER_FACTS",
+    "INGEST_JOB",
+    "NORMALIZE_JOB",
+    "MATCH_BASE",
+    "RESOLVE_GAPS",
+    "BUILD_SELECTION_PLAN",
+    "PROPOSE_TAILORING_CHANGES",
+    "VALIDATE_CHANGES",
+    "APPLY_CHANGES",
+    "FINAL_MATCH",
+    "GROUNDING_AUDIT",
+    "ATS_STRUCTURE_VALIDATION",
+    "RENDER",
+    "RENDER_VALIDATION",
+    "COMPLETE"
+  ],
+  "allowed_dependencies": [
+    "resume-core public APIs",
+    "career-store public service APIs",
+    "career-mcp abstractions",
+    "resume-agent proposal APIs",
+    "resume-render public APIs",
+    "workflow public APIs"
+  ],
+  "forbidden_responsibilities": [
+    "independent_scoring_logic",
+    "direct_career_db_table_writes",
+    "private_resume_mutation_application",
+    "duplicated_domain_schemas",
+    "renderer_semantic_changes",
+    "plugin_host_behavior",
+    "agent_truth_authority",
+    "checkpoint_skipping"
+  ],
+  "commands": [
+    {
+      "name": "init",
+      "argv": [
+        "init"
+      ],
+      "description": "Create the workspace, write valid default config, prepare/migrate career-store database through career-store APIs, record versions, and safely tolerate reruns.",
+      "creates_or_prepares": [
+        "config.json",
+        "resume/",
+        "job/",
+        "data/career.db",
+        "operations/",
+        "reports/",
+        "output/"
+      ],
+      "must_not": [
+        "destroy_existing_data",
+        "write_career_db_tables_directly"
+      ],
+      "result_fields": [
+        "status",
+        "workspace",
+        "config_version",
+        "schema_versions",
+        "migrations",
+        "warnings"
+      ]
+    },
+    {
+      "name": "ingest_resume",
+      "argv": [
+        "ingest",
+        "<file>"
+      ],
+      "description": "Accept a resume fixture, call core validation/sanitation, persist base and working artifacts, record base hash, and persist candidate career facts through career-store.",
+      "checkpoints": [
+        "INGEST_RESUME",
+        "VALIDATE_BASE",
+        "EXTRACT_PERSIST_CAREER_FACTS"
+      ],
+      "outputs": [
+        "resume/base.json",
+        "resume/working.json"
+      ],
+      "must_not": [
+        "allow_agent_generated_unsupported_content_into_base",
+        "mutate_existing_base_without_explicit_reingest",
+        "write_career_db_tables_directly"
+      ]
+    },
+    {
+      "name": "ingest_job",
+      "argv": [
+        "job",
+        "ingest",
+        "<file-or-url-text>"
+      ],
+      "description": "Accept a job description, call core job normalization, retain source text, classify requirement types, and persist job/current.json.",
+      "checkpoints": [
+        "INGEST_JOB",
+        "NORMALIZE_JOB"
+      ],
+      "outputs": [
+        "job/current.json"
+      ],
+      "must_not": [
+        "drop_requirement_source_text",
+        "duplicate_core_job_schema"
+      ]
+    },
+    {
+      "name": "match",
+      "argv": [
+        "match"
+      ],
+      "description": "Run official scoring through resume-core, search career facts through store/MCP, emit deterministic requirement-level reasoning, and route hard unresolved requirements to resolution policy.",
+      "checkpoints": [
+        "MATCH_BASE"
+      ],
+      "must_not": [
+        "compute_independent_score",
+        "hide_unresolved_hard_requirements",
+        "treat_related_as_exact"
+      ]
+    },
+    {
+      "name": "resolve",
+      "argv": [
+        "resolve"
+      ],
+      "description": "Use deterministic code ranking for unresolved topics, agent phrasing only, structured answer interpretation, career-store persistence after explicit confirmation, and match reruns.",
+      "checkpoints": [
+        "RESOLVE_GAPS",
+        "MATCH_BASE"
+      ],
+      "must_not": [
+        "let_agent_choose_official_topic",
+        "persist_without_explicit_confirmation",
+        "skip_match_rerun"
+      ]
+    },
+    {
+      "name": "tailor",
+      "argv": [
+        "tailor"
+      ],
+      "description": "Build deterministic selection plan, invoke agent rewrite proposals, persist operations separately, validate through core, apply only valid operations to working resume, and audit rejections.",
+      "checkpoints": [
+        "BUILD_SELECTION_PLAN",
+        "PROPOSE_TAILORING_CHANGES",
+        "VALIDATE_CHANGES",
+        "APPLY_CHANGES"
+      ],
+      "must_not": [
+        "mutate_resume_base",
+        "apply_operations_without_core_validation",
+        "drop_rejected_operations_from_audit"
+      ]
+    },
+    {
+      "name": "validate",
+      "argv": [
+        "validate"
+      ],
+      "description": "Run final match, grounding audit, ATS checks, structure/length checks, repetition checks, inferred-fact rejection, and unresolved-requirement truth checks.",
+      "checkpoints": [
+        "FINAL_MATCH",
+        "GROUNDING_AUDIT",
+        "ATS_STRUCTURE_VALIDATION"
+      ],
+      "must_not": [
+        "trust_agent_final_answer_without_checks",
+        "mark_unresolved_requirement_resolved",
+        "allow_unverified_inferred_final_claim"
+      ]
+    },
+    {
+      "name": "export",
+      "argv": [
+        "export",
+        "--format",
+        "docx"
+      ],
+      "description": "Invoke renderer, write Markdown and DOCX targets, record template version, handle overflow by returning to selection/rewrite, and run render validation.",
+      "checkpoints": [
+        "RENDER",
+        "RENDER_VALIDATION"
+      ],
+      "outputs": [
+        "output/"
+      ],
+      "must_not": [
+        "truncate_to_fit",
+        "rewrite_semantic_content_in_renderer_path",
+        "skip_render_validation"
+      ]
+    },
+    {
+      "name": "run",
+      "argv": [
+        "run",
+        "<resume>",
+        "<job>"
+      ],
+      "description": "Execute the same checkpoint sequence as individual commands and produce equivalent artifacts for equivalent state/config.",
+      "checkpoints": [
+        "INIT",
+        "INGEST_RESUME",
+        "VALIDATE_BASE",
+        "EXTRACT_PERSIST_CAREER_FACTS",
+        "INGEST_JOB",
+        "NORMALIZE_JOB",
+        "MATCH_BASE",
+        "RESOLVE_GAPS",
+        "BUILD_SELECTION_PLAN",
+        "PROPOSE_TAILORING_CHANGES",
+        "VALIDATE_CHANGES",
+        "APPLY_CHANGES",
+        "FINAL_MATCH",
+        "GROUNDING_AUDIT",
+        "ATS_STRUCTURE_VALIDATION",
+        "RENDER",
+        "RENDER_VALIDATION",
+        "COMPLETE"
+      ],
+      "must_not": [
+        "skip_validation_due_to_agent_output",
+        "produce_different_artifacts_than_explicit_sequence"
+      ]
+    },
+    {
+      "name": "inspect_fact",
+      "argv": [
+        "inspect",
+        "fact",
+        "<id>"
+      ],
+      "description": "Show fact, verification state, evidence, relationships, and conflicts through store/MCP public APIs.",
+      "must_not": [
+        "query_career_db_tables_directly",
+        "hide_unverified_state"
+      ]
+    },
+    {
+      "name": "inspect_requirement",
+      "argv": [
+        "inspect",
+        "requirement",
+        "<id>"
+      ],
+      "description": "Show requirement source text, normalized terms, resolution state, and evidence through core/workflow public reports.",
+      "must_not": [
+        "invent_requirement_resolution",
+        "drop_source_text"
+      ]
+    },
+    {
+      "name": "audit",
+      "argv": [
+        "audit"
+      ],
+      "description": "Reconstruct run identity, config hash, versions, scores, questions, facts, operations, validations, and outputs from workflow/report artifacts.",
+      "must_not": [
+        "omit_rejected_operations",
+        "omit_fact_changes",
+        "omit_validation_outcomes"
+      ]
+    }
+  ]
+}

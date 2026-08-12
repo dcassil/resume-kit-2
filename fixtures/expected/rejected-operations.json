@@ -1,0 +1,13 @@
+{
+  "fixture_id": "rejected-operations",
+  "schema_version": "expected-snapshot.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "unsupported scale rejected",
+    "unsupported management scope rejected",
+    "title inflation rejected",
+    "AWS years inflation rejected",
+    "Azure as proof of AWS rejected"
+  ]
+}

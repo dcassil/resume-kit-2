@@ -1,0 +1,10 @@
+{
+  "fixture_id": "invalid-years-inflation",
+  "schema_version": "operation-fixture.v1",
+  "target_path": "/skills",
+  "before": "AWS experience, six years",
+  "after": "AWS experience, ten years",
+  "expected_status": "rejected",
+  "expected_reason": "years_inflation",
+  "notes": "AWS answer fixture supports about six years, not ten."
+}

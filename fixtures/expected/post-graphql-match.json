@@ -1,0 +1,11 @@
+{
+  "fixture_id": "post-graphql-match",
+  "schema_version": "expected-snapshot.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "GraphQL resolves from explicit user answer",
+    "around five years is preserved",
+    "production API context is recorded only to the level supported by answer evidence"
+  ]
+}

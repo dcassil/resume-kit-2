@@ -1,0 +1,10 @@
+{
+  "fixture_id": "invalid-unsupported-management",
+  "schema_version": "operation-fixture.v1",
+  "target_path": "/experience/0/bullets/1",
+  "before": "Led a small team of three developers.",
+  "after": "Managed 30 engineers across multiple delivery teams.",
+  "expected_status": "rejected",
+  "expected_reason": "unsupported_management_scope",
+  "notes": "Small-team leadership is supported; management of 30 engineers is not."
+}

@@ -1,0 +1,11 @@
+{
+  "fixture_id": "normalized-resume",
+  "schema_version": "expected-snapshot.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "contains React, TypeScript, Node.js, PostgreSQL, Azure, REST/API work, workflow automation, responsive web apps",
+    "does not contain AWS, GraphQL, Staff Software Engineer, unsupported scale, or unsupported management scope",
+    "formatting noise is normalized or reported deterministically"
+  ]
+}

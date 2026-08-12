@@ -1,0 +1,11 @@
+{
+  "fixture_id": "post-aws-match",
+  "schema_version": "expected-snapshot.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "AWS preferred requirement resolves from explicit user answer",
+    "six years is preserved",
+    "match reruns after fact verification"
+  ]
+}

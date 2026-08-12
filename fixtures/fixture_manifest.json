@@ -1,0 +1,130 @@
+{
+  "schema_version": "fixtures.v1",
+  "config_hash": "fixture-config-v1",
+  "fixture_set_id": "resume-kit-contract-fixtures-v1",
+  "required_directories": [
+    "resumes",
+    "jobs",
+    "answers",
+    "operations",
+    "expected",
+    "migrations"
+  ],
+  "resume_fixture": {
+    "id": "resume-main",
+    "path": "resumes/resume-main.txt",
+    "must_include": [
+      "Senior Software Developer",
+      "12 years",
+      "full-stack",
+      "SaaS",
+      "React",
+      "TypeScript",
+      "Node.js",
+      "PostgreSQL",
+      "Azure",
+      "REST APIs",
+      "workflow automation",
+      "responsive web apps",
+      "small team"
+    ],
+    "must_not_include": [
+      "AWS",
+      "GraphQL",
+      "responsive design",
+      "Staff Software Engineer",
+      "20 million users",
+      "30 direct reports",
+      "30 engineers",
+      "global scale"
+    ],
+    "formatting_noise": [
+      "smart_quotes",
+      "non_breaking_space",
+      "odd_bullet",
+      "inconsistent_date"
+    ]
+  },
+  "job_fixtures": [
+    {
+      "id": "job-a",
+      "path": "jobs/job-a-staff-software-engineer.txt",
+      "title": "Staff Software Engineer",
+      "required_terms": [
+        "8+ years",
+        "React",
+        "TypeScript",
+        "API architecture/design",
+        "responsive design",
+        "SaaS"
+      ],
+      "preferred_terms": [
+        "AWS",
+        "GraphQL",
+        "technical leadership"
+      ]
+    },
+    {
+      "id": "job-b",
+      "path": "jobs/job-b-senior-full-stack-engineer.txt",
+      "title": "Senior Full Stack Engineer",
+      "required_terms": [
+        "React",
+        "Node.js",
+        "GraphQL",
+        "AWS"
+      ],
+      "preferred_terms": [
+        "PostgreSQL",
+        "SaaS"
+      ]
+    }
+  ],
+  "answer_fixtures": [
+    {
+      "id": "answer-aws",
+      "path": "answers/aws.txt",
+      "exact_text": "Yes. I have about six years of AWS experience, mainly EC2, S3, Lambda, RDS, and IAM."
+    },
+    {
+      "id": "answer-graphql",
+      "path": "answers/graphql.txt",
+      "exact_text": "Yes, around five years. I've built and maintained GraphQL APIs in production."
+    },
+    {
+      "id": "answer-architecture",
+      "path": "answers/architecture.txt",
+      "exact_text": "I've designed APIs and application architecture for more than ten years, but I haven't had Staff Engineer as my formal title."
+    }
+  ],
+  "canonical_paths": [
+    "/summary",
+    "/experience/0/title",
+    "/experience/0/bullets/0",
+    "/experience/0/bullets/1",
+    "/experience/1/bullets/0",
+    "/skills"
+  ],
+  "invalid_operations": [
+    "operations/invalid-unsupported-scale.json",
+    "operations/invalid-unsupported-management.json",
+    "operations/invalid-title-inflation.json",
+    "operations/invalid-years-inflation.json",
+    "operations/invalid-related-skill-overreach.json"
+  ],
+  "expected_snapshots": [
+    "expected/normalized-resume.json",
+    "expected/normalized-job-a.json",
+    "expected/normalized-job-b.json",
+    "expected/initial-job-a-match.json",
+    "expected/post-aws-match.json",
+    "expected/post-graphql-match.json",
+    "expected/final-job-a-match.json",
+    "expected/job-b-initial-match.json",
+    "expected/selection-plan.json",
+    "expected/valid-operations.json",
+    "expected/rejected-operations.json",
+    "expected/run-manifest.json",
+    "expected/audit-report.json"
+  ]
+}

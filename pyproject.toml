@@ -1,0 +1,76 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "resume-kit"
+version = "0.0.0"
+description = "Contract-first resume tailoring platform."
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.setuptools]
+packages = [
+  "resume_core",
+  "career_store",
+  "career_mcp",
+  "resume_agent",
+  "resume_cli",
+  "resume_plugin",
+  "resume_render",
+  "workflow",
+]
+
+[tool.setuptools.package-dir]
+resume_core = "resume-core/resume_core"
+career_store = "career-store/career_store"
+career_mcp = "career-mcp/career_mcp"
+resume_agent = "resume-agent/resume_agent"
+resume_cli = "resume-cli/resume_cli"
+resume_plugin = "resume-plugin/resume_plugin"
+resume_render = "resume-render/resume_render"
+workflow = "workflow"
+
+[tool."resume-kit"]
+canonical_test_command = "python3 tools/run_gate.py --pr --root ."
+future_contract_command = "python3 -m unittest discover -s tests/contract"
+
+[[tool."resume-kit".packages]]
+folder = "resume-core"
+import_name = "resume_core"
+owns = "Deterministic schemas, normalization, validation, scoring, grounding, selection, and change application."
+
+[[tool."resume-kit".packages]]
+folder = "career-store"
+import_name = "career_store"
+owns = "SQLite career facts, evidence, verification state, relationships, migrations, and transactions."
+
+[[tool."resume-kit".packages]]
+folder = "career-mcp"
+import_name = "career_mcp"
+owns = "Narrow semantic MCP surface over career-store."
+
+[[tool."resume-kit".packages]]
+folder = "resume-agent"
+import_name = "resume_agent"
+owns = "Schema-constrained semantic extraction, question, answer, and rewrite proposals."
+
+[[tool."resume-kit".packages]]
+folder = "resume-cli"
+import_name = "resume_cli"
+owns = "Local reference orchestration and command surface."
+
+[[tool."resume-kit".packages]]
+folder = "resume-plugin"
+import_name = "resume_plugin"
+owns = "Host/plugin adapter mapping and presentation."
+
+[[tool."resume-kit".packages]]
+folder = "resume-render"
+import_name = "resume_render"
+owns = "Semantic-neutral Markdown, DOCX, and PDF rendering plus render validation."
+
+[[tool."resume-kit".packages]]
+folder = "workflow"
+import_name = "workflow"
+owns = "Cross-package state machine, checkpoints, run manifests, audit, and recovery semantics."

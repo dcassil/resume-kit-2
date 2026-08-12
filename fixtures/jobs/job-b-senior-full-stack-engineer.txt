@@ -1,0 +1,12 @@
+Senior Full Stack Engineer
+Example Growth Systems
+
+Required qualifications:
+- React experience for production web applications.
+- Node.js service development.
+- GraphQL API design or maintenance.
+- AWS experience for application infrastructure.
+
+Preferred qualifications:
+- PostgreSQL experience.
+- SaaS product background.

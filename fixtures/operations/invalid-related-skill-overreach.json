@@ -1,0 +1,10 @@
+{
+  "fixture_id": "invalid-related-skill-overreach",
+  "schema_version": "operation-fixture.v1",
+  "target_path": "/skills",
+  "before": "Azure",
+  "after": "AWS",
+  "expected_status": "rejected",
+  "expected_reason": "related_skill_overreach",
+  "notes": "Azure may be related cloud experience but is not exact or verified AWS evidence."
+}

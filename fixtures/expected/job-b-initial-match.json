@@ -1,0 +1,12 @@
+{
+  "fixture_id": "job-b-initial-match",
+  "schema_version": "expected-snapshot.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "React and Node.js resolve from resume",
+    "AWS resolves from persisted Job A user-verified fact",
+    "GraphQL resolves from persisted Job A user-verified fact",
+    "already verified AWS/GraphQL facts are not re-asked"
+  ]
+}

@@ -22,6 +22,39 @@ tests/
 tools/
 ```
 
+## Runtime Package Convention
+
+Top-level folders keep the contract names from the product architecture. Python imports use snake_case runtime package names inside those folders.
+
+| Folder | Python import |
+|---|---|
+| `resume-core/` | `resume_core` |
+| `career-store/` | `career_store` |
+| `career-mcp/` | `career_mcp` |
+| `resume-agent/` | `resume_agent` |
+| `resume-cli/` | `resume_cli` |
+| `resume-plugin/` | `resume_plugin` |
+| `resume-render/` | `resume_render` |
+| `workflow/` | `workflow` |
+
+Rules:
+
+- Runtime packages are installed from the root `pyproject.toml`.
+- Hyphenated folders are ownership/documentation boundaries; they are not Python import names.
+- Each hyphenated package folder contains exactly one public snake_case package at `<folder>/<import_name>/`.
+- Cross-package code imports public package names only, for example `import resume_core` or `from career_store import ...`.
+- Private implementation modules use `_`-prefixed package paths and must not be imported across package boundaries.
+- Do not add per-folder `pyproject.toml`, local `sys.path` mutation, or alternate package roots unless this contract changes.
+- Shared DTOs and JSON schema fragments live in package-owned `schemas.py` modules. Import `Result`, `Error`, resume/job/match/change DTOs, and `VerificationState` from `resume_core`; import `Fact`/`CareerFact` and `Evidence` from `career_store`; import `RunManifest` from `workflow`.
+
+The canonical current test command is:
+
+```sh
+python3 tools/run_tests.py --root .
+```
+
+That command creates an isolated editable install from `pyproject.toml` before running the current executable contract and boundary suite. Future package API contracts remain available under `tests/contract/` and should be added to the canonical runner as implementations land.
+
 ## Folder Purposes
 
 | Folder | Purpose | Primary contract source |
@@ -77,4 +110,3 @@ Each folder owns exactly one Markdown test-spec document at this stage. The docu
 - concrete test cases,
 - smoke/E2E coverage,
 - non-responsibilities and forbidden behavior.
-

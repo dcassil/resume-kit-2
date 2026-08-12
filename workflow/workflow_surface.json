@@ -1,0 +1,239 @@
+{
+  "contract_version": 1,
+  "package": "workflow",
+  "purpose": "Cross-package state machine, checkpoints, run manifest, audit trail, recovery semantics, and deterministic orchestration rules. Workflow coordinates public package outputs; it does not own package-private logic or alternate truth rules.",
+  "public_api": {
+    "module": "workflow",
+    "functions": [
+      "createRun",
+      "getNextCheckpoint",
+      "advanceCheckpoint",
+      "recordCheckpointResult",
+      "buildRunManifest",
+      "recoverRun",
+      "assertCanComplete"
+    ],
+    "style": "Functions may be synchronous or asynchronous. Workflow state is advanced only from persisted state, validated DTOs, and deterministic package outputs."
+  },
+  "canonical_checkpoints": [
+    "INIT",
+    "INGEST_RESUME",
+    "VALIDATE_BASE",
+    "EXTRACT_PERSIST_CAREER_FACTS",
+    "INGEST_JOB",
+    "NORMALIZE_JOB",
+    "MATCH_BASE",
+    "RESOLVE_GAPS",
+    "BUILD_SELECTION_PLAN",
+    "PROPOSE_TAILORING_CHANGES",
+    "VALIDATE_CHANGES",
+    "APPLY_CHANGES",
+    "FINAL_MATCH",
+    "GROUNDING_AUDIT",
+    "ATS_STRUCTURE_VALIDATION",
+    "RENDER",
+    "RENDER_VALIDATION",
+    "COMPLETE"
+  ],
+  "run_manifest_required_fields": [
+    "run_id",
+    "base_resume_id",
+    "base_resume_hash",
+    "job_id",
+    "config_hash",
+    "canonical_resume_schema_version",
+    "job_schema_version",
+    "career_db_schema_version",
+    "change_operation_schema_version",
+    "matching_algorithm_version",
+    "matching_config_version",
+    "renderer_template_version",
+    "agent_model_config",
+    "initial_score",
+    "final_score",
+    "facts_added",
+    "facts_verified",
+    "operations_applied",
+    "operations_rejected",
+    "validation_status",
+    "output_artifact_paths"
+  ],
+  "forbidden_responsibilities": [
+    "package_private_logic",
+    "alternate_scoring_rules",
+    "alternate_validation_rules",
+    "direct_resume_mutation",
+    "direct_career_db_writes",
+    "renderer_semantic_changes",
+    "agent_truth_authority",
+    "checkpoint_skipping",
+    "duplicate_fact_or_question_writes"
+  ],
+  "surfaces": [
+    {
+      "name": "createRun",
+      "description": "Create or load run state with run ID, config hash, schema/package versions, and initial stage metadata.",
+      "input_contract": {
+        "required": [
+          "workspace",
+          "config"
+        ]
+      },
+      "output_contract": {
+        "result_type": "RunState",
+        "required_fields": [
+          "run_id",
+          "current_checkpoint",
+          "config_hash",
+          "schema_versions",
+          "package_versions",
+          "stage_state",
+          "recovery_markers"
+        ]
+      }
+    },
+    {
+      "name": "getNextCheckpoint",
+      "description": "Return the deterministic next checkpoint from persisted state and policy.",
+      "input_contract": {
+        "required": [
+          "run_state"
+        ]
+      },
+      "output_contract": {
+        "result_type": "CheckpointDecision",
+        "required_fields": [
+          "status",
+          "current_checkpoint",
+          "next_checkpoint",
+          "required_inputs",
+          "blocking_reasons",
+          "determinism_key"
+        ]
+      }
+    },
+    {
+      "name": "advanceCheckpoint",
+      "description": "Advance only valid checkpoint transitions when required artifacts and validations are present.",
+      "input_contract": {
+        "required": [
+          "run_state",
+          "target_checkpoint",
+          "evidence"
+        ]
+      },
+      "output_contract": {
+        "result_type": "CheckpointAdvance",
+        "required_fields": [
+          "status",
+          "previous_checkpoint",
+          "current_checkpoint",
+          "transition_evidence",
+          "audit_event",
+          "blocking_reasons"
+        ]
+      }
+    },
+    {
+      "name": "recordCheckpointResult",
+      "description": "Record deterministic package outputs, validation results, questions/answers, operations, render reports, and recovery markers for a checkpoint.",
+      "input_contract": {
+        "required": [
+          "run_state",
+          "checkpoint",
+          "result"
+        ]
+      },
+      "output_contract": {
+        "result_type": "CheckpointRecord",
+        "required_fields": [
+          "status",
+          "checkpoint",
+          "artifact_refs",
+          "operation_log_refs",
+          "question_answer_log_refs",
+          "validation_refs",
+          "render_refs",
+          "audit_event"
+        ]
+      }
+    },
+    {
+      "name": "buildRunManifest",
+      "description": "Build a complete run manifest that can explain inputs, versions, hashes, scores, facts, questions, operations, validations, outputs, and recovery.",
+      "input_contract": {
+        "required": [
+          "run_state"
+        ]
+      },
+      "output_contract": {
+        "result_type": "RunManifest",
+        "required_fields": [
+          "run_id",
+          "base_resume_id",
+          "base_resume_hash",
+          "job_id",
+          "config_hash",
+          "canonical_resume_schema_version",
+          "job_schema_version",
+          "career_db_schema_version",
+          "change_operation_schema_version",
+          "matching_algorithm_version",
+          "matching_config_version",
+          "renderer_template_version",
+          "agent_model_config",
+          "initial_score",
+          "final_score",
+          "facts_added",
+          "facts_verified",
+          "operations_applied",
+          "operations_rejected",
+          "validation_status",
+          "output_artifact_paths"
+        ]
+      }
+    },
+    {
+      "name": "recoverRun",
+      "description": "Resume from persisted deterministic state after interruption without duplicating user questions, fact writes, or applied operations.",
+      "input_contract": {
+        "required": [
+          "workspace",
+          "run_id"
+        ]
+      },
+      "output_contract": {
+        "result_type": "RecoveryPlan",
+        "required_fields": [
+          "status",
+          "run_id",
+          "resume_from_checkpoint",
+          "already_applied_operations",
+          "already_asked_questions",
+          "already_written_facts",
+          "required_reruns",
+          "transactional_integrity"
+        ]
+      }
+    },
+    {
+      "name": "assertCanComplete",
+      "description": "Block COMPLETE unless final match, grounding audit, ATS/structure validation, render validation, audit artifacts, and unresolved-hard-requirement policy all pass.",
+      "input_contract": {
+        "required": [
+          "run_state"
+        ]
+      },
+      "output_contract": {
+        "result_type": "CompletionGate",
+        "required_fields": [
+          "status",
+          "can_complete",
+          "required_gates",
+          "failed_gates",
+          "audit_manifest_ref"
+        ]
+      }
+    }
+  ]
+}

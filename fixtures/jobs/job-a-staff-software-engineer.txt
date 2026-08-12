@@ -1,0 +1,14 @@
+Staff Software Engineer
+Example Product Platform
+
+Required qualifications:
+- 8+ years of software engineering experience building production applications.
+- Strong React and TypeScript experience.
+- Experience with API architecture/design for distributed product systems.
+- Experience delivering responsive design across desktop and mobile surfaces.
+- Background building or operating SaaS products.
+
+Preferred qualifications:
+- AWS experience.
+- GraphQL API experience.
+- Technical leadership through mentoring, design review, or cross-team architecture work.

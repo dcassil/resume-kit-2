@@ -1,0 +1,448 @@
+{
+  "contract_version": 1,
+  "package": "career-mcp",
+  "purpose": "Narrow semantic MCP adapter over career-store with no raw SQL, unrestricted mutation, scoring, resume mutation, or presentation behavior.",
+  "public_api": {
+    "module": "career_mcp",
+    "factory": "create_career_mcp",
+    "adapter_methods": [
+      "list_tools",
+      "call_tool"
+    ],
+    "store_dependency": "A career-store service object is injected into create_career_mcp(store, policy=None, audit_sink=None). MCP code must call store service methods and must not open SQLite or mutate tables directly."
+  },
+  "mcp_endpoints": [
+    {
+      "name": "tools/list",
+      "description": "Returns the exact allowed career.* tool definitions."
+    },
+    {
+      "name": "tools/call",
+      "description": "Validates arguments, enforces scope policy, calls the injected career-store service, normalizes DTO responses, and maps errors without leaking database details."
+    }
+  ],
+  "verification_states": [
+    "source_stated",
+    "user_verified",
+    "imported",
+    "inferred",
+    "unknown"
+  ],
+  "relationship_types": [
+    "alias",
+    "equivalent",
+    "related",
+    "child",
+    "parent"
+  ],
+  "resolution_states": [
+    "exact_match",
+    "alias_match",
+    "verified_fact_match",
+    "related_match",
+    "possible_match",
+    "unknown",
+    "explicitly_missing",
+    "not_applicable"
+  ],
+  "forbidden_tools": [
+    "execute_sql",
+    "run_query",
+    "truncate",
+    "truncate_table",
+    "raw_update",
+    "raw_delete"
+  ],
+  "tools": [
+    {
+      "name": "career.search_facts",
+      "description": "Search career-store facts by semantic query, optional fact type, and optional verification state. Returns normalized fact summaries with minimum necessary evidence only.",
+      "mutates": false,
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "skill",
+                "experience",
+                "domain",
+                "achievement",
+                "role",
+                "education",
+                "certification",
+                "preference"
+              ]
+            },
+            "uniqueItems": true
+          },
+          "verification": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "source_stated",
+                "user_verified",
+                "imported",
+                "inferred",
+                "unknown"
+              ]
+            },
+            "uniqueItems": true
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 10
+          }
+        }
+      },
+      "response_contract": {
+        "status": "ok",
+        "required_fields": [
+          "facts"
+        ],
+        "fact_summary_fields": [
+          "fact_id",
+          "type",
+          "text",
+          "verification_state",
+          "evidence_summary"
+        ],
+        "must_omit": [
+          "contact_data",
+          "raw_sql",
+          "database_rows"
+        ]
+      }
+    },
+    {
+      "name": "career.get_fact",
+      "description": "Return one career fact with verification state, evidence summary, relationships, conflicts, and no raw database internals.",
+      "mutates": false,
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fact_id"
+        ],
+        "properties": {
+          "fact_id": {
+            "type": "string",
+            "pattern": "^fact_[A-Za-z0-9][A-Za-z0-9_-]*$"
+          },
+          "include_conflicts": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "response_contract": {
+        "status": "ok_or_not_found",
+        "required_fields": [
+          "fact",
+          "verification_state",
+          "evidence_summary",
+          "relationships",
+          "conflicts"
+        ],
+        "not_found_error": "not_found"
+      }
+    },
+    {
+      "name": "career.propose_fact",
+      "description": "Create or return a candidate fact through career-store validation. Agent proposals require confirmation before they can become user_verified claims.",
+      "mutates": true,
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "text",
+          "source"
+        ],
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "agent_interpretation",
+              "resume_source",
+              "user_answer",
+              "trusted_source"
+            ]
+          },
+          "evidence": {
+            "type": "object"
+          },
+          "dedupe_key": {
+            "type": "string"
+          }
+        }
+      },
+      "response_contract": {
+        "status": "mutation",
+        "required_fields": [
+          "mutation_status",
+          "fact_id",
+          "verification_state",
+          "conflicts",
+          "confirmation_required",
+          "audit"
+        ],
+        "must_not_set": [
+          "user_verified_without_explicit_confirmation"
+        ]
+      }
+    },
+    {
+      "name": "career.add_evidence",
+      "description": "Append evidence to an existing fact through career-store validation. Evidence alone does not silently remove confirmation requirements or upgrade verification.",
+      "mutates": true,
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fact_id",
+          "evidence"
+        ],
+        "properties": {
+          "fact_id": {
+            "type": "string",
+            "pattern": "^fact_[A-Za-z0-9][A-Za-z0-9_-]*$"
+          },
+          "evidence": {
+            "type": "object",
+            "minProperties": 1
+          }
+        }
+      },
+      "response_contract": {
+        "status": "mutation",
+        "required_fields": [
+          "mutation_status",
+          "fact_id",
+          "verification_state",
+          "conflicts",
+          "confirmation_required",
+          "audit"
+        ]
+      }
+    },
+    {
+      "name": "career.verify_fact",
+      "description": "Set a fact verification state only after explicit user confirmation or trusted-source evidence. user_verified requires explicit confirmation.",
+      "mutates": true,
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fact_id",
+          "verification_state",
+          "confirmation"
+        ],
+        "properties": {
+          "fact_id": {
+            "type": "string",
+            "pattern": "^fact_[A-Za-z0-9][A-Za-z0-9_-]*$"
+          },
+          "verification_state": {
+            "type": "string",
+            "enum": [
+              "source_stated",
+              "user_verified",
+              "imported",
+              "inferred",
+              "unknown"
+            ]
+          },
+          "confirmation": {
+            "type": "object",
+            "minProperties": 1
+          },
+          "evidence_id": {
+            "type": "string"
+          }
+        }
+      },
+      "response_contract": {
+        "status": "mutation",
+        "required_fields": [
+          "mutation_status",
+          "fact_id",
+          "verification_state",
+          "conflicts",
+          "confirmation_required",
+          "audit"
+        ],
+        "must_not_set": [
+          "user_verified_without_explicit_confirmation"
+        ]
+      }
+    },
+    {
+      "name": "career.add_relationship",
+      "description": "Add a validated alias, equivalent, related, child, or parent relationship through career-store validation. Equivalent relationships require user confirmation or trusted evidence.",
+      "mutates": true,
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "from_fact_id",
+          "to_fact_id",
+          "relationship_type"
+        ],
+        "properties": {
+          "from_fact_id": {
+            "type": "string",
+            "pattern": "^fact_[A-Za-z0-9][A-Za-z0-9_-]*$"
+          },
+          "to_fact_id": {
+            "type": "string",
+            "pattern": "^fact_[A-Za-z0-9][A-Za-z0-9_-]*$"
+          },
+          "relationship_type": {
+            "type": "string",
+            "enum": [
+              "alias",
+              "equivalent",
+              "related",
+              "child",
+              "parent"
+            ]
+          },
+          "evidence": {
+            "type": "object"
+          },
+          "confirmation": {
+            "type": "object"
+          }
+        }
+      },
+      "response_contract": {
+        "status": "mutation",
+        "required_fields": [
+          "mutation_status",
+          "fact_id",
+          "verification_state",
+          "conflicts",
+          "confirmation_required",
+          "audit"
+        ]
+      }
+    },
+    {
+      "name": "career.find_matches",
+      "description": "Map normalized job requirements to known career facts and return match classifications. This tool does not compute or assign official match scores.",
+      "mutates": false,
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requirements"
+        ],
+        "properties": {
+          "requirements": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "requirement_id",
+                "source_text",
+                "normalized_terms"
+              ],
+              "properties": {
+                "requirement_id": {
+                  "type": "string"
+                },
+                "source_text": {
+                  "type": "string"
+                },
+                "normalized_terms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "response_contract": {
+        "status": "ok",
+        "required_fields": [
+          "matches"
+        ],
+        "match_fields": [
+          "requirement_id",
+          "resolution_state",
+          "fact_ids",
+          "reasoning"
+        ],
+        "resolution_states": [
+          "exact_match",
+          "alias_match",
+          "verified_fact_match",
+          "related_match",
+          "possible_match",
+          "unknown",
+          "explicitly_missing",
+          "not_applicable"
+        ],
+        "must_omit": [
+          "official_score",
+          "overall_score"
+        ]
+      }
+    },
+    {
+      "name": "career.get_unverified",
+      "description": "Return unresolved, inferred, or unknown facts useful for targeted interviews, clearly marked as not confirmed claims.",
+      "mutates": false,
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "topic": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 10
+          }
+        }
+      },
+      "response_contract": {
+        "status": "ok",
+        "required_fields": [
+          "facts"
+        ],
+        "must_mark": [
+          "unverified",
+          "confirmation_required"
+        ]
+      }
+    }
+  ]
+}

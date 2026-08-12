@@ -1,0 +1,11 @@
+{
+  "fixture_id": "valid-operations",
+  "schema_version": "expected-snapshot.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "operations include target path, before value, after value, facts used, requirements targeted, provenance, and status",
+    "valid operations move proposed to validated to applied",
+    "base resume remains unchanged"
+  ]
+}

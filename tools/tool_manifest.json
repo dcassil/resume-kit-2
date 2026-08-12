@@ -1,0 +1,154 @@
+{
+  "schema_version": "tools.v1",
+  "tool_set_id": "resume-kit-local-tools-v1",
+  "required_capabilities": [
+    "test_runner_wrappers",
+    "fixture_validators",
+    "snapshot_review_helpers",
+    "architecture_import_checkers",
+    "migration_checkers",
+    "release_checks",
+    "audit_validators",
+    "render_parse_back_validators"
+  ],
+  "release_blocking_expectations": [
+    "build_package_import_success",
+    "pr_gate_tests",
+    "full_smoke_test",
+    "hallucination_rejection",
+    "base_immutability",
+    "deterministic_scoring",
+    "render_validation",
+    "audit_completeness",
+    "full_e2e_for_release_candidate",
+    "job_b_persistent_learning",
+    "recovery_tests",
+    "migration_upgrade_tests"
+  ],
+  "tools": [
+    {
+      "path": "tools/run_gate.py",
+      "kind": "test_runner_wrapper",
+      "supports_gate": ["pr"],
+      "invokes_surfaces": ["tools/run_tests.py", "tests/suite_manifest.json"],
+      "reads": ["tools/run_tests.py", "tests/"],
+      "writes": [],
+      "release_blocking": true,
+      "description": "Provides the single obvious PR completion gate command for agents and developers."
+    },
+    {
+      "path": "tools/career_mcp_guardrails.py",
+      "kind": "architecture_import_checker",
+      "supports_gate": ["pr"],
+      "invokes_surfaces": ["career-mcp/tool_surface.json", "career-mcp source files"],
+      "reads": ["career-mcp/", "career-mcp/tool_surface.json"],
+      "writes": [],
+      "release_blocking": true,
+      "description": "Blocks career-mcp raw SQL tools, unrestricted mutations, scoring, resume mutation, and forbidden imports."
+    },
+    {
+      "path": "tools/career_store_guardrails.py",
+      "kind": "architecture_import_checker",
+      "supports_gate": ["pr"],
+      "invokes_surfaces": ["career-store/store_surface.json", "career-store source files"],
+      "reads": ["career-store/", "career-store/store_surface.json"],
+      "writes": [],
+      "release_blocking": true,
+      "description": "Blocks career-store adapter imports, raw SQL public APIs, prompting, rendering, resume mutation, LLM calls, silent verification promotion, and surface drift."
+    },
+    {
+      "path": "tools/resume_core_guardrails.py",
+      "kind": "architecture_import_checker",
+      "supports_gate": ["pr"],
+      "invokes_surfaces": ["resume-core/core_surface.json", "resume-core source files"],
+      "reads": ["resume-core/", "resume-core/core_surface.json"],
+      "writes": [],
+      "release_blocking": true,
+      "description": "Blocks resume-core adapter imports, persistence, rendering, prompting, file IO, LLM calls, workflow transitions, and surface drift."
+    },
+    {
+      "path": "tools/resume_agent_guardrails.py",
+      "kind": "architecture_import_checker",
+      "supports_gate": ["pr"],
+      "invokes_surfaces": ["resume-agent/agent_surface.json", "resume-agent source files"],
+      "reads": ["resume-agent/", "resume-agent/agent_surface.json"],
+      "writes": [],
+      "release_blocking": true,
+      "description": "Blocks resume-agent persistence, scoring, final verification authority, workflow decisions, and unsupported inflation."
+    },
+    {
+      "path": "tools/resume_render_guardrails.py",
+      "kind": "architecture_import_checker",
+      "supports_gate": ["pr"],
+      "invokes_surfaces": ["resume-render/render_surface.json", "resume-render source files"],
+      "reads": ["resume-render/", "resume-render/render_surface.json"],
+      "writes": [],
+      "release_blocking": true,
+      "description": "Blocks renderer career lookup, scoring, semantic rewrites, direct resume mutation, unsupported additions, and silent truncation."
+    },
+    {
+      "path": "tools/resume_cli_guardrails.py",
+      "kind": "architecture_import_checker",
+      "supports_gate": ["pr"],
+      "invokes_surfaces": ["resume-cli/cli_surface.json", "resume-cli source files"],
+      "reads": ["resume-cli/", "resume-cli/cli_surface.json"],
+      "writes": [],
+      "release_blocking": true,
+      "description": "Blocks CLI direct career DB writes, independent scoring, private mutation, plugin behavior, and unsafe base writes."
+    },
+    {
+      "path": "tools/resume_plugin_guardrails.py",
+      "kind": "architecture_import_checker",
+      "supports_gate": ["pr"],
+      "invokes_surfaces": ["resume-plugin/plugin_surface.json", "resume-plugin source files"],
+      "reads": ["resume-plugin/", "resume-plugin/plugin_surface.json"],
+      "writes": [],
+      "release_blocking": true,
+      "description": "Blocks plugin-owned scoring, SQLite schema, ATS sanitation, mutation logic, private internals, and validation-bypass prompts."
+    },
+    {
+      "path": "tools/workflow_guardrails.py",
+      "kind": "architecture_import_checker",
+      "supports_gate": ["pr"],
+      "invokes_surfaces": ["workflow/workflow_surface.json", "workflow source files"],
+      "reads": ["workflow/", "workflow/workflow_surface.json"],
+      "writes": [],
+      "release_blocking": true,
+      "description": "Blocks workflow private imports, alternate truth/scoring/validation rules, direct DB writes, and checkpoint skips."
+    },
+    {
+      "path": "tools/fixtures_guardrails.py",
+      "kind": "fixture_validator",
+      "supports_gate": ["pr", "main", "release"],
+      "invokes_surfaces": ["fixtures/fixture_manifest.json", "fixture files"],
+      "reads": ["fixtures/"],
+      "writes": [],
+      "release_blocking": true,
+      "description": "Validates stable fixture truth, exact answer text, invalid operations, and reviewed expected snapshots."
+    },
+    {
+      "path": "tools/tests_guardrails.py",
+      "kind": "release_check",
+      "supports_gate": ["pr", "main", "release"],
+      "invokes_surfaces": ["tests/suite_manifest.json", "test files"],
+      "reads": ["tests/"],
+      "writes": [],
+      "release_blocking": true,
+      "description": "Validates test suite layout, gate definitions, release blockers, and absence of hidden business logic in tests."
+    },
+    {
+      "path": "tools/tools_guardrails.py",
+      "kind": "release_check",
+      "supports_gate": ["pr", "main", "release"],
+      "invokes_surfaces": ["tools/tool_manifest.json", "tool files"],
+      "reads": ["tools/"],
+      "writes": [],
+      "release_blocking": true,
+      "description": "Validates tool documentation, release-blocking declarations, and absence of hidden product behavior in tools."
+    }
+  ],
+  "wrapper_patterns": [
+    "tools/pre-commit-*-guardrails.sh",
+    "tools/watch_*_guardrails.py"
+  ]
+}

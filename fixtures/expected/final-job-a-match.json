@@ -1,0 +1,11 @@
+{
+  "fixture_id": "final-job-a-match",
+  "schema_version": "expected-snapshot.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "architecture/API-design evidence can support architecture requirements",
+    "formal Staff title remains absent from employment history",
+    "unresolved hard requirements are not falsely marked resolved"
+  ]
+}

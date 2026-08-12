@@ -1,0 +1,10 @@
+{
+  "fixture_id": "run-manifest",
+  "schema_version": "expected-snapshot.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "manifest records run ID, base hash, job ID, config hash, schema/package/template/model versions",
+    "manifest records initial/final scores, facts added/verified, operations applied/rejected, validations, and outputs"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "fixture_id": "normalized-job-a",
+  "schema_version": "expected-snapshot.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "required 8+ years, React, TypeScript, API architecture/design, responsive design, SaaS",
+    "preferred AWS, GraphQL, technical leadership",
+    "every requirement retains source text and normalized terms"
+  ]
+}

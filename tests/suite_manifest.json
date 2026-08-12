@@ -1,0 +1,115 @@
+{
+  "schema_version": "tests-suite.v1",
+  "suite_id": "resume-kit-contract-test-suite-v1",
+  "required_layout": [
+    "unit",
+    "contract",
+    "boundary",
+    "integration",
+    "smoke",
+    "e2e",
+    "fixtures",
+    "snapshots"
+  ],
+  "required_gates": {
+    "pr": [
+      "unit",
+      "contract",
+      "boundary",
+      "deterministic_scoring_fixtures",
+      "hallucination_rejection_fixtures"
+    ],
+    "main": [
+      "pr",
+      "smoke"
+    ],
+    "release_candidate": [
+      "main",
+      "e2e",
+      "renderer_parse_back",
+      "migration_upgrade"
+    ]
+  },
+  "categories": {
+    "unit": [
+      "schema_parsing",
+      "ats_sanitation",
+      "date_normalization",
+      "requirement_normalization",
+      "scoring_math",
+      "state_transitions",
+      "change_validation",
+      "relationship_matching",
+      "config_parsing"
+    ],
+    "contract": [
+      "public_surfaces",
+      "dto_accept_reject",
+      "verification_evidence_rules",
+      "proposal_only_agent_outputs",
+      "semantic_neutral_rendering",
+      "cli_artifacts"
+    ],
+    "boundary": [
+      "dependency_direction",
+      "forbidden_behavior",
+      "raw_sql_exposure",
+      "renderer_semantic_mutation",
+      "plugin_domain_algorithms",
+      "cli_public_api_orchestration"
+    ],
+    "integration": [
+      "resume_ingest_to_store",
+      "job_ingest_to_match",
+      "resolve_loop",
+      "tailor_validation_application",
+      "render_validated_working_resume"
+    ],
+    "smoke": [
+      "install_build",
+      "sqlite_migration",
+      "base_immutability",
+      "career_fact_evidence",
+      "hallucination_rejection",
+      "markdown_docx_export",
+      "audit_explanation"
+    ],
+    "e2e": [
+      "complete_job_a",
+      "second_job_reuse",
+      "failure_recovery",
+      "audit_reconstruction"
+    ]
+  },
+  "determinism_requirements": [
+    "isolated_temp_directories",
+    "isolated_sqlite_databases",
+    "frozen_time_for_ids",
+    "record_versions_and_hashes",
+    "official_scoring_runs_twice",
+    "snapshot_deterministic_outputs",
+    "tolerant_language_strict_structured_fields"
+  ],
+  "release_blockers": [
+    "fabricated_skill_title_metric_years_responsibility_scale_or_outcome",
+    "inferred_fact_treated_as_verified",
+    "related_fact_treated_as_equivalent_without_relationship",
+    "missing_provenance_for_generated_claim",
+    "nondeterministic_official_score",
+    "base_resume_mutation",
+    "raw_sql_mcp_exposure",
+    "renderer_semantic_mutation",
+    "lost_learned_facts_between_jobs",
+    "duplicate_questions_for_verified_facts",
+    "false_resolution_of_unresolved_hard_requirement"
+  ],
+  "runner_commands": {
+    "canonical": "python3 tools/run_gate.py --pr --root .",
+    "pr": "python3 tools/run_gate.py --pr --root .",
+    "boundary": "python3 -m unittest tests.boundary.test_resume_core_guardrails tests.boundary.test_career_store_guardrails tests.boundary.test_career_mcp_guardrails tests.boundary.test_resume_agent_guardrails tests.boundary.test_resume_render_guardrails tests.boundary.test_resume_cli_guardrails tests.boundary.test_resume_plugin_guardrails tests.boundary.test_workflow_guardrails tests.boundary.test_fixtures_guardrails tests.boundary.test_tests_guardrails tests.boundary.test_tools_guardrails",
+    "fixtures": "python3 -m unittest tests.contract.test_fixtures_contract tests.boundary.test_fixtures_guardrails",
+    "contract_current": "python3 -m unittest tests.contract.test_fixtures_contract tests.contract.test_tests_contract tests.contract.test_tools_contract tests.contract.test_runtime_package_layout_contract tests.contract.test_shared_dto_schemas_contract",
+    "contract_tdd": "python3 -m unittest discover -s tests/contract",
+    "guardrails": "python3 tools/tests_guardrails.py --root ."
+  }
+}

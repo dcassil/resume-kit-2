@@ -1,0 +1,10 @@
+{
+  "fixture_id": "invalid-unsupported-scale",
+  "schema_version": "operation-fixture.v1",
+  "target_path": "/experience/0/bullets/0",
+  "before": "Built React applications.",
+  "after": "Architected enterprise React platforms serving 20 million users globally.",
+  "expected_status": "rejected",
+  "expected_reason": "unsupported_scale",
+  "notes": "Resume fixture has no evidence for enterprise/global scale or 20 million users."
+}

@@ -1,0 +1,11 @@
+{
+  "fixture_id": "audit-report",
+  "schema_version": "expected-snapshot.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "audit reconstructs source resume, job, config, questions, answers, facts, operations, validations, and outputs",
+    "audit includes rejected adversarial operations and deterministic rejection reasons",
+    "audit omits unnecessary sensitive raw data"
+  ]
+}

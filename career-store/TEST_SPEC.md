@@ -22,6 +22,7 @@ Relevant public surface:
 
 Tests should expect durable storage around these data areas:
 
+- shared fact/evidence DTO and JSON schema definitions in `career_store.schemas`
 - facts
 - fact relationships
 - evidence
@@ -140,4 +141,3 @@ The E2E fixture must prove:
 - evidence chains identify source resume or prior user verification,
 - conflicts are represented instead of hidden,
 - DB state is reconstructable from audit artifacts.
-

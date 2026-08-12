@@ -1,0 +1,11 @@
+{
+  "fixture_id": "initial-job-a-match",
+  "schema_version": "expected-snapshot.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "React and TypeScript resolve from resume",
+    "AWS and GraphQL remain unresolved or preferred gaps",
+    "Azure is not treated as proof of AWS"
+  ]
+}
