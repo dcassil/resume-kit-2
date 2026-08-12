@@ -1,7 +1,7 @@
 {
   "version": 1,
   "algorithm": "ed25519",
-  "publicKey": "MCowBQYDK2VwAyEAzaajx7xsFMHtvnAuSz76mN99ygLZXEN_CthWJKXWXWg",
-  "keyId": "sha256:6c05e59ce19e142513e36576fed196d6ca65a599235d97fb36ff370b495a552f",
-  "fingerprint": "sha256:6c05e59ce19e142513e36576fed196d6ca65a599235d97fb36ff370b495a552f"
+  "publicKey": "MCowBQYDK2VwAyEAnyMqEFTFKGPUYuAgtPc4gmEe5K-KOKYIMNMtDx1pQC8",
+  "keyId": "sha256:7287fc5dd53b9827091b2cb4e6b65ea369d71e01bbe684a4cc90929dba16a7fd",
+  "fingerprint": "sha256:7287fc5dd53b9827091b2cb4e6b65ea369d71e01bbe684a4cc90929dba16a7fd"
 }

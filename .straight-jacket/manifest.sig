@@ -1,7 +1,7 @@
 {
   "version": 1,
   "algorithm": "ed25519",
-  "keyId": "sha256:6c05e59ce19e142513e36576fed196d6ca65a599235d97fb36ff370b495a552f",
-  "signedAt": "2026-08-12T19:30:26.711Z",
-  "signature": "CEa9X6FtOAGxLth_vd0mPi41Io4VrR2wW5EIeSeCnX-kdrkmXk9iwD0Y5ms_wMyR_0XbysAWA_ZmIvGqPbfcAw"
+  "keyId": "sha256:7287fc5dd53b9827091b2cb4e6b65ea369d71e01bbe684a4cc90929dba16a7fd",
+  "signedAt": "2026-08-12T19:40:08.991Z",
+  "signature": "LaOGyiTzVjZP4dYXYibPybieYpNGet-fuO8ccNe0bU6i2Qa5xIVsFr9fbiSVmFljpt-kXDPeWlRd5cFjwTg6Bw"
 }
