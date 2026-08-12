@@ -25,6 +25,83 @@
       "registeredAt": "2026-08-12T17:57:59.507Z"
     },
     {
+      "path": "tests/boundary/test_career_mcp_guardrails.py",
+      "name": "test_career_mcp_guardrails.py",
+      "checksum": "sha256:ae3a35cfca0ca22c6c5d6fc1509c151e95f7ed6941133cd3f2031d1bb179ff18",
+      "size": 3888,
+      "registeredAt": "2026-08-12T19:30:26.706Z"
+    },
+    {
+      "path": "tests/boundary/test_career_store_guardrails.py",
+      "name": "test_career_store_guardrails.py",
+      "checksum": "sha256:2a08d4041da52898cfeb595f7425bcb0d104bdfb2dfe61604b04b4714946b414",
+      "size": 7320,
+      "registeredAt": "2026-08-12T19:30:26.708Z"
+    },
+    {
+      "path": "tests/boundary/test_fixtures_guardrails.py",
+      "name": "test_fixtures_guardrails.py",
+      "checksum": "sha256:d48eab6cc8675cd508f31e347c46c35088d66c783c43fc69b9c82a14b23ff2ce",
+      "size": 4135,
+      "registeredAt": "2026-08-12T19:30:26.708Z"
+    },
+    {
+      "path": "tests/boundary/test_resume_agent_guardrails.py",
+      "name": "test_resume_agent_guardrails.py",
+      "checksum": "sha256:8c44a1ef4b00dd153bb83a351afbdea52d29ef9643bc3b02b50e9e47c6e4eab0",
+      "size": 4658,
+      "registeredAt": "2026-08-12T19:30:26.708Z"
+    },
+    {
+      "path": "tests/boundary/test_resume_cli_guardrails.py",
+      "name": "test_resume_cli_guardrails.py",
+      "checksum": "sha256:8bec207d1ddbf859e698fe05273732178d35477be9783abbc404d5f980eace56",
+      "size": 5188,
+      "registeredAt": "2026-08-12T19:30:26.709Z"
+    },
+    {
+      "path": "tests/boundary/test_resume_core_guardrails.py",
+      "name": "test_resume_core_guardrails.py",
+      "checksum": "sha256:bd3bdadd5d86759dca86b601e08605a5d610794c4e159419cd2c33bbfae8b3b2",
+      "size": 6926,
+      "registeredAt": "2026-08-12T19:30:26.709Z"
+    },
+    {
+      "path": "tests/boundary/test_resume_plugin_guardrails.py",
+      "name": "test_resume_plugin_guardrails.py",
+      "checksum": "sha256:28042f63deb7f2f96a2e385edad2402a0b206c1effdb158310b5f72b648cec63",
+      "size": 5382,
+      "registeredAt": "2026-08-12T19:30:26.709Z"
+    },
+    {
+      "path": "tests/boundary/test_resume_render_guardrails.py",
+      "name": "test_resume_render_guardrails.py",
+      "checksum": "sha256:e19f4409b36b4892ad764e9afbbcdace010fb8ac59605e0bdd0d306490ef8f5c",
+      "size": 5267,
+      "registeredAt": "2026-08-12T19:30:26.709Z"
+    },
+    {
+      "path": "tests/boundary/test_tests_guardrails.py",
+      "name": "test_tests_guardrails.py",
+      "checksum": "sha256:2c9c81b54ff13c4594b9521643f281307ebfd6fded34cfaf0e877a1a181d2740",
+      "size": 3676,
+      "registeredAt": "2026-08-12T19:30:26.710Z"
+    },
+    {
+      "path": "tests/boundary/test_tools_guardrails.py",
+      "name": "test_tools_guardrails.py",
+      "checksum": "sha256:2e60926daf240c8fd60fd110a7106000f64c6fd39d2012b04467048fbbbe6cc6",
+      "size": 5160,
+      "registeredAt": "2026-08-12T19:30:26.710Z"
+    },
+    {
+      "path": "tests/boundary/test_workflow_guardrails.py",
+      "name": "test_workflow_guardrails.py",
+      "checksum": "sha256:c8dc85b341fb5c45ca82e7b0d5e5c003b48566d52a129a67e696fdf352dc3a8e",
+      "size": 5209,
+      "registeredAt": "2026-08-12T19:30:26.711Z"
+    },
+    {
       "path": "tools/career_mcp_guardrails.py",
       "name": "career_mcp_guardrails.py",
       "checksum": "sha256:be7e80c1f950902d4ebd4ea96be1d0fcf6a048bc44a95bd4c8fa68da0d8469fe",
