@@ -1,0 +1,17 @@
+name: Straight Jacket
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install -g straight-jacket
+      - run: straight-jacket verify --trusted-public-key-fingerprint "$STRAIGHT_JACKET_PUBLIC_KEY_FINGERPRINT" --json

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "repoId": "sha256:6492818d86f8d31004a2c78d37cf1cf74d808a4840a37438fc3598de59f229a4",
+  "hashAlgorithm": "sha256",
+  "signatureAlgorithm": "ed25519",
+  "keyId": "sha256:6c05e59ce19e142513e36576fed196d6ca65a599235d97fb36ff370b495a552f",
+  "policy": {
+    "allowSymlinks": false,
+    "requireHumanAuthorization": true,
+    "failClosed": true
+  },
+  "entries": []
+}
