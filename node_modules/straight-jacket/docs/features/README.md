@@ -11,6 +11,7 @@ This folder breaks Straight Jacket into implementation pieces that match the pro
 - [CLI](./cli.md): command behavior, prompts, JSON output, and exit codes.
 - [MCP](./mcp.md): read-only tool surface and forbidden capabilities.
 - [Hooks And CI](./hooks-ci.md): pre-commit hook, CI template, and strong enforcement posture.
+- [GitHub Protection Setup](./github-protection.md): required PR and status-check setup for protected `main`.
 - [Plugin And Skill](./plugin-skill.md): agent-facing behavior and install/help flows.
 - [Guardrails](./guardrails.md): quality, boundary, and coverage checks.
 - [Implementation Roadmap](./implementation-roadmap.md): suggested TDD build order.

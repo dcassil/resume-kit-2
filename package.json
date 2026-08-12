@@ -1,5 +1,5 @@
 {
-  "devDependencies": {
-    "straight-jacket": "^0.1.5"
+  "dependencies": {
+    "straight-jacket": "^0.1.8"
   }
 }

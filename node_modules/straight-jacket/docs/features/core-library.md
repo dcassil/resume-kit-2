@@ -22,7 +22,9 @@ Export these async functions from `src/index.js`:
 
 - `initRepository(input)`
 - `addProtectedFile(input)`
+- `addProtectedFiles(input)`
 - `removeProtectedFile(input)`
+- `removeProtectedFiles(input)`
 - `updateProtectedFile(input)`
 - `renameProtectedFile(input)`
 - `verifyRepository(input)`
@@ -48,6 +50,7 @@ Mutating fields:
 
 - `password`: human-entered password
 - `path`: repo-relative protected path
+- `paths`: repo-relative protected paths and/or glob patterns
 - `from`: repo-relative old path for rename
 - `to`: repo-relative new path for rename
 - `reason`: optional human-readable explanation
@@ -157,6 +160,29 @@ Flow:
 3. Remove exact path entry.
 4. Fail if path is not registered.
 5. Re-sign manifest.
+
+### `addProtectedFiles`
+
+Flow:
+
+1. Expand exact paths and glob patterns against the repository working tree.
+2. Load and verify manifest signature.
+3. Validate the combined set for duplicates and case collisions.
+4. Require password authorization once.
+5. Create entries for every expanded path.
+6. Append entries in deterministic order.
+7. Re-sign manifest once.
+
+### `removeProtectedFiles`
+
+Flow:
+
+1. Load and verify manifest signature.
+2. Expand exact paths and glob patterns against registered manifest paths.
+3. Fail if an exact path is not registered or a pattern matches no entries.
+4. Require password authorization once.
+5. Remove every matched entry.
+6. Re-sign manifest once.
 
 ### `updateProtectedFile`
 

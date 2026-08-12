@@ -37,8 +37,8 @@ Mutating:
 
 ```text
 straight-jacket init
-straight-jacket add <path> --reason "..."
-straight-jacket remove <path>
+straight-jacket add <path-or-pattern>... --reason "..."
+straight-jacket remove <path-or-pattern>...
 straight-jacket update <path>
 straight-jacket rename <old-path> <new-path>
 straight-jacket install-hook
@@ -138,15 +138,32 @@ Help behavior:
 
 Inputs:
 
-- path argument
+- one or more path or glob-pattern arguments
 - optional `--reason`
 - `--json`
 
 Behavior:
 
-- prompt for password
-- call `addProtectedFile`
-- print registered entry
+- prompt for password once
+- call `addProtectedFiles`
+- print registered entries
+- accept shell-expanded path lists such as `tools/pre-commit-alpha tools/pre-commit-beta`
+- expand quoted patterns such as `tools/pre-commit-*` repo-relative
+
+### `remove`
+
+Inputs:
+
+- one or more path or glob-pattern arguments
+- `--json`
+
+Behavior:
+
+- prompt for password once
+- call `removeProtectedFiles`
+- match quoted patterns against registered protected paths
+- remove matching manifest entries without deleting files
+- print `removedPath` for one removed entry and `removedPaths` for multiple removed entries
 
 ### `list`
 

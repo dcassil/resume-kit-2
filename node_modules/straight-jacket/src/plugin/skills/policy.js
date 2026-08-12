@@ -7,7 +7,16 @@ export function buildSkillPolicy() {
     setupGuidance: {
       cliMissing: "npm install -g github:dcassil/straight-jacket",
       projectNotInitialized: "straight-jacket init",
-      mcpNotConnected: "[mcp_servers.straight-jacket]"
+      mcpNotConnected: "[mcp_servers.straight-jacket]",
+      githubProtectionGuide: "docs/features/github-protection.md"
+    },
+    githubProtectionChecks: {
+      requiredStatusCheck: "verify",
+      requirePullRequestBeforeMerging: true,
+      requireBranchesUpToDate: true,
+      enforceAdmins: true,
+      disableForcePushes: true,
+      disableDeletions: true
     },
     forbiddenActions: [
       "edit .straight-jacket/manifest.json",

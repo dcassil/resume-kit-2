@@ -81,6 +81,34 @@ command = "straight-jacket-mcp"
 args = []
 ```
 
+## GitHub Protection Guidance
+
+Local hooks are advisory. `git commit --no-verify` can bypass local hook checks, and ordinary feature branches may still accept bad commits. Strong GitHub enforcement requires remote branch protection or rulesets.
+
+When the user asks to set up GitHub protection, use the GitHub UI/API or `gh` CLI to configure and verify:
+
+- `main` requires a pull request before merging.
+- `main` requires the `verify` status check.
+- required status checks are strict/up-to-date before merge.
+- admins are included in enforcement.
+- force pushes and deletions are disabled.
+- `develop` exists if the repository uses a develop integration branch.
+- `STRAIGHT_JACKET_PUBLIC_KEY_FINGERPRINT` is set as a repository variable for the verifier workflow.
+
+If using `gh`, the setup guide is:
+
+```text
+docs/features/github-protection.md
+```
+
+After changing GitHub settings, read back branch protection before claiming success:
+
+```sh
+gh api "repos/OWNER/REPO/branches/main/protection"
+```
+
+Do not claim protected-file changes are merge-blocked unless the remote readback confirms required PRs and required `verify` on `main`.
+
 ## Protected-File Editing Policy
 
 Avoid editing protected paths. If a protected file must change, make the content change only when the user explicitly asks for it, then ask the human to run the appropriate command locally:

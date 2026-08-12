@@ -20,6 +20,8 @@ The skill should instruct AI agents to:
 - list protected files before broad edits
 - avoid editing protected paths
 - run `straight-jacket verify` before final response when Straight Jacket metadata exists
+- distinguish advisory local hooks from remote merge enforcement
+- verify GitHub branch protection before claiming protected-file changes cannot merge
 - explain violations without trying to bypass them
 - ask the human to run update/remove/rename commands when protected state must change
 - never request, infer, store, or pass a human password
@@ -48,6 +50,7 @@ Expected sections:
 - Required first checks
 - Protected-file editing policy
 - Verification policy
+- GitHub protection setup policy
 - Human update flow
 - Forbidden actions
 

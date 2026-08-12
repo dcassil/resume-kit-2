@@ -36,5 +36,7 @@ jobs:
           node-version: 20
       - run: npm install -g straight-jacket
       - run: straight-jacket verify --trusted-public-key-fingerprint "$STRAIGHT_JACKET_PUBLIC_KEY_FINGERPRINT" --json
+        env:
+          STRAIGHT_JACKET_PUBLIC_KEY_FINGERPRINT: \${{ vars.STRAIGHT_JACKET_PUBLIC_KEY_FINGERPRINT }}
 `;
 }

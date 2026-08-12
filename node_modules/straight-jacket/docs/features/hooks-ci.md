@@ -25,6 +25,11 @@ Strong enforcement requires at least one verifier outside the AI-editable workin
 
 Straight Jacket must never claim local hooks are impossible to bypass.
 
+For GitHub repositories, the recommended merge gate is documented in
+[GitHub Protection Setup](./github-protection.md): require PRs on `main`, require
+the `verify` check, require up-to-date branches, enforce admins, and disable force
+pushes/deletions.
+
 ## Pre-Commit Hook
 
 Template path:
@@ -125,6 +130,9 @@ straight-jacket verify --trusted-public-key-fingerprint "$STRAIGHT_JACKET_PUBLIC
 ```
 
 The fingerprint variable must be controlled by humans or repository administrators.
+
+For GitHub Actions, store it as a repository variable named
+`STRAIGHT_JACKET_PUBLIC_KEY_FINGERPRINT`.
 
 ## Server-Side Hook Template
 

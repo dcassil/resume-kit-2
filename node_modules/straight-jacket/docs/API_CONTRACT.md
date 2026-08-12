@@ -86,6 +86,49 @@ Rules:
 - rejects paths that collide only by case
 - re-signs the manifest after mutation
 
+### `addProtectedFiles(input)`
+
+Registers multiple file paths and/or glob-pattern matches with one authorization and one manifest signature update.
+
+Input:
+
+```js
+{
+  repoRoot: "/absolute/path/to/repo",
+  paths: ["tools/pre-commit-alpha", "tools/pre-commit-beta"],
+  password: "human supplied password",
+  reason: "Hook scripts",
+  now: "2026-08-12T00:00:00.000Z"
+}
+```
+
+Expected output:
+
+```js
+{
+  ok: true,
+  entries: [
+    {
+      path: "tools/pre-commit-alpha",
+      checksum: "sha256:..."
+    },
+    {
+      path: "tools/pre-commit-beta",
+      checksum: "sha256:..."
+    }
+  ]
+}
+```
+
+Rules:
+
+- accepts shell-expanded path lists such as `tools/pre-commit-alpha tools/pre-commit-beta`
+- expands quoted glob patterns repo-relative
+- prompts/unlocks once at the CLI layer
+- rejects unmatched patterns
+- rejects duplicate or case-colliding paths as one set
+- re-signs the manifest once after all entries are created
+
 ### `removeProtectedFile(input)`
 
 Removes a registered entry.
@@ -114,6 +157,41 @@ Rules:
 - requires human authorization
 - fails if the manifest signature is invalid before mutation
 - re-signs the manifest after mutation
+
+### `removeProtectedFiles(input)`
+
+Removes multiple registered entries by exact path and/or glob pattern with one authorization and one manifest signature update.
+
+Input:
+
+```js
+{
+  repoRoot: "/absolute/path/to/repo",
+  paths: ["tools/pre-commit-*"],
+  password: "human supplied password"
+}
+```
+
+Expected output:
+
+```js
+{
+  ok: true,
+  removedPaths: [
+    "tools/pre-commit-alpha",
+    "tools/pre-commit-beta"
+  ]
+}
+```
+
+Rules:
+
+- matches patterns against registered manifest paths, not the working tree
+- accepts shell-expanded path lists and quoted glob patterns
+- requires human authorization once
+- fails if an exact path is not registered
+- fails if a pattern does not match any registered protected path
+- re-signs the manifest once after all matching entries are removed
 
 ### `updateProtectedFile(input)`
 
