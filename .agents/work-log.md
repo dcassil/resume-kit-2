@@ -1,15 +1,21 @@
 # Work Log
 
-## Orchestrator
+## 2026-08-12 Teamwork Wave 1
 
-- Branch: `codex/resume-core-career-store`
-- Worktree: `/Users/danielcassil/Code/.worktrees/resume-kit-orch-core-store`
-- Guardrail policy: workers must not edit guardrail scripts, gate runners, manifests, or public surface manifests unless explicitly assigned by the orchestrator.
+- Orchestrator branch: `codex/teamwork-workflow`
+- Worktree: `/Users/danielcassil/Code/.worktrees/resume-kit-teamwork-workflow`
+- Integration branch: `develop`
 
-## Claims
+### Claims
 
-| Status | Agent | Scope | Claimed files |
-| --- | --- | --- | --- |
-| Completed | resume-core-worker | Decomposed `resume-core/TEST_SPEC.md` into runtime tasks and implemented the `resume_core` public functions needed by the future contract while preserving guardrails. | `resume-core/resume_core/__init__.py`, `resume-core/resume_core/domain.py` |
-| Completed | career-store-storage-worker | Implemented durable SQLite-backed career-store service operations for facts, evidence, verification, relationships, job matches, and conflicts. | `career-store/career_store/store.py` |
-| Completed | career-store-matching-worker | Implemented pure career-store normalization, matching, and conflict helper functions. | `career-store/career_store/matching.py` |
+- Orchestrator: `career-mcp/career_mcp/__init__.py`, `workflow/__init__.py`, `workflow/schemas.py`, `.agents/work-log.md` - complete
+- Worker resume-agent: `resume-agent/resume_agent/__init__.py` - complete
+- Worker resume-render: `resume-render/resume_render/__init__.py` - complete
+- Worker resume-plugin: `resume-plugin/resume_plugin/__init__.py` - complete
+- Orchestrator Wave 2: `resume-cli/resume_cli/__init__.py` - complete
+
+### Sequencing
+
+- Wave 1: complete `career-mcp`, `workflow`, `resume-agent`, `resume-render`, and `resume-plugin` package surfaces. Focused package contract and boundary checks passed.
+- Wave 2: implement `resume-cli/resume_cli/__init__.py` after package surfaces exist. Focused CLI contract and boundary checks passed.
+- Verification is owned by the orchestrator after workers finish.
