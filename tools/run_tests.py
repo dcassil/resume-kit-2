@@ -32,6 +32,13 @@ CURRENT_TEST_MODULES = [
     "tests.boundary.test_tools_guardrails",
 ]
 
+FUTURE_CONTRACT_TEST_MODULES = [
+    "tests.contract.test_resume_core_contract",
+    "tests.boundary.test_resume_core_guardrails",
+    "tests.contract.test_career_store_contract",
+    "tests.boundary.test_career_store_guardrails",
+]
+
 
 GENERATED_DIRS = [
     "resume_kit.egg-info",
@@ -59,9 +66,15 @@ def run_command(command: list[str], cwd: Path, env: dict[str, str]) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", default=".", help="Repository root. Defaults to current directory.")
+    parser.add_argument(
+        "--future-contract",
+        action="store_true",
+        help="Run the next package contract target: resume-core and career-store contracts plus boundary guardrails.",
+    )
     args = parser.parse_args(argv)
 
     root = Path(args.root).resolve()
+    test_modules = FUTURE_CONTRACT_TEST_MODULES if args.future_contract else CURRENT_TEST_MODULES
     env = os.environ.copy()
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     env["PIP_DISABLE_PIP_VERSION_CHECK"] = "1"
@@ -75,7 +88,7 @@ def main(argv: list[str] | None = None) -> int:
             if install_code:
                 return install_code
 
-            return run_command([str(python), "-m", "unittest", *CURRENT_TEST_MODULES], cwd=root, env=env)
+            return run_command([str(python), "-m", "unittest", *test_modules], cwd=root, env=env)
         finally:
             clean_generated_artifacts(root)
 

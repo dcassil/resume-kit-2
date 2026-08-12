@@ -126,6 +126,66 @@ class CareerStoreGuardrailTests(unittest.TestCase):
         finally:
             shutil.rmtree(temp)
 
+    def test_public_api_scanner_ignores_method_calls(self):
+        temp = make_temp_repo()
+        try:
+            (temp / "career-store" / "store.py").write_text(
+                "def searchFacts(query):\n"
+                "    return {'status': 'ok', 'facts': query.get('facts', [])}\n",
+                encoding="utf-8",
+            )
+            result = run_guardrail(temp)
+            self.assertEqual(result.returncode, 0, result.stdout)
+        finally:
+            shutil.rmtree(temp)
+
+    def test_public_api_scanner_ignores_nested_helpers_and_methods(self):
+        temp = make_temp_repo()
+        try:
+            (temp / "career-store" / "store.py").write_text(
+                "class FactCache:\n"
+                "    def get(self, key):\n"
+                "        return None\n"
+                "def searchFacts(query):\n"
+                "    def find_local(value):\n"
+                "        return value\n"
+                "    return {'status': 'ok', 'facts': find_local(query.get('facts', []))}\n",
+                encoding="utf-8",
+            )
+            result = run_guardrail(temp)
+            self.assertEqual(result.returncode, 0, result.stdout)
+        finally:
+            shutil.rmtree(temp)
+
+    def test_unapproved_public_function_definition_is_hard_blocked(self):
+        temp = make_temp_repo()
+        try:
+            (temp / "career-store" / "store.py").write_text(
+                "def getConnection(config):\n"
+                "    return config\n",
+                encoding="utf-8",
+            )
+            result = run_guardrail(temp)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("getConnection", result.stdout)
+            self.assertIn("Potential public career-store function", result.stdout)
+        finally:
+            shutil.rmtree(temp)
+
+    def test_forbidden_exported_public_name_is_hard_blocked(self):
+        temp = make_temp_repo()
+        try:
+            (temp / "career-store" / "store.py").write_text(
+                "__all__ = ['runQuery']\n",
+                encoding="utf-8",
+            )
+            result = run_guardrail(temp)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("runQuery", result.stdout)
+            self.assertIn("Forbidden raw/destructive/prompt/render public API", result.stdout)
+        finally:
+            shutil.rmtree(temp)
+
 
 if __name__ == "__main__":
     unittest.main()

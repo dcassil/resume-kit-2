@@ -100,6 +100,8 @@ QUESTION_PATTERNS = {
 
 CODE_SUFFIXES = {".py", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"}
 IGNORED_DIRS = {"__pycache__", ".pytest_cache", "node_modules", ".venv", "venv", "dist", "build"}
+PUBLIC_FUNCTION_PREFIXES = ("search", "get", "upsert", "verify", "add", "find", "record")
+RAW_API_PATTERN = re.compile(r"(sql|query|truncate|deleteEvidence|askUser|renderResume)", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -304,31 +306,89 @@ def scan_python_imports(path: Path, text: str) -> list[Failure]:
     return failures
 
 
+def literal_string_items(node: ast.AST) -> list[str]:
+    if not isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+        return []
+    return [item.value for item in node.elts if isinstance(item, ast.Constant) and isinstance(item.value, str)]
+
+
+def is_forbidden_store_public_api_name(name: str) -> bool:
+    return name in FORBIDDEN_PUBLIC_API or (RAW_API_PATTERN.search(name) and not name.startswith("_"))
+
+
+def is_unapproved_public_store_name(name: str) -> bool:
+    return name.startswith(PUBLIC_FUNCTION_PREFIXES) and name not in ALLOWED_SURFACES and not name.startswith("_")
+
+
+def store_public_api_failure(path: Path, name: str, line: int | None) -> Failure | None:
+    if is_forbidden_store_public_api_name(name):
+        return Failure(
+            path,
+            f"Forbidden raw/destructive/prompt/render public API '{name}' appears in career-store source.",
+            "Expose semantic store APIs only. Raw SQL execution, destructive evidence deletion, prompting, and rendering are not public store surfaces.",
+            line,
+        )
+    if is_unapproved_public_store_name(name):
+        return Failure(
+            path,
+            f"Potential public career-store function '{name}' is not in career-store/TEST_SPEC.md.",
+            "Keep public API to store_surface.json functions; make helpers private or update TEST_SPEC.md and the manifest first.",
+            line,
+        )
+    return None
+
+
+def scan_python_public_api(path: Path, text: str) -> list[Failure]:
+    try:
+        tree = ast.parse(text, filename=str(path))
+    except SyntaxError as exc:
+        return [
+            Failure(
+                path,
+                f"Python source cannot be parsed: {exc.msg}.",
+                "Fix syntax before boundary guardrails can classify public API definitions.",
+                exc.lineno,
+            )
+        ]
+
+    failures: list[Failure] = []
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            failure = store_public_api_failure(path, node.name, node.lineno)
+            if failure:
+                failures.append(failure)
+        elif isinstance(node, ast.Assign):
+            if any(isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets):
+                for exported_name in literal_string_items(node.value):
+                    failure = store_public_api_failure(path, exported_name, node.lineno)
+                    if failure:
+                        failures.append(failure)
+        elif isinstance(node, ast.AnnAssign):
+            if isinstance(node.target, ast.Name) and node.target.id == "__all__" and node.value:
+                for exported_name in literal_string_items(node.value):
+                    failure = store_public_api_failure(path, exported_name, node.lineno)
+                    if failure:
+                        failures.append(failure)
+    return failures
+
+
+def scan_text_public_api(path: Path, text: str) -> list[Failure]:
+    failures: list[Failure] = []
+    for match in re.finditer(r"\b(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_][A-Za-z0-9_]*)\b", text):
+        failure = store_public_api_failure(path, match.group(1), line_for_offset(text, match.start()))
+        if failure:
+            failures.append(failure)
+    for match in re.finditer(r"\bexport\s*\{([^}]+)\}", text):
+        for exported_name in re.findall(r"\b[A-Za-z_][A-Za-z0-9_]*\b", match.group(1)):
+            failure = store_public_api_failure(path, exported_name, line_for_offset(text, match.start()))
+            if failure:
+                failures.append(failure)
+    return failures
+
+
 def scan_text(path: Path, text: str) -> list[Failure]:
     failures: list[Failure] = []
     lowered = text.lower()
-
-    for match in re.finditer(r"\b(?:def|function)\s+([A-Za-z_][A-Za-z0-9_]*)\b", text):
-        function_name = match.group(1)
-        if function_name in FORBIDDEN_PUBLIC_API or (re.search(r"(sql|query|truncate|deleteEvidence|askUser|renderResume)", function_name) and not function_name.startswith("_")):
-            failures.append(
-                Failure(
-                    path,
-                    f"Forbidden raw/destructive/prompt/render public API '{function_name}' appears in career-store source.",
-                    "Expose semantic store APIs only. Raw SQL execution, destructive evidence deletion, prompting, and rendering are not public store surfaces.",
-                    line_for_offset(text, match.start()),
-                )
-            )
-        if function_name.startswith(("search", "get", "upsert", "verify", "add", "find", "record")):
-            if function_name not in ALLOWED_SURFACES and not function_name.startswith("_"):
-                failures.append(
-                    Failure(
-                        path,
-                        f"Potential public career-store function '{function_name}' is not in career-store/TEST_SPEC.md.",
-                        "Keep public API to store_surface.json functions; make helpers private or update TEST_SPEC.md and the manifest first.",
-                        line_for_offset(text, match.start()),
-                    )
-                )
 
     for banned, message in FORBIDDEN_IMPORTS.items():
         if "-" in banned and banned in lowered:
@@ -386,18 +446,6 @@ def scan_text(path: Path, text: str) -> list[Failure]:
                 )
             )
 
-    for api_name in FORBIDDEN_PUBLIC_API:
-        pattern = re.compile(rf"(?<![a-z0-9_.-]){re.escape(api_name)}(?![a-z0-9_.-])", re.IGNORECASE)
-        match = pattern.search(text)
-        if match:
-            failures.append(
-                Failure(
-                    path,
-                    f"Forbidden public API name '{api_name}' appears in career-store source.",
-                    "Do not expose or advertise raw SQL, destructive, prompt, or render entry points from career-store.",
-                    line_for_offset(text, match.start()),
-                )
-            )
     return failures
 
 
@@ -411,6 +459,9 @@ def run(root: Path) -> list[Failure]:
         text = path.read_text(encoding="utf-8")
         if path.suffix == ".py":
             failures.extend(scan_python_imports(path, text))
+            failures.extend(scan_python_public_api(path, text))
+        else:
+            failures.extend(scan_text_public_api(path, text))
         failures.extend(scan_text(path, text))
     return failures
 

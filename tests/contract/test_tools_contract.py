@@ -75,7 +75,7 @@ class ToolsContractTests(unittest.TestCase):
 
     def test_pr_gate_command_is_the_canonical_completion_command(self):
         self.assertEqual(MANIFEST["tools"][0]["path"], "tools/run_gate.py")
-        self.assertEqual(MANIFEST["tools"][0]["supports_gate"], ["pr"])
+        self.assertEqual(MANIFEST["tools"][0]["supports_gate"], ["pr", "future_contract"])
 
     def test_pr_gate_delegates_to_current_test_runner(self):
         temp = Path(tempfile.mkdtemp(prefix="run-gate-contract-"))
@@ -108,6 +108,40 @@ class ToolsContractTests(unittest.TestCase):
             self.assertEqual(result.returncode, 7, result.stdout)
             self.assertEqual(marker.read_text(encoding="utf-8"), f"--root {temp.resolve()}")
             self.assertIn("Running PR gate", result.stdout)
+        finally:
+            shutil.rmtree(temp)
+
+    def test_future_contract_gate_delegates_to_current_test_runner(self):
+        temp = Path(tempfile.mkdtemp(prefix="run-gate-future-contract-"))
+        try:
+            tools = temp / "tools"
+            tools.mkdir()
+            shutil.copy2(TOOLS / "run_gate.py", tools / "run_gate.py")
+            marker = temp / "marker.txt"
+            (tools / "run_tests.py").write_text(
+                "\n".join(
+                    [
+                        "import sys",
+                        "from pathlib import Path",
+                        f"Path({str(marker)!r}).write_text(' '.join(sys.argv[1:]), encoding='utf-8')",
+                        "raise SystemExit(7)",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(tools / "run_gate.py"), "--future-contract", "--root", str(temp)],
+                cwd=temp,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 7, result.stdout)
+            self.assertEqual(marker.read_text(encoding="utf-8"), f"--root {temp.resolve()} --future-contract")
+            self.assertIn("Running future contract gate", result.stdout)
         finally:
             shutil.rmtree(temp)
 

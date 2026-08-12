@@ -104,6 +104,7 @@ FILE_IO_PATTERNS = [
 
 CODE_SUFFIXES = {".py", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"}
 IGNORED_DIRS = {"__pycache__", ".pytest_cache", "node_modules", ".venv", "venv", "dist", "build"}
+PUBLIC_FUNCTION_PREFIXES = ("normalize", "validate", "sanitize", "score", "get", "rank", "apply")
 
 
 @dataclass(frozen=True)
@@ -276,22 +277,98 @@ def scan_python_imports(path: Path, text: str) -> list[Failure]:
     return failures
 
 
-def scan_text(path: Path, text: str) -> list[Failure]:
-    failures: list[Failure] = []
-    lowered = text.lower()
+def is_unapproved_public_core_name(name: str) -> bool:
+    return name.startswith(PUBLIC_FUNCTION_PREFIXES) and name not in ALLOWED_SURFACES and not name.startswith("_")
 
-    for match in re.finditer(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(", text):
-        function_name = match.group(1)
-        if function_name.startswith(("normalize", "validate", "sanitize", "score", "get", "rank", "apply")):
-            if function_name not in ALLOWED_SURFACES and not function_name.startswith("_"):
+
+def literal_string_items(node: ast.AST) -> list[str]:
+    if not isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+        return []
+    return [item.value for item in node.elts if isinstance(item, ast.Constant) and isinstance(item.value, str)]
+
+
+def scan_python_public_api(path: Path, text: str) -> list[Failure]:
+    try:
+        tree = ast.parse(text, filename=str(path))
+    except SyntaxError as exc:
+        return [
+            Failure(
+                path,
+                f"Python source cannot be parsed: {exc.msg}.",
+                "Fix syntax before boundary guardrails can classify public API definitions.",
+                exc.lineno,
+            )
+        ]
+
+    failures: list[Failure] = []
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if is_unapproved_public_core_name(node.name):
                 failures.append(
                     Failure(
                         path,
-                        f"Potential public resume-core function '{function_name}' is not in resume-core/TEST_SPEC.md.",
+                        f"Potential public resume-core function '{node.name}' is not in resume-core/TEST_SPEC.md.",
                         "Keep public API to core_surface.json functions; make helpers private or update TEST_SPEC.md and the manifest first.",
+                        node.lineno,
+                    )
+                )
+        elif isinstance(node, ast.Assign):
+            if any(isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets):
+                for exported_name in literal_string_items(node.value):
+                    if is_unapproved_public_core_name(exported_name):
+                        failures.append(
+                            Failure(
+                                path,
+                                f"Exported resume-core name '{exported_name}' is not in resume-core/TEST_SPEC.md.",
+                                "Keep exported API to core_surface.json functions/types; make helpers private or update TEST_SPEC.md and the manifest first.",
+                                node.lineno,
+                            )
+                        )
+        elif isinstance(node, ast.AnnAssign):
+            if isinstance(node.target, ast.Name) and node.target.id == "__all__" and node.value:
+                for exported_name in literal_string_items(node.value):
+                    if is_unapproved_public_core_name(exported_name):
+                        failures.append(
+                            Failure(
+                                path,
+                                f"Exported resume-core name '{exported_name}' is not in resume-core/TEST_SPEC.md.",
+                                "Keep exported API to core_surface.json functions/types; make helpers private or update TEST_SPEC.md and the manifest first.",
+                                node.lineno,
+                            )
+                        )
+    return failures
+
+
+def scan_text_public_api(path: Path, text: str) -> list[Failure]:
+    failures: list[Failure] = []
+    for match in re.finditer(r"\b(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_][A-Za-z0-9_]*)\b", text):
+        function_name = match.group(1)
+        if is_unapproved_public_core_name(function_name):
+            failures.append(
+                Failure(
+                    path,
+                    f"Potential public resume-core function '{function_name}' is not in resume-core/TEST_SPEC.md.",
+                    "Keep public API to core_surface.json functions; make helpers private or update TEST_SPEC.md and the manifest first.",
+                    line_for_offset(text, match.start()),
+                )
+            )
+    for match in re.finditer(r"\bexport\s*\{([^}]+)\}", text):
+        for exported_name in re.findall(r"\b[A-Za-z_][A-Za-z0-9_]*\b", match.group(1)):
+            if is_unapproved_public_core_name(exported_name):
+                failures.append(
+                    Failure(
+                        path,
+                        f"Exported resume-core name '{exported_name}' is not in resume-core/TEST_SPEC.md.",
+                        "Keep exported API to core_surface.json functions/types; make helpers private or update TEST_SPEC.md and the manifest first.",
                         line_for_offset(text, match.start()),
                     )
                 )
+    return failures
+
+
+def scan_text(path: Path, text: str) -> list[Failure]:
+    failures: list[Failure] = []
+    lowered = text.lower()
 
     for banned, message in FORBIDDEN_IMPORTS.items():
         if "-" in banned and banned in lowered:
@@ -361,6 +438,9 @@ def run(root: Path) -> list[Failure]:
         text = path.read_text(encoding="utf-8")
         if path.suffix == ".py":
             failures.extend(scan_python_imports(path, text))
+            failures.extend(scan_python_public_api(path, text))
+        else:
+            failures.extend(scan_text_public_api(path, text))
         failures.extend(scan_text(path, text))
     return failures
 

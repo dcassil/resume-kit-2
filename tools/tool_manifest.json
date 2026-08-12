@@ -29,12 +29,12 @@
     {
       "path": "tools/run_gate.py",
       "kind": "test_runner_wrapper",
-      "supports_gate": ["pr"],
+      "supports_gate": ["pr", "future_contract"],
       "invokes_surfaces": ["tools/run_tests.py", "tests/suite_manifest.json"],
       "reads": ["tools/run_tests.py", "tests/"],
       "writes": [],
       "release_blocking": true,
-      "description": "Provides the single obvious PR completion gate command for agents and developers."
+      "description": "Provides the single obvious PR completion gate and opt-in future contract gate commands for agents and developers."
     },
     {
       "path": "tools/career_mcp_guardrails.py",

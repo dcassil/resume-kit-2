@@ -111,6 +111,68 @@ class ResumeCoreGuardrailTests(unittest.TestCase):
         finally:
             shutil.rmtree(temp)
 
+    def test_public_api_scanner_ignores_method_and_helper_calls(self):
+        temp = make_temp_repo()
+        try:
+            (temp / "resume-core" / "domain.py").write_text(
+                "import unicodedata\n"
+                "def sanitizeText(payload):\n"
+                "    text = payload.get('text', '')\n"
+                "    return {'status': 'ok', 'text': unicodedata.normalize('NFKC', text), 'warnings': []}\n",
+                encoding="utf-8",
+            )
+            result = run_guardrail(temp)
+            self.assertEqual(result.returncode, 0, result.stdout)
+        finally:
+            shutil.rmtree(temp)
+
+    def test_public_api_scanner_ignores_nested_helpers_and_methods(self):
+        temp = make_temp_repo()
+        try:
+            (temp / "resume-core" / "domain.py").write_text(
+                "class DraftNormalizer:\n"
+                "    def normalize(self, value):\n"
+                "        return value\n"
+                "def sanitizeText(payload):\n"
+                "    def validate_helper(value):\n"
+                "        return value\n"
+                "    return {'status': 'ok', 'text': validate_helper(payload['text']), 'warnings': []}\n",
+                encoding="utf-8",
+            )
+            result = run_guardrail(temp)
+            self.assertEqual(result.returncode, 0, result.stdout)
+        finally:
+            shutil.rmtree(temp)
+
+    def test_unapproved_public_function_definition_is_hard_blocked(self):
+        temp = make_temp_repo()
+        try:
+            (temp / "resume-core" / "domain.py").write_text(
+                "def validateHelper(payload):\n"
+                "    return {'status': 'ok'}\n",
+                encoding="utf-8",
+            )
+            result = run_guardrail(temp)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("validateHelper", result.stdout)
+            self.assertIn("Potential public resume-core function", result.stdout)
+        finally:
+            shutil.rmtree(temp)
+
+    def test_unapproved_exported_public_name_is_hard_blocked(self):
+        temp = make_temp_repo()
+        try:
+            (temp / "resume-core" / "domain.py").write_text(
+                "__all__ = ['rankHelper']\n",
+                encoding="utf-8",
+            )
+            result = run_guardrail(temp)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("rankHelper", result.stdout)
+            self.assertIn("Exported resume-core name", result.stdout)
+        finally:
+            shutil.rmtree(temp)
+
 
 if __name__ == "__main__":
     unittest.main()

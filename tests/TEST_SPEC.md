@@ -38,10 +38,18 @@ tests/
 Canonical current command:
 
 ```sh
-python3 tools/run_tests.py --root .
+python3 tools/run_gate.py --pr --root .
 ```
 
 This command installs the root package metadata in an isolated editable environment, verifies the runtime package layout, and runs the current executable contract and boundary suite.
+
+Future package contract target:
+
+```sh
+python3 tools/run_gate.py --future-contract --root .
+```
+
+This opt-in gate covers the resume-core and career-store contract tests plus their package boundary guardrails. It is intentionally separate from the current PR gate until those package implementations are ready.
 
 ### PR gate
 
