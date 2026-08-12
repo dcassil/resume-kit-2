@@ -1,5 +1,18 @@
 """Public runtime package for resume-core."""
 
+from .domain import (
+    applyChange,
+    getUnresolvedRequirements,
+    normalizeJobModel,
+    normalizeResume,
+    rankResumeContent,
+    sanitizeText,
+    scoreMatch,
+    validateChange,
+    validateFinalResume,
+    validateGrounding,
+    validateResume,
+)
 from .schemas import (
     CANONICAL_RESUME_SCHEMA,
     ERROR_SCHEMA,
@@ -52,6 +65,17 @@ __all__ = [
     "ResumeField",
     "Status",
     "VerificationState",
+    "applyChange",
+    "getUnresolvedRequirements",
+    "normalizeJobModel",
+    "normalizeResume",
+    "rankResumeContent",
     "require_fields",
+    "sanitizeText",
+    "scoreMatch",
     "to_json_dict",
+    "validateChange",
+    "validateFinalResume",
+    "validateGrounding",
+    "validateResume",
 ]

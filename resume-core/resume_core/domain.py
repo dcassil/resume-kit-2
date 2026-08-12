@@ -1,0 +1,888 @@
+"""Deterministic data-only domain functions for the resume-core public API."""
+
+from __future__ import annotations
+
+import copy
+import hashlib
+import re
+from typing import Any
+from unicodedata import category as _unicode_category
+from unicodedata import normalize as _unicode_normalize
+
+from .schemas import (
+    ChangeOperationStatus,
+    JsonObject,
+    RequirementClassification,
+    ResolutionState,
+    VerificationState,
+    to_json_dict,
+)
+
+
+SCHEMA_VERSION = "resume-core.result.v1"
+ALGORITHM_VERSION = "resume-core.match.v1"
+
+_RESOLVED = {
+    ResolutionState.EXACT_MATCH.value,
+    ResolutionState.ALIAS_MATCH.value,
+    ResolutionState.VERIFIED_FACT_MATCH.value,
+}
+_VERIFIED_FACT_STATES = {VerificationState.SOURCE_STATED.value, VerificationState.USER_VERIFIED.value}
+_CONTROL_WHITELIST = {"\n", "\r", "\t"}
+_SMART_TRANSLATION = str.maketrans(
+    {
+        "\u00a0": " ",
+        "\u2018": "'",
+        "\u2019": "'",
+        "\u201c": '"',
+        "\u201d": '"',
+        "\u2022": "-",
+        "\u2023": "-",
+        "\u2043": "-",
+        "\u2219": "-",
+        "\u25e6": "-",
+        "\uf0b7": "-",
+    }
+)
+_GUARDED_TERMS = {
+    "aws": ("aws", "amazon web services"),
+    "graphql": ("graphql", "graph ql"),
+    "staff_title": ("staff software engineer", "staff engineer"),
+    "unsupported_scale": ("20 million", "20m users"),
+    "unsupported_management": ("30 engineers", "managed 30"),
+}
+_NUMBER_WORDS = {
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+}
+_YEARS_RE = re.compile(r"\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\+?\s+years?\b", re.IGNORECASE)
+
+
+def sanitizeText(text: Any, rules: JsonObject | None = None) -> JsonObject:
+    """Normalize ATS-hostile characters and report unsupported controls."""
+
+    del rules
+    if text is None:
+        return _result("error", text="", warnings=[_issue("invalid_text", "text is required.")])
+
+    warnings: list[JsonObject] = []
+    normalized_chars: list[str] = []
+    for index, char in enumerate(str(text).translate(_SMART_TRANSLATION)):
+        if _unicode_category(char) == "Cc" and char not in _CONTROL_WHITELIST:
+            warnings.append(
+                _issue(
+                    "unsupported_control_character",
+                    "Removed unsupported control character.",
+                    f"text/{index}",
+                    {"codepoint": f"U+{ord(char):04X}"},
+                )
+            )
+        else:
+            normalized_chars.append(char)
+
+    cleaned = _unicode_normalize("NFKC", "".join(normalized_chars))
+    return _result("warning" if warnings else "ok", text=cleaned, warnings=warnings)
+
+
+def normalizeResume(source_resume: Any, config: JsonObject | None = None) -> JsonObject:
+    """Normalize supplied structured resume data without adding unsupported claims."""
+
+    del config
+    resume = _unwrap(source_resume, "source_resume")
+    if not isinstance(resume, dict):
+        return _result(
+            "error",
+            canonical_resume={},
+            warnings=[_issue("invalid_resume", "source_resume must be an object.")],
+            provenance_map={},
+        )
+
+    warnings: list[JsonObject] = []
+    normalized = _clean_copy(resume, warnings)
+    for field_name in ("experience", "skills", "education"):
+        if field_name not in normalized:
+            normalized[field_name] = []
+            warnings.append(_issue("missing_array_normalized", f"Added empty {field_name} array.", field_name))
+    if "schema_version" not in normalized:
+        normalized["schema_version"] = "canonical-resume.v1"
+    if "resume_id" not in normalized:
+        normalized["resume_id"] = _stable_id("resume", _text(normalized))
+    if "source" not in normalized:
+        normalized["source"] = {"kind": "structured"}
+    if "provenance" not in normalized:
+        normalized["provenance"] = []
+    if "verification_state" not in normalized:
+        normalized["verification_state"] = VerificationState.SOURCE_STATED.value
+
+    provenance_map = {}
+    for entry in _array(_item(normalized, "provenance", [])):
+        if isinstance(entry, dict) and "claim_id" in entry:
+            provenance_map[str(entry["claim_id"])] = copy.deepcopy(entry)
+
+    return _result(
+        "warning" if warnings else "ok",
+        canonical_resume=normalized,
+        warnings=warnings,
+        provenance_map=provenance_map,
+    )
+
+
+def validateResume(canonical_resume: Any) -> JsonObject:
+    """Validate canonical resume shape, required arrays, dates, and truth states."""
+
+    resume = _unwrap(canonical_resume, "canonical_resume")
+    errors: list[JsonObject] = []
+    warnings: list[JsonObject] = []
+    if not isinstance(resume, dict):
+        return _result("error", errors=[_issue("invalid_resume", "canonical_resume must be an object.")], warnings=warnings)
+
+    for field_name in ("schema_version", "experience", "skills", "education"):
+        if field_name not in resume:
+            errors.append(_issue("missing_field", f"CanonicalResume requires {field_name}.", field_name))
+    for field_name in ("experience", "skills", "education"):
+        if field_name in resume and not isinstance(resume[field_name], list):
+            errors.append(_issue("invalid_array", f"{field_name} must be an array.", field_name))
+
+    state = _item(resume, "verification_state")
+    valid_states = {item.value for item in VerificationState}
+    if state is not None and state not in valid_states:
+        errors.append(_issue("invalid_verification_state", "Unknown verification state.", "verification_state"))
+
+    provenance = _item(resume, "provenance", [])
+    if provenance is not None and not isinstance(provenance, list):
+        errors.append(_issue("invalid_provenance", "provenance must be an array.", "provenance"))
+    else:
+        for index, entry in enumerate(_array(provenance)):
+            if not isinstance(entry, dict) or "source" not in entry or "text" not in entry:
+                errors.append(_issue("malformed_provenance", "Provenance entries require source and text.", f"provenance/{index}"))
+
+    for index, entry in enumerate(_array(_item(resume, "experience", []))):
+        if isinstance(entry, dict):
+            _check_dates(entry, f"experience/{index}", errors, warnings)
+
+    return _result("error" if errors else "ok", errors=errors, warnings=warnings)
+
+
+def normalizeJobModel(source_job: Any, config: JsonObject | None = None) -> JsonObject:
+    """Normalize job requirements with deterministic requirement IDs."""
+
+    job = _unwrap(source_job, "source_job")
+    config = config or {}
+    if not isinstance(job, dict):
+        return _result("error", job_model={}, warnings=[_issue("invalid_job", "source_job must be an object.")])
+
+    warnings: list[JsonObject] = []
+    raw_requirements = _item(job, "requirements", [])
+    if isinstance(raw_requirements, str):
+        raw_requirements = [line.strip() for line in raw_requirements.splitlines() if line.strip()]
+    if not isinstance(raw_requirements, list):
+        raw_requirements = []
+        warnings.append(_issue("invalid_requirements", "requirements must be an array.", "requirements"))
+
+    requirements = [_requirement(item, index, config) for index, item in enumerate(raw_requirements)]
+    model = {
+        "schema_version": _item(job, "schema_version", "job-model.v1"),
+        "job_id": _item(job, "job_id") or _stable_id("job", _text(job)),
+        "title": _item(job, "title"),
+        "company": _item(job, "company"),
+        "source": copy.deepcopy(_item(job, "source", {"kind": "structured"})),
+        "metadata": copy.deepcopy(_item(job, "metadata", {})),
+        "requirements": requirements,
+    }
+    return _result("warning" if warnings else "ok", job_model=model, warnings=warnings)
+
+
+def scoreMatch(
+    canonical_resume: Any,
+    job_model: Any,
+    career_fact_dtos: list[JsonObject] | None = None,
+    config: JsonObject | None = None,
+) -> JsonObject:
+    """Score resume and job fit from supplied resume, job, fact DTO, and config data."""
+
+    resume = _unwrap(canonical_resume, "canonical_resume")
+    job = _unwrap(job_model, "job_model")
+    config = config or {}
+    facts = [item for item in career_fact_dtos or [] if isinstance(item, dict)]
+    if not isinstance(resume, dict) or not isinstance(job, dict):
+        return _result("error", match_result=_empty_match())
+
+    resume_text = _normal_text(_text(resume))
+    aliases = _alias_map(config)
+    fact_index = _fact_index(facts)
+    requirement_results: list[JsonObject] = []
+    unresolved: list[str] = []
+    score = 0.0
+    max_score = 0.0
+
+    for requirement in _requirements(job):
+        requirement_id = str(_item(requirement, "requirement_id") or _stable_id("req", _text(requirement)))
+        classification = _classification(requirement)
+        weight = _number(_item(requirement, "weight"), 1.0)
+        terms = _terms(requirement)
+        max_score += max(weight, 0.0)
+        state = ResolutionState.UNKNOWN.value
+        matched_fact_ids: list[str] = []
+        evidence: list[JsonObject] = []
+
+        if _terms_in_text(terms, resume_text):
+            state = ResolutionState.EXACT_MATCH.value
+            evidence.append({"source": "resume", "terms": terms})
+        else:
+            alias_terms = sorted({alias for term in terms for alias in _item(aliases, term, set())})
+            if alias_terms and _terms_in_text(alias_terms, resume_text):
+                state = ResolutionState.ALIAS_MATCH.value
+                evidence.append({"source": "alias", "terms": alias_terms})
+            else:
+                matched_fact_ids = _fact_matches(terms, fact_index, bool(_item(config, "allow_inferred_facts", False)))
+                if matched_fact_ids:
+                    state = ResolutionState.VERIFIED_FACT_MATCH.value
+                    evidence.extend({"source": "career_fact", "fact_id": fact_id} for fact_id in matched_fact_ids)
+
+        requirement_score = weight if state in _RESOLVED else 0.0
+        blocking = classification == RequirementClassification.REQUIRED.value and state not in _RESOLVED
+        if blocking:
+            unresolved.append(requirement_id)
+        score += requirement_score
+        requirement_results.append(
+            {
+                "requirement_id": requirement_id,
+                "classification": classification,
+                "resolution_state": state,
+                "score": round(requirement_score, 4),
+                "max_score": round(max(weight, 0.0), 4),
+                "matched_fact_ids": matched_fact_ids,
+                "blocking": blocking,
+                "evidence": evidence,
+            }
+        )
+
+    strict = _strict_policy(config)
+    match = {
+        "schema_version": "match-result.v1",
+        "match_id": _stable_id("match", f"{_item(resume, 'resume_id', '')}:{_item(job, 'job_id', '')}:{score}:{unresolved}"),
+        "job_id": str(_item(job, "job_id", "")),
+        "resume_id": str(_item(resume, "resume_id", "")),
+        "score": round(score, 4),
+        "max_score": round(max_score, 4),
+        "score_percent": round(score * 100 / max_score, 2) if max_score else 0.0,
+        "requirement_results": requirement_results,
+        "unresolved_requirement_ids": unresolved,
+        "can_continue": not unresolved or not strict,
+        "explanations": ["Required unresolved requirements block continuation." if unresolved and strict else "No required hard gate is blocking continuation."],
+        "algorithm_version": ALGORITHM_VERSION,
+    }
+    return _result("ok", match_result=match)
+
+
+def getUnresolvedRequirements(match_result: Any, policy: JsonObject | None = None) -> JsonObject:
+    """Return unresolved requirement DTOs and continuation gate state."""
+
+    match = _unwrap(match_result, "match_result")
+    policy = policy or {}
+    if not isinstance(match, dict):
+        return _result("error", unresolved_requirements=[], can_continue=False)
+
+    unresolved_ids = {str(item) for item in _array(_item(match, "unresolved_requirement_ids", []))}
+    unresolved = [
+        copy.deepcopy(item)
+        for item in _array(_item(match, "requirement_results", []))
+        if isinstance(item, dict)
+        and (
+            _item(item, "requirement_id") in unresolved_ids
+            or (_item(item, "classification") == RequirementClassification.REQUIRED.value and _item(item, "resolution_state") not in _RESOLVED)
+        )
+    ]
+    require_resolution = bool(_item(policy, "require_hard_resolution") or _item(policy, "require_resolution") or _item(policy, "policy") == "strict")
+    can_continue = not unresolved if require_resolution else bool(_item(match, "can_continue", True))
+    return _result("ok", unresolved_requirements=unresolved, can_continue=can_continue)
+
+
+def rankResumeContent(canonical_resume: Any, job_model: Any, match_result: Any, config: JsonObject | None = None) -> JsonObject:
+    """Build a deterministic content ranking while preserving the base resume."""
+
+    del match_result
+    resume = _unwrap(canonical_resume, "canonical_resume")
+    job = _unwrap(job_model, "job_model")
+    config = config or {}
+    if not isinstance(resume, dict) or not isinstance(job, dict):
+        return _result("error", selection_plan={}, ranked_content=[])
+
+    terms = sorted({term for requirement in _requirements(job) for term in _terms(requirement)})
+    experience_limit = int(_item(config, "max_experience", _item(config, "experience_max", len(_array(_item(resume, "experience", []))))))
+    skills_limit = int(_item(config, "max_skills", _item(config, "skills_max", len(_array(_item(resume, "skills", []))))))
+    bullet_limit = int(_item(config, "max_bullets_per_role", _item(config, "bullets_per_role_max", 999)))
+    ranked: list[JsonObject] = []
+
+    for index, item in enumerate(_array(_item(resume, "experience", []))):
+        item_id = _item(item, "id", f"experience_{index}") if isinstance(item, dict) else f"experience_{index}"
+        ranked.append({"kind": "experience", "id": item_id, "source_index": index, "score": _relevance(_text(item), terms)})
+    for index, item in enumerate(_array(_item(resume, "skills", []))):
+        ranked.append({"kind": "skill", "id": f"skill_{index}", "source_index": index, "score": _relevance(_text(item), terms)})
+
+    ranked.sort(key=lambda item: (-item["score"], item["kind"], item["source_index"]))
+    plan = {
+        "section_order": list(_item(config, "section_order", ["basics", "summary", "skills", "experience", "education"])),
+        "experience_ids": [item["id"] for item in ranked if item["kind"] == "experience"][: max(experience_limit, 0)],
+        "skill_indices": [item["source_index"] for item in ranked if item["kind"] == "skill"][: max(skills_limit, 0)],
+        "limits": {
+            "max_experience": max(experience_limit, 0),
+            "max_skills": max(skills_limit, 0),
+            "max_bullets_per_role": max(bullet_limit, 0),
+        },
+    }
+    return _result("ok", selection_plan=plan, ranked_content=ranked)
+
+
+def validateChange(
+    canonical_resume: Any,
+    operation: Any,
+    job_model: Any,
+    career_fact_dtos: list[JsonObject] | None = None,
+    policy: JsonObject | None = None,
+) -> JsonObject:
+    """Validate a proposed resume change against current content and supplied facts."""
+
+    resume = _unwrap(canonical_resume, "canonical_resume")
+    op = _unwrap(operation, "operation")
+    job = _unwrap(job_model, "job_model")
+    policy = policy or {}
+    facts = [item for item in career_fact_dtos or [] if isinstance(item, dict)]
+    grounding = {"supported": False, "supporting_fact_ids": [], "supporting_requirement_ids": [], "guarded_claims": []}
+    if not isinstance(resume, dict) or not isinstance(op, dict):
+        return _result("error", operation_id="", validation_state="rejected", errors=[_issue("invalid_operation", "operation and canonical_resume must be objects.")], grounding=grounding)
+
+    errors: list[JsonObject] = []
+    operation_id = str(_item(op, "operation_id", ""))
+    if _item(op, "status", ChangeOperationStatus.PROPOSED.value) != ChangeOperationStatus.PROPOSED.value:
+        errors.append(_issue("invalid_status", "Only proposed operations can be validated.", "status"))
+    path = str(_item(op, "path", ""))
+    if not path.startswith("/"):
+        errors.append(_issue("invalid_path", "Operation path must be a JSON pointer.", "path"))
+
+    path_exists, current_value = _pointer_value(resume, path)
+    if "before" in op and _item(op, "before") != current_value and not (_item(op, "before") is None and not path_exists):
+        errors.append(_issue("before_mismatch", "Operation before value does not match current content.", "before"))
+
+    requirements = {str(_item(item, "requirement_id")): item for item in _requirements(job) if isinstance(item, dict)}
+    linked_requirement_ids = [str(item) for item in _array(_item(op, "linked_requirement_ids", []))]
+    missing_requirements = [item for item in linked_requirement_ids if item not in requirements]
+    if missing_requirements:
+        errors.append(_issue("missing_requirement", "Operation references missing requirement IDs.", "linked_requirement_ids", {"requirement_ids": missing_requirements}))
+
+    fact_index = _fact_index(facts)
+    linked_fact_ids = [str(item) for item in _array(_item(op, "linked_fact_ids", []))]
+    missing_fact_ids = [item for item in linked_fact_ids if item not in fact_index]
+    if missing_fact_ids:
+        errors.append(_issue("missing_fact", "Operation references missing fact IDs.", "linked_fact_ids", {"fact_ids": missing_fact_ids}))
+
+    after_text = _normal_text(_text(_item(op, "after")))
+    guarded = _guarded_claims(after_text)
+    support_by_claim = _claim_support(guarded, fact_index, linked_fact_ids, bool(_item(policy, "allow_inferred_facts", False)))
+    supported_claims = set(support_by_claim)
+    supporting_fact_ids = sorted({fact_id for ids in support_by_claim.values() for fact_id in ids})
+    grounding = {
+        "supported": False,
+        "supporting_fact_ids": supporting_fact_ids,
+        "supporting_requirement_ids": linked_requirement_ids,
+        "guarded_claims": sorted(guarded),
+    }
+
+    unsupported_guarded = guarded - supported_claims
+    if unsupported_guarded:
+        errors.append(_issue("unsupported_guarded_claim", "Guarded claims require exact supplied verified fact DTO support.", "after", {"claims": sorted(unsupported_guarded)}))
+    if _years(after_text) and not _facts_support_terms(_years(after_text), fact_index, linked_fact_ids, bool(_item(policy, "allow_inferred_facts", False))):
+        errors.append(_issue("unsupported_years_claim", "Years-of-experience claims require matching verified fact support.", "after"))
+    if guarded and not linked_fact_ids:
+        errors.append(_issue("missing_linked_fact", "Guarded changes must link supporting fact IDs.", "linked_fact_ids"))
+
+    grounding["supported"] = not errors
+    validation_state = "validated" if not errors else "rejected"
+    result = _result("ok" if not errors else "rejected", operation_id=operation_id, validation_state=validation_state, errors=errors, grounding=grounding)
+    if not errors:
+        validated = copy.deepcopy(op)
+        validated["status"] = ChangeOperationStatus.VALIDATED.value
+        validated["validation_state"] = validation_state
+        result["validated_operation"] = to_json_dict(validated)
+    return result
+
+
+def applyChange(working_resume: Any, validated_operation: Any) -> JsonObject:
+    """Apply only validated operations to a copied working resume."""
+
+    resume = _unwrap(working_resume, "working_resume")
+    op = _unwrap(validated_operation, "validated_operation")
+    operation_id = str(_item(op, "operation_id", "")) if isinstance(op, dict) else ""
+    if not isinstance(resume, dict) or not isinstance(op, dict):
+        return _result("error", working_resume=copy.deepcopy(resume) if isinstance(resume, dict) else {}, operation_id=operation_id, audit={"applied": False})
+    if _item(op, "status") != ChangeOperationStatus.VALIDATED.value and _item(op, "validation_state") != "validated":
+        return _result("rejected", working_resume=copy.deepcopy(resume), operation_id=operation_id, audit={"applied": False, "reason": "operation_not_validated"})
+
+    result_resume = copy.deepcopy(resume)
+    path = str(_item(op, "path", ""))
+    before = _item(op, "before")
+    after = copy.deepcopy(_item(op, "after"))
+    path_exists, current = _pointer_value(result_resume, path)
+    if current == after:
+        return _result("ok", working_resume=result_resume, operation_id=operation_id, audit={"applied": False, "already_applied": True})
+    if before != current and not (before is None and not path_exists):
+        return _result("rejected", working_resume=result_resume, operation_id=operation_id, audit={"applied": False, "reason": "before_mismatch"})
+    applied = _set_pointer(result_resume, path, after)
+    return _result("ok" if applied else "error", working_resume=result_resume, operation_id=operation_id, audit={"applied": applied, "status_transition": "validated->applied" if applied else "not_applied"})
+
+
+def validateGrounding(
+    working_resume: Any,
+    career_fact_dtos: list[JsonObject] | None = None,
+    applied_operations: list[JsonObject] | None = None,
+    policy: JsonObject | None = None,
+) -> JsonObject:
+    """Check final resume claims against supplied facts and operation provenance."""
+
+    resume = _unwrap(working_resume, "working_resume")
+    policy = policy or {}
+    facts = [item for item in career_fact_dtos or [] if isinstance(item, dict)]
+    if not isinstance(resume, dict):
+        return _result("error", unsupported_claims=[], missing_provenance=[], warnings=[])
+
+    fact_index = _fact_index(facts)
+    linked_fact_ids = [
+        str(fact_id)
+        for operation in applied_operations or []
+        if isinstance(operation, dict)
+        for fact_id in _array(_item(operation, "linked_fact_ids", []))
+    ]
+    text = _normal_text(_text(resume))
+    guarded = _guarded_claims(text)
+    supported = set(_claim_support(guarded, fact_index, linked_fact_ids, bool(_item(policy, "allow_inferred_facts", False))))
+    unsupported = [{"claim": claim, "reason": "missing_verified_fact"} for claim in sorted(guarded - supported)]
+    if not _item(policy, "allow_inferred_facts", False):
+        for fact in facts:
+            if _item(fact, "verification_state") == VerificationState.INFERRED.value and _term_in_text(_fact_text(fact), text):
+                unsupported.append({"claim": str(_item(fact, "fact_id", "")), "reason": "inferred_fact_not_allowed"})
+    missing_provenance = _missing_provenance(resume)
+    return _result("fail" if unsupported or missing_provenance else "pass", unsupported_claims=unsupported, missing_provenance=missing_provenance, warnings=[])
+
+
+def validateFinalResume(
+    working_resume: Any,
+    job_model: Any,
+    career_fact_dtos: list[JsonObject] | None = None,
+    config: JsonObject | None = None,
+) -> JsonObject:
+    """Run final deterministic validation and scoring before rendering/export."""
+
+    resume = _unwrap(working_resume, "working_resume")
+    config = config or {}
+    validation = validateResume(resume)
+    grounding = validateGrounding(resume, career_fact_dtos or [], [], config)
+    scoring = scoreMatch(resume, job_model, career_fact_dtos or [], config)
+    errors = list(_item(validation, "errors", []))
+    if _item(grounding, "status") == "fail":
+        errors.extend(_item(grounding, "unsupported_claims", []))
+        errors.extend(_item(grounding, "missing_provenance", []))
+    warnings = list(_item(validation, "warnings", [])) + list(_item(grounding, "warnings", []))
+    warnings.extend(_duplicate_warnings(resume if isinstance(resume, dict) else {}))
+    warnings.extend(_keyword_warnings(resume if isinstance(resume, dict) else {}))
+    return _result(
+        "pass" if not errors else "fail",
+        final_resume=copy.deepcopy(resume) if isinstance(resume, dict) else {},
+        match_result=_item(scoring, "match_result", _empty_match()),
+        errors=errors,
+        warnings=warnings,
+    )
+
+
+def _result(status: str, **fields: Any) -> JsonObject:
+    return {"schema_version": SCHEMA_VERSION, "status": status, **to_json_dict(fields)}
+
+
+def _issue(code: str, message: str, field_path: str | None = None, details: JsonObject | None = None) -> JsonObject:
+    issue: JsonObject = {"code": code, "message": message, "severity": "error"}
+    if field_path is not None:
+        issue["field_path"] = field_path
+    if details:
+        issue["details"] = details
+    return issue
+
+
+def _item(mapping: Any, key: str, default: Any = None) -> Any:
+    if isinstance(mapping, dict) and key in mapping:
+        return mapping[key]
+    return default
+
+
+def _unwrap(value: Any, key: str) -> Any:
+    payload = to_json_dict(value)
+    if isinstance(payload, dict) and key in payload:
+        return payload[key]
+    return payload
+
+
+def _array(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else []
+
+
+def _clean_copy(value: Any, warnings: list[JsonObject]) -> Any:
+    if isinstance(value, str):
+        sanitized = sanitizeText(value)
+        warnings.extend(_item(sanitized, "warnings", []))
+        return sanitized["text"]
+    if isinstance(value, list):
+        return [_clean_copy(item, warnings) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _clean_copy(item, warnings) for key, item in value.items()}
+    return copy.deepcopy(value)
+
+
+def _text(value: Any) -> str:
+    value = to_json_dict(value)
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (int, float, bool)):
+        return str(value)
+    if isinstance(value, list):
+        return " ".join(_text(item) for item in value)
+    if isinstance(value, dict):
+        return " ".join(_text(item) for key, item in sorted(value.items()) if key != "metadata")
+    return str(value)
+
+
+def _normal_text(value: Any) -> str:
+    return " ".join(str(value).lower().replace("/", " ").replace("-", " ").split())
+
+
+def _stable_id(prefix: str, value: Any) -> str:
+    digest = hashlib.sha256(_text(value).encode("utf-8")).hexdigest()[:12]
+    return f"{prefix}_{digest}"
+
+
+def _check_dates(entry: JsonObject, path: str, errors: list[JsonObject], warnings: list[JsonObject]) -> None:
+    start = _date_key(_item(entry, "start_date"))
+    end_value = _item(entry, "end_date")
+    end = _date_key(end_value)
+    if _item(entry, "start_date") and start is None:
+        warnings.append(_issue("ambiguous_start_date", "Start date is ambiguous.", f"{path}/start_date"))
+    if end_value and str(end_value).lower() not in {"present", "current"} and end is None:
+        warnings.append(_issue("ambiguous_end_date", "End date is ambiguous.", f"{path}/end_date"))
+    if start and end and start > end:
+        errors.append(_issue("reversed_date_range", "Start date is after end date.", path))
+
+
+def _date_key(value: Any) -> tuple[int, int] | None:
+    if value is None or str(value).lower() in {"present", "current"}:
+        return None
+    match = re.fullmatch(r"(\d{4})(?:-(\d{1,2}))?", str(value).strip())
+    if not match:
+        return None
+    year = int(match.group(1))
+    month = int(match.group(2) or "1")
+    if year < 1900 or month < 1 or month > 12:
+        return None
+    return (year, month)
+
+
+def _requirement(raw: Any, index: int, config: JsonObject) -> JsonObject:
+    if isinstance(raw, str):
+        source_text = raw
+        concept = raw
+        classification = _infer_classification(raw)
+        terms = _terms_for(raw)
+        importance = _default_importance(classification)
+        weight = _default_weight(classification, importance)
+        requirement_id = _stable_requirement_id(index, concept, config)
+        years = _extract_years(raw)
+    elif isinstance(raw, dict):
+        source_text = str(_item(raw, "source_text") or _item(raw, "concept") or "")
+        concept = str(_item(raw, "concept") or source_text)
+        classification = str(_item(raw, "classification") or _infer_classification(source_text))
+        raw_terms = _item(raw, "normalized_terms")
+        terms = [str(term).lower() for term in raw_terms] if isinstance(raw_terms, list) else _terms_for(concept)
+        importance = str(_item(raw, "importance") or _default_importance(classification))
+        weight = _number(_item(raw, "weight"), _default_weight(classification, importance))
+        requirement_id = str(_item(raw, "requirement_id") or _stable_requirement_id(index, concept, config))
+        years = _item(raw, "years") or _extract_years(source_text)
+    else:
+        source_text = str(raw)
+        concept = source_text
+        classification = RequirementClassification.CONTEXTUAL.value
+        terms = _terms_for(source_text)
+        importance = "low"
+        weight = 1.0
+        requirement_id = _stable_requirement_id(index, concept, config)
+        years = None
+    if classification not in {item.value for item in RequirementClassification}:
+        classification = RequirementClassification.CONTEXTUAL.value
+    return {
+        "requirement_id": requirement_id,
+        "classification": classification,
+        "concept": concept,
+        "importance": importance,
+        "weight": weight,
+        "source_text": source_text,
+        "normalized_terms": terms,
+        "years": years,
+    }
+
+
+def _stable_requirement_id(index: int, concept: str, config: JsonObject) -> str:
+    prefix = str(_item(config, "requirement_id_prefix", "req"))
+    return f"{prefix}_{index}_{hashlib.sha256(concept.lower().encode('utf-8')).hexdigest()[:8]}"
+
+
+def _infer_classification(text: str) -> str:
+    lowered = text.lower()
+    if "preferred" in lowered or "nice to have" in lowered:
+        return RequirementClassification.PREFERRED.value
+    if "required" in lowered or "must" in lowered or "8+" in lowered:
+        return RequirementClassification.REQUIRED.value
+    return RequirementClassification.CONTEXTUAL.value
+
+
+def _default_importance(classification: str) -> str:
+    if classification == RequirementClassification.REQUIRED.value:
+        return "high"
+    if classification == RequirementClassification.PREFERRED.value:
+        return "medium"
+    return "low"
+
+
+def _default_weight(classification: str, importance: Any) -> float:
+    if classification == RequirementClassification.REQUIRED.value:
+        return 10.0
+    if classification == RequirementClassification.PREFERRED.value:
+        return 3.0
+    return 2.0 if str(importance) == "medium" else 1.0
+
+
+def _requirements(job: Any) -> list[JsonObject]:
+    if not isinstance(job, dict):
+        return []
+    return [item for item in _array(_item(job, "requirements", [])) if isinstance(item, dict)]
+
+
+def _classification(requirement: JsonObject) -> str:
+    value = str(_item(requirement, "classification", RequirementClassification.CONTEXTUAL.value))
+    return value if value in {item.value for item in RequirementClassification} else RequirementClassification.CONTEXTUAL.value
+
+
+def _terms(requirement: JsonObject) -> list[str]:
+    raw = _item(requirement, "normalized_terms")
+    if isinstance(raw, list) and raw:
+        return sorted({_normal_text(item) for item in raw if _normal_text(item)})
+    return _terms_for(_item(requirement, "concept") or _item(requirement, "source_text") or "")
+
+
+def _terms_for(value: Any) -> list[str]:
+    text = _normal_text(value)
+    if not text:
+        return []
+    terms = {text}
+    terms.update(part for part in text.split() if len(part) > 1)
+    return sorted(terms)
+
+
+def _terms_in_text(terms: list[str], text: str) -> bool:
+    return any(_term_in_text(term, text) for term in terms)
+
+
+def _term_in_text(term: Any, text: str) -> bool:
+    normalized = _normal_text(term)
+    return bool(normalized and normalized in _normal_text(text))
+
+
+def _alias_map(config: JsonObject) -> dict[str, set[str]]:
+    raw = _item(config, "aliases", _item(config, "alias_map", {}))
+    aliases: dict[str, set[str]] = {}
+    if isinstance(raw, dict):
+        for key, value in raw.items():
+            alias_values = value if isinstance(value, list) else [value]
+            aliases[_normal_text(key)] = {_normal_text(item) for item in alias_values if _normal_text(item)}
+    return aliases
+
+
+def _fact_index(facts: list[JsonObject]) -> dict[str, JsonObject]:
+    index: dict[str, JsonObject] = {}
+    for fact in facts:
+        fact_id = _item(fact, "fact_id")
+        if fact_id:
+            index[str(fact_id)] = fact
+    return index
+
+
+def _fact_text(fact: JsonObject) -> str:
+    pieces = [_item(fact, "text", "")]
+    pieces.extend(_array(_item(fact, "normalized_terms", [])))
+    for entry in _array(_item(fact, "evidence", [])):
+        if isinstance(entry, dict):
+            pieces.append(_item(entry, "text", ""))
+    return _normal_text(" ".join(_text(item) for item in pieces))
+
+
+def _fact_allowed(fact: JsonObject, allow_inferred: bool) -> bool:
+    state = _item(fact, "verification_state", VerificationState.UNKNOWN.value)
+    return state in _VERIFIED_FACT_STATES or (allow_inferred and state == VerificationState.INFERRED.value)
+
+
+def _fact_matches(terms: list[str], fact_index: dict[str, JsonObject], allow_inferred: bool) -> list[str]:
+    matches = []
+    for fact_id, fact in sorted(fact_index.items()):
+        if _fact_allowed(fact, allow_inferred) and _terms_in_text(terms, _fact_text(fact)):
+            matches.append(fact_id)
+    return matches
+
+
+def _strict_policy(config: JsonObject) -> bool:
+    return bool(_item(config, "require_hard_resolution") or _item(config, "policy") == "strict")
+
+
+def _number(value: Any, default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def _guarded_claims(text: str) -> set[str]:
+    normalized = _normal_text(text)
+    return {claim for claim, terms in _GUARDED_TERMS.items() if any(_term_in_text(term, normalized) for term in terms)}
+
+
+def _claim_support(guarded: set[str], fact_index: dict[str, JsonObject], linked_fact_ids: list[str], allow_inferred: bool) -> dict[str, list[str]]:
+    supported: dict[str, list[str]] = {}
+    for claim in guarded:
+        terms = _GUARDED_TERMS[claim]
+        for fact_id in linked_fact_ids:
+            fact = _item(fact_index, str(fact_id))
+            if isinstance(fact, dict) and _fact_allowed(fact, allow_inferred) and any(_term_in_text(term, _fact_text(fact)) for term in terms):
+                if claim not in supported:
+                    supported[claim] = []
+                supported[claim].append(str(fact_id))
+    return supported
+
+
+def _years(text: str) -> list[str]:
+    return [match.group(0).lower() for match in _YEARS_RE.finditer(text)]
+
+
+def _extract_years(text: str) -> str | None:
+    matches = _years(text)
+    return matches[0] if matches else None
+
+
+def _facts_support_terms(terms: list[str], fact_index: dict[str, JsonObject], linked_fact_ids: list[str], allow_inferred: bool) -> bool:
+    for term in terms:
+        for fact_id in linked_fact_ids:
+            fact = _item(fact_index, str(fact_id))
+            if isinstance(fact, dict) and _fact_allowed(fact, allow_inferred) and _term_in_text(term, _fact_text(fact)):
+                return True
+    return False
+
+
+def _pointer_value(document: Any, pointer: str) -> tuple[bool, Any]:
+    if not pointer.startswith("/"):
+        return False, None
+    current = document
+    for token in pointer.strip("/").split("/"):
+        token = token.replace("~1", "/").replace("~0", "~")
+        if isinstance(current, dict) and token in current:
+            current = current[token]
+        elif isinstance(current, list) and token.isdigit() and int(token) < len(current):
+            current = current[int(token)]
+        elif isinstance(current, list) and token == "-":
+            return False, None
+        else:
+            return False, None
+    return True, current
+
+
+def _set_pointer(document: JsonObject, pointer: str, value: Any) -> bool:
+    if not pointer.startswith("/"):
+        return False
+    tokens = [token.replace("~1", "/").replace("~0", "~") for token in pointer.strip("/").split("/")]
+    current: Any = document
+    for token in tokens[:-1]:
+        if isinstance(current, dict):
+            if token not in current:
+                current[token] = {}
+            current = current[token]
+        elif isinstance(current, list) and token.isdigit() and int(token) < len(current):
+            current = current[int(token)]
+        else:
+            return False
+    final = tokens[-1] if tokens else ""
+    if isinstance(current, dict):
+        current[final] = value
+        return True
+    if isinstance(current, list):
+        if final == "-":
+            current.append(value)
+            return True
+        if final.isdigit() and int(final) < len(current):
+            current[int(final)] = value
+            return True
+    return False
+
+
+def _missing_provenance(resume: JsonObject) -> list[JsonObject]:
+    provenance = _array(_item(resume, "provenance", []))
+    if provenance:
+        return []
+    claims = []
+    for field_name in ("summary", "skills", "experience", "projects"):
+        if _item(resume, field_name):
+            claims.append({"field_path": field_name, "reason": "missing_provenance"})
+    return claims
+
+
+def _duplicate_warnings(resume: JsonObject) -> list[JsonObject]:
+    warnings: list[JsonObject] = []
+    seen: set[str] = set()
+    for item in _array(_item(resume, "skills", [])):
+        key = _normal_text(item)
+        if key in seen:
+            warnings.append(_issue("duplicate_skill", "Duplicate skill detected.", "skills"))
+        seen.add(key)
+    return warnings
+
+
+def _keyword_warnings(resume: JsonObject) -> list[JsonObject]:
+    warnings: list[JsonObject] = []
+    words = _normal_text(_text(resume)).split()
+    if not words:
+        return warnings
+    for word in sorted(set(words)):
+        if len(word) > 2 and words.count(word) > max(8, len(words) // 5):
+            warnings.append(_issue("possible_keyword_stuffing", "Repeated term detected.", "resume", {"term": word}))
+            break
+    return warnings
+
+
+def _relevance(text: Any, terms: list[str]) -> int:
+    normalized = _normal_text(text)
+    return sum(1 for term in terms if _term_in_text(term, normalized))
+
+
+def _empty_match() -> JsonObject:
+    return {
+        "schema_version": "match-result.v1",
+        "match_id": "match_empty",
+        "job_id": "",
+        "resume_id": "",
+        "score": 0.0,
+        "max_score": 0.0,
+        "requirement_results": [],
+        "unresolved_requirement_ids": [],
+        "can_continue": False,
+        "algorithm_version": ALGORITHM_VERSION,
+    }
