@@ -237,7 +237,7 @@ def run_smoke(root: Path, workspace: Path, keep_workspace: bool) -> None:
 
 
 def load_public_packages() -> dict[str, Any]:
-    require(importlib.metadata.version("resume-kit") == "0.0.0", "resume-kit package metadata is unavailable or wrong")
+    require(importlib.metadata.version("resume-kit"), "resume-kit package metadata is unavailable")
     modules: dict[str, Any] = {}
     for name in PACKAGE_IMPORTS:
         modules[name] = importlib.import_module(name)

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "resume-kit"
-version = "0.0.0"
+version = "0.1.0"
 description = "Contract-first resume tailoring platform."
 requires-python = ">=3.11"
 dependencies = []
@@ -30,6 +30,9 @@ resume_cli = "resume-cli/resume_cli"
 resume_plugin = "resume-plugin/resume_plugin"
 resume_render = "resume-render/resume_render"
 workflow = "workflow"
+
+[tool.setuptools.package-data]
+career_mcp = ["tool_surface.json"]
 
 [tool."resume-kit"]
 canonical_test_command = "python3 tools/run_gate.py --pr --root ."

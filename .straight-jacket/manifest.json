@@ -230,9 +230,9 @@
     {
       "path": "tools/run_smoke.py",
       "name": "run_smoke.py",
-      "checksum": "sha256:413845b878dedd66f24031e74237052c264796dd0d46e4bdf9506e385e2d377d",
-      "size": 16310,
-      "registeredAt": "2026-08-13T17:03:05.353Z"
+      "checksum": "sha256:b6eddec117d92750c7d845a77ff759f9113ceda2b63dc399723c35087f26359b",
+      "size": 16290,
+      "registeredAt": "2026-08-13T20:03:31.392Z"
     },
     {
       "path": "tools/run_tests.py",

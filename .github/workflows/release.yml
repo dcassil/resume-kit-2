@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump to apply when version is empty"
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      version:
+        description: "Optional exact release version, for example 0.1.1"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build, tag, publish, and create release
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Prepare version and changelog
+        id: prepare
+        run: |
+          args=(--root . --notes-file .release-notes.md)
+          if [ -n "${{ inputs.version }}" ]; then
+            args+=(--version "${{ inputs.version }}")
+          else
+            args+=(--bump "${{ inputs.bump }}")
+          fi
+          python3 scripts/prepare_release.py "${args[@]}"
+      - name: Validate release tree
+        run: python3 tools/run_gate.py --main --root .
+      - name: Build package artifacts
+        run: |
+          python3 -m pip install --upgrade pip build
+          python3 -m build
+      - name: Smoke test built wheel
+        run: |
+          python3 -m venv "$RUNNER_TEMP/resume-kit-release"
+          "$RUNNER_TEMP/resume-kit-release/bin/python" -m pip install --upgrade pip
+          "$RUNNER_TEMP/resume-kit-release/bin/python" -m pip install dist/*.whl
+          "$RUNNER_TEMP/resume-kit-release/bin/python" tools/run_smoke.py \
+            --root . \
+            --workspace "$RUNNER_TEMP/resume-kit-release-smoke" \
+            --installed-env
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-package-dist
+          path: dist/*
+          if-no-files-found: error
+      - name: Commit release version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml CHANGELOG.md
+          git commit -m "chore: release ${{ steps.prepare.outputs.tag }}"
+      - name: Tag release
+        run: git tag -a "${{ steps.prepare.outputs.tag }}" -m "Release ${{ steps.prepare.outputs.tag }}"
+      - name: Push release commit and tag
+        run: |
+          git push origin HEAD:main
+          git push origin "${{ steps.prepare.outputs.tag }}"
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.prepare.outputs.tag }}" \
+            --title "${{ steps.prepare.outputs.tag }}" \
+            --notes-file .release-notes.md \
+            --verify-tag
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

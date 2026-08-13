@@ -197,7 +197,9 @@ async def _maybe_await(value: Any) -> Any:
 
 
 def _load_tools() -> list[JsonObject]:
-    surface_path = Path(__file__).resolve().parents[1] / "tool_surface.json"
+    package_surface_path = Path(__file__).with_name("tool_surface.json")
+    source_surface_path = Path(__file__).resolve().parents[1] / "tool_surface.json"
+    surface_path = package_surface_path if package_surface_path.exists() else source_surface_path
     surface = json.loads(surface_path.read_text(encoding="utf-8"))
     return list(surface["tools"])
 
