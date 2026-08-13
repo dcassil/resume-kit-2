@@ -47,6 +47,107 @@ _FORBIDDEN_RESULT_KEYS = {
     "working_resume",
     "base_resume",
 }
+_USER_CONFIRMATION_SOURCES = {"user_answer", "user_confirmation", "manual_confirmation"}
+_AFFIRMATIVE_CONFIRMATION_MARKERS = {
+    "yes",
+    "confirmed",
+    "correct",
+    "that is correct",
+    "i have",
+    "ive",
+    "i ve",
+    "i built",
+    "i designed",
+    "i maintained",
+    "i led",
+    "my experience",
+}
+_NEGATION_MARKERS = {
+    " no ",
+    " not ",
+    " never ",
+    " havent ",
+    " haven t ",
+    " have not ",
+    " did not ",
+    " dont ",
+    " don t ",
+    " without ",
+}
+_STOP_TERMS = {
+    "and",
+    "app",
+    "application",
+    "apps",
+    "applications",
+    "built",
+    "design",
+    "designed",
+    "developer",
+    "development",
+    "engineer",
+    "engineering",
+    "experience",
+    "for",
+    "in",
+    "maintained",
+    "of",
+    "required",
+    "skill",
+    "skills",
+    "software",
+    "the",
+    "with",
+    "years",
+}
+_TERM_ALIASES: dict[str, set[str]] = {
+    "api": {"apis", "rest api", "rest apis", "backend api", "service api"},
+    "api architecture": {
+        "api design",
+        "apis architecture",
+        "application architecture",
+        "architecture",
+        "system design",
+        "technical design",
+    },
+    "application architecture": {"api architecture", "architecture", "software architecture", "system architecture", "system design"},
+    "architecture": {"api architecture", "application architecture", "software architecture", "system architecture", "system design"},
+    "aws": {"amazon web services"},
+    "amazon web services": {"aws"},
+    "ec2": {"aws ec2"},
+    "graphql": {"graph ql", "graphql api", "graphql apis", "gql"},
+    "gql": {"graphql"},
+    "leadership": {"lead", "led", "mentor", "mentored", "mentoring", "technical leadership", "team leadership"},
+    "node": {"node js", "nodejs"},
+    "node js": {"node", "nodejs"},
+    "nodejs": {"node", "node js"},
+    "postgres": {"postgresql", "postgre sql"},
+    "postgresql": {"postgres", "postgre sql"},
+    "responsive design": {
+        "mobile friendly",
+        "responsive ui",
+        "responsive web app",
+        "responsive web apps",
+        "responsive web application",
+        "responsive web applications",
+    },
+    "responsive web apps": {"responsive design"},
+    "saas": {"software as a service", "multi tenant", "multitenant"},
+    "software as a service": {"saas"},
+    "software engineering": {"software development", "application development", "engineering"},
+    "system design": {"architecture", "application architecture", "technical design"},
+}
+_AWS_SERVICE_TERMS = {"ec2", "s3", "lambda", "rds", "iam"}
+_RESOLUTION_RANK = {
+    "conflicted": 0,
+    "unknown": 1,
+    "explicitly_missing": 2,
+    "possible_match": 3,
+    "related_match": 4,
+    "alias_match": 5,
+    "exact_match": 6,
+    "verified_fact_match": 7,
+}
 
 
 JsonObject = dict[str, Any]
@@ -144,7 +245,10 @@ class CareerStore:
         conflicts = self._detect_conflicts({**fact, "fact_id": fact_id, "normalized_terms": normalized})
         mutation_status = "created"
         with self._connect() as conn:
-            existing = conn.execute("SELECT fact_id, verification_state, created_at FROM facts WHERE fact_id = ?", (fact_id,)).fetchone()
+            existing = conn.execute(
+                "SELECT fact_id, verification_state, created_at, metadata_json FROM facts WHERE fact_id = ?",
+                (fact_id,),
+            ).fetchone()
             if existing is None:
                 conn.execute(
                     """
@@ -181,7 +285,7 @@ class CareerStore:
                         _to_json(normalized),
                         next_state,
                         now,
-                        _to_json(fact.get("metadata", {})),
+                        _to_json(_merged_metadata(_from_json(str(existing["metadata_json"]), {}), fact.get("metadata", {}))),
                         fact_id,
                     ),
                 )
@@ -218,7 +322,7 @@ class CareerStore:
         if row is None:
             return self._mutation_error("verifyFact", fact_id, "unknown", "not_found", True)
         current_state = str(row["verification_state"])
-        if requested_state == "user_verified" and current_state in {"inferred", "unknown"} and not _confirmation_is_explicit(confirmation):
+        if requested_state == "user_verified" and not _confirmation_allows_user_verified(confirmation, source):
             return _clean_result(
                 {
                     "schema_version": SCHEMA_VERSION,
@@ -232,16 +336,12 @@ class CareerStore:
                 }
             )
         now = self._clock()
+        evidence = _confirmation_evidence(confirmation, requested_state, source)
         with self._connect() as conn:
             conn.execute(
                 "UPDATE facts SET verification_state = ?, updated_at = ? WHERE fact_id = ?",
                 (requested_state, now, fact_id),
             )
-            evidence = {
-                "source": source,
-                "text": _confirmation_text(confirmation, requested_state),
-                "metadata": {"confirmation": confirmation} if isinstance(confirmation, dict) else {},
-            }
             self._insert_evidence(conn, fact_id, evidence, source, now)
             conn.commit()
         return _clean_result(
@@ -364,30 +464,65 @@ class CareerStore:
         facts = [self._fact_from_row(row) for row in self._fact_rows()]
         for requirement in requirements:
             requirement_id = str(requirement.get("requirement_id", requirement.get("id", "")))
-            requirement_terms = _normalized_terms(requirement)
-            best = self._best_match(requirement_terms, facts, policy)
-            if best is None:
+            candidates = self._candidate_matches(requirement, facts, policy)
+            if not candidates:
                 unresolved.append(
                     {
                         "requirement_id": requirement_id,
                         "resolution_state": "unknown",
                         "concept": requirement.get("concept", requirement.get("text", "")),
+                        "source_text": requirement.get("source_text", requirement.get("text", "")),
                     }
                 )
                 continue
+            best = candidates[0]
             fact = dict(best["fact"])
             if include_evidence:
                 fact["evidence"] = self._evidence_for_fact(fact["fact_id"])
+            supporting_facts = []
+            for candidate in candidates:
+                supporting = dict(candidate["fact"])
+                if include_evidence:
+                    supporting["evidence"] = self._evidence_for_fact(supporting["fact_id"])
+                supporting_facts.append(
+                    {
+                        "fact_id": supporting["fact_id"],
+                        "fact": supporting,
+                        "resolution_state": candidate["resolution_state"],
+                        "match_type": candidate["resolution_state"],
+                        "match_terms": candidate["match_terms"],
+                        "relationship_id": candidate.get("relationship_id"),
+                        "metadata": candidate.get("metadata", {}),
+                    }
+                )
             item = {
                 "requirement_id": requirement_id,
                 "job_id": job_id,
                 "fact_id": fact["fact_id"],
+                "fact_ids": [candidate["fact"]["fact_id"] for candidate in candidates],
                 "fact": fact,
+                "supporting_facts": supporting_facts,
                 "resolution_state": best["resolution_state"],
                 "match_type": best["resolution_state"],
+                "match_terms": best["match_terms"],
+                "metadata": {
+                    "concept": requirement.get("concept", requirement.get("text", "")),
+                    "source_text": requirement.get("source_text", requirement.get("text", "")),
+                    **best.get("metadata", {}),
+                },
             }
             matches.append(item)
             conflicts.extend(self._conflicts_for_fact(fact["fact_id"]))
+            if best["resolution_state"] in {"unknown", "possible_match", "explicitly_missing", "conflicted"}:
+                unresolved.append(
+                    {
+                        "requirement_id": requirement_id,
+                        "resolution_state": best["resolution_state"],
+                        "concept": requirement.get("concept", requirement.get("text", "")),
+                        "source_text": requirement.get("source_text", requirement.get("text", "")),
+                        "fact_ids": item["fact_ids"],
+                    }
+                )
         matches.sort(key=lambda item: (item["requirement_id"], item["resolution_state"], item["fact_id"]))
         unresolved.sort(key=lambda item: item["requirement_id"])
         return _clean_result(
@@ -407,6 +542,7 @@ class CareerStore:
         requirement_id: str,
         fact_ids: list[str],
         resolution_state: str,
+        metadata: JsonObject | None = None,
     ) -> JsonObject:
         resolution_state = str(resolution_state)
         if resolution_state not in _RESOLUTION_STATES:
@@ -414,6 +550,11 @@ class CareerStore:
         now = self._clock()
         clean_fact_ids = sorted(str(fact_id) for fact_id in fact_ids)
         job_match_id = _stable_id("job_match", job_id, requirement_id, "|".join(clean_fact_ids), resolution_state)
+        match_metadata = {
+            "fact_count": len(clean_fact_ids),
+            "resolution_state": resolution_state,
+            **(metadata or {}),
+        }
         with self._connect() as conn:
             existing = conn.execute("SELECT job_match_id FROM job_matches WHERE job_match_id = ?", (job_match_id,)).fetchone()
             mutation_status = "updated" if existing else "created"
@@ -427,7 +568,7 @@ class CareerStore:
                     resolution_state = excluded.resolution_state,
                     metadata_json = excluded.metadata_json
                 """,
-                (job_match_id, str(job_id), str(requirement_id), _to_json(clean_fact_ids), resolution_state, now, _to_json({})),
+                (job_match_id, str(job_id), str(requirement_id), _to_json(clean_fact_ids), resolution_state, now, _to_json(match_metadata)),
             )
             conn.commit()
         return _clean_result(
@@ -436,6 +577,10 @@ class CareerStore:
                 "status": mutation_status,
                 "mutation_status": mutation_status,
                 "job_match_id": job_match_id,
+                "job_id": str(job_id),
+                "requirement_id": str(requirement_id),
+                "fact_ids": clean_fact_ids,
+                "resolution_state": resolution_state,
                 "audit": self._audit("recordJobMatch", mutated=True),
             }
         )
@@ -592,7 +737,15 @@ class CareerStore:
         evidence_text = str(evidence.get("text", ""))
         evidence_id = str(
             evidence.get("evidence_id")
-            or _stable_id("evidence", fact_id, evidence_source, str(evidence.get("source_id", "")), evidence_text)
+            or _stable_id(
+                "evidence",
+                fact_id,
+                evidence_source,
+                str(evidence.get("source_id", "")),
+                evidence_text,
+                _to_json(evidence.get("source_span")),
+                _to_json(evidence.get("metadata", {})),
+            )
         )
         conn.execute(
             """
@@ -662,7 +815,7 @@ class CareerStore:
             other_id = relationship["to_fact_id"] if relationship["from_fact_id"] == fact_id else relationship["from_fact_id"]
             other = self._fact_from_row(self._fact_row(other_id))
             if other:
-                terms.extend(other["normalized_terms"])
+                terms.extend(_expanded_terms(other["normalized_terms"]))
                 terms.append(_normalize(other["text"]))
         return sorted(set(term for term in terms if term))
 
@@ -751,54 +904,120 @@ class CareerStore:
         }
         return requested_state if precedence.get(requested_state, 0) >= precedence.get(current_state, 0) else current_state
 
-    def _best_match(self, requirement_terms: list[str], facts: list[JsonObject], policy: JsonObject) -> JsonObject | None:
-        requirement_set = set(requirement_terms)
+    def _candidate_matches(self, requirement: JsonObject, facts: list[JsonObject], policy: JsonObject) -> list[JsonObject]:
+        requirement_terms = _normalized_terms(requirement)
+        requirement_set = set(_expanded_terms(requirement_terms))
         if not requirement_set:
-            return None
-        ranked: list[tuple[int, str, JsonObject, str]] = []
+            return []
+        requirement_year = _required_years(requirement)
+        ranked: list[tuple[int, int, str, str, JsonObject]] = []
         for fact in facts:
-            fact_terms = set(fact["normalized_terms"] + [_normalize(fact["text"])])
-            overlap = requirement_set.intersection(fact_terms)
+            fact_terms = self._fact_match_terms(fact["fact_id"])
+            overlap = _meaningful_overlap(requirement_set, fact_terms)
             if overlap:
-                if fact["verification_state"] == "conflicted":
-                    resolution = "conflicted"
-                    score = 0
-                elif fact["verification_state"] == "explicitly_missing":
-                    resolution = "explicitly_missing"
-                    score = 1
-                elif fact["verification_state"] == "user_verified":
-                    resolution = "verified_fact_match"
-                    score = 2
-                else:
-                    resolution = "exact_match"
-                    score = 3
-                ranked.append((score, fact["text"].casefold(), fact, resolution))
+                resolution, metadata = _direct_resolution(fact, requirement_year, fact_terms)
+                ranked.append(
+                    (
+                        _RESOLUTION_RANK[resolution],
+                        len(overlap),
+                        fact["text"].casefold(),
+                        fact["fact_id"],
+                        {
+                            "fact": fact,
+                            "resolution_state": resolution,
+                            "match_terms": sorted(overlap),
+                            "metadata": metadata,
+                        },
+                    )
+                )
                 continue
-            relationship_match = self._relationship_match(fact["fact_id"], requirement_set, policy)
-            if relationship_match:
-                ranked.append((relationship_match[0], fact["text"].casefold(), fact, relationship_match[1]))
+            relationship_match = self._relationship_match(fact["fact_id"], requirement_set, requirement_year, policy)
+            if relationship_match is not None:
+                resolution = relationship_match["resolution_state"]
+                ranked.append(
+                    (
+                        _RESOLUTION_RANK[resolution],
+                        len(relationship_match["match_terms"]),
+                        fact["text"].casefold(),
+                        fact["fact_id"],
+                        {"fact": fact, **relationship_match},
+                    )
+                )
         if not ranked:
-            return None
-        ranked.sort(key=lambda item: (-item[0], item[1], item[2]["fact_id"]))
-        _, _, fact, resolution = ranked[0]
-        return {"fact": fact, "resolution_state": resolution}
+            return []
+        ranked.sort(key=lambda item: (-item[0], -item[1], item[2], item[3]))
+        selected: list[JsonObject] = []
+        best_rank = ranked[0][0]
+        for rank, _, _, _, candidate in ranked:
+            if rank < best_rank and len(selected) >= 1:
+                break
+            selected.append(candidate)
+            if len(selected) >= int(policy.get("max_supporting_facts", 3)):
+                break
+        return selected
 
-    def _relationship_match(self, fact_id: str, requirement_terms: set[str], policy: JsonObject) -> tuple[int, str] | None:
+    def _fact_match_terms(self, fact_id: str) -> set[str]:
+        fact = self._fact_from_row(self._fact_row(fact_id))
+        terms: list[str] = []
+        if fact:
+            terms.extend(fact.get("normalized_terms", []))
+            terms.append(_normalize(fact.get("text", "")))
+            metadata = fact.get("metadata", {})
+            if isinstance(metadata, dict):
+                terms.extend(_metadata_terms(metadata))
+        for evidence in self._evidence_for_fact(fact_id):
+            if not _contains_negation(evidence.get("text", "")):
+                terms.append(_normalize(evidence.get("text", "")))
+                terms.extend(_normalized_terms(evidence))
+            metadata = evidence.get("metadata", {})
+            if isinstance(metadata, dict):
+                terms.extend(_metadata_terms(metadata))
+        terms.extend(self._relationship_terms(fact_id))
+        return set(_expanded_terms(terms))
+
+    def _relationship_match(
+        self,
+        fact_id: str,
+        requirement_terms: set[str],
+        requirement_year: int | None,
+        policy: JsonObject,
+    ) -> JsonObject | None:
         for relationship in self._relationships_for_fact(fact_id):
             other_id = relationship["to_fact_id"] if relationship["from_fact_id"] == fact_id else relationship["from_fact_id"]
             other = self._fact_from_row(self._fact_row(other_id))
-            other_terms = set(other.get("normalized_terms", []) + [_normalize(other.get("text", ""))])
-            if not requirement_terms.intersection(other_terms):
+            other_terms = set(_expanded_terms(other.get("normalized_terms", []) + [_normalize(other.get("text", ""))]))
+            overlap = _meaningful_overlap(requirement_terms, other_terms)
+            if not overlap:
                 continue
             relationship_type = relationship["relationship_type"]
+            fact = self._fact_from_row(self._fact_row(fact_id))
+            fact_terms = self._fact_match_terms(fact_id)
+            _, metadata = _direct_resolution(fact, requirement_year, fact_terms)
             if relationship_type in {"alias", "equivalent"}:
-                return (2, "alias_match")
+                resolution = "possible_match" if metadata.get("years_satisfied") is False else "alias_match"
+                return {
+                    "resolution_state": resolution,
+                    "match_terms": sorted(overlap),
+                    "relationship_id": relationship["relationship_id"],
+                    "metadata": metadata,
+                }
             if relationship_type == "related":
-                if policy.get("allow_related_as_equivalent"):
-                    return (1, "related_match")
-                return (0, "possible_match")
+                resolution = "related_match" if policy.get("allow_related_as_equivalent") else "possible_match"
+                if metadata.get("years_satisfied") is False:
+                    resolution = "possible_match"
+                return {
+                    "resolution_state": resolution,
+                    "match_terms": sorted(overlap),
+                    "relationship_id": relationship["relationship_id"],
+                    "metadata": metadata,
+                }
             if relationship_type == "contradicts":
-                return (0, "conflicted")
+                return {
+                    "resolution_state": "conflicted",
+                    "match_terms": sorted(overlap),
+                    "relationship_id": relationship["relationship_id"],
+                    "metadata": metadata,
+                }
         return None
 
     def _mutation_error(
@@ -877,10 +1096,103 @@ def _normalized_terms(value: JsonObject) -> list[str]:
     if isinstance(raw_terms, str):
         raw_terms = [raw_terms]
     terms = [_normalize(term) for term in raw_terms]
-    for key in ("concept", "text", "type"):
+    for key in ("concept", "source_text", "text", "type"):
         if value.get(key):
             terms.append(_normalize(value[key]))
-    return sorted(set(term for term in terms if term))
+    return sorted(set(_expanded_terms(terms)))
+
+
+def _expanded_terms(values: list[Any] | set[Any] | tuple[Any, ...]) -> list[str]:
+    terms: set[str] = set()
+    for value in values:
+        normalized = _normalize(value)
+        if not normalized:
+            continue
+        terms.add(normalized)
+        pieces = normalized.split()
+        terms.update(piece for piece in pieces if len(piece) > 1)
+        for canonical, aliases in _TERM_ALIASES.items():
+            all_terms = {canonical, *aliases}
+            if normalized in all_terms or any(_term_in_text(alias, normalized) for alias in all_terms):
+                terms.add(canonical)
+                terms.update(aliases)
+    if "aws" in terms or "amazon web services" in terms:
+        terms.update(term for term in _AWS_SERVICE_TERMS if any(term in _normalize(value) for value in values))
+    return sorted(term for term in terms if term)
+
+
+def _metadata_terms(metadata: JsonObject) -> list[str]:
+    terms: list[str] = []
+    for key, value in metadata.items():
+        if isinstance(value, (str, int, float, bool)):
+            terms.append(_normalize(key))
+            terms.append(_normalize(value))
+        elif isinstance(value, list):
+            terms.append(_normalize(key))
+            terms.extend(_normalize(item) for item in value if isinstance(item, (str, int, float, bool)))
+        elif isinstance(value, dict):
+            terms.append(_normalize(key))
+            terms.extend(_metadata_terms(value))
+    return terms
+
+
+def _term_in_text(term: str, text: str) -> bool:
+    normalized = _normalize(term)
+    haystack = f" {_normalize(text)} "
+    return bool(normalized and f" {normalized} " in haystack)
+
+
+def _meaningful_overlap(requirement_terms: set[str], fact_terms: set[str]) -> set[str]:
+    overlap = requirement_terms.intersection(fact_terms)
+    return {term for term in overlap if term not in _STOP_TERMS}
+
+
+def _required_years(requirement: JsonObject) -> int | None:
+    raw_years = requirement.get("years")
+    if isinstance(raw_years, (int, float)) and 0 < int(raw_years) < 60:
+        return int(raw_years)
+    if isinstance(raw_years, str):
+        parsed = _year_claim(raw_years, {_normalize(raw_years)})
+        if parsed is not None:
+            return int(parsed)
+    parsed = _year_claim(
+        " ".join(str(requirement.get(key, "")) for key in ("concept", "source_text", "text")),
+        set(_normalized_terms(requirement)),
+    )
+    return int(parsed) if parsed is not None else None
+
+
+def _direct_resolution(fact: JsonObject, requirement_year: int | None, fact_terms: set[str]) -> tuple[str, JsonObject]:
+    if fact["verification_state"] == "conflicted":
+        return "conflicted", {}
+    if fact["verification_state"] == "explicitly_missing":
+        return "explicitly_missing", {}
+    fact_year_text = " ".join([str(fact.get("text", "")), *fact.get("normalized_terms", [])])
+    fact_year = _year_claim(fact_year_text, fact_terms)
+    metadata: JsonObject = {}
+    if requirement_year is not None:
+        metadata["required_years"] = requirement_year
+        if fact_year is not None:
+            fact_year_int = int(fact_year)
+            metadata["fact_years"] = fact_year_int
+            metadata["years_satisfied"] = fact_year_int >= requirement_year
+            if fact_year_int < requirement_year:
+                return "possible_match", metadata
+        else:
+            metadata["years_satisfied"] = False
+            return "possible_match", metadata
+    if fact["verification_state"] == "user_verified":
+        return "verified_fact_match", metadata
+    if fact["verification_state"] in {"unknown", "inferred"}:
+        return "possible_match", metadata
+    return "exact_match", metadata
+
+
+def _merged_metadata(existing: JsonObject, incoming: Any) -> JsonObject:
+    merged = dict(existing) if isinstance(existing, dict) else {}
+    if isinstance(incoming, dict):
+        merged.update(incoming)
+    return merged
 
 
 def _state_value(value: Any) -> str:
@@ -890,10 +1202,18 @@ def _state_value(value: Any) -> str:
 def _has_explicit_confirmation(policy: JsonObject, evidence: JsonObject | None, source: str) -> bool:
     if policy.get("explicit_confirmation") is True:
         return True
-    if source in {"user_answer", "user_confirmation", "manual_confirmation"}:
+    if policy.get("confirmation") is True or policy.get("confirmed") is True:
         return True
-    if evidence and evidence.get("source") in {"user_answer", "user_confirmation", "manual_confirmation"}:
+    if source in {"user_confirmation", "manual_confirmation"}:
         return True
+    if evidence:
+        if evidence.get("source") in {"user_confirmation", "manual_confirmation"}:
+            return True
+        metadata = evidence.get("metadata", {})
+        if isinstance(metadata, dict) and (metadata.get("explicit") is True or metadata.get("confirmed") is True):
+            return True
+        if source in _USER_CONFIRMATION_SOURCES and _text_is_explicit_confirmation(evidence.get("text", "")):
+            return True
     return False
 
 
@@ -901,10 +1221,37 @@ def _confirmation_is_explicit(confirmation: JsonObject | str | bool | None) -> b
     if confirmation is True:
         return True
     if isinstance(confirmation, str):
-        return bool(confirmation.strip())
+        return _text_is_explicit_confirmation(confirmation)
     if isinstance(confirmation, dict):
-        return confirmation.get("explicit") is True or confirmation.get("confirmed") is True
+        if confirmation.get("explicit") is True or confirmation.get("confirmed") is True:
+            return True
+        return _text_is_explicit_confirmation(confirmation.get("text") or confirmation.get("answer") or "")
     return False
+
+
+def _confirmation_allows_user_verified(confirmation: JsonObject | str | bool | None, source: str) -> bool:
+    if not _confirmation_is_explicit(confirmation):
+        return False
+    if source in _USER_CONFIRMATION_SOURCES:
+        return True
+    if isinstance(confirmation, dict):
+        confirmation_source = str(confirmation.get("source", confirmation.get("kind", "")))
+        return confirmation_source in _USER_CONFIRMATION_SOURCES
+    return False
+
+
+def _text_is_explicit_confirmation(value: Any) -> bool:
+    normalized = f" {_normalize(value)} "
+    if not normalized.strip():
+        return False
+    if _contains_negation(value):
+        return False
+    return any(marker in normalized for marker in _AFFIRMATIVE_CONFIRMATION_MARKERS)
+
+
+def _contains_negation(value: Any) -> bool:
+    normalized = f" {_normalize(value)} "
+    return any(marker in normalized for marker in _NEGATION_MARKERS)
 
 
 def _confirmation_text(confirmation: JsonObject | str | bool | None, verification_state: str) -> str:
@@ -913,6 +1260,32 @@ def _confirmation_text(confirmation: JsonObject | str | bool | None, verificatio
     if isinstance(confirmation, str):
         return confirmation
     return f"confirmed {verification_state}"
+
+
+def _confirmation_evidence(confirmation: JsonObject | str | bool | None, verification_state: str, source: str) -> JsonObject:
+    metadata: JsonObject = {
+        "verification_state": verification_state,
+        "confirmation_source": source,
+    }
+    evidence: JsonObject = {
+        "source": source,
+        "text": _confirmation_text(confirmation, verification_state),
+        "metadata": metadata,
+    }
+    if isinstance(confirmation, dict):
+        if confirmation.get("source_id") is not None:
+            evidence["source_id"] = confirmation.get("source_id")
+        if confirmation.get("source_span") is not None:
+            evidence["source_span"] = confirmation.get("source_span")
+        if confirmation.get("observed_at") is not None:
+            evidence["observed_at"] = confirmation.get("observed_at")
+        supplied_metadata = confirmation.get("metadata", {})
+        metadata["confirmation"] = {key: value for key, value in confirmation.items() if key != "metadata"}
+        if isinstance(supplied_metadata, dict):
+            metadata.update(supplied_metadata)
+    elif isinstance(confirmation, bool):
+        metadata["confirmation"] = confirmation
+    return evidence
 
 
 def _year_claim(text: str, terms: set[str]) -> str | None:

@@ -7,11 +7,14 @@ or changing career facts.
 
 from __future__ import annotations
 
+import base64
 import hashlib
-import json
+import io
 import math
-import re
+import zipfile
 from typing import Any
+from xml.etree import ElementTree
+from xml.sax.saxutils import escape
 
 
 RenderDict = dict[str, Any]
@@ -31,6 +34,19 @@ _UNSUPPORTED_CHARACTERS = {
     "\u2022": "bullet character",
     "\u00a0": "non-breaking space",
 }
+_DOCX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+_DOCX_CONTENT_TYPES = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>
+"""
+_DOCX_ROOT_RELS = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>
+"""
 
 
 def _typed_error(kind: str, message: str, fmt: str | None = None) -> RenderDict:
@@ -256,6 +272,47 @@ def _base_result(fmt: str, template: dict[str, Any], content: str) -> RenderDict
     }
 
 
+def _docx_paragraph(line: str) -> str:
+    stripped = line.strip()
+    if not stripped:
+        return "<w:p/>"
+
+    style = ""
+    text = stripped
+    if stripped.startswith("## "):
+        style = '<w:pPr><w:pStyle w:val="Heading2"/></w:pPr>'
+        text = stripped[3:].strip()
+    elif stripped.startswith("# "):
+        style = '<w:pPr><w:pStyle w:val="Title"/></w:pPr>'
+        text = stripped[2:].strip()
+    elif stripped.startswith("- ") or stripped.startswith("* "):
+        text = stripped[2:].strip()
+
+    safe_text = escape(text, {'"': "&quot;"})
+    return f"<w:p>{style}<w:r><w:t xml:space=\"preserve\">{safe_text}</w:t></w:r></w:p>"
+
+
+def _build_docx_bytes(text: str) -> bytes:
+    paragraphs = "\n".join(_docx_paragraph(line) for line in text.splitlines())
+    document_xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    {paragraphs}
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="360" w:footer="360" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>
+"""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", _DOCX_CONTENT_TYPES)
+        archive.writestr("_rels/.rels", _DOCX_ROOT_RELS)
+        archive.writestr("word/document.xml", document_xml)
+    return buffer.getvalue()
+
+
 def renderMarkdown(resume: Any, template: Any) -> RenderDict:
     """Render a canonical resume to Markdown without changing semantic content."""
 
@@ -271,7 +328,7 @@ def renderMarkdown(resume: Any, template: Any) -> RenderDict:
 
 
 def renderDocx(resume: Any, template: Any) -> RenderDict:
-    """Render a DOCX-compatible artifact description from canonical text."""
+    """Render a real DOCX artifact payload from canonical text."""
 
     if error := _validate_resume(resume):
         return _typed_error("validation_error", error, "docx")
@@ -279,12 +336,14 @@ def renderDocx(resume: Any, template: Any) -> RenderDict:
         return _typed_error("validation_error", error, "docx")
 
     content, sections = _render_markdown_text(resume, template)
+    docx_bytes = _build_docx_bytes(content)
     result = _base_result("docx", template, content)
     result.update(
         {
             "artifact": {
                 "kind": "docx",
-                "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "media_type": _DOCX_MEDIA_TYPE,
+                "content_base64": base64.b64encode(docx_bytes).decode("ascii"),
                 "text": content,
             },
             "sections": sections,
@@ -361,24 +420,86 @@ def measureLayout(resume: Any, template: Any) -> RenderDict:
     }
 
 
-def _extract_text(file: Any) -> tuple[str | None, str | None, dict[str, Any]]:
+def _extract_docx_text(content_base64: Any) -> tuple[str | None, list[str]]:
+    if not isinstance(content_base64, str) or not content_base64:
+        return None, ["DOCX artifact is missing content_base64."]
+
+    try:
+        docx_bytes = base64.b64decode(content_base64, validate=True)
+    except (ValueError, TypeError):
+        return None, ["DOCX artifact content_base64 is not valid base64."]
+
+    try:
+        with zipfile.ZipFile(io.BytesIO(docx_bytes)) as archive:
+            names = set(archive.namelist())
+            required = {"[Content_Types].xml", "_rels/.rels", "word/document.xml"}
+            missing = sorted(required - names)
+            if missing:
+                return None, [f"DOCX artifact is missing required parts: {', '.join(missing)}."]
+            document_xml = archive.read("word/document.xml")
+    except (zipfile.BadZipFile, KeyError, OSError):
+        return None, ["DOCX artifact is not a readable DOCX zip payload."]
+
+    try:
+        root = ElementTree.fromstring(document_xml)
+    except ElementTree.ParseError:
+        return None, ["DOCX artifact word/document.xml is not readable XML."]
+
+    namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+    paragraphs: list[str] = []
+    for paragraph in root.findall(".//w:p", namespace):
+        text_parts = [
+            node.text or ""
+            for node in paragraph.findall(".//w:t", namespace)
+        ]
+        paragraph_text = "".join(text_parts).strip()
+        if paragraph_text:
+            paragraphs.append(paragraph_text)
+    if not paragraphs:
+        return "", ["DOCX artifact contains no readable document text."]
+    return "\n".join(paragraphs), []
+
+
+def _text_contains_material_lines(haystack: str, needle: str) -> bool:
+    lowered_haystack = haystack.lower()
+    for raw_line in needle.splitlines():
+        line = raw_line.strip()
+        if line.startswith("#"):
+            line = line.lstrip("#").strip()
+        if line.startswith("- ") or line.startswith("* "):
+            line = line[2:].strip()
+        if line and line.lower() not in lowered_haystack:
+            return False
+    return True
+
+
+def _extract_text(file: Any) -> tuple[str | None, str | None, dict[str, Any], list[str]]:
     if isinstance(file, str):
-        return file, "markdown", {}
+        return file, "markdown", {}, []
     if not isinstance(file, dict):
-        return None, None, {}
+        return None, None, {}, []
 
     fmt = str(file.get("format") or "unknown")
     if isinstance(file.get("content"), str):
-        return file["content"], fmt, file
+        return file["content"], fmt, file, []
 
     artifact = file.get("artifact")
-    if isinstance(artifact, dict) and isinstance(artifact.get("text"), str):
-        return artifact["text"], str(artifact.get("kind") or fmt), file
+    if isinstance(artifact, dict):
+        artifact_format = str(artifact.get("kind") or fmt)
+        artifact_text = artifact.get("text") if isinstance(artifact.get("text"), str) else None
+        artifact_warnings: list[str] = []
+        if artifact_format == "docx" or artifact.get("media_type") == _DOCX_MEDIA_TYPE:
+            docx_text, artifact_warnings = _extract_docx_text(artifact.get("content_base64"))
+            if artifact_text and docx_text is not None and not _text_contains_material_lines(docx_text, artifact_text):
+                artifact_warnings.append("DOCX artifact payload is missing text from the parse-back sidecar.")
+            return artifact_text or docx_text, "docx", file, artifact_warnings
+        if artifact_text is not None:
+            return artifact_text, artifact_format, file, []
 
     if isinstance(file.get("text"), str):
-        return file["text"], fmt, file
+        return file["text"], fmt, file, []
 
-    return None, fmt, file
+    return None, fmt, file, []
 
 
 def _heading_names(text: str) -> set[str]:
@@ -388,6 +509,13 @@ def _heading_names(text: str) -> set[str]:
         if stripped.startswith(_HEADING_PREFIXES):
             headings.add(stripped.lstrip("#").strip().lower())
     return headings
+
+
+def _has_heading(text: str, heading: str, headings: set[str]) -> bool:
+    lowered_heading = heading.lower()
+    if lowered_heading in headings:
+        return True
+    return any(line.strip().lower() == lowered_heading for line in text.splitlines())
 
 
 def _expected_terms(expected_resume: Any) -> list[str]:
@@ -407,7 +535,7 @@ def _expected_terms(expected_resume: Any) -> list[str]:
 def validateRenderedOutput(file: Any) -> RenderDict:
     """Validate parse-back text and renderer-specific ATS concerns."""
 
-    text, fmt, payload = _extract_text(file)
+    text, fmt, payload, artifact_warnings = _extract_text(file)
     if text is None or fmt is None or fmt == "unknown":
         return {
             "status": "error",
@@ -428,7 +556,7 @@ def validateRenderedOutput(file: Any) -> RenderDict:
             if not isinstance(section, dict):
                 continue
             heading = str(section.get("heading") or section.get("id") or "").strip()
-            if heading and heading.lower() not in headings:
+            if heading and not _has_heading(text, heading, headings):
                 missing_sections.append(heading)
 
     lowered_text = text.lower()
@@ -442,7 +570,7 @@ def validateRenderedOutput(file: Any) -> RenderDict:
         for character, description in _UNSUPPORTED_CHARACTERS.items()
         if character in text
     ]
-    warnings: list[str] = []
+    warnings: list[str] = list(artifact_warnings)
     if not text.strip():
         warnings.append("Rendered output is empty.")
     if missing_sections:
