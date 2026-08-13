@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "algorithm": "ed25519",
+  "kdf": {
+    "name": "scrypt",
+    "cost": 16384,
+    "blockSize": 8,
+    "parallelization": 1,
+    "keyLength": 32,
+    "salt": "dkeJdhoVEnmm5jEBwNytWw"
+  },
+  "cipher": {
+    "name": "aes-256-gcm",
+    "iv": "Lf2iNlEXr4rtfOeB",
+    "tag": "Xeyo71-ol6pGoMMQMjHGxA"
+  },
+  "encryptedPrivateKey": "eROJ3yWbxM89A_MKaju8TKAdXua9Y6YmanTRqSRtHpZpIFtVCRO9dwOZEPfYykrD",
+  "publicKeyFingerprint": "sha256:6dfca75bb6b879238e8badfbbd7a165fedd3cee80acef88d1dd606e9ac288b91"
+}

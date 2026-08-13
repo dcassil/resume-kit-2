@@ -29,12 +29,22 @@
     {
       "path": "tools/run_gate.py",
       "kind": "test_runner_wrapper",
-      "supports_gate": ["pr", "future_contract"],
-      "invokes_surfaces": ["tools/run_tests.py", "tests/suite_manifest.json"],
-      "reads": ["tools/run_tests.py", "tests/"],
+      "supports_gate": ["pr", "future_contract", "smoke", "main"],
+      "invokes_surfaces": ["tools/run_tests.py", "tools/run_smoke.py", "tests/suite_manifest.json"],
+      "reads": ["tools/run_tests.py", "tools/run_smoke.py", "tests/"],
       "writes": [],
       "release_blocking": true,
-      "description": "Provides the single obvious PR completion gate and opt-in future contract gate commands for agents and developers."
+      "description": "Provides the single obvious PR completion gate, full contract gate, smoke gate, and main gate commands for agents and developers."
+    },
+    {
+      "path": "tools/run_smoke.py",
+      "kind": "release_check",
+      "supports_gate": ["smoke", "main"],
+      "invokes_surfaces": ["SMOKE_TEST.md", "fixtures/", "public runtime package APIs"],
+      "reads": ["SMOKE_TEST.md", "fixtures/", "resume-core/", "career-store/", "career-mcp/", "resume-agent/", "resume-render/", "resume-cli/", "workflow/"],
+      "writes": ["temporary smoke workspace"],
+      "release_blocking": true,
+      "description": "Runs the installed package smoke flow with workspace initialization, career-store persistence, MCP search, deterministic matching, resolution, tailoring, render validation, audit, and hallucination rejection checks."
     },
     {
       "path": "tools/career_mcp_guardrails.py",

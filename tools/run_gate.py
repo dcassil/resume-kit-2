@@ -29,6 +29,25 @@ def run_future_contract_gate(root: Path) -> int:
     )
 
 
+def run_smoke_gate(root: Path) -> int:
+    runner = root / "tools" / "run_smoke.py"
+    if not runner.exists():
+        print(f"Gate failed: missing smoke runner at {runner}", file=sys.stderr)
+        return 1
+
+    env = os.environ.copy()
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    print("Running smoke gate: installed package smoke flow and release-blocking honesty checks.", flush=True)
+    return run_command([sys.executable, str(runner), "--root", str(root)], cwd=root, env=env)
+
+
+def run_main_gate(root: Path) -> int:
+    pr_code = run_pr_gate(root)
+    if pr_code:
+        return pr_code
+    return run_smoke_gate(root)
+
+
 def run_test_runner(root: Path, extra_args: list[str], label: str) -> int:
     runner = root / "tools" / "run_tests.py"
     if not runner.exists():
@@ -50,10 +69,16 @@ def main(argv: list[str] | None = None) -> int:
     gate.add_argument(
         "--future-contract",
         action="store_true",
-        help="Run the opt-in future package contract gate for resume-core and career-store.",
+        help="Run the full package contract target plus boundary guardrails.",
     )
+    gate.add_argument("--smoke", action="store_true", help="Run the installed package smoke harness.")
+    gate.add_argument("--main", action="store_true", help="Run the main gate: PR gate plus smoke harness.")
     args = parser.parse_args(argv)
 
+    if args.main:
+        return run_main_gate(Path(args.root).resolve())
+    if args.smoke:
+        return run_smoke_gate(Path(args.root).resolve())
     if args.future_contract:
         return run_future_contract_gate(Path(args.root).resolve())
     return run_pr_gate(Path(args.root).resolve())

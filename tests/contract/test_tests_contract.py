@@ -49,7 +49,7 @@ class TestsSuiteContractTests(unittest.TestCase):
 
     def test_runner_commands_are_declared_for_current_and_future_gates(self):
         commands = MANIFEST["runner_commands"]
-        for command_name in ["boundary", "fixtures", "contract_current", "contract_tdd", "future_contract", "guardrails"]:
+        for command_name in ["boundary", "fixtures", "contract_current", "contract_tdd", "future_contract", "smoke", "main", "guardrails"]:
             self.assertIn(command_name, commands)
             self.assertTrue(commands[command_name].startswith("python3"))
 

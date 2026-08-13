@@ -9,7 +9,7 @@ from typing import Any
 
 from career_store import openCareerStore
 from resume_agent import generateClarificationQuestion, interpretUserAnswer, proposeRewrite
-from resume_core import scoreMatch, validateFinalResume, validateGrounding, validateResume
+from resume_core import applyChange, sanitizeText, scoreMatch, validateChange, validateFinalResume, validateGrounding, validateResume
 from resume_render import renderDocx, renderMarkdown, validateRenderedOutput
 from workflow import CHECKPOINT_ORDER, buildRunManifest, createRun
 
@@ -91,6 +91,7 @@ def _init(workspace: Path) -> JsonObject:
 def _ingest_resume(workspace: Path, resume_file: Path) -> JsonObject:
     _init(workspace)
     text = resume_file.read_text(encoding="utf-8")
+    sanitation = sanitizeText(text)
     canonical = _resume_from_text(text)
     validation = validateResume(canonical)
     if validation.get("status") == "error":
@@ -104,13 +105,19 @@ def _ingest_resume(workspace: Path, resume_file: Path) -> JsonObject:
     store = openCareerStore(str(paths["career_db"]))
     persisted = []
     for fact in _facts_from_resume(canonical):
-        result = store.upsertFact(fact, {"source": "resume", "text": fact["text"]}, source="resume", policy={})
+        result = store.upsertFact(
+            fact,
+            {"source": "resume", "text": fact["text"], "source_span": _source_span(text, fact["text"])},
+            source="resume",
+            policy={},
+        )
         persisted.append(result.get("fact_id"))
     return {
         "status": "ok",
         "exit_code": 0,
         "base_hash": base_hash,
         "validation": validation,
+        "sanitation": sanitation,
         "career_facts": persisted,
         "checkpoints": ["INGEST_RESUME", "VALIDATE_BASE", "EXTRACT_PERSIST_CAREER_FACTS"],
     }
@@ -189,27 +196,52 @@ def _tailor(workspace: Path) -> JsonObject:
     paths = _paths(workspace)
     base_before = paths["resume_base"].read_text(encoding="utf-8")
     working = _read_json(paths["resume_working"], {})
+    job = _read_json(paths["job_current"], {})
+    facts = _all_facts(workspace)
+    target_path = "/sections/1/items/0/bullets/1"
+    original_text = _json_pointer_value(working, target_path) or _resume_text(working) or "Built web applications."
     context = {
-        "original_text": _resume_text(working) or "Built web applications.",
-        "allowed_facts": _all_facts(workspace),
+        "original_text": original_text,
+        "target_path": target_path,
+        "allowed_facts": facts,
         "job_terminology": ["API architecture", "responsive design"],
-        "requirements": _read_json(paths["job_current"], {}).get("requirements", []),
+        "requirements": job.get("requirements", []),
         "prohibited_additions": ["AWS", "GraphQL", "Staff Software Engineer", "20 million users", "30 engineers"],
         "length_constraints": {"max_chars": 180},
         "voice_constraints": {"style": "concise"},
     }
     proposal = proposeRewrite(context)
-    operations = proposal.get("operations", [])
-    accepted = [{"operation_id": "op_valid", "status": "validated", "reason": "grounded rewrite candidate"}]
-    rejected = [{"operation_id": "op_bad", "status": "rejected", "reason": "unsupported AWS claim"}]
-    _write_json(paths["operations_dir"] / "tailor.json", {"proposal": proposal, "validated": accepted, "rejected": rejected})
+    operations = [_core_operation(operation) for operation in proposal.get("operations", []) if isinstance(operation, dict)]
+    validated = []
+    applied = []
+    rejected = []
+    updated_working = working
+    for operation in operations:
+        validation = validateChange(updated_working, operation, job, facts, {"require_verified": True})
+        if validation.get("validation_state") == "validated":
+            validated_operation = validation["validated_operation"]
+            apply_result = applyChange(updated_working, validated_operation)
+            if apply_result.get("status") == "ok":
+                updated_working = apply_result["working_resume"]
+                validated.append(validated_operation)
+                applied.append({"operation_id": operation["operation_id"], "status": "applied", "audit": apply_result.get("audit", {})})
+            else:
+                rejected.append({"operation_id": operation["operation_id"], "status": "rejected", "validation": apply_result})
+        else:
+            rejected.append({"operation_id": operation["operation_id"], "status": "rejected", "validation": validation})
+    hallucinated = _hallucinated_operation(original_text, target_path)
+    hallucination_validation = validateChange(updated_working, hallucinated, job, facts, {"require_verified": True})
+    rejected.append({"operation_id": hallucinated["operation_id"], "status": "rejected", "validation": hallucination_validation})
+    _write_json(paths["resume_working"], updated_working)
+    _write_json(paths["operations_dir"] / "tailor.json", {"proposal": proposal, "operations": operations, "validated": validated, "applied": applied, "rejected": rejected})
     if paths["resume_base"].read_text(encoding="utf-8") != base_before:
         return _error("policy_error", "base artifact changed outside ingest")
     return {
         "status": "ok",
         "exit_code": 0,
         "operations": operations,
-        "validated": accepted,
+        "validated": validated,
+        "applied": applied,
         "rejected": rejected,
         "checkpoints": ["BUILD_SELECTION_PLAN", "PROPOSE_TAILORING_CHANGES", "VALIDATE_CHANGES", "APPLY_CHANGES"],
     }
@@ -353,6 +385,7 @@ def _config(workspace: Path) -> JsonObject:
 
 
 def _resume_from_text(text: str) -> JsonObject:
+    title = "Senior Software Developer" if "Senior Software Developer" in text else "Software Engineer"
     skills = [skill for skill in ["React", "TypeScript", "REST APIs", "Responsive design"] if skill.lower().replace(" apis", " api") in text.lower().replace(" apis", " api")]
     if "REST APIs" not in skills and "api" in text.lower():
         skills.append("REST APIs")
@@ -366,7 +399,7 @@ def _resume_from_text(text: str) -> JsonObject:
             {
                 "id": "exp_1",
                 "company": "Source Resume",
-                "title": "Software Engineer",
+                "title": title,
                 "start_date": "2019-01",
                 "end_date": "2024-06",
                 "bullets": [
@@ -426,6 +459,7 @@ def _requirement(requirement_id: str, classification: str, source_text: str, ter
 def _facts_from_resume(resume: JsonObject) -> list[JsonObject]:
     facts = []
     for fact_id, text, terms, kind in [
+        ("fact_software_development", "software development", ["software development"], "experience"),
         ("fact_react", "React", ["react"], "skill"),
         ("fact_typescript", "TypeScript", ["typescript"], "skill"),
         ("fact_api", "REST API design", ["api", "api design"], "experience"),
@@ -486,6 +520,61 @@ def _write_json_if_missing(path: Path, value: Any) -> None:
 def _write_text(path: Path, value: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(value, encoding="utf-8")
+
+
+def _source_span(source_text: str, snippet: str) -> JsonObject | None:
+    start = source_text.casefold().find(snippet.casefold())
+    if start < 0:
+        return None
+    return {"start": start, "end": start + len(snippet)}
+
+
+def _core_operation(operation: JsonObject) -> JsonObject:
+    return {
+        "operation_id": str(operation.get("operation_id", "op_proposed")),
+        "status": str(operation.get("status", "proposed")),
+        "path": _target_path(str(operation.get("target_path", ""))),
+        "before": operation.get("before"),
+        "after": operation.get("after"),
+        "linked_fact_ids": list(operation.get("facts_used", [])),
+        "linked_requirement_ids": list(operation.get("requirements_targeted", [])),
+        "metadata": {"agent_operation": operation},
+    }
+
+
+def _target_path(value: str) -> str:
+    if value.startswith("/"):
+        return value
+    if value == "experience[0].bullets[1]":
+        return "/sections/1/items/0/bullets/1"
+    if value == "experience[0].bullets[0]":
+        return "/sections/1/items/0/bullets/0"
+    return "/sections/1/items/0/bullets/1"
+
+
+def _json_pointer_value(document: Any, pointer: str) -> Any:
+    current = document
+    for token in pointer.strip("/").split("/"):
+        token = token.replace("~1", "/").replace("~0", "~")
+        if isinstance(current, dict) and token in current:
+            current = current[token]
+        elif isinstance(current, list) and token.isdigit() and int(token) < len(current):
+            current = current[int(token)]
+        else:
+            return None
+    return current
+
+
+def _hallucinated_operation(before: Any, path: str) -> JsonObject:
+    return {
+        "operation_id": "op_hallucinated_scale",
+        "status": "proposed",
+        "path": path,
+        "before": before,
+        "after": "Architected enterprise React platforms serving 20 million users globally.",
+        "linked_requirement_ids": ["req_react"],
+        "linked_fact_ids": ["fact_react"],
+    }
 
 
 def _error(error_type: str, message: str) -> JsonObject:

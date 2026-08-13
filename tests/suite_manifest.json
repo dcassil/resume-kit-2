@@ -117,6 +117,8 @@
   "runner_commands": {
     "canonical": "python3 tools/run_gate.py --pr --root .",
     "pr": "python3 tools/run_gate.py --pr --root .",
+    "main": "python3 tools/run_gate.py --main --root .",
+    "smoke": "python3 tools/run_gate.py --smoke --root .",
     "future_contract": "python3 tools/run_gate.py --future-contract --root .",
     "boundary": "python3 -m unittest tests.boundary.test_resume_core_guardrails tests.boundary.test_career_store_guardrails tests.boundary.test_career_mcp_guardrails tests.boundary.test_resume_agent_guardrails tests.boundary.test_resume_render_guardrails tests.boundary.test_resume_cli_guardrails tests.boundary.test_resume_plugin_guardrails tests.boundary.test_workflow_guardrails tests.boundary.test_fixtures_guardrails tests.boundary.test_tests_guardrails tests.boundary.test_tools_guardrails",
     "fixtures": "python3 -m unittest tests.contract.test_fixtures_contract tests.boundary.test_fixtures_guardrails",
