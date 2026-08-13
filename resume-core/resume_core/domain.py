@@ -27,7 +27,7 @@ _RESOLVED = {
     ResolutionState.ALIAS_MATCH.value,
     ResolutionState.VERIFIED_FACT_MATCH.value,
 }
-_VERIFIED_FACT_STATES = {VerificationState.SOURCE_STATED.value, VerificationState.USER_VERIFIED.value}
+_VERIFIED_FACT_STATES = {VerificationState.SOURCE_STATED.value, VerificationState.USER_VERIFIED.value, "imported"}
 _CONTROL_WHITELIST = {"\n", "\r", "\t"}
 _SMART_TRANSLATION = str.maketrans(
     {
@@ -64,6 +64,82 @@ _NUMBER_WORDS = {
     "ten": 10,
 }
 _YEARS_RE = re.compile(r"\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\+?\s+years?\b", re.IGNORECASE)
+_GENERIC_TERMS = {
+    "a",
+    "an",
+    "and",
+    "applications",
+    "background",
+    "building",
+    "design",
+    "delivering",
+    "development",
+    "distributed",
+    "experience",
+    "for",
+    "in",
+    "of",
+    "operating",
+    "or",
+    "preferred",
+    "production",
+    "product",
+    "products",
+    "qualifications",
+    "required",
+    "strong",
+    "systems",
+    "the",
+    "through",
+    "with",
+}
+_TERM_VARIANTS = {
+    "api": ("api", "apis", "rest api", "rest apis"),
+    "api architecture": (
+        "api architecture",
+        "api architecture design",
+        "api design",
+        "application architecture",
+        "designed apis",
+        "designed rest apis",
+        "rest api design",
+        "rest apis",
+    ),
+    "aws": ("aws", "amazon web services"),
+    "graphql": ("graphql", "graph ql"),
+    "leadership": (
+        "code review",
+        "cross team architecture",
+        "delivery planning",
+        "design review",
+        "led a small team",
+        "mentoring",
+        "team leadership",
+        "technical leadership",
+    ),
+    "node js": ("node", "node js", "nodejs"),
+    "postgresql": ("postgres", "postgresql"),
+    "react": ("react",),
+    "responsive design": (
+        "desktop and mobile",
+        "responsive apps",
+        "responsive design",
+        "responsive web applications",
+        "responsive web apps",
+    ),
+    "saas": ("multi tenant saas", "saas", "software as a service"),
+    "software engineering": (
+        "full stack software development",
+        "software development",
+        "software engineering",
+        "software engineering experience",
+    ),
+    "typescript": ("typescript", "type script"),
+}
+_RELATED_REQUIREMENT_TERMS = {
+    "aws": ("azure", "cloud infrastructure", "cloud services"),
+    "graphql": ("rest api", "rest apis", "api design"),
+}
 
 
 def sanitizeText(text: Any, rules: JsonObject | None = None) -> JsonObject:
@@ -182,7 +258,7 @@ def normalizeJobModel(source_job: Any, config: JsonObject | None = None) -> Json
     warnings: list[JsonObject] = []
     raw_requirements = _item(job, "requirements", [])
     if isinstance(raw_requirements, str):
-        raw_requirements = [line.strip() for line in raw_requirements.splitlines() if line.strip()]
+        raw_requirements = _requirements_from_text(raw_requirements)
     if not isinstance(raw_requirements, list):
         raw_requirements = []
         warnings.append(_issue("invalid_requirements", "requirements must be an array.", "requirements"))
@@ -220,6 +296,7 @@ def scoreMatch(
     fact_index = _fact_index(facts)
     requirement_results: list[JsonObject] = []
     unresolved: list[str] = []
+    preferred_unresolved: list[str] = []
     score = 0.0
     max_score = 0.0
 
@@ -229,38 +306,28 @@ def scoreMatch(
         weight = _number(_item(requirement, "weight"), 1.0)
         terms = _terms(requirement)
         max_score += max(weight, 0.0)
-        state = ResolutionState.UNKNOWN.value
-        matched_fact_ids: list[str] = []
-        evidence: list[JsonObject] = []
-
-        if _terms_in_text(terms, resume_text):
-            state = ResolutionState.EXACT_MATCH.value
-            evidence.append({"source": "resume", "terms": terms})
-        else:
-            alias_terms = sorted({alias for term in terms for alias in _item(aliases, term, set())})
-            if alias_terms and _terms_in_text(alias_terms, resume_text):
-                state = ResolutionState.ALIAS_MATCH.value
-                evidence.append({"source": "alias", "terms": alias_terms})
-            else:
-                matched_fact_ids = _fact_matches(terms, fact_index, bool(_item(config, "allow_inferred_facts", False)))
-                if matched_fact_ids:
-                    state = ResolutionState.VERIFIED_FACT_MATCH.value
-                    evidence.extend({"source": "career_fact", "fact_id": fact_id} for fact_id in matched_fact_ids)
+        state, matched_fact_ids, evidence = _resolve_requirement(requirement, terms, resume_text, aliases, fact_index, config)
 
         requirement_score = weight if state in _RESOLVED else 0.0
         blocking = classification == RequirementClassification.REQUIRED.value and state not in _RESOLVED
         if blocking:
             unresolved.append(requirement_id)
+        elif classification == RequirementClassification.PREFERRED.value and state not in _RESOLVED:
+            preferred_unresolved.append(requirement_id)
         score += requirement_score
         requirement_results.append(
             {
                 "requirement_id": requirement_id,
                 "classification": classification,
+                "concept": _item(requirement, "concept"),
+                "source_text": _item(requirement, "source_text"),
+                "normalized_terms": terms,
                 "resolution_state": state,
                 "score": round(requirement_score, 4),
                 "max_score": round(max(weight, 0.0), 4),
                 "matched_fact_ids": matched_fact_ids,
                 "blocking": blocking,
+                "unresolved": state not in _RESOLVED,
                 "evidence": evidence,
             }
         )
@@ -276,6 +343,7 @@ def scoreMatch(
         "score_percent": round(score * 100 / max_score, 2) if max_score else 0.0,
         "requirement_results": requirement_results,
         "unresolved_requirement_ids": unresolved,
+        "preferred_unresolved_requirement_ids": preferred_unresolved,
         "can_continue": not unresolved or not strict,
         "explanations": ["Required unresolved requirements block continuation." if unresolved and strict else "No required hard gate is blocking continuation."],
         "algorithm_version": ALGORITHM_VERSION,
@@ -292,18 +360,40 @@ def getUnresolvedRequirements(match_result: Any, policy: JsonObject | None = Non
         return _result("error", unresolved_requirements=[], can_continue=False)
 
     unresolved_ids = {str(item) for item in _array(_item(match, "unresolved_requirement_ids", []))}
-    unresolved = [
-        copy.deepcopy(item)
-        for item in _array(_item(match, "requirement_results", []))
-        if isinstance(item, dict)
-        and (
-            _item(item, "requirement_id") in unresolved_ids
-            or (_item(item, "classification") == RequirementClassification.REQUIRED.value and _item(item, "resolution_state") not in _RESOLVED)
-        )
+    preferred_ids = {str(item) for item in _array(_item(match, "preferred_unresolved_requirement_ids", []))}
+    all_results = [item for item in _array(_item(match, "requirement_results", [])) if isinstance(item, dict)]
+    required_unresolved = [
+        _unresolved_copy(item)
+        for item in all_results
+        if _item(item, "requirement_id") in unresolved_ids
+        or (_item(item, "classification") == RequirementClassification.REQUIRED.value and _item(item, "resolution_state") not in _RESOLVED)
     ]
+    preferred_unresolved = [
+        _unresolved_copy(item)
+        for item in all_results
+        if _item(item, "requirement_id") in preferred_ids
+        or (_item(item, "classification") == RequirementClassification.PREFERRED.value and _item(item, "resolution_state") not in _RESOLVED)
+    ]
+    contextual_unresolved = [
+        _unresolved_copy(item)
+        for item in all_results
+        if _item(item, "classification") == RequirementClassification.CONTEXTUAL.value and _item(item, "resolution_state") not in _RESOLVED
+    ]
+    include_contextual = bool(_item(policy, "include_contextual"))
+    unresolved = _rank_unresolved(required_unresolved + preferred_unresolved + (contextual_unresolved if include_contextual else []))
+    blocking = _rank_unresolved(required_unresolved)
     require_resolution = bool(_item(policy, "require_hard_resolution") or _item(policy, "require_resolution") or _item(policy, "policy") == "strict")
-    can_continue = not unresolved if require_resolution else bool(_item(match, "can_continue", True))
-    return _result("ok", unresolved_requirements=unresolved, can_continue=can_continue)
+    can_continue = not blocking if require_resolution else bool(_item(match, "can_continue", True))
+    return _result(
+        "ok",
+        unresolved_requirements=unresolved,
+        required_unresolved_requirements=blocking,
+        preferred_unresolved_requirements=_rank_unresolved(preferred_unresolved),
+        blocking_requirements=blocking,
+        ranked_unresolved_requirements=unresolved,
+        selected_requirement=copy.deepcopy(unresolved[0]) if unresolved else None,
+        can_continue=can_continue,
+    )
 
 
 def rankResumeContent(canonical_resume: Any, job_model: Any, match_result: Any, config: JsonObject | None = None) -> JsonObject:
@@ -364,11 +454,21 @@ def validateChange(
     operation_id = str(_item(op, "operation_id", ""))
     if _item(op, "status", ChangeOperationStatus.PROPOSED.value) != ChangeOperationStatus.PROPOSED.value:
         errors.append(_issue("invalid_status", "Only proposed operations can be validated.", "status"))
-    path = str(_item(op, "path", ""))
+    path = _operation_path(op)
     if not path.startswith("/"):
         errors.append(_issue("invalid_path", "Operation path must be a JSON pointer.", "path"))
 
     path_exists, current_value = _pointer_value(resume, path)
+    parent_exists = _pointer_parent_exists(resume, path)
+    operation_kind = str(_item(op, "op", "replace" if path_exists else "add"))
+    if operation_kind not in {"add", "replace", "remove"}:
+        errors.append(_issue("invalid_op", "Operation op must be add, replace, or remove.", "op"))
+    if not parent_exists:
+        errors.append(_issue("invalid_path", "Operation path parent does not exist in the canonical resume.", "path"))
+    if operation_kind == "replace" and not path_exists:
+        errors.append(_issue("missing_target", "Replace operations require an existing target path.", "path"))
+    if operation_kind == "add" and path_exists and not path.endswith("/-"):
+        errors.append(_issue("target_exists", "Add operations require a new object member or array append path.", "path"))
     if "before" in op and _item(op, "before") != current_value and not (_item(op, "before") is None and not path_exists):
         errors.append(_issue("before_mismatch", "Operation before value does not match current content.", "before"))
 
@@ -403,6 +503,10 @@ def validateChange(
         errors.append(_issue("unsupported_years_claim", "Years-of-experience claims require matching verified fact support.", "after"))
     if guarded and not linked_fact_ids:
         errors.append(_issue("missing_linked_fact", "Guarded changes must link supporting fact IDs.", "linked_fact_ids"))
+    if guarded and not linked_requirement_ids:
+        errors.append(_issue("missing_linked_requirement", "Guarded changes must link the requirement IDs they resolve.", "linked_requirement_ids"))
+    if _title_inflation(path, current_value, _item(op, "after"), support_by_claim):
+        errors.append(_issue("title_inflation", "Employment title changes require exact user-verified title fact support.", "after"))
 
     grounding["supported"] = not errors
     validation_state = "validated" if not errors else "rejected"
@@ -427,16 +531,37 @@ def applyChange(working_resume: Any, validated_operation: Any) -> JsonObject:
         return _result("rejected", working_resume=copy.deepcopy(resume), operation_id=operation_id, audit={"applied": False, "reason": "operation_not_validated"})
 
     result_resume = copy.deepcopy(resume)
-    path = str(_item(op, "path", ""))
+    path = _operation_path(op)
     before = _item(op, "before")
     after = copy.deepcopy(_item(op, "after"))
     path_exists, current = _pointer_value(result_resume, path)
+    if not _pointer_parent_exists(result_resume, path):
+        return _result("error", working_resume=result_resume, operation_id=operation_id, audit={"applied": False, "reason": "invalid_path"})
+    if _append_already_present(result_resume, path, after):
+        return _result("ok", working_resume=result_resume, operation_id=operation_id, audit={"applied": False, "already_applied": True, "path": path})
     if current == after:
         return _result("ok", working_resume=result_resume, operation_id=operation_id, audit={"applied": False, "already_applied": True})
     if before != current and not (before is None and not path_exists):
         return _result("rejected", working_resume=result_resume, operation_id=operation_id, audit={"applied": False, "reason": "before_mismatch"})
     applied = _set_pointer(result_resume, path, after)
-    return _result("ok" if applied else "error", working_resume=result_resume, operation_id=operation_id, audit={"applied": applied, "status_transition": "validated->applied" if applied else "not_applied"})
+    applied_operation = copy.deepcopy(op)
+    if applied:
+        applied_operation["status"] = ChangeOperationStatus.APPLIED.value
+    return _result(
+        "ok" if applied else "error",
+        working_resume=result_resume,
+        operation_id=operation_id,
+        applied_operation=applied_operation if applied else None,
+        audit={
+            "applied": applied,
+            "path": path,
+            "before": before,
+            "after": after if applied else None,
+            "linked_fact_ids": _array(_item(op, "linked_fact_ids", [])),
+            "linked_requirement_ids": _array(_item(op, "linked_requirement_ids", [])),
+            "status_transition": "validated->applied" if applied else "not_applied",
+        },
+    )
 
 
 def validateGrounding(
@@ -559,7 +684,10 @@ def _text(value: Any) -> str:
 
 
 def _normal_text(value: Any) -> str:
-    return " ".join(str(value).lower().replace("/", " ").replace("-", " ").split())
+    text = str(value).lower()
+    text = text.replace("&", " and ")
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    return " ".join(text.split())
 
 
 def _stable_id(prefix: str, value: Any) -> str:
@@ -590,6 +718,27 @@ def _date_key(value: Any) -> tuple[int, int] | None:
     if year < 1900 or month < 1 or month > 12:
         return None
     return (year, month)
+
+
+def _requirements_from_text(text: str) -> list[JsonObject]:
+    requirements: list[JsonObject] = []
+    current_classification = RequirementClassification.CONTEXTUAL.value
+    for line in str(text).splitlines():
+        cleaned = line.strip()
+        if not cleaned:
+            continue
+        lowered = cleaned.lower()
+        if "required qualification" in lowered or lowered.startswith("required"):
+            current_classification = RequirementClassification.REQUIRED.value
+            continue
+        if "preferred qualification" in lowered or lowered.startswith("preferred") or "nice to have" in lowered:
+            current_classification = RequirementClassification.PREFERRED.value
+            continue
+        cleaned = cleaned.lstrip("-*•◦ ").strip()
+        if not cleaned:
+            continue
+        requirements.append({"source_text": cleaned, "concept": cleaned, "classification": current_classification})
+    return requirements
 
 
 def _requirement(raw: Any, index: int, config: JsonObject) -> JsonObject:
@@ -635,6 +784,50 @@ def _requirement(raw: Any, index: int, config: JsonObject) -> JsonObject:
     }
 
 
+def _resolve_requirement(
+    requirement: JsonObject,
+    terms: list[str],
+    resume_text: str,
+    aliases: dict[str, set[str]],
+    fact_index: dict[str, JsonObject],
+    config: JsonObject,
+) -> tuple[str, list[str], list[JsonObject]]:
+    allow_inferred = bool(_item(config, "allow_inferred_facts", False))
+    required_years = _minimum_required_years(_item(requirement, "years") or _item(requirement, "source_text") or _item(requirement, "concept"))
+    non_year_terms = [term for term in terms if _minimum_required_years(term) is None]
+
+    if required_years is not None:
+        years_met, years_evidence = _years_met(resume_text, required_years)
+        if years_met and (not non_year_terms or _terms_in_text(non_year_terms, resume_text)):
+            evidence = [{"source": "resume", "terms": non_year_terms, "required_years": required_years, "matched_years": years_evidence}]
+            return ResolutionState.EXACT_MATCH.value, [], evidence
+    elif _terms_in_text(terms, resume_text):
+        return ResolutionState.EXACT_MATCH.value, [], [{"source": "resume", "terms": _matched_terms(terms, resume_text)}]
+
+    alias_terms = _aliases_for_terms(terms, aliases)
+    if required_years is not None:
+        years_met, years_evidence = _years_met(resume_text, required_years)
+        if years_met and alias_terms and _terms_in_text(alias_terms, resume_text):
+            evidence = [{"source": "alias", "terms": _matched_terms(alias_terms, resume_text), "required_years": required_years, "matched_years": years_evidence}]
+            return ResolutionState.ALIAS_MATCH.value, [], evidence
+    elif alias_terms and _terms_in_text(alias_terms, resume_text):
+        return ResolutionState.ALIAS_MATCH.value, [], [{"source": "alias", "terms": _matched_terms(alias_terms, resume_text)}]
+
+    fact_state, fact_ids, fact_evidence = _fact_resolution(terms, required_years, fact_index, allow_inferred)
+    if fact_state:
+        return fact_state, fact_ids, fact_evidence
+
+    related_terms = _related_terms_for(terms)
+    if related_terms and _terms_in_text(related_terms, resume_text):
+        return ResolutionState.RELATED_MATCH.value, [], [{"source": "resume", "terms": _matched_terms(related_terms, resume_text), "reason": "related_not_equivalent"}]
+
+    possible_terms = _possible_terms(terms)
+    if possible_terms and _terms_in_text(possible_terms, resume_text):
+        return ResolutionState.POSSIBLE_MATCH.value, [], [{"source": "resume", "terms": _matched_terms(possible_terms, resume_text), "reason": "partial_overlap"}]
+
+    return ResolutionState.UNKNOWN.value, [], []
+
+
 def _stable_requirement_id(index: int, concept: str, config: JsonObject) -> str:
     prefix = str(_item(config, "requirement_id_prefix", "req"))
     return f"{prefix}_{index}_{hashlib.sha256(concept.lower().encode('utf-8')).hexdigest()[:8]}"
@@ -644,7 +837,7 @@ def _infer_classification(text: str) -> str:
     lowered = text.lower()
     if "preferred" in lowered or "nice to have" in lowered:
         return RequirementClassification.PREFERRED.value
-    if "required" in lowered or "must" in lowered or "8+" in lowered:
+    if "required" in lowered or "must" in lowered or "8+" in lowered or "requirement" in lowered:
         return RequirementClassification.REQUIRED.value
     return RequirementClassification.CONTEXTUAL.value
 
@@ -673,6 +866,8 @@ def _requirements(job: Any) -> list[JsonObject]:
 
 def _classification(requirement: JsonObject) -> str:
     value = str(_item(requirement, "classification", RequirementClassification.CONTEXTUAL.value))
+    if value == RequirementClassification.CONTEXTUAL.value and _item(requirement, "required") is True:
+        return RequirementClassification.REQUIRED.value
     return value if value in {item.value for item in RequirementClassification} else RequirementClassification.CONTEXTUAL.value
 
 
@@ -687,18 +882,88 @@ def _terms_for(value: Any) -> list[str]:
     text = _normal_text(value)
     if not text:
         return []
-    terms = {text}
-    terms.update(part for part in text.split() if len(part) > 1)
+    terms = set(_domain_terms(text))
+    years = _extract_years(text)
+    if years:
+        terms.add(_normal_text(years))
+    terms.update(part for part in text.split() if _specific_term(part))
+    if not terms and len(text) > 1:
+        terms.add(text)
     return sorted(terms)
 
 
+def _domain_terms(text: str) -> list[str]:
+    normalized = _normal_text(text)
+    terms: set[str] = set()
+    for canonical, variants in _TERM_VARIANTS.items():
+        if any(_term_in_text(variant, normalized) for variant in variants):
+            terms.add(_normal_text(canonical))
+            terms.update(_normal_text(variant) for variant in variants if _normal_text(variant))
+    return sorted(terms)
+
+
+def _specific_term(term: Any) -> bool:
+    normalized = _normal_text(term)
+    if not normalized or normalized in _GENERIC_TERMS:
+        return False
+    if " " in normalized:
+        words = [word for word in normalized.split() if word not in _GENERIC_TERMS]
+        return bool(words)
+    return len(normalized) > 1
+
+
+def _specific_terms(terms: list[str]) -> list[str]:
+    expanded: set[str] = set()
+    for term in terms:
+        normalized = _normal_text(term)
+        if not normalized:
+            continue
+        if normalized in _TERM_VARIANTS:
+            expanded.add(normalized)
+            expanded.update(_normal_text(item) for item in _TERM_VARIANTS[normalized])
+            continue
+        variant_group = _variant_group(normalized)
+        if variant_group:
+            expanded.add(_normal_text(variant_group[0]))
+            expanded.update(_normal_text(item) for item in variant_group[1])
+            continue
+        if _specific_term(normalized):
+            expanded.add(normalized)
+    return sorted(expanded)
+
+
+def _variant_group(term: str) -> tuple[str, tuple[str, ...]] | None:
+    for canonical, variants in _TERM_VARIANTS.items():
+        normalized_variants = {_normal_text(item) for item in variants}
+        if term in normalized_variants:
+            return canonical, variants
+    return None
+
+
+def _aliases_for_terms(terms: list[str], aliases: dict[str, set[str]]) -> list[str]:
+    alias_terms: set[str] = set()
+    for term in _specific_terms(terms):
+        alias_terms.update(_item(aliases, term, set()))
+    return sorted(term for term in alias_terms if _specific_term(term))
+
+
+def _matched_terms(terms: list[str], text: str) -> list[str]:
+    return sorted({term for term in _specific_terms(terms) if _term_in_text(term, text)})
+
+
 def _terms_in_text(terms: list[str], text: str) -> bool:
-    return any(_term_in_text(term, text) for term in terms)
+    return any(_term_in_text(term, text) for term in _specific_terms(terms))
 
 
 def _term_in_text(term: Any, text: str) -> bool:
     normalized = _normal_text(term)
-    return bool(normalized and normalized in _normal_text(text))
+    normalized_text = _normal_text(text)
+    if not normalized or not normalized_text:
+        return False
+    if " " in normalized:
+        return normalized in normalized_text
+    words = normalized_text.split()
+    return normalized in words or f"{normalized}s" in words or (normalized.endswith("s") and normalized[:-1] in words)
 
 
 def _alias_map(config: JsonObject) -> dict[str, set[str]]:
@@ -709,6 +974,88 @@ def _alias_map(config: JsonObject) -> dict[str, set[str]]:
             alias_values = value if isinstance(value, list) else [value]
             aliases[_normal_text(key)] = {_normal_text(item) for item in alias_values if _normal_text(item)}
     return aliases
+
+
+def _minimum_required_years(value: Any) -> int | None:
+    matches = _YEARS_RE.findall(str(value))
+    if not matches:
+        return None
+    raw = matches[0].lower()
+    if raw.isdigit():
+        return int(raw)
+    return _NUMBER_WORDS.get(raw)
+
+
+def _years_met(text: str, required_years: int) -> tuple[bool, int | None]:
+    values = [_minimum_required_years(match.group(0)) for match in _YEARS_RE.finditer(str(text))]
+    numeric_values = [value for value in values if value is not None]
+    if not numeric_values:
+        return False, None
+    best = max(numeric_values)
+    return best >= required_years, best
+
+
+def _fact_resolution(
+    terms: list[str],
+    required_years: int | None,
+    fact_index: dict[str, JsonObject],
+    allow_inferred: bool,
+) -> tuple[str | None, list[str], list[JsonObject]]:
+    explicit_missing: list[str] = []
+    verified: list[str] = []
+    related: list[str] = []
+    evidence: list[JsonObject] = []
+    for fact_id, fact in sorted(fact_index.items()):
+        fact_text = _fact_text(fact)
+        if not _fact_relevant(terms, required_years, fact_text):
+            continue
+        state = str(_item(fact, "verification_state", VerificationState.UNKNOWN.value))
+        fact_evidence = {"source": "career_fact", "fact_id": fact_id, "terms": _matched_terms(terms, fact_text)}
+        if required_years is not None:
+            met, matched_years = _years_met(fact_text, required_years)
+            fact_evidence["required_years"] = required_years
+            fact_evidence["matched_years"] = matched_years
+            if not met:
+                continue
+        if state == VerificationState.EXPLICITLY_MISSING.value:
+            explicit_missing.append(fact_id)
+            evidence.append({**fact_evidence, "resolution_state": ResolutionState.EXPLICITLY_MISSING.value})
+        elif _fact_allowed(fact, allow_inferred):
+            verified.append(fact_id)
+            evidence.append(fact_evidence)
+        elif str(_item(fact, "resolution_state", "")) == ResolutionState.RELATED_MATCH.value:
+            related.append(fact_id)
+            evidence.append({**fact_evidence, "resolution_state": ResolutionState.RELATED_MATCH.value})
+    if explicit_missing:
+        return ResolutionState.EXPLICITLY_MISSING.value, explicit_missing, evidence
+    if verified:
+        return ResolutionState.VERIFIED_FACT_MATCH.value, verified, evidence
+    if related:
+        return ResolutionState.RELATED_MATCH.value, related, evidence
+    return None, [], []
+
+
+def _fact_relevant(terms: list[str], required_years: int | None, fact_text: str) -> bool:
+    non_year_terms = [term for term in terms if _minimum_required_years(term) is None]
+    if non_year_terms and _terms_in_text(non_year_terms, fact_text):
+        return True
+    return required_years is not None and _years_met(fact_text, required_years)[0]
+
+
+def _related_terms_for(terms: list[str]) -> list[str]:
+    related: set[str] = set()
+    for term in _specific_terms(terms):
+        related.update(_RELATED_REQUIREMENT_TERMS.get(term, ()))
+    return sorted(related)
+
+
+def _possible_terms(terms: list[str]) -> list[str]:
+    possible: set[str] = set()
+    for term in terms:
+        for part in _normal_text(term).split():
+            if _specific_term(part):
+                possible.add(part)
+    return sorted(possible - set(_specific_terms(terms)))
 
 
 def _fact_index(facts: list[JsonObject]) -> dict[str, JsonObject]:
@@ -764,11 +1111,36 @@ def _claim_support(guarded: set[str], fact_index: dict[str, JsonObject], linked_
         terms = _GUARDED_TERMS[claim]
         for fact_id in linked_fact_ids:
             fact = _item(fact_index, str(fact_id))
-            if isinstance(fact, dict) and _fact_allowed(fact, allow_inferred) and any(_term_in_text(term, _fact_text(fact)) for term in terms):
+            if (
+                isinstance(fact, dict)
+                and _fact_allowed(fact, allow_inferred)
+                and not _fact_negates_claim(claim, fact)
+                and any(_term_in_text(term, _fact_text(fact)) for term in terms)
+            ):
                 if claim not in supported:
                     supported[claim] = []
                 supported[claim].append(str(fact_id))
     return supported
+
+
+def _fact_negates_claim(claim: str, fact: JsonObject) -> bool:
+    text = _fact_text(fact)
+    if claim == "staff_title" and any(phrase in text for phrase in ("not had staff", "haven t had staff", "not staff engineer", "not staff software engineer")):
+        return True
+    if any(phrase in text for phrase in ("no ", "not ", "never ", "haven t ", "hasn t ", "without ")):
+        claim_terms = _GUARDED_TERMS.get(claim, ())
+        return any(_term_in_text(term, text) for term in claim_terms)
+    return False
+
+
+def _title_inflation(path: str, before: Any, after: Any, support_by_claim: dict[str, list[str]]) -> bool:
+    if not path.endswith("/title"):
+        return False
+    after_text = _normal_text(after)
+    before_text = _normal_text(before)
+    if "staff" not in after_text or "staff" in before_text:
+        return False
+    return not support_by_claim.get("staff_title")
 
 
 def _years(text: str) -> list[str]:
@@ -789,6 +1161,10 @@ def _facts_support_terms(terms: list[str], fact_index: dict[str, JsonObject], li
     return False
 
 
+def _operation_path(operation: JsonObject) -> str:
+    return str(_item(operation, "path") or _item(operation, "target_path") or "")
+
+
 def _pointer_value(document: Any, pointer: str) -> tuple[bool, Any]:
     if not pointer.startswith("/"):
         return False, None
@@ -804,6 +1180,32 @@ def _pointer_value(document: Any, pointer: str) -> tuple[bool, Any]:
         else:
             return False, None
     return True, current
+
+
+def _pointer_parent_exists(document: Any, pointer: str) -> bool:
+    if not pointer.startswith("/"):
+        return False
+    tokens = [token.replace("~1", "/").replace("~0", "~") for token in pointer.strip("/").split("/")]
+    if not tokens:
+        return False
+    current = document
+    for token in tokens[:-1]:
+        if isinstance(current, dict) and token in current:
+            current = current[token]
+        elif isinstance(current, list) and token.isdigit() and int(token) < len(current):
+            current = current[int(token)]
+        else:
+            return False
+    final = tokens[-1]
+    return isinstance(current, dict) or (isinstance(current, list) and (final == "-" or final.isdigit()))
+
+
+def _append_already_present(document: Any, pointer: str, value: Any) -> bool:
+    if not pointer.endswith("/-"):
+        return False
+    parent_pointer = pointer[:-2]
+    exists, parent = _pointer_value(document, parent_pointer)
+    return bool(exists and isinstance(parent, list) and value in parent)
 
 
 def _set_pointer(document: JsonObject, pointer: str, value: Any) -> bool:
@@ -832,6 +1234,62 @@ def _set_pointer(document: JsonObject, pointer: str, value: Any) -> bool:
             current[int(final)] = value
             return True
     return False
+
+
+def _unresolved_copy(requirement_result: JsonObject) -> JsonObject:
+    copied = copy.deepcopy(requirement_result)
+    copied["resolution_state"] = str(_item(copied, "resolution_state", ResolutionState.UNKNOWN.value))
+    copied["resolution_state_group"] = _resolution_group(copied["resolution_state"])
+    copied["blocking"] = bool(_item(copied, "blocking", False))
+    copied["unresolved"] = copied["resolution_state"] not in _RESOLVED
+    return copied
+
+
+def _rank_unresolved(requirements: list[JsonObject]) -> list[JsonObject]:
+    unique: dict[str, JsonObject] = {}
+    for item in requirements:
+        requirement_id = str(_item(item, "requirement_id", ""))
+        if requirement_id and requirement_id not in unique:
+            unique[requirement_id] = item
+    return sorted(
+        unique.values(),
+        key=lambda item: (
+            0 if _item(item, "blocking") else 1,
+            _classification_rank(str(_item(item, "classification", ""))),
+            _resolution_rank(str(_item(item, "resolution_state", ""))),
+            -_number(_item(item, "max_score", _item(item, "weight", 0.0)), 0.0),
+            str(_item(item, "requirement_id", "")),
+        ),
+    )
+
+
+def _classification_rank(value: str) -> int:
+    return {
+        RequirementClassification.REQUIRED.value: 0,
+        RequirementClassification.PREFERRED.value: 1,
+        RequirementClassification.CONTEXTUAL.value: 2,
+    }.get(value, 3)
+
+
+def _resolution_rank(value: str) -> int:
+    return {
+        ResolutionState.EXPLICITLY_MISSING.value: 0,
+        ResolutionState.UNKNOWN.value: 1,
+        ResolutionState.POSSIBLE_MATCH.value: 2,
+        ResolutionState.RELATED_MATCH.value: 3,
+    }.get(value, 4)
+
+
+def _resolution_group(value: str) -> str:
+    if value in _RESOLVED:
+        return "resolved"
+    if value == ResolutionState.RELATED_MATCH.value:
+        return "related_not_resolved"
+    if value == ResolutionState.POSSIBLE_MATCH.value:
+        return "possible_not_resolved"
+    if value == ResolutionState.EXPLICITLY_MISSING.value:
+        return "missing"
+    return "unknown"
 
 
 def _missing_provenance(resume: JsonObject) -> list[JsonObject]:
