@@ -39,7 +39,7 @@ The system supports CLI, MCP, agent, renderer, and future plugin/UI surfaces whi
 
 ## Current State **[REQUIRED]**
 
-The repo contains the contract-first package structure, surface manifests, fixtures, guardrails, smoke/E2E documents, and implementation playbook for the target architecture. Core runtime packages are present as thin package skeletons with contract and boundary tests defining the intended behavior.
+The repo contains the contract-first package structure, surface manifests, fixtures, guardrails, smoke/E2E documents, and implementation playbook for the target architecture. The 2026-08-12/13 implementation waves added ~7,500 lines across all eight runtime packages: the PR gate (188 contract/boundary/guardrail tests), smoke gate, and future-contract gate are green, but a full alignment audit (2026-08-13) found actual product depth at roughly 25-55% per package, with fixture-tuned honesty gates, DTO/enum drift from the section 4 contracts, a workflow state machine the CLI never drives, and a release-candidate test tier that exists only on paper. Six ADRs (RKIT-A-0001 through RKIT-A-0006) were decided on 2026-08-13 to resolve the open runtime/contract questions — including RKIT-A-0006, which rules that documented contract semantics are authoritative over implementation drift — and all initiatives were re-baselined against the audit's verified findings.
 
 Implementation authority is intentionally document-driven: `CONTRACT_SURFACE_ALIGNMENT.md`, package `TEST_SPEC.md` files, surface manifests, `PRODUCT_VISION_AND_CONTRACTS.md`, `SMOKE_TEST.md`, and `E2E_TEST.md` define the product and test gates. Existing or prior resume-kit behavior is not authoritative.
 
