@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+from architecture_lint import scan_python_architecture
+
 
 ALLOWED_SURFACES = {
     "extractResumeSemantics",
@@ -313,6 +315,7 @@ def run(root: Path) -> list[Failure]:
         text = path.read_text(encoding="utf-8")
         if path.suffix == ".py":
             failures.extend(scan_python_imports(path, text))
+            failures.extend(scan_python_architecture("resume-agent", path, text))
         failures.extend(scan_text(path, text))
     return failures
 

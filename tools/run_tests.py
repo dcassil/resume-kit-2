@@ -30,6 +30,7 @@ CONTRACT_TEST_MODULES = [
 ]
 
 BOUNDARY_TEST_MODULES = [
+    "tests.boundary.test_architecture_lint_guardrails",
     "tests.boundary.test_career_mcp_guardrails",
     "tests.boundary.test_career_store_guardrails",
     "tests.boundary.test_resume_agent_guardrails",

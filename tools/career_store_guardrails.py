@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+from architecture_lint import scan_python_architecture
+
 
 ALLOWED_SURFACES = {
     "searchFacts",
@@ -459,6 +461,7 @@ def run(root: Path) -> list[Failure]:
         text = path.read_text(encoding="utf-8")
         if path.suffix == ".py":
             failures.extend(scan_python_imports(path, text))
+            failures.extend(scan_python_architecture("career-store", path, text))
             failures.extend(scan_python_public_api(path, text))
         else:
             failures.extend(scan_text_public_api(path, text))
