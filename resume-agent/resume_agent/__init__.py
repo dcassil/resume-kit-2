@@ -52,9 +52,11 @@ def _stable_id(prefix: str, text: str) -> str:
 def _evidence(text: str, snippet: str, prefix: str) -> dict[str, Any]:
     start = text.lower().find(snippet.lower())
     end = start + len(snippet) if start >= 0 else None
+    evidence_key = f"{start}:{snippet}" if start >= 0 else snippet
     return {
-        "evidence_id": _stable_id(prefix, snippet),
+        "evidence_id": _stable_id(prefix, evidence_key),
         "text": snippet,
+        "snippet": snippet,
         "span": {"start": start if start >= 0 else None, "end": end},
     }
 
@@ -74,8 +76,9 @@ def _proposal_fact(
     terms: list[str],
     evidence_id: str,
     confidence: str = "medium",
+    extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    return {
+    proposal = {
         "fact_id": _stable_id("fact", f"{category}:{text}"),
         "category": category,
         "text": text,
@@ -84,6 +87,9 @@ def _proposal_fact(
         "confidence": confidence,
         "review_required": True,
     }
+    if extra:
+        proposal.update(extra)
+    return proposal
 
 
 def _split_items(text: str) -> list[str]:
@@ -94,14 +100,20 @@ def _split_items(text: str) -> list[str]:
 def _terms_for(text: str) -> list[str]:
     lowered = text.lower()
     terms: list[str] = []
+    years = re.search(r"\b\d+\s*\+?\s*years?\b", text, re.IGNORECASE)
+    if years:
+        terms.append(_clean_text(years.group(0)))
     checks = [
-        ("8+ years", r"8\+\s*years"),
+        ("software engineering", r"\bsoftware engineering\b"),
         ("react", r"\breact\b"),
         ("typescript", r"\btypescript\b"),
+        ("node.js", r"\bnode(?:\.js|js)?\b"),
+        ("postgresql", r"\bpostgres(?:ql)?\b"),
         ("api", r"\bapis?\b|\bapi\b"),
         ("api architecture", r"\bapi architecture\b|\barchitecture/design\b"),
-        ("api design", r"\bapi design\b|\barchitecture/design\b"),
+        ("api design", r"\bapi design\b|\barchitecture/design\b|\bdesign\b"),
         ("responsive design", r"\bresponsive\b"),
+        ("responsive web applications", r"\bresponsive\b.*\bweb\b|\bweb\b.*\bresponsive\b"),
         ("saas", r"\bsaas\b"),
         ("aws", r"\baws\b"),
         ("graphql", r"\bgraphql\b"),
@@ -111,6 +123,151 @@ def _terms_for(text: str) -> list[str]:
         if re.search(pattern, lowered, re.IGNORECASE):
             terms.append(term)
     return terms or [_clean_text(text).lower()]
+
+
+def _unique(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    unique_values: list[str] = []
+    for value in values:
+        cleaned = _clean_text(value)
+        key = cleaned.lower()
+        if cleaned and key not in seen:
+            seen.add(key)
+            unique_values.append(cleaned)
+    return unique_values
+
+
+def _line_records(text: str) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    offset = 0
+    for raw_line in text.splitlines(keepends=True):
+        line = raw_line.rstrip("\r\n")
+        stripped = line.strip()
+        if stripped:
+            start = offset + line.find(stripped)
+            records.append({"text": stripped, "start": start, "end": start + len(stripped)})
+        offset += len(raw_line)
+    return records
+
+
+def _evidence_from_span(text: str, snippet: str, start: int, end: int, prefix: str) -> dict[str, Any]:
+    return {
+        "evidence_id": _stable_id(prefix, f"{start}:{snippet}"),
+        "text": snippet,
+        "snippet": snippet,
+        "span": {"start": start, "end": end},
+    }
+
+
+def _add_resume_fact(
+    raw_text: str,
+    facts: list[dict[str, Any]],
+    evidence: list[dict[str, Any]],
+    category: str,
+    label: str,
+    pattern: str,
+    terms: list[str],
+    confidence: str = "high",
+    extra: dict[str, Any] | None = None,
+) -> None:
+    match = re.search(pattern, raw_text, re.IGNORECASE | re.MULTILINE)
+    if not match:
+        return
+    snippet = _clean_text(match.group(0))
+    source = _evidence(raw_text, snippet, "resume_ev")
+    evidence.append(source)
+    facts.append(_proposal_fact(label, category, terms, source["evidence_id"], confidence, extra))
+
+
+def _looks_like_title(line: str) -> bool:
+    return bool(
+        re.search(
+            r"\b(software|engineer|developer|architect|lead|principal|senior|full[- ]stack)\b",
+            line,
+            re.IGNORECASE,
+        )
+    )
+
+
+def _is_section_heading(line: str) -> bool:
+    cleaned = line.strip().rstrip(":").lower()
+    return cleaned in {
+        "required",
+        "requirements",
+        "required qualifications",
+        "minimum qualifications",
+        "preferred",
+        "preferred qualifications",
+        "nice to have",
+        "nice-to-have",
+        "context",
+        "about",
+        "responsibilities",
+        "qualifications",
+    }
+
+
+def _job_heading_classification(line: str) -> tuple[str | None, str]:
+    match = re.match(
+        r"^\s*(required(?:\s+qualifications?)?|requirements?|minimum qualifications?|preferred(?:\s+qualifications?)?|nice[- ]to[- ]have|contextual|responsibilities|about)\s*:?\s*(.*)$",
+        line,
+        re.IGNORECASE,
+    )
+    if not match:
+        return None, ""
+    heading = match.group(1).lower()
+    if "preferred" in heading or "nice" in heading:
+        return "preferred", match.group(2).strip()
+    if "required" in heading or "requirement" in heading or "minimum" in heading:
+        return "required", match.group(2).strip()
+    return "contextual", match.group(2).strip()
+
+
+def _strip_bullet(line: str) -> str:
+    return re.sub(r"^\s*[-*•◦]\s*", "", line).strip()
+
+
+def _requirement_items(body: str) -> list[str]:
+    cleaned = _clean_text(body.strip(" .;"))
+    if not cleaned:
+        return []
+    if "," not in cleaned:
+        return [cleaned]
+    parts = re.split(r",|\band\b", cleaned)
+    return [_clean_text(part.strip(" .;:")) for part in parts if _clean_text(part.strip(" .;:"))]
+
+
+def _years_detail(text: str) -> dict[str, Any] | None:
+    match = re.search(r"\b(\d+)\s*\+?\s*years?\b", text, re.IGNORECASE)
+    if not match:
+        return None
+    return {"minimum": int(match.group(1)), "source_text": _clean_text(match.group(0))}
+
+
+def _requirement_concepts(source_text: str) -> list[tuple[str, list[str]]]:
+    lowered = source_text.lower()
+    concepts: list[tuple[str, list[str]]] = []
+    checks = [
+        ("req_years", ["years", "software engineering"], r"\b\d+\s*\+?\s*years?\b"),
+        ("req_react", ["react"], r"\breact\b"),
+        ("req_typescript", ["typescript"], r"\btypescript\b"),
+        ("req_node", ["node.js"], r"\bnode(?:\.js|js)?\b"),
+        ("req_postgresql", ["postgresql"], r"\bpostgres(?:ql)?\b"),
+        ("req_aws", ["aws"], r"\baws\b"),
+        ("req_graphql", ["graphql"], r"\bgraphql\b"),
+        ("req_responsive", ["responsive design"], r"\bresponsive\b"),
+        ("req_saas", ["saas"], r"\bsaas\b"),
+        ("req_leadership", ["technical leadership"], r"\btechnical leadership\b|\bleadership\b|\bmentoring\b|\bdesign review\b|\bcross-team architecture\b"),
+        ("req_api", ["api", "api architecture", "api design"], r"\bapi architecture\b|\barchitecture/design\b|\bapi design\b|\bapis?\b"),
+    ]
+    for requirement_id, terms, pattern in checks:
+        if re.search(pattern, lowered, re.IGNORECASE):
+            concepts.append((requirement_id, terms))
+    if any(requirement_id == "req_graphql" for requirement_id, _ in concepts):
+        concepts = [(requirement_id, terms) for requirement_id, terms in concepts if requirement_id != "req_api"]
+    if not concepts:
+        concepts.append((_stable_id("req", source_text), _terms_for(source_text)))
+    return concepts
 
 
 def _safe_topic(value: Any) -> str:
@@ -150,41 +307,103 @@ def extractResumeSemantics(rawText: str, context: dict[str, Any] | None = None) 
     """Extract source-backed semantic proposals from plain resume text."""
 
     del context
-    text = _clean_text(rawText)
-    if not text:
+    if not _clean_text(rawText):
         return _error("validation_error", "rawText must be a non-empty string.")
 
     result = _base("resume_semantic_extraction")
     evidence: list[dict[str, Any]] = []
     facts: list[dict[str, Any]] = []
 
-    patterns = [
+    lines = _line_records(rawText)
+    possible_titles = [
+        line
+        for line in lines[:4]
+        if _looks_like_title(str(line["text"])) and not _is_section_heading(str(line["text"]))
+    ]
+    if possible_titles:
+        title = possible_titles[0]
+        source = _evidence_from_span(rawText, str(title["text"]), int(title["start"]), int(title["end"]), "resume_ev")
+        evidence.append(source)
+        facts.append(
+            _proposal_fact(
+                str(title["text"]),
+                "title",
+                [str(title["text"]).lower()],
+                source["evidence_id"],
+                "high",
+            )
+        )
+
+    years_match = re.search(
+        r"\b\d+\s*\+?\s+years?\s+of\s+(?:full[- ]stack\s+)?software development experience\b",
+        rawText,
+        re.IGNORECASE,
+    )
+    if years_match:
+        snippet = _clean_text(years_match.group(0))
+        source = _evidence(rawText, snippet, "resume_ev")
+        evidence.append(source)
+        terms = _terms_for(snippet)
+        if "full-stack" not in terms and re.search(r"full[- ]stack", snippet, re.IGNORECASE):
+            terms.append("full-stack")
+        if "software development" not in terms:
+            terms.append("software development")
+        facts.append(
+            _proposal_fact(
+                snippet,
+                "experience",
+                _unique(terms),
+                source["evidence_id"],
+                "high",
+                {"years": _years_detail(snippet)},
+            )
+        )
+
+    resume_patterns = [
+        ("domain", "SaaS products", r"\bmulti-tenant\s+SaaS products?\b|\bSaaS products?\b|\bSaaS\b", ["saas"]),
         ("skill", "React", r"\bReact\b", ["react"]),
         ("skill", "TypeScript", r"\bTypeScript\b", ["typescript"]),
+        ("skill", "Node.js", r"\bNode\.js\b|\bNodeJS\b", ["node.js"]),
+        ("skill", "PostgreSQL", r"\bPostgreSQL\b|\bPostgres\b", ["postgresql"]),
+        ("skill", "Azure", r"\bAzure\b", ["azure"]),
         ("skill", "REST APIs", r"\bREST APIs?\b", ["rest", "api"]),
         (
             "experience",
-            "responsive web applications",
-            r"\bresponsive web applications?\b",
-            ["responsive design", "web applications"],
+            "API design and integration work",
+            r"\bDesigned\s+REST APIs?\b|\bREST APIs?\b|\bAPI architecture\b|\bAPI design\b|\bintegration patterns\b",
+            ["rest", "api", "api design"],
         ),
         (
             "experience",
-            "API architecture",
-            r"\bAPI architecture\b|\bDesigned API architecture\b",
-            ["api", "api architecture", "api design"],
+            "responsive web apps",
+            r"\bresponsive web apps?\b|\bresponsive web applications?\b",
+            ["responsive design", "responsive web applications"],
         ),
-        ("domain", "SaaS products", r"\bSaaS products?\b|\bSaaS\b", ["saas"]),
+        (
+            "experience",
+            "workflow automation",
+            r"\bworkflow automation\b",
+            ["workflow automation"],
+        ),
+        (
+            "leadership",
+            "team leadership",
+            r"\bLed a small team of three developers\b|\bteam leadership\b|\bdelivery planning\b|\bcode review\b|\brelease coordination\b",
+            ["team leadership", "delivery planning", "code review", "release coordination"],
+        ),
     ]
 
-    for category, label, pattern, terms in patterns:
-        snippet = _first_match(text, pattern)
-        if not snippet:
-            continue
-        source = _evidence(text, snippet, "ev")
-        evidence.append(source)
-        facts.append(_proposal_fact(label, category, terms, source["evidence_id"], "high"))
+    seen_facts = {fact["fact_id"] for fact in facts}
+    for category, label, pattern, terms in resume_patterns:
+        before = len(facts)
+        _add_resume_fact(rawText, facts, evidence, category, label, pattern, terms)
+        if len(facts) > before and facts[-1]["fact_id"] in seen_facts:
+            facts.pop()
+            evidence.pop()
+        elif len(facts) > before:
+            seen_facts.add(facts[-1]["fact_id"])
 
+    text = _clean_text(rawText)
     if _contains(text, r"\bambiguous\b|\bvarious\b|\bseveral\b"):
         result["uncertainty"].append(
             {
@@ -212,35 +431,71 @@ def extractJobSemantics(rawJobText: str, context: dict[str, Any] | None = None) 
         return _error("validation_error", "rawJobText must be a non-empty string.")
 
     result = _base("job_semantic_extraction")
-    lines = [line.strip() for line in rawJobText.splitlines() if line.strip()]
-    heading = lines[0] if lines else ""
+    lines = _line_records(rawJobText)
+    heading = str(lines[0]["text"]) if lines else ""
     job_title = _clean_text(heading.split(",", 1)[0]) if heading else None
     company = _clean_text(heading.split(",", 1)[1]) if "," in heading else None
+    if company is None and len(lines) > 1:
+        second = str(lines[1]["text"])
+        if not _is_section_heading(second) and not _job_heading_classification(second)[0] and not re.match(r"^\s*[-*•◦]", second):
+            company = second
 
     requirements: list[dict[str, Any]] = []
     evidence: list[dict[str, Any]] = []
     terminology: list[str] = []
+    seen_requirements: set[tuple[str, str]] = set()
+    current_classification: str | None = None
 
-    for line in lines[1:]:
-        label_match = re.match(r"^(required|preferred|contextual)\s*:\s*(.+)$", line, re.IGNORECASE)
-        if not label_match:
-            continue
-        classification = label_match.group(1).lower()
-        body = label_match.group(2)
-        for item in _split_items(body):
-            terms = _terms_for(item)
-            source = _evidence(text, item, "job_ev")
-            evidence.append(source)
+    def append_requirement(source_text: str, classification: str, start: int | None = None, end: int | None = None) -> None:
+        cleaned = _clean_text(source_text.strip(" .;"))
+        if not cleaned:
+            return
+        source = (
+            _evidence_from_span(rawJobText, cleaned, start, end, "job_ev")
+            if start is not None and end is not None
+            else _evidence(rawJobText, cleaned, "job_ev")
+        )
+        evidence.append(source)
+        for requirement_id, concept_terms in _requirement_concepts(cleaned):
+            key = (requirement_id, classification)
+            if key in seen_requirements:
+                continue
+            seen_requirements.add(key)
+            terms = _unique([*concept_terms, *_terms_for(cleaned)])
             terminology.extend(term for term in terms if term not in terminology)
-            requirements.append(
-                {
-                    "requirement_id": _stable_id("req", f"{classification}:{item}"),
-                    "source_text": item,
-                    "classification": classification,
-                    "normalized_terms": terms,
-                    "source_evidence_ids": [source["evidence_id"]],
-                }
-            )
+            requirement: dict[str, Any] = {
+                "requirement_id": requirement_id,
+                "source_text": cleaned,
+                "classification": classification,
+                "normalized_terms": terms,
+                "source_evidence_ids": [source["evidence_id"]],
+            }
+            years = _years_detail(cleaned)
+            if years:
+                requirement["years"] = years
+            requirements.append(requirement)
+
+    start_index = 1
+    if company and len(lines) > 1 and str(lines[1]["text"]) == company:
+        start_index = 2
+
+    for record in lines[start_index:]:
+        line = str(record["text"])
+        heading_classification, heading_body = _job_heading_classification(line)
+        if heading_classification:
+            current_classification = heading_classification
+            if heading_body:
+                for item in _requirement_items(heading_body):
+                    append_requirement(item, current_classification)
+            continue
+
+        body = _strip_bullet(line)
+        if not body or _is_section_heading(body):
+            continue
+        classification = current_classification or "contextual"
+        line_start = int(record["start"]) + line.find(body)
+        line_end = line_start + len(body)
+        append_requirement(body, classification, line_start, line_end)
 
     if not requirements:
         result["uncertainty"].append(
