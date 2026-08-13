@@ -22,7 +22,7 @@ Future utilities may include:
 ### Test runner wrappers
 
 - Run PR gate with unit, contract, boundary, deterministic scoring, and hallucination fixtures.
-- Run future contract gate with resume-core and career-store contracts plus package boundary guardrails.
+- Run future contract gate with full package contracts plus package boundary guardrails.
 - Run main gate with smoke tests.
 - Run release gate with E2E, renderer parse-back, and migration upgrade tests.
 - Return non-zero on any release-blocking failure.

@@ -15,6 +15,12 @@
     "future_contract": [
       "resume_core_contract",
       "career_store_contract",
+      "career_mcp_contract",
+      "workflow_contract",
+      "resume_agent_contract",
+      "resume_render_contract",
+      "resume_cli_contract",
+      "resume_plugin_contract",
       "package_boundary_guardrails"
     ],
     "pr": [
@@ -111,10 +117,12 @@
   "runner_commands": {
     "canonical": "python3 tools/run_gate.py --pr --root .",
     "pr": "python3 tools/run_gate.py --pr --root .",
+    "main": "python3 tools/run_gate.py --main --root .",
+    "smoke": "python3 tools/run_gate.py --smoke --root .",
     "future_contract": "python3 tools/run_gate.py --future-contract --root .",
     "boundary": "python3 -m unittest tests.boundary.test_resume_core_guardrails tests.boundary.test_career_store_guardrails tests.boundary.test_career_mcp_guardrails tests.boundary.test_resume_agent_guardrails tests.boundary.test_resume_render_guardrails tests.boundary.test_resume_cli_guardrails tests.boundary.test_resume_plugin_guardrails tests.boundary.test_workflow_guardrails tests.boundary.test_fixtures_guardrails tests.boundary.test_tests_guardrails tests.boundary.test_tools_guardrails",
     "fixtures": "python3 -m unittest tests.contract.test_fixtures_contract tests.boundary.test_fixtures_guardrails",
-    "contract_current": "python3 -m unittest tests.contract.test_fixtures_contract tests.contract.test_tests_contract tests.contract.test_tools_contract tests.contract.test_runtime_package_layout_contract tests.contract.test_shared_dto_schemas_contract",
+    "contract_current": "python3 -m unittest discover -s tests/contract",
     "contract_tdd": "python3 -m unittest discover -s tests/contract",
     "guardrails": "python3 tools/tests_guardrails.py --root ."
   }
