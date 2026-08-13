@@ -33,7 +33,7 @@ workflow = "workflow"
 
 [tool."resume-kit"]
 canonical_test_command = "python3 tools/run_gate.py --pr --root ."
-future_contract_command = "python3 -m unittest discover -s tests/contract"
+future_contract_command = "python3 tools/run_gate.py --future-contract --root ."
 
 [[tool."resume-kit".packages]]
 folder = "resume-core"

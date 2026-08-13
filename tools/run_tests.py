@@ -13,12 +13,23 @@ import venv
 from pathlib import Path
 
 
-CURRENT_TEST_MODULES = [
+CONTRACT_TEST_MODULES = [
+    "tests.contract.test_resume_core_contract",
+    "tests.contract.test_career_store_contract",
+    "tests.contract.test_career_mcp_contract",
+    "tests.contract.test_workflow_contract",
+    "tests.contract.test_resume_agent_contract",
+    "tests.contract.test_resume_render_contract",
+    "tests.contract.test_resume_cli_contract",
+    "tests.contract.test_resume_plugin_contract",
     "tests.contract.test_fixtures_contract",
-    "tests.contract.test_tests_contract",
-    "tests.contract.test_tools_contract",
     "tests.contract.test_runtime_package_layout_contract",
     "tests.contract.test_shared_dto_schemas_contract",
+    "tests.contract.test_tests_contract",
+    "tests.contract.test_tools_contract",
+]
+
+BOUNDARY_TEST_MODULES = [
     "tests.boundary.test_career_mcp_guardrails",
     "tests.boundary.test_career_store_guardrails",
     "tests.boundary.test_resume_agent_guardrails",
@@ -32,11 +43,14 @@ CURRENT_TEST_MODULES = [
     "tests.boundary.test_tools_guardrails",
 ]
 
+CURRENT_TEST_MODULES = [
+    *CONTRACT_TEST_MODULES,
+    *BOUNDARY_TEST_MODULES,
+]
+
 FUTURE_CONTRACT_TEST_MODULES = [
-    "tests.contract.test_resume_core_contract",
-    "tests.boundary.test_resume_core_guardrails",
-    "tests.contract.test_career_store_contract",
-    "tests.boundary.test_career_store_guardrails",
+    *CONTRACT_TEST_MODULES,
+    *BOUNDARY_TEST_MODULES,
 ]
 
 
@@ -69,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--future-contract",
         action="store_true",
-        help="Run the next package contract target: resume-core and career-store contracts plus boundary guardrails.",
+        help="Run the full package contract target plus boundary guardrails.",
     )
     args = parser.parse_args(argv)
 

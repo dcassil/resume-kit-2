@@ -25,7 +25,7 @@ def run_future_contract_gate(root: Path) -> int:
     return run_test_runner(
         root,
         ["--future-contract"],
-        "Running future contract gate: resume-core and career-store contracts plus boundary guardrails.",
+        "Running future contract gate: full package contracts plus boundary guardrails.",
     )
 
 

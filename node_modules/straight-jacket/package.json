@@ -1,6 +1,6 @@
 {
   "name": "straight-jacket",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "type": "module",
   "description": "A tiny MCP, CLI, and plugin for human-protected repo files.",
   "author": "Daniel Cassil <me@danielcassil.com>",
