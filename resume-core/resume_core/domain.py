@@ -602,13 +602,14 @@ def validateFinalResume(
     job_model: Any,
     career_fact_dtos: list[JsonObject] | None = None,
     config: JsonObject | None = None,
+    applied_operations: list[JsonObject] | None = None,
 ) -> JsonObject:
     """Run final deterministic validation and scoring before rendering/export."""
 
     resume = _unwrap(working_resume, "working_resume")
     config = config or {}
     validation = validateResume(resume)
-    grounding = validateGrounding(resume, career_fact_dtos or [], [], config)
+    grounding = validateGrounding(resume, career_fact_dtos or [], applied_operations or [], config)
     scoring = scoreMatch(resume, job_model, career_fact_dtos or [], config)
     errors = list(_item(validation, "errors", []))
     if _item(grounding, "status") == "fail":

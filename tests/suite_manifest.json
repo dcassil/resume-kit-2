@@ -124,6 +124,7 @@
     "fixtures": "python3 -m unittest tests.contract.test_fixtures_contract tests.boundary.test_fixtures_guardrails",
     "contract_current": "python3 -m unittest discover -s tests/contract",
     "contract_tdd": "python3 -m unittest discover -s tests/contract",
+    "e2e": "python3 -m unittest tests.e2e.test_grounded_tailoring_final_validation",
     "guardrails": "python3 tools/tests_guardrails.py --root ."
   }
 }
