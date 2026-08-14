@@ -1,3 +1,45 @@
+# Handoff — 2026-08-14 (RKIT-I-0001 COMPLETE, codex-driven execution)
+
+Read this first. It supersedes the "next steps" of the 2026-08-13 handoff below (design review + decomposition are DONE). Everything else below (defect table, ADRs, depth caveats, command caveats) still applies.
+
+## 1. What shipped this session (all on `develop`, UNPUSHED)
+
+**RKIT-I-0001 "Resume-Core Canonical Contracts" is COMPLETE** — 8 tasks (RKIT-T-0003..0010), decomposed + implemented + committed, PR gate **198 tests green + smoke green**. Commits: `9adf305` (decomposition), `d044de0` (front four T-0003/0005/0008/0004), `e33233c` (T-0006), `8d522ce` (T-0007), `653cca1` (T-0009), `740a185` (T-0010), `0e60781` (Metis state). Initiative + all 8 tasks are in Metis `completed`.
+
+What that delivered: canonical `VerificationState`={source_stated,user_verified,imported,inferred,unknown} / `ResolutionState`={…,explicitly_missing,not_applicable} (dropped `conflicted`); career-store first-class **conflict-record** path replacing the removed enum member; `ResumeChangeOperation` shape (6 statuses, 5 verbs, mandatory reason/linked_*_ids/provenance, structural validateChange); JobModel §4.2 + **JobTerm** substrate (deterministic); schema-backed validateResume (stdlib walker, enforces resume_id/source); typed date rejection (`invalid_date`/`reversed_range`, new `dates.py`); claim-level ResumeField provenance weaving (honest empty/unknown defaults, new `claim_fields.py`) — the substrate RKIT-I-0004 consumes; realigned shared-DTO contract test (whole-set assertEqual, strengthen-only); resume-core unit tier (25 tests in `tests/unit`) + TEST_SPEC.
+
+**RKIT-I-0051 Wave 1 is decomposed but NOT started** — 12 tasks RKIT-T-0011..0022 exist in Metis (`todo`), fully populated with acceptance criteria + `blocked_by` DAG.
+
+## 2. How execution ran — the codex driving setup (REUSE THIS)
+
+"Teamwork with codex agents": Daniel's `~/.codex/config.toml` is set to `sandbox_mode="danger-full-access"` + `approval_policy="never"`, and a Claude Code permission rule `Bash(codex exec:*)` is added. So the driver launches codex FLAG-FREE (adding `--approve-for-me`/`--dangerously-*` gets blocked by the auto-mode classifier — do NOT add them):
+
+```sh
+cat <promptfile> | codex exec --cd /Users/danielcassil/Code/resume-kit-2 -o <out.txt> - > <full.log> 2>&1
+```
+
+Per-task loop that worked: (1) transition the Metis task to `active`; (2) write a tight prompt file that points codex at the task doc `.metis/…/tasks/RKIT-T-00NN.md`, states the approved decisions, forbids protected-file edits + commits ("report only"), and gives PYTHONPATH verify commands; (3) launch codex in background; (4) review the diff + run `python3 tools/run_gate.py --pr --root .` AND `--smoke`; (5) commit per task with the trailer block; (6) transition task → `completed`. Codex is reliable and caught real issues (e.g. the protected-guardrail conflict on T-0003) — trust it but always review + run BOTH gates before committing.
+
+## 3. THE STRAIGHT-JACKET PASSWORD GATE (human-in-the-loop, unavoidable)
+
+Pre-commit hook runs `straight-jacket verify` (protected-file integrity, NOT the test gate). Editing any protected file blocks ALL commits until re-registered, and `straight-jacket update <path>` prompts for Daniel's LOCAL PASSWORD interactively — it CANNOT be automated (refuses env/flag/file). Protected set: `tools/tool_manifest.json`, `run_gate.py`/`run_smoke.py`/`run_tests.py`, `tools/TEST_SPEC.md`, all `tools/*_guardrails.py`, all `tests/boundary/test_*_guardrails.py`. (Contract tests in `tests/contract/` are NOT protected.) A-0006 authorizes realigning protected guardrails/manifests to documented contracts, but the re-registration is still Daniel's password. In I-0001 only `tools/career_store_guardrails.py` needed it (once).
+
+## 4. Next work (nothing started; needs Daniel for design review + passwords)
+
+- **RKIT-I-0002** (Deterministic Requirement Resolution & Match Scoring) is now UNBLOCKED (its only blocker was I-0001). It is the natural next resume-core initiative — needs the human-in-the-loop design-review + decompose flow (same as I-0001 got). RKIT-I-0004 (grounded change lifecycle) is unblocked from I-0001 but still `blocked_by` I-0002; RKIT-I-0003 blocked_by I-0002.
+- **RKIT-I-0051 Wave 1** is ready to execute (already decomposed). Lane split: AUTONOMOUS (codex + commit, no password) = T-0011, T-0012, T-0015, T-0019, T-0020; NEEDS-PASSWORD (protected files) = T-0014, T-0016, T-0017, T-0018, T-0022, and T-0021/T-0013 if they must edit protected `run_tests.py`. **RKIT-T-0021 (REQ-009) wires `tests/unit` into the gate's module list (protected `run_tests.py`)** — until it lands, the 25 I-0001 unit tests exist but aren't gate-run (their behaviors ARE covered by discovered contract assertions, so no gate gap).
+
+## 5. Tech-debt created this session (documented, owned elsewhere — don't lose these)
+
+- **resume-cli compatibility shims** in `resume-cli/resume_cli/__init__.py` (both commented): (a) `_ingest_job` folds `preferred[]` into the `requirements` superset so ingest is lossless under the new JobModel split; (b) `_core_operation`/`_hallucinated_operation` now emit `schema_version/op/reason/provenance` so grounded ops validate and the hallucinated op is rejected on GROUNDING (not missing fields). These are minimal shims to keep smoke green; proper `preferred[]` handling + agent-emitted reason/provenance are owned by RKIT-I-0016/0036/0038. **Lesson: T-0005/T-0008 contract tightening breaks downstream operation/job producers — check `--smoke` (not just `--pr`) after any resume-core DTO change.**
+- New resume-core internal modules `dates.py`, `claim_fields.py`, `pointers.py` (stdlib-only helpers).
+
+## 6. Metis tooling quirks (do NOT re-fight)
+
+MCP `create_document` fails to resolve these parents ("not found at expected path"); use the `metis` CLI: `metis create task --initiative RKIT-I-00NN "title"` (auto-syncs). Task-parent resolution keys off `strategy_id` + physical dir. RKIT-I-0051 was relocated to `strategies/RKIT-S-0001/initiatives/` with `strategy_id: RKIT-S-0001` so creation resolves (supersedes the old "don't move I-0051 dir" note). Everything is UNPUSHED — Daniel says "push" when ready.
+
+---
+
 # Handoff — 2026-08-13 (post-audit, post-ADR, post-re-baseline)
 
 Read this first when resuming work on resume-kit-2. It supersedes any impression the work-log "complete" claims or the green gates give you.
