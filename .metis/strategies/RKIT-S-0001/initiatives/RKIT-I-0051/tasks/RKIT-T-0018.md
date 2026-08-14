@@ -4,16 +4,15 @@ level: task
 title: "REQ-010c: Redefine future-contract as distinct package-contract gate"
 short_code: "RKIT-T-0018"
 created_at: 2026-08-14T03:14:05.713153+00:00
-updated_at: 2026-08-14T03:14:05.713153+00:00
+updated_at: 2026-08-14T17:30:13.798744+00:00
 parent: executable-release-gate-e2e
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -30,6 +29,8 @@ initiative_id: RKIT-I-0051
 ## Objective
 
 Resolve the orphaned `--future-contract` flag by redefining it as a genuinely distinct forward-looking package-contract gate rather than a vestigial alias of `--pr`. This task makes `--future-contract` run the extra package contracts that the current gate omits and pins its single canonical role in the docs, so the release path has a clear, non-overlapping distinction between the current gate and the full-package-contract gate.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -84,3 +85,5 @@ No task dependencies — startable once the initiative is active. Semantically, 
 ## Status Updates
 
 *To be added during implementation*
+
+- 2026-08-14: Implemented the redefine path. `tools/run_tests.py` now defines `FUTURE_CONTRACT_TEST_MODULES` as `CURRENT_TEST_MODULES` plus `tests.smoke.test_smoke_harness` and `tests.e2e.test_grounded_tailoring_final_validation`; `tools/run_gate.py` labels `--future-contract` as the forward-looking full package-contract superset. Updated `tests/TEST_SPEC.md`, `PROJECT_STRUCTURE_AND_TEST_STRATEGY.md`, and `tests/suite_manifest.json` to keep `--pr` as the only canonical current gate and describe `--future-contract` as distinct. Verification: `--pr` passed 257 tests, `--future-contract` passed 264 tests, and the import-time superset check reported `superset: True` with the two extra modules. Straight Jacket verify remains red because checksum updates were forbidden.

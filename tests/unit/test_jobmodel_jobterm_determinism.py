@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 import unittest
 
-from resume_core_test_utils import load_resume_core
+from tests.unit.resume_core_test_utils import load_resume_core
 
 
 resume_core = load_resume_core()

@@ -53,7 +53,15 @@ The canonical current test command is:
 python3 tools/run_gate.py --pr --root .
 ```
 
-This matches `tests/suite_manifest.json` `runner_commands.canonical`. The gate runner creates an isolated editable install from `pyproject.toml` before running the current executable contract and boundary suite (`tools/run_tests.py` is the lower-level runner it drives; invoking it directly is equivalent but the gate entry point is canonical). Future package API contracts remain available under `tests/contract/` and should be added to the canonical runner as implementations land.
+This is the only canonical current gate and matches `tests/suite_manifest.json` `runner_commands.canonical`. The gate runner creates an isolated editable install from `pyproject.toml` before running the current executable contract, boundary, unit, honesty-fixture, and snapshot suite (`tools/run_tests.py` is the lower-level runner it drives; invoking it directly is equivalent but the gate entry point is canonical).
+
+The distinct forward-looking full package-contract gate is:
+
+```sh
+python3 tools/run_gate.py --future-contract --root .
+```
+
+It is a strict superset of the current PR gate: it keeps every `--pr` module and adds the full package-contract acceptance surfaces that the PR gate intentionally omits.
 
 ## Folder Purposes
 

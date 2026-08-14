@@ -4,16 +4,15 @@ level: task
 title: "REQ-009: Scaffold unit tier and I-0001-stable resume-core unit cases"
 short_code: "RKIT-T-0021"
 created_at: 2026-08-14T03:14:05.840188+00:00
-updated_at: 2026-08-14T03:14:05.840188+00:00
+updated_at: 2026-08-14T17:15:12.847681+00:00
 parent: executable-release-gate-e2e
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -30,6 +29,8 @@ initiative_id: RKIT-I-0051
 ## Objective
 
 Populate the currently empty `tests/unit` tier (today only a `.gitkeep`) with deterministic resume-core unit cases for behavior that already exists and is stable on current code, and map the PR gate's declared `unit` category to real modules so it no longer maps to zero. Critically, this task scopes those cases ONLY to surfaces that RKIT-I-0001 will NOT change, deliberately deferring the volatile surfaces so we do not write throwaway tests against soon-to-change behavior.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

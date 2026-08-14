@@ -21,8 +21,6 @@ REQUIRED_CAPABILITIES = {
     "architecture_import_checkers",
     "migration_checkers",
     "release_checks",
-    "audit_validators",
-    "render_parse_back_validators",
 }
 
 RELEASE_BLOCKING_EXPECTATIONS = {
@@ -110,6 +108,14 @@ def load_manifest(root: Path) -> tuple[dict, list[Failure]]:
         return {}, [Failure(path, f"Invalid JSON: {exc.msg}.", "Fix JSON so tool contracts are machine-checkable.", exc.lineno)]
 
 
+def capability_to_tool_kind(capability: str) -> str:
+    if capability.endswith("ies"):
+        return f"{capability[:-3]}y"
+    if capability.endswith("s"):
+        return capability[:-1]
+    return capability
+
+
 def validate_manifest(root: Path, manifest: dict) -> list[Failure]:
     path = root / "tools" / "tool_manifest.json"
     failures: list[Failure] = []
@@ -139,6 +145,18 @@ def validate_manifest(root: Path, manifest: dict) -> list[Failure]:
     entries = manifest.get("tools")
     if not isinstance(entries, list):
         return [Failure(path, "tool_manifest.json must define a tools array.", "Declare one entry per primary local utility.")]
+
+    tool_kinds = {entry.get("kind") for entry in entries if isinstance(entry, dict)}
+    for capability in sorted(capabilities):
+        expected_kind = capability_to_tool_kind(capability)
+        if expected_kind not in tool_kinds:
+            failures.append(
+                Failure(
+                    path,
+                    f"Required capability '{capability}' has no implementing tool kind '{expected_kind}'.",
+                    f"Add a tools[] entry with kind='{expected_kind}' or remove the orphaned required_capabilities entry '{capability}'.",
+                )
+            )
 
     documented_paths = {entry.get("path") for entry in entries if isinstance(entry, dict)}
     required_primary_tools = {

@@ -41,15 +41,15 @@ Canonical current command:
 python3 tools/run_gate.py --pr --root .
 ```
 
-This command installs the root package metadata in an isolated editable environment, verifies the runtime package layout, and runs the current executable contract and boundary suite.
+This is the only canonical current gate. It installs the root package metadata in an isolated editable environment, verifies the runtime package layout, and runs the current executable contract, boundary, unit, honesty-fixture, and snapshot suite.
 
-Full package contract target:
+Forward-looking full package-contract gate:
 
 ```sh
 python3 tools/run_gate.py --future-contract --root .
 ```
 
-This gate covers all implemented package contract tests plus their package boundary guardrails.
+This distinct gate is a strict superset of `--pr`. It keeps every current-gate module and adds the full package-contract acceptance surfaces that are intentionally omitted from the PR gate.
 
 ### PR gate
 

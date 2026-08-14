@@ -6,14 +6,17 @@
 
 ## Expected Structure
 
-Future utilities may include:
+Current required capabilities are:
 
 - test runners,
 - fixture validators,
 - snapshot review helpers,
 - architecture import checkers,
 - migration checkers,
-- release checks,
+- release checks.
+
+Deferred capabilities owned by Wave-2 work are not part of `required_capabilities` yet:
+
 - audit validators,
 - render parse-back validators.
 

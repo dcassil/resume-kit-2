@@ -44,14 +44,42 @@ BOUNDARY_TEST_MODULES = [
     "tests.boundary.test_tools_guardrails",
 ]
 
+UNIT_TEST_MODULES = [
+    "tests.unit.test_change_operation_structural",
+    "tests.unit.test_enum_membership",
+    "tests.unit.test_jobmodel_jobterm_determinism",
+    "tests.unit.test_normalize_resume_provenance",
+    "tests.unit.test_resume_core_ats_sanitation_unit",
+    "tests.unit.test_resume_core_config_parsing_unit",
+    "tests.unit.test_resume_core_relationship_matching_unit",
+    "tests.unit.test_resume_core_scoring_math_unit",
+    "tests.unit.test_validate_resume_contracts",
+]
+
+HONESTY_FIXTURE_TEST_MODULES = [
+    "tests.contract.test_honesty_fixtures_validate_change",
+]
+
+SNAPSHOT_TEST_MODULES = [
+    "tests.snapshots.test_expected_snapshots_match_live_output",
+]
+
+FULL_PACKAGE_CONTRACT_TEST_MODULES = [
+    "tests.smoke.test_smoke_harness",
+    "tests.e2e.test_grounded_tailoring_final_validation",
+]
+
 CURRENT_TEST_MODULES = [
     *CONTRACT_TEST_MODULES,
     *BOUNDARY_TEST_MODULES,
+    *UNIT_TEST_MODULES,
+    *HONESTY_FIXTURE_TEST_MODULES,
+    *SNAPSHOT_TEST_MODULES,
 ]
 
 FUTURE_CONTRACT_TEST_MODULES = [
-    *CONTRACT_TEST_MODULES,
-    *BOUNDARY_TEST_MODULES,
+    *CURRENT_TEST_MODULES,
+    *FULL_PACKAGE_CONTRACT_TEST_MODULES,
 ]
 
 
@@ -84,7 +112,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--future-contract",
         action="store_true",
-        help="Run the full package contract target plus boundary guardrails.",
+        help="Run the forward-looking full package-contract superset gate.",
     )
     args = parser.parse_args(argv)
 
