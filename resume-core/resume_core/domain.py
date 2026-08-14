@@ -11,6 +11,7 @@ from unicodedata import normalize as _unicode_normalize
 
 from .claim_fields import provenance_index as _provenance_index, weave_claim_fields as _weave_claim_fields
 from .dates import date_key as _parse_date_key, record_date_result as _record_date_result
+from .matching_config import resolve_matching_config
 from .pointers import _append_already_present, _pointer_parent_exists, _pointer_value, _set_pointer
 from .schemas import (
     CANONICAL_RESUME_SCHEMA,
@@ -350,9 +351,12 @@ def scoreMatch(
     resume = _unwrap(canonical_resume, "canonical_resume")
     job = _unwrap(job_model, "job_model")
     config = config or {}
+    matching_config = resolve_matching_config(config)
     facts = [item for item in career_fact_dtos or [] if isinstance(item, dict)]
     if not isinstance(resume, dict) or not isinstance(job, dict):
         return _result("error", match_result=_empty_match())
+    if matching_config.errors:
+        return _result("error", match_result=_empty_match(), errors=matching_config.errors, warnings=matching_config.warnings)
 
     resume_text = _normal_text(_text(resume))
     aliases = _alias_map(config)
@@ -395,7 +399,7 @@ def scoreMatch(
             }
         )
 
-    strict = _strict_policy(config)
+    strict = matching_config.config.require_hard_requirements_resolved
     match = {
         "schema_version": "match-result.v1",
         "match_id": _stable_id("match", f"{_item(resume, 'resume_id', '')}:{_item(job, 'job_id', '')}:{score}:{unresolved}"),
@@ -419,8 +423,17 @@ def getUnresolvedRequirements(match_result: Any, policy: JsonObject | None = Non
 
     match = _unwrap(match_result, "match_result")
     policy = policy or {}
+    matching_config = resolve_matching_config(policy)
     if not isinstance(match, dict):
         return _result("error", unresolved_requirements=[], can_continue=False)
+    if matching_config.errors:
+        return _result(
+            "error",
+            unresolved_requirements=[],
+            can_continue=False,
+            errors=matching_config.errors,
+            warnings=matching_config.warnings,
+        )
 
     unresolved_ids = {str(item) for item in _array(_item(match, "unresolved_requirement_ids", []))}
     preferred_ids = {str(item) for item in _array(_item(match, "preferred_unresolved_requirement_ids", []))}
@@ -445,7 +458,7 @@ def getUnresolvedRequirements(match_result: Any, policy: JsonObject | None = Non
     include_contextual = bool(_item(policy, "include_contextual"))
     unresolved = _rank_unresolved(required_unresolved + preferred_unresolved + (contextual_unresolved if include_contextual else []))
     blocking = _rank_unresolved(required_unresolved)
-    require_resolution = bool(_item(policy, "require_hard_resolution") or _item(policy, "require_resolution") or _item(policy, "policy") == "strict")
+    require_resolution = bool(_item(policy, "require_resolution") or matching_config.config.require_hard_requirements_resolved)
     can_continue = not blocking if require_resolution else bool(_item(match, "can_continue", True))
     return _result(
         "ok",
@@ -680,6 +693,7 @@ def validateFinalResume(
     grounding = validateGrounding(resume, career_fact_dtos or [], applied_operations or [], config)
     scoring = scoreMatch(resume, job_model, career_fact_dtos or [], config)
     errors = list(_item(validation, "errors", []))
+    errors.extend(_item(scoring, "errors", []))
     if _item(grounding, "status") == "fail":
         errors.extend(_item(grounding, "unsupported_claims", []))
         errors.extend(_item(grounding, "missing_provenance", []))
@@ -1301,10 +1315,6 @@ def _fact_matches(terms: list[str], fact_index: dict[str, JsonObject], allow_inf
         if _fact_allowed(fact, allow_inferred) and _terms_in_text(terms, _fact_text(fact)):
             matches.append(fact_id)
     return matches
-
-
-def _strict_policy(config: JsonObject) -> bool:
-    return bool(_item(config, "require_hard_resolution") or _item(config, "policy") == "strict")
 
 
 def _number(value: Any, default: float) -> float:

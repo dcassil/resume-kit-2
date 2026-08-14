@@ -4,14 +4,14 @@ level: task
 title: "Chunk 1: Section 13 matching.* config wiring, validation, flat-key deprecation"
 short_code: "RKIT-T-0023"
 created_at: 2026-08-14T19:46:11.187064+00:00
-updated_at: 2026-08-14T19:46:11.187064+00:00
+updated_at: 2026-08-14T20:34:37.655433+00:00
 parent: resume-core-deterministic
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,10 @@ initiative_id: RKIT-I-0002
 ## Objective
 
 Wire the section 13 `matching.*` config namespace through resume-core's shared config validation layer so scoring and gating read documented, validated keys instead of the ad-hoc flat keys (`policy`, `require_hard_resolution`) the audit found at `domain.py:1092-1093, 795`. This is the substrate chunk: every later chunk (threshold, decision, weights, terminology) reads its knobs through what this task builds, so the parse/validate/default plumbing must land first and be right.
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -76,4 +80,4 @@ None within I-0002 (chain root). Builds on RKIT-I-0001's config validation layer
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-14: Codex-implemented, reviewed, committed. New `matching_config.py` with `resolve_matching_config` → {config, errors, warnings}; snake_case internal fields; defaults single-sourced; `policy:"strict"` → requireHardRequirementsResolved=True (faithful to old domain.py behavior), conflicts → `conflicting_matching_config_key`. No flat-key reads left in domain.py. 6 new unit tests green; PR 257 + smoke green; snapshots unchanged (behavior parity proven). Gate wiring of the new unit module deferred to the end-of-initiative password batch.

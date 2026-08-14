@@ -45,6 +45,7 @@ Relevant contract surfaces:
   - Unparseable but not impossible date text remains an ambiguity warning, not a typed rejection.
 - `JobModel` section-4.2 normalization deterministically populates `seniority`, `industries`, `domains`, separate `requirements` and `preferred` arrays, and `terminology: JobTerm[]`. Each `JobTerm` has non-empty `surface`, normalized `canonical`, source in `{title, requirement, description}`, and numeric `weight`; repeated normalization of identical input must produce identical output.
 - `normalizeResume` wraps meaningful claims as per-claim `ResumeField` values. A source-backed claim preserves matching provenance and its valid verification state; a sourceless or malformed-provenance claim defaults to `provenance: []` and `verification_state: unknown`, never a silent `source_stated`.
+- Section-13 matching config is resolved through `resume_core.matching_config.resolve_matching_config`: `matching.scoreAutoThreshold`, `matching.weights.{requiredSkills,experience,roleAlignment,domainIndustry,preferredSkills,terminology}`, and `matching.requireHardRequirementsResolved` are validated with deterministic defaults; unknown keys inside `matching` or `matching.weights` reject with typed config errors; flat `policy` and `require_hard_resolution` remain accepted with deprecation warnings during the migration window and conflict with their matching namespace equivalent rejects.
 
 ## Expected Structure
 
@@ -123,6 +124,14 @@ Future implementation may decompose internally, but tests should assume public A
 - Assert unresolved hard requirements dominate overall continuation decision even if numeric score is high.
 - Assert preferred missing items may reduce score but do not masquerade as required failures.
 - Snapshot expected base score for smoke and E2E fixtures.
+
+### Matching config
+
+- Resolve default section-13 matching config from absent config.
+- Reject unknown keys inside `matching` and `matching.weights` with typed config errors.
+- Map flat `policy: strict` and `require_hard_resolution: true` to `matching.requireHardRequirementsResolved` with deprecation warnings.
+- Reject conflicting flat and namespaced hard-requirement settings.
+- Keep scoring behavior stable while routing scoring config reads through the resolved matching config.
 
 ### Selection planning
 

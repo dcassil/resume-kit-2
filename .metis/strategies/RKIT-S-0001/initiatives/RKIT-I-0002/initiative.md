@@ -4,14 +4,14 @@ level: initiative
 title: "Resume-Core Deterministic Requirement Resolution And Match Scoring"
 short_code: "RKIT-I-0002"
 created_at: 2026-08-13T20:41:36.852663+00:00
-updated_at: 2026-08-14T19:46:00.705945+00:00
+updated_at: 2026-08-14T20:27:58.570415+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0001]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/decompose"
+  - "#phase/active"
 
 
 exit_criteria_met: false
