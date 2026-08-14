@@ -588,8 +588,10 @@ def validateChange(
     if missing_fact_ids:
         errors.append(_issue("missing_fact", "Operation references missing fact IDs.", "linked_fact_ids", {"fact_ids": missing_fact_ids}))
 
+    operation_skill_terms = _operation_skill_terms(linked_requirement_ids, requirements)
     after_text = _normal_text(_text(_item(op, "after")))
-    guarded = _guarded_claims(after_text)
+    before_text = _normal_text(_text(_item(op, "before")))
+    guarded = _guarded_claims(after_text, operation_skill_terms) - _guarded_claims(before_text, operation_skill_terms)
     allow_inferred = guardrails_config.config.allow_inferred
     support_by_claim = _claim_support(guarded, fact_index, linked_fact_ids, allow_inferred)
     after_title_rank = _title_rank(_item(op, "after"))
@@ -1133,6 +1135,18 @@ def _requirements(job: Any) -> list[JsonObject]:
         if isinstance(item, dict):
             unique.setdefault(str(_item(item, "requirement_id", _stable_id("req", item))), item)
     return list(unique.values())
+
+
+def _operation_skill_terms(linked_requirement_ids: list[str], requirements: dict[str, JsonObject]) -> list[str]:
+    terms: set[str] = set()
+    for requirement_id in linked_requirement_ids:
+        requirement = requirements.get(requirement_id)
+        if isinstance(requirement, dict):
+            for term in _terms(requirement):
+                normalized = _normal_text(term)
+                if normalized and " " not in normalized and _specific_term(normalized):
+                    terms.add(normalized)
+    return sorted(terms)
 
 
 def _classification(requirement: JsonObject) -> str:

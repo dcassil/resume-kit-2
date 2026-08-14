@@ -1187,9 +1187,13 @@
         "validation_result": {
           "errors": [],
           "grounding": {
-            "guarded_claims": [],
+            "guarded_claims": [
+              "skill:architecture"
+            ],
             "supported": true,
-            "supporting_fact_ids": [],
+            "supporting_fact_ids": [
+              "fact_architecture"
+            ],
             "supporting_requirement_ids": [
               "fixture_req_2_e55af3cd"
             ]

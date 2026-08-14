@@ -83,7 +83,7 @@ _SINGULAR_SUBJECTS = {
     "people": "person",
     "users": "user",
 }
-_QUANTITY_COUNT_SUBJECTS = {"developer", "engineer", "person", "user"}
+_QUANTITY_COUNT_SUBJECTS = {"developer", "engineer", "percent", "percentage", "person", "user"}
 _GROUNDED_SKILL_TERMS = {
     "aws": ("aws", "amazon web services"),
     "graphql": ("graphql", "graph ql"),
@@ -127,13 +127,13 @@ _GENERIC_TERMS = {
 }
 
 
-def _guarded_claims(text: str) -> set[str]:
+def _guarded_claims(text: str, skill_terms: list[str] | None = None) -> set[str]:
     normalized = _normal_text(text)
     claims: set[str] = set()
     claims.update(_quantity_claims(normalized))
     claims.update(_title_claims(normalized))
     claims.update(_year_claims(normalized))
-    claims.update(_skill_claims(normalized))
+    claims.update(_skill_claims(normalized, skill_terms))
     return claims
 
 
@@ -255,11 +255,14 @@ def _year_claims(text: str) -> set[str]:
     return claims
 
 
-def _skill_claims(text: str) -> set[str]:
+def _skill_claims(text: str, skill_terms: list[str] | None = None) -> set[str]:
     claims: set[str] = set()
     for canonical, variants in _GROUNDED_SKILL_TERMS.items():
         if any(_term_in_text(variant, text) for variant in variants):
             claims.add(f"skill:{canonical}")
+    for term in _specific_terms(skill_terms or []):
+        if _term_in_text(term, text):
+            claims.add(f"skill:{term}")
     return claims
 
 

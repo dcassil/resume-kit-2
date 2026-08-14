@@ -36,6 +36,8 @@ Deferred capabilities owned by Wave-2 work are not part of `required_capabilitie
 - Validate fixture presence and schema.
 - Validate that resume fixture does not accidentally include AWS/GraphQL/Staff/unsupported metrics.
 - Validate invalid operation fixtures remain unsupported by evidence.
+- Validate every generated or fixture `ResumeChangeOperation` includes the mandatory lifecycle fields `reason`, `linked_requirement_ids`, `linked_fact_ids`, and `provenance` as non-empty values when submitted for validation/application.
+- Validate operation linkage through `linked_requirement_ids`, `linked_fact_ids`, and `provenance` as required DTO evidence for the operation itself, not only when wording in `reason` depends on those links.
 - Validate expected snapshots include schema/config/version metadata.
 
 ### Architecture checkers

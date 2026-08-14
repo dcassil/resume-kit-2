@@ -4,14 +4,14 @@ level: task
 title: "guardrails.* config wiring plus duplicate/stuffing generalization"
 short_code: "RKIT-T-0037"
 created_at: 2026-08-14T22:54:23.908642+00:00
-updated_at: 2026-08-14T23:37:39.696343+00:00
+updated_at: 2026-08-14T23:45:29.918892+00:00
 parent: resume-core-grounded-change
 blocked_by: [RKIT-T-0036]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0004
 ## Objective
 
 Wire the section 13 `guardrails.*` config namespace through the shared config layer per RKIT-A-0006 item 6 (migrating and removing the flat `allow_inferred_facts` key), and generalize the duplicate/keyword-stuffing checks (RKIT-I-0004 Requirements 7's config half and 8's duplicate/stuffing half; domain.py:1306-1326).
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
