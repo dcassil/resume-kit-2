@@ -98,6 +98,7 @@ Validate pure functions and local behavior:
 - change validation,
 - relationship matching,
 - config parsing.
+- selection planning, including section-13 resume config defaults, configured section order, skills/experience/bullets min-max handling, bullet-level entries, match-derived traceability, immutable base input, and deterministic repeated output.
 
 ### Contract tests
 
@@ -145,6 +146,7 @@ Required smoke assertions:
 - career facts persisted with evidence,
 - MCP search works without raw SQL,
 - score reproducible,
+- selection planning reports min deficits without fabrication, preserves base resume immutability, carries match-derived requirement/fact traceability, and remains deterministic for identical inputs,
 - user confirmation updates career model,
 - agent outputs are proposals,
 - grounded rewrite can be applied,
@@ -179,8 +181,12 @@ Validate the full product behavior:
 - Freeze time where IDs/timestamps affect output.
 - Record package versions, schema versions, model config, config hash, and renderer template version.
 - Run official scoring twice and assert identical results.
+- Run official selection planning twice for identical resume/job/match/config input and assert identical ranked content and selection plan output.
+- Assert selection planning never mutates the base resume object.
 - Assert section-4.3 `MatchResult` fields strictly: `threshold`, `hardRequirementsResolved`, tri-state `decision`, derived `can_continue`, and full `dimensions` in addition to scores and requirement results.
+- Assert section-13 resume selection defaults strictly, including default section order `summary`, `skills`, `experience`, `projects`, `education`.
 - Snapshot expected deterministic outputs, including match-result score, threshold, decision, hard-requirement state, and dimensions for smoke/E2E match fixtures.
+- Snapshot expected selection-plan outputs with bullet-granularity entries, constraint reports, and unconditional requirement/fact traceability for match-derived kept or dropped entries.
 - Keep language-model phrasing assertions tolerant, but keep structured fields strict.
 
 ## Pass/Fail Policy
@@ -199,3 +205,6 @@ Release is blocked by:
 - duplicate questions for verified facts without legitimate reason,
 - false resolution of unresolved hard requirement.
 - accepting removed flat matching config keys such as `policy` or `require_hard_resolution` instead of requiring the section-13 `matching.*` vocabulary and typed unknown-key rejection.
+- fabricating skills, experience roles, or bullets to satisfy selection-planning minimums instead of reporting typed deficit constraint rows.
+- omitting requirement/fact traceability from match-derived selection-plan entries.
+- emitting selection plans with the pre-section-13 default order or without bullet-granularity entries.

@@ -4,14 +4,14 @@ level: task
 title: "Chunk 5: Selection unit suites and TEST_SPEC strengthening"
 short_code: "RKIT-T-0033"
 created_at: 2026-08-14T21:14:46.127322+00:00
-updated_at: 2026-08-14T21:14:46.127322+00:00
+updated_at: 2026-08-14T21:50:08.899443+00:00
 parent: resume-core-selection-planning-and
-blocked_by: ["RKIT-T-0032"]
+blocked_by: [RKIT-T-0032]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,10 @@ initiative_id: RKIT-I-0003
 ## Objective
 
 Close out the initiative: complete the TEST_SPEC selection-planning unit cases (min/max respect for skills/experience/bullets, configured section order, projects placement), strengthen the specs so min constraints, the section-order default, and deficit flagging are explicitly required (the looseness that certified the max-only stub), and remove the deprecated flat `max_skills` key after migrating in-repo callers.
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

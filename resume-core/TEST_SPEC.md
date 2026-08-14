@@ -142,11 +142,14 @@ Future implementation may decompose internally, but tests should assume public A
 
 - Rank job-relevant experience above less relevant content.
 - Respect configured section order.
-- Respect skills min/max.
-- Respect experience min/max.
-- Respect bullets-per-role min/max.
+- Use the section-13 default section order `summary`, `skills`, `experience`, `projects`, `education` when no `resume.sectionOrder` is supplied.
+- Respect skills min/max. If `resume.skills.min` cannot be met from existing source content, report a `deficit` constraint row and never fabricate skills.
+- Respect experience min/max. If `resume.experience.min` cannot be met from existing source content, report a `deficit` constraint row and never fabricate roles.
+- Respect bullets-per-role min/max at bullet granularity. Selection-plan entries must identify individual bullet paths, and if `resume.bulletsPerRole.min` cannot be met from existing source bullets, report `deficit` plus role-level deficit details instead of fabricating bullets.
+- Every match-derived selection-plan entry must carry requirement traceability, and fact traceability when the MatchResult supplies matched fact IDs.
 - Never allow agent output to override structural maxima directly.
 - Keep the base resume unchanged.
+- Produce deterministic ranked content and selection plans for identical resume/job/match/config input.
 
 ### Change validation
 

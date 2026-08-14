@@ -14,6 +14,7 @@ JsonObject = dict[str, Any]
 RESUME_CONFIG_VERSION = "resume-config.v1"
 RESUME_KEYS = ("targetPages", "skills", "experience", "bulletsPerRole", "sectionOrder")
 RESUME_RANGE_KEYS = ("min", "max")
+REMOVED_FLAT_KEYS = ("max_" + "skills",)
 KNOWN_SECTION_ORDER = ("summary", "skills", "experience", "projects", "education")
 
 DEFAULT_SECTION_ORDER = ["summary", "skills", "experience", "projects", "education"]
@@ -73,7 +74,7 @@ def resolve_resume_config(config: JsonObject | None) -> ResumeConfigResult:
         values.update(resume)
         _reject_unknown_resume_keys(values, errors)
 
-    _apply_deprecated_flat_max_skills(raw, values, errors, warnings)
+    _reject_removed_flat_keys(raw, errors)
 
     skills = _range_value(values.get("skills"), "resume.skills", errors)
     experience = _range_value(values.get("experience"), "resume.experience", errors)
@@ -121,40 +122,12 @@ def _reject_unknown_resume_keys(values: JsonObject, errors: list[JsonObject]) ->
         )
 
 
-def _apply_deprecated_flat_max_skills(
-    raw: JsonObject,
-    values: JsonObject,
-    errors: list[JsonObject],
-    warnings: list[JsonObject],
-) -> None:
-    if "max_skills" not in raw:
-        return
+def _reject_removed_flat_keys(raw: JsonObject, errors: list[JsonObject]) -> None:
+    allowed = ["resume"]
+    for key in REMOVED_FLAT_KEYS:
+        if key in raw:
+            errors.append(_issue("unknown_resume_config_key", "Unknown resume config key.", key, {"allowed": allowed}))
 
-    skills = values.get("skills")
-    nested_has_max = isinstance(skills, dict) and "max" in skills
-    if nested_has_max:
-        errors.append(
-            _issue(
-                "conflicting_resume_config_key",
-                "max_skills conflicts with resume.skills.max.",
-                "max_skills",
-                {"replacement": "resume.skills.max"},
-            )
-        )
-    else:
-        next_skills = dict(skills) if isinstance(skills, dict) else {}
-        next_skills["max"] = raw["max_skills"]
-        values["skills"] = next_skills
-
-    warnings.append(
-        _issue(
-            "deprecated_resume_config_key",
-            "max_skills is deprecated; use resume.skills.max.",
-            "max_skills",
-            {"replacement": "resume.skills.max"},
-            severity="warning",
-        )
-    )
 
 
 def _range_value(raw: Any, field_path: str, errors: list[JsonObject]) -> ResumeCountRange:

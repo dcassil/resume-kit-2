@@ -120,9 +120,9 @@ class BulletSelectionUnitTests(unittest.TestCase):
         result = resume_core.rankResumeContent(resume, JOB_MODEL, _match([]), _config(experience_max=2, bullets_min=2))
 
         constraints = {row["constraint"]: row for row in result["selection_plan"]["constraint_report"]}
-        self.assertEqual(constraints["min_bullets_per_role"]["status"], "deficit")
+        self.assertEqual(constraints["resume.bulletsPerRole.min"]["status"], "deficit")
         self.assertEqual(
-            constraints["min_bullets_per_role"]["role_deficits"],
+            constraints["resume.bulletsPerRole.min"]["role_deficits"],
             [{"role_index": 0, "role_id": "exp_short", "path": "/experience/0/bullets", "limit": 2, "actual": 1}],
         )
 

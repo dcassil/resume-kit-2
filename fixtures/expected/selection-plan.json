@@ -155,37 +155,37 @@
       "constraint_report": [
         {
           "actual": 12,
-          "constraint": "max_skills",
+          "constraint": "resume.skills.max",
           "limit": 12,
           "status": "satisfied"
         },
         {
           "actual": 12,
-          "constraint": "min_skills",
+          "constraint": "resume.skills.min",
           "limit": 0,
           "status": "satisfied"
         },
         {
           "actual": 2,
-          "constraint": "max_experience",
+          "constraint": "resume.experience.max",
           "limit": 2,
           "status": "satisfied"
         },
         {
           "actual": 2,
-          "constraint": "min_experience",
+          "constraint": "resume.experience.min",
           "limit": 0,
           "status": "satisfied"
         },
         {
           "actual": 4,
-          "constraint": "max_bullets_per_role",
+          "constraint": "resume.bulletsPerRole.max",
           "limit": 4,
           "status": "satisfied"
         },
         {
           "actual": 3,
-          "constraint": "min_bullets_per_role",
+          "constraint": "resume.bulletsPerRole.min",
           "limit": 0,
           "status": "satisfied"
         }

@@ -477,7 +477,7 @@ class ResumeCoreDomainContractTests(unittest.TestCase):
         self.assertTrue(plan["entries"])
         for entry in plan["entries"]:
             self.assertEqual(set(entry), {"path", "action", "relevance", "reason", "requirement_ids", "fact_ids"})
-        self.assertEqual(plan["constraint_report"][0]["constraint"], "max_skills")
+        self.assertEqual(plan["constraint_report"][0]["constraint"], "resume.skills.max")
         self.assertIn("ranked_content", result)
 
 

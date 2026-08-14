@@ -98,16 +98,34 @@ class SelectionPlanShapeUnitTests(unittest.TestCase):
         bullet_paths = [entry["path"] for entry in plan["entries"] if "/bullets/" in entry["path"]]
         self.assertTrue(bullet_paths)
 
+    def test_configured_section_order_is_honored(self):
+        config = copy.deepcopy(CONFIG)
+        config["resume"]["sectionOrder"] = ["skills", "summary", "projects", "experience", "education"]
+
+        result = resume_core.rankResumeContent(CANONICAL_RESUME, JOB_MODEL, {"ignored": True}, config)
+
+        self.assertEqual(result.get("status"), "ok", result)
+        self.assertEqual(result["selection_plan"]["sections"], ["skills", "summary", "projects", "experience", "education"])
+
+    def test_default_section_13_order_includes_projects_before_education(self):
+        result = resume_core.rankResumeContent(CANONICAL_RESUME, JOB_MODEL, {"ignored": True}, {})
+
+        self.assertEqual(result.get("status"), "ok", result)
+        self.assertEqual(result["selection_plan"]["sections"], ["summary", "skills", "experience", "projects", "education"])
+
     def test_constraint_report_truthfully_records_skills_cap(self):
         plan = self._plan()
 
         constraints = {row["constraint"]: row for row in plan["constraint_report"]}
-        self.assertEqual(constraints["max_skills"], {"constraint": "max_skills", "limit": 2, "actual": 3, "status": "violated"})
-        self.assertEqual(constraints["min_skills"]["status"], "satisfied")
-        self.assertEqual(constraints["max_experience"]["status"], "satisfied")
-        self.assertEqual(constraints["min_experience"]["status"], "satisfied")
-        self.assertEqual(constraints["max_bullets_per_role"]["status"], "satisfied")
-        self.assertEqual(constraints["min_bullets_per_role"]["status"], "satisfied")
+        self.assertEqual(
+            constraints["resume.skills.max"],
+            {"constraint": "resume.skills.max", "limit": 2, "actual": 3, "status": "violated"},
+        )
+        self.assertEqual(constraints["resume.skills.min"]["status"], "satisfied")
+        self.assertEqual(constraints["resume.experience.max"]["status"], "satisfied")
+        self.assertEqual(constraints["resume.experience.min"]["status"], "satisfied")
+        self.assertEqual(constraints["resume.bulletsPerRole.max"]["status"], "satisfied")
+        self.assertEqual(constraints["resume.bulletsPerRole.min"]["status"], "satisfied")
         self.assertEqual(plan["metadata"]["target_pages"], 1.0)
         self.assertEqual(plan["metadata"]["config_snapshot"], CONFIG["resume"])
 

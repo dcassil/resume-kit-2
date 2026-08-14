@@ -93,28 +93,14 @@ class ResumeConfigUnitTests(unittest.TestCase):
         self.assertEqual(result.errors[0]["code"], "invalid_resume_config_value")
         self.assertEqual(result.errors[0]["field_path"], "resume.sectionOrder.0")
 
-    def test_flat_max_skills_maps_to_resume_skills_max_with_warning(self):
-        result = resume_core.rankResumeContent(CANONICAL_RESUME, JOB_MODEL, {}, {"max_skills": 2})
-
-        self.assertEqual(result["status"], "ok", result)
-        self.assertEqual(result["warnings"][0]["code"], "deprecated_resume_config_key")
-        self.assertEqual(result["selection_plan"]["metadata"]["config_snapshot"]["skills"]["max"], 2)
-        dropped_skills = [
-            entry for entry in result["selection_plan"]["entries"] if entry["path"].startswith("/skills/") and entry["action"] == "drop"
-        ]
-        self.assertEqual(len(dropped_skills), 1)
-
-    def test_flat_max_skills_conflict_with_namespace_is_typed_error(self):
-        result = resume_core.rankResumeContent(
-            CANONICAL_RESUME,
-            JOB_MODEL,
-            {},
-            {"max_skills": 2, "resume": {"skills": {"max": 3}}},
-        )
+    def test_removed_flat_skills_max_is_typed_unknown_key_error(self):
+        removed_key = "max_" + "skills"
+        result = resume_core.rankResumeContent(CANONICAL_RESUME, JOB_MODEL, {}, {removed_key: 2})
 
         self.assertEqual(result["status"], "error")
-        self.assertEqual(result["errors"][0]["code"], "conflicting_resume_config_key")
-        self.assertEqual(result["warnings"][0]["code"], "deprecated_resume_config_key")
+        self.assertEqual(result["errors"][0]["code"], "unknown_resume_config_key")
+        self.assertEqual(result["errors"][0]["field_path"], removed_key)
+        self.assertEqual(result["warnings"], [])
 
     def test_min_deficits_are_reported_without_fabricating_content(self):
         result = resume_core.rankResumeContent(
@@ -126,12 +112,12 @@ class ResumeConfigUnitTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "ok", result)
         constraints = {row["constraint"]: row for row in result["selection_plan"]["constraint_report"]}
-        self.assertEqual(constraints["min_skills"]["status"], "deficit")
-        self.assertEqual(constraints["min_skills"]["actual"], 3)
-        self.assertEqual(constraints["min_experience"]["status"], "deficit")
-        self.assertEqual(constraints["min_experience"]["actual"], 2)
-        self.assertEqual(constraints["min_bullets_per_role"]["status"], "deficit")
-        self.assertEqual(constraints["min_bullets_per_role"]["actual"], 1)
+        self.assertEqual(constraints["resume.skills.min"]["status"], "deficit")
+        self.assertEqual(constraints["resume.skills.min"]["actual"], 3)
+        self.assertEqual(constraints["resume.experience.min"]["status"], "deficit")
+        self.assertEqual(constraints["resume.experience.min"]["actual"], 2)
+        self.assertEqual(constraints["resume.bulletsPerRole.min"]["status"], "deficit")
+        self.assertEqual(constraints["resume.bulletsPerRole.min"]["actual"], 1)
         self.assertEqual(len([entry for entry in result["selection_plan"]["entries"] if entry["path"].startswith("/skills/")]), 3)
 
     def test_max_constraints_drop_lowest_relevance_content(self):

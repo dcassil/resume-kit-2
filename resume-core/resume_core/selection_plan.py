@@ -157,7 +157,7 @@ def _constraint_report(
     count_values = [row["actual"] for row in selected_bullet_counts]
     max_selected_bullet_count = max(count_values, default=0)
     min_selected_bullet_count = min(count_values, default=0)
-    min_bullets_report = _min_report("min_bullets_per_role", config.bullets_per_role.min, min_selected_bullet_count)
+    min_bullets_report = _min_report("resume.bulletsPerRole.min", config.bullets_per_role.min, min_selected_bullet_count)
     role_deficits = [
         {
             "role_index": row["role_index"],
@@ -172,11 +172,11 @@ def _constraint_report(
     if role_deficits:
         min_bullets_report["role_deficits"] = role_deficits
     return [
-        _max_report("max_skills", config.skills.max, len(skills)),
-        _min_report("min_skills", config.skills.min, len(skills)),
-        _max_report("max_experience", config.experience.max, len(experience)),
-        _min_report("min_experience", config.experience.min, len(experience)),
-        _max_report("max_bullets_per_role", config.bullets_per_role.max, max_selected_bullet_count),
+        _max_report("resume.skills.max", config.skills.max, len(skills)),
+        _min_report("resume.skills.min", config.skills.min, len(skills)),
+        _max_report("resume.experience.max", config.experience.max, len(experience)),
+        _min_report("resume.experience.min", config.experience.min, len(experience)),
+        _max_report("resume.bulletsPerRole.max", config.bullets_per_role.max, max_selected_bullet_count),
         min_bullets_report,
     ]
 

@@ -4,14 +4,14 @@ level: initiative
 title: "Resume-Core Selection Planning And Structural Constraints"
 short_code: "RKIT-I-0003"
 created_at: 2026-08-13T20:41:36.874684+00:00
-updated_at: 2026-08-14T21:16:28.606471+00:00
+updated_at: 2026-08-14T21:50:17.733900+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0002]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -27,6 +27,8 @@ initiative_id: resume-core-selection-planning-and
 Package: `resume-core`. Selection planning. `rankResumeContent` exists and passes gates, but it is a stub relative to this initiative's outcome: it explicitly discards its `match_result` input (`del match_result`, domain.py:402), so relevance ranking against the job — the core of the outcome — has no substrate; it enforces only a `max_skills` cap read from an ad-hoc flat key while every section 13 `resume.*` min constraint is ignored (domain.py:410-412); its default section order `['basics','summary','skills','experience','education']` diverges from section 13's `['summary','skills','experience','projects','education']` (domain.py:423); and there is no bullet-level content selection (domain.py:399-432). The TEST_SPEC selection-planning cases (respect skills/experience/bullets min/max, honor configured section order) sit unimplemented in the empty tests/unit directory, and the base-immutability promise in the outcome has had no corresponding requirement or test. Calling this state a passing scaffold hid that relevance-improving, constraint-enforcing selection planning is essentially unstarted despite the package work log claiming completeness.
 
 Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
+
+**COMPLETED 2026-08-14** — all five chunks (RKIT-T-0029..0033) codex-implemented, driver-reviewed, committed. Delivered: ContentSelectionPlan DTO (JSON-pointer entries, constraint_report, metadata) with immutability + determinism invariants; validated `resume.*` config (min/max, §13 sectionOrder with basics pinned as render header, targetPages; max_skills removed with typed rejection); match-result-driven relevance ranking (del match_result gone; sensitivity guard); bullet-level selection with per-role min/max and unconditional traceability (no empty reasons; structural-maxima guard); specs strengthened. Gates green (--pr 258, --future-contract 265, --smoke). Outstanding: new tests/unit modules ride the pending run_tests.py wiring batch (Daniel converting hook to warn; single approve+locks commit before PR to main).
 
 ## Goals & Non-Goals **[REQUIRED]**
 
