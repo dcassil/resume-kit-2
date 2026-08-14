@@ -160,6 +160,15 @@ class RequirementMatch:
 
 
 @dataclass(frozen=True)
+class MatchDimension:
+    name: str
+    weight: float
+    score: float
+    contribution: float
+    evidence: list[JsonObject] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class MatchResult:
     schema_version: str
     match_id: str
@@ -170,6 +179,7 @@ class MatchResult:
     threshold: float
     hardRequirementsResolved: bool
     decision: str
+    dimensions: list[MatchDimension | JsonObject]
     requirement_results: list[RequirementMatch | JsonObject]
     unresolved_requirement_ids: list[str] = field(default_factory=list)
     can_continue: bool = True
@@ -309,6 +319,28 @@ JOB_MODEL_SCHEMA: JsonObject = {
     },
 }
 
+MATCH_DIMENSION_SCHEMA: JsonObject = {
+    "schema_version": "match-dimension.v1",
+    "type": "object",
+    "required": ["name", "weight", "score", "contribution", "evidence"],
+    "properties": {
+        "name": {
+            "enum": [
+                "requiredSkills",
+                "experience",
+                "roleAlignment",
+                "domainIndustry",
+                "preferredSkills",
+                "terminology",
+            ]
+        },
+        "weight": {"type": "number"},
+        "score": {"type": "number", "minimum": 0, "maximum": 1},
+        "contribution": {"type": "number"},
+        "evidence": {"type": "array"},
+    },
+}
+
 MATCH_RESULT_SCHEMA: JsonObject = {
     "schema_version": "match-result.v1",
     "type": "object",
@@ -322,6 +354,7 @@ MATCH_RESULT_SCHEMA: JsonObject = {
         "threshold",
         "hardRequirementsResolved",
         "decision",
+        "dimensions",
         "requirement_results",
     ],
     "properties": {
@@ -334,6 +367,7 @@ MATCH_RESULT_SCHEMA: JsonObject = {
         "threshold": {"type": "number"},
         "hardRequirementsResolved": {"type": "boolean"},
         "decision": {"enum": ["continue", "resolve_gaps", "blocked"]},
+        "dimensions": {"type": "array", "items": MATCH_DIMENSION_SCHEMA},
         "requirement_results": {"type": "array"},
         "unresolved_requirement_ids": {"type": "array", "items": {"type": "string"}},
         "can_continue": {"type": "boolean"},
@@ -376,6 +410,7 @@ SCHEMAS: dict[str, JsonObject] = {
     "JobModel": JOB_MODEL_SCHEMA,
     "JobRequirement": JOB_REQUIREMENT_SCHEMA,
     "JobTerm": JOB_TERM_SCHEMA,
+    "MatchDimension": MATCH_DIMENSION_SCHEMA,
     "MatchResult": MATCH_RESULT_SCHEMA,
     "ResumeChangeOperation": RESUME_CHANGE_OPERATION_SCHEMA,
 }

@@ -107,7 +107,8 @@
         "tests.unit.test_jobmodel_jobterm_determinism"
       ],
       "scoring_math": [
-        "tests.unit.test_resume_core_scoring_math_unit"
+        "tests.unit.test_resume_core_scoring_math_unit",
+        "tests.unit.test_match_dimensions_unit"
       ],
       "match_decision": [
         "tests.unit.test_match_decision_unit"

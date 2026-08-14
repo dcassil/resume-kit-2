@@ -18,12 +18,77 @@
       "algorithm_version": "resume-core.match.v1",
       "can_continue": true,
       "decision": "continue",
+      "dimensions": [
+        {
+          "contribution": 0.3,
+          "evidence": [
+            {
+              "requirement_id": "fixture_req_1_3ff8909e"
+            }
+          ],
+          "name": "requiredSkills",
+          "score": 1.0,
+          "weight": 0.3
+        },
+        {
+          "contribution": 0.25,
+          "evidence": [
+            {
+              "requirement_id": "fixture_req_0_58105daf"
+            }
+          ],
+          "name": "experience",
+          "score": 1.0,
+          "weight": 0.25
+        },
+        {
+          "contribution": 0.1,
+          "evidence": [
+            {
+              "requirement_id": "fixture_req_2_e55af3cd"
+            },
+            {
+              "requirement_id": "fixture_req_3_fd10e4a4"
+            },
+            {
+              "requirement_id": "fixture_req_4_8f8157ef"
+            }
+          ],
+          "name": "domainIndustry",
+          "score": 1.0,
+          "weight": 0.1
+        },
+        {
+          "contribution": 0.066667,
+          "evidence": [
+            {
+              "requirement_id": "fixture_req_5_a1cdaa2a"
+            },
+            {
+              "requirement_id": "fixture_req_6_3ef16ea5"
+            },
+            {
+              "requirement_id": "fixture_req_7_b8f2ddc2"
+            }
+          ],
+          "name": "preferredSkills",
+          "score": 0.666667,
+          "weight": 0.1
+        },
+        {
+          "contribution": 0.0,
+          "evidence": [],
+          "name": "terminology",
+          "score": 0.0,
+          "weight": 0.1
+        }
+      ],
       "explanations": [
         "No required hard gate is blocking continuation and score meets threshold."
       ],
       "hardRequirementsResolved": true,
       "job_id": "job-a",
-      "match_id": "match_ddc6ca75639e",
+      "match_id": "match_74e5cfa5355b",
       "max_score": 59.0,
       "preferred_unresolved_requirement_ids": [
         "fixture_req_5_a1cdaa2a"
@@ -296,8 +361,8 @@
       ],
       "resume_id": "resume-main",
       "schema_version": "match-result.v1",
-      "score": 56.0,
-      "score_percent": 94.92,
+      "score": 49.7451,
+      "score_percent": 84.31,
       "threshold": 7.5,
       "unresolved_requirement_ids": []
     },

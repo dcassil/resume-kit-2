@@ -69,9 +69,9 @@ class ScoringMathUnitTests(unittest.TestCase):
 
         self.assertEqual(first, second)
         match = first["match_result"]
-        self.assertEqual(match["score"], 10.0)
+        self.assertEqual(match["score"], 7.2)
         self.assertEqual(match["max_score"], 18.0)
-        self.assertEqual(match["score_percent"], 55.56)
+        self.assertEqual(match["score_percent"], 40.0)
         self.assertEqual(match["algorithm_version"], "resume-core.match.v1")
 
     def test_missing_preferred_is_distinct_from_required_blockers(self):
@@ -82,16 +82,16 @@ class ScoringMathUnitTests(unittest.TestCase):
         result_by_id = {item["requirement_id"]: item for item in match["requirement_results"]}
         self.assertTrue(result_by_id["req_node"]["blocking"])
         self.assertFalse(result_by_id["pref_aws"]["blocking"])
-        self.assertTrue(match["can_continue"])
+        self.assertFalse(match["can_continue"])
 
     def test_verified_preferred_fact_increases_score_without_clearing_required_blocker(self):
         facts = [{"fact_id": "fact_aws", "text": "AWS", "verification_state": "user_verified"}]
 
         match = resume_core.scoreMatch(_resume(), _job(), facts, {})["match_result"]
 
-        self.assertEqual(match["score"], 13.0)
+        self.assertEqual(match["score"], 10.8)
         self.assertEqual(match["max_score"], 18.0)
-        self.assertEqual(match["score_percent"], 72.22)
+        self.assertEqual(match["score_percent"], 60.0)
         self.assertEqual(match["unresolved_requirement_ids"], ["req_node"])
         self.assertEqual(match["preferred_unresolved_requirement_ids"], [])
 

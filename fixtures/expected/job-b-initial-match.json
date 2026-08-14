@@ -20,12 +20,63 @@
       "algorithm_version": "resume-core.match.v1",
       "can_continue": true,
       "decision": "continue",
+      "dimensions": [
+        {
+          "contribution": 0.3,
+          "evidence": [
+            {
+              "requirement_id": "fixture_req_0_66ee47a4"
+            },
+            {
+              "requirement_id": "fixture_req_1_1f330851"
+            }
+          ],
+          "name": "requiredSkills",
+          "score": 1.0,
+          "weight": 0.3
+        },
+        {
+          "contribution": 0.1,
+          "evidence": [
+            {
+              "requirement_id": "fixture_req_2_bdba1a3e"
+            },
+            {
+              "requirement_id": "fixture_req_3_c3f15cdb"
+            }
+          ],
+          "name": "domainIndustry",
+          "score": 1.0,
+          "weight": 0.1
+        },
+        {
+          "contribution": 0.1,
+          "evidence": [
+            {
+              "requirement_id": "fixture_req_4_8fd3c8fc"
+            },
+            {
+              "requirement_id": "fixture_req_5_f4df372d"
+            }
+          ],
+          "name": "preferredSkills",
+          "score": 1.0,
+          "weight": 0.1
+        },
+        {
+          "contribution": 0.0,
+          "evidence": [],
+          "name": "terminology",
+          "score": 0.0,
+          "weight": 0.1
+        }
+      ],
       "explanations": [
         "No required hard gate is blocking continuation and score meets threshold."
       ],
       "hardRequirementsResolved": true,
       "job_id": "job-b",
-      "match_id": "match_a9e20c7380b2",
+      "match_id": "match_a427a71e65dc",
       "max_score": 46.0,
       "preferred_unresolved_requirement_ids": [],
       "requirement_results": [
@@ -203,8 +254,8 @@
       ],
       "resume_id": "resume-main",
       "schema_version": "match-result.v1",
-      "score": 46.0,
-      "score_percent": 100.0,
+      "score": 38.3333,
+      "score_percent": 83.33,
       "threshold": 7.5,
       "unresolved_requirement_ids": []
     },

@@ -121,6 +121,7 @@ Future implementation may decompose internally, but tests should assume public A
 
 - Run the same resume/job/fact/config input twice and assert identical `MatchResult`.
 - Assert score dimensions add/explain consistently.
+- Assert each match dimension entry carries name, weight, score, contribution, and real requirement/fact evidence refs.
 - Assert unresolved hard requirements dominate overall continuation decision even if numeric score is high.
 - Assert preferred missing items may reduce score but do not masquerade as required failures.
 - Snapshot expected base score for smoke and E2E fixtures.

@@ -11,6 +11,7 @@ from unicodedata import normalize as _unicode_normalize
 
 from .claim_fields import provenance_index as _provenance_index, weave_claim_fields as _weave_claim_fields
 from .dates import date_key as _parse_date_key, record_date_result as _record_date_result
+from .match_dimensions import _configured_default_weight, _match_dimensions, _score_from_dimensions
 from .match_decision import decide_match, empty_match, match_decision_explanation
 from .matching_config import resolve_matching_config
 from .pointers import _append_already_present, _pointer_parent_exists, _pointer_value, _set_pointer
@@ -400,6 +401,8 @@ def scoreMatch(
             }
         )
 
+    dimensions = _match_dimensions(requirement_results, matching_config.config.weights)
+    score = _score_from_dimensions(dimensions, max_score)
     threshold = matching_config.config.score_auto_threshold
     hard_requirements_resolved = not unresolved
     decision = decide_match(score, threshold, hard_requirements_resolved, matching_config.config)
@@ -414,6 +417,7 @@ def scoreMatch(
         "threshold": threshold,
         "hardRequirementsResolved": hard_requirements_resolved,
         "decision": decision,
+        "dimensions": dimensions,
         "requirement_results": requirement_results,
         "unresolved_requirement_ids": unresolved,
         "preferred_unresolved_requirement_ids": preferred_unresolved,
@@ -835,9 +839,9 @@ def _requirement(raw: Any, index: int, config: JsonObject) -> JsonObject:
         classification = _infer_classification(raw)
         terms = _terms_for(raw)
         importance = _default_importance(classification)
-        weight = _default_weight(classification, importance)
         requirement_id = _stable_requirement_id(index, concept, config)
         years = _extract_years(raw)
+        weight = _configured_default_weight(config, classification, importance, concept, source_text, terms, years)
     elif isinstance(raw, dict):
         source_text = str(_item(raw, "source_text") or _item(raw, "concept") or "")
         concept = str(_item(raw, "concept") or source_text)
@@ -845,18 +849,21 @@ def _requirement(raw: Any, index: int, config: JsonObject) -> JsonObject:
         raw_terms = _item(raw, "normalized_terms")
         terms = [str(term).lower() for term in raw_terms] if isinstance(raw_terms, list) else _terms_for(concept)
         importance = str(_item(raw, "importance") or _default_importance(classification))
-        weight = _number(_item(raw, "weight"), _default_weight(classification, importance))
         requirement_id = str(_item(raw, "requirement_id") or _stable_requirement_id(index, concept, config))
         years = _item(raw, "years") or _extract_years(source_text)
+        weight = _number(
+            _item(raw, "weight"),
+            _configured_default_weight(config, classification, importance, concept, source_text, terms, years),
+        )
     else:
         source_text = str(raw)
         concept = source_text
         classification = RequirementClassification.CONTEXTUAL.value
         terms = _terms_for(source_text)
         importance = "low"
-        weight = 1.0
         requirement_id = _stable_requirement_id(index, concept, config)
         years = None
+        weight = _configured_default_weight(config, classification, importance, concept, source_text, terms, years)
     if classification not in {item.value for item in RequirementClassification}:
         classification = RequirementClassification.CONTEXTUAL.value
     return {
@@ -1077,14 +1084,6 @@ def _default_importance(classification: str) -> str:
     if classification == RequirementClassification.PREFERRED.value:
         return "medium"
     return "low"
-
-
-def _default_weight(classification: str, importance: Any) -> float:
-    if classification == RequirementClassification.REQUIRED.value:
-        return 10.0
-    if classification == RequirementClassification.PREFERRED.value:
-        return 3.0
-    return 2.0 if str(importance) == "medium" else 1.0
 
 
 def _requirements(job: Any) -> list[JsonObject]:

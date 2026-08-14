@@ -96,7 +96,7 @@ class ConfigParsingUnitTests(unittest.TestCase):
         self.assertEqual(default_match["requirement_results"][0]["resolution_state"], "unknown")
         self.assertEqual(default_match["score"], 0.0)
         self.assertEqual(allowed_match["requirement_results"][0]["resolution_state"], "verified_fact_match")
-        self.assertEqual(allowed_match["score"], 4.0)
+        self.assertEqual(allowed_match["score"], 2.0)
 
 
 if __name__ == "__main__":

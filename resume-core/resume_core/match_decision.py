@@ -35,6 +35,7 @@ def empty_match(algorithm_version: str) -> JsonObject:
         "threshold": DEFAULT_SCORE_AUTO_THRESHOLD,
         "hardRequirementsResolved": False,
         "decision": "blocked",
+        "dimensions": [],
         "requirement_results": [],
         "unresolved_requirement_ids": [],
         "can_continue": False,

@@ -31,6 +31,18 @@ DEFAULT_MATCHING_WEIGHTS: dict[str, float] = {
     "preferredSkills": 0.10,
     "terminology": 0.10,
 }
+DEFAULT_REQUIREMENT_WEIGHT_SCALE: dict[str, float] = {
+    "requiredSkills": 10.0,
+    "experience": 10.0,
+    "roleAlignment": 10.0,
+    "domainIndustry": 10.0,
+    "preferredSkills": 3.0,
+    "terminology": 0.0,
+}
+DEFAULT_CONTEXTUAL_REQUIREMENT_WEIGHT_SCALE: dict[str, float] = {
+    "medium": 2.0,
+    "low": 1.0,
+}
 
 
 @dataclass(frozen=True)
@@ -118,6 +130,26 @@ def resolve_matching_config(config: JsonObject | None) -> MatchingConfigResult:
         errors=errors,
         warnings=warnings,
     )
+
+
+def default_requirement_weight(
+    dimension_name: str,
+    weights: dict[str, float],
+    *,
+    classification: str | None = None,
+    importance: str | None = None,
+) -> float:
+    """Return a config-sourced per-requirement default for a match dimension."""
+
+    baseline = DEFAULT_MATCHING_WEIGHTS.get(dimension_name, 0.0)
+    scale = DEFAULT_REQUIREMENT_WEIGHT_SCALE.get(dimension_name, 1.0)
+    if classification == "contextual" and dimension_name == "requiredSkills":
+        scale = DEFAULT_CONTEXTUAL_REQUIREMENT_WEIGHT_SCALE.get(str(importance or "low"), 1.0)
+    if baseline <= 0:
+        return scale
+    # Round to 9 decimals so config-scaled weights stay byte-stable in
+    # normalized snapshots (scale * w / baseline reintroduces float noise).
+    return round(scale * float(weights.get(dimension_name, baseline)) / baseline, 9)
 
 
 def _matching_payload(raw: JsonObject, errors: list[JsonObject]) -> tuple[JsonObject, bool]:
