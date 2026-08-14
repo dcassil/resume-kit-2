@@ -9,6 +9,7 @@ from typing import Any
 from unicodedata import category as _unicode_category
 from unicodedata import normalize as _unicode_normalize
 
+from .dates import date_key as _parse_date_key, record_date_result as _record_date_result
 from .pointers import _append_already_present, _pointer_parent_exists, _pointer_value, _set_pointer
 from .schemas import (
     CANONICAL_RESUME_SCHEMA,
@@ -38,6 +39,8 @@ _VERIFIED_FACT_STATES = {
 _CHANGE_OPERATION_OPS = {"replace", "rewrite", "insert", "remove", "move"}
 _CHANGE_OPERATION_STATUSES = {status.value for status in ChangeOperationStatus}
 _CONTROL_WHITELIST = {"\n", "\r", "\t"}
+_INVALID_DATE_CODE = "invalid_date"
+_REVERSED_RANGE_CODE = "reversed_range"
 _SMART_TRANSLATION = str.maketrans(
     {
         "\u00a0": " ",
@@ -276,7 +279,7 @@ def validateResume(canonical_resume: Any) -> JsonObject:
         if isinstance(entry, dict):
             _check_dates(entry, f"experience/{index}", errors, warnings)
 
-    return _result("error" if errors else "ok", errors=errors, warnings=warnings)
+    return _result("error" if errors else "ok", canonical_resume=resume, errors=errors, warnings=warnings)
 
 
 def normalizeJobModel(source_job: Any, config: JsonObject | None = None) -> JsonObject:
@@ -767,28 +770,18 @@ def _stable_id(prefix: str, value: Any) -> str:
 
 
 def _check_dates(entry: JsonObject, path: str, errors: list[JsonObject], warnings: list[JsonObject]) -> None:
-    start = _date_key(_item(entry, "start_date"))
+    start_value = _item(entry, "start_date")
+    start = _parse_date_key(start_value)
     end_value = _item(entry, "end_date")
-    end = _date_key(end_value)
-    if _item(entry, "start_date") and start is None:
-        warnings.append(_issue("ambiguous_start_date", "Start date is ambiguous.", f"{path}/start_date"))
-    if end_value and str(end_value).lower() not in {"present", "current"} and end is None:
-        warnings.append(_issue("ambiguous_end_date", "End date is ambiguous.", f"{path}/end_date"))
-    if start and end and start > end:
-        errors.append(_issue("reversed_date_range", "Start date is after end date.", path))
-
-
-def _date_key(value: Any) -> tuple[int, int] | None:
-    if value is None or str(value).lower() in {"present", "current"}:
-        return None
-    match = re.fullmatch(r"(\d{4})(?:-(\d{1,2}))?", str(value).strip())
-    if not match:
-        return None
-    year = int(match.group(1))
-    month = int(match.group(2) or "1")
-    if year < 1900 or month < 1 or month > 12:
-        return None
-    return (year, month)
+    end = _parse_date_key(end_value)
+    _record_date_result(
+        entry, "start_date", start_value, start, f"{path}/start_date", "start", errors, warnings, _issue, _INVALID_DATE_CODE
+    )
+    _record_date_result(
+        entry, "end_date", end_value, end, f"{path}/end_date", "end", errors, warnings, _issue, _INVALID_DATE_CODE
+    )
+    if start.key and end.key and start.key > end.key:
+        errors.append(_issue(_REVERSED_RANGE_CODE, "Start date is after end date.", path))
 
 
 def _requirements_from_text(text: str) -> list[JsonObject]:
