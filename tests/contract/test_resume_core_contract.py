@@ -208,6 +208,133 @@ class ResumeCoreDomainContractTests(unittest.TestCase):
             self.assertTrue(term.get("canonical"))
             self.assertIn(term.get("source"), {"title", "requirement", "description"})
 
+    def test_discovered_enum_membership_matches_restored_contract_sets(self):
+        self.assertEqual(
+            {state.value for state in self.core.VerificationState},
+            {"source_stated", "user_verified", "imported", "inferred", "unknown"},
+        )
+        self.assertEqual(
+            {state.value for state in self.core.ResolutionState},
+            {
+                "exact_match",
+                "alias_match",
+                "verified_fact_match",
+                "related_match",
+                "possible_match",
+                "unknown",
+                "explicitly_missing",
+                "not_applicable",
+            },
+        )
+
+        imported_resume = dict(CANONICAL_RESUME, verification_state="imported")
+        imported = maybe_await(self.core.validateResume(imported_resume))
+        self.assertEqual(imported.get("status"), "ok", imported)
+
+        explicit_absence_resume = dict(CANONICAL_RESUME, verification_state="explicitly_missing")
+        explicit_absence = maybe_await(self.core.validateResume(explicit_absence_resume))
+        self.assertEqual(explicit_absence.get("status"), "error", explicit_absence)
+        self.assertIn("invalid_verification_state", {error.get("code") for error in explicit_absence.get("errors", [])})
+        self.assertNotIn("conflicted", {state.value for state in self.core.VerificationState})
+        self.assertNotIn("conflicted", {state.value for state in self.core.ResolutionState})
+
+    def test_discovered_validate_resume_enforces_schema_required_identity_fields(self):
+        self.assertEqual(
+            set(self.core.CANONICAL_RESUME_SCHEMA["required"]),
+            {"schema_version", "resume_id", "source", "experience", "skills", "education"},
+        )
+        for field_name in ("resume_id", "source"):
+            with self.subTest(field_name=field_name):
+                resume = dict(CANONICAL_RESUME)
+                del resume[field_name]
+                result = maybe_await(self.core.validateResume(resume))
+                missing_fields = {
+                    error.get("field_path")
+                    for error in result.get("errors", [])
+                    if error.get("code") == "missing_field"
+                }
+                self.assertEqual(result.get("status"), "error", result)
+                self.assertIn(field_name, missing_fields)
+
+    def test_discovered_dates_canonicalize_and_reject_typed_failures(self):
+        canonicalizing_resume = dict(
+            CANONICAL_RESUME,
+            experience=[
+                {
+                    "id": "exp_date_contract",
+                    "company": "Example SaaS",
+                    "title": "Software Engineer",
+                    "start_date": "01/2019",
+                    "end_date": "present",
+                    "bullets": [],
+                }
+            ],
+        )
+        canonicalized = maybe_await(self.core.validateResume(canonicalizing_resume))
+        self.assertEqual(canonicalized.get("status"), "ok", canonicalized)
+        self.assertEqual(canonicalized["canonical_resume"]["experience"][0]["start_date"], "2019-01")
+        self.assertIn("ambiguous_start_date", {warning.get("code") for warning in canonicalized.get("warnings", [])})
+
+        invalid_resume = dict(
+            CANONICAL_RESUME,
+            experience=[
+                {
+                    "id": "exp_invalid_date_contract",
+                    "company": "Example SaaS",
+                    "title": "Software Engineer",
+                    "start_date": "2019-13",
+                    "bullets": [],
+                }
+            ],
+        )
+        invalid = maybe_await(self.core.validateResume(invalid_resume))
+        self.assertEqual(invalid.get("status"), "error", invalid)
+        self.assertIn("invalid_date", {error.get("code") for error in invalid.get("errors", [])})
+
+        reversed_resume = dict(
+            CANONICAL_RESUME,
+            experience=[
+                {
+                    "id": "exp_reversed_date_contract",
+                    "company": "Example SaaS",
+                    "title": "Software Engineer",
+                    "start_date": "2020-02",
+                    "end_date": "2020-01",
+                    "bullets": [],
+                }
+            ],
+        )
+        reversed_result = maybe_await(self.core.validateResume(reversed_resume))
+        self.assertEqual(reversed_result.get("status"), "error", reversed_result)
+        self.assertIn("reversed_range", {error.get("code") for error in reversed_result.get("errors", [])})
+
+    def test_discovered_normalize_resume_sourceless_claims_stay_unknown(self):
+        source_resume = {
+            "schema_version": "canonical-resume.v1",
+            "resume_id": "resume_contract_claim_default",
+            "source": {"kind": "test_fixture"},
+            "experience": [
+                {
+                    "id": "exp_contract_claim",
+                    "company": "Example SaaS",
+                    "title": "Software Engineer",
+                    "bullets": ["Built React workflows."],
+                }
+            ],
+            "skills": ["React"],
+            "education": [],
+            "provenance": [],
+        }
+
+        result = maybe_await(self.core.normalizeResume(source_resume))
+        self.assertEqual(result.get("status"), "ok", result)
+        bullet = result["canonical_resume"]["experience"][0]["bullets"][0]
+        skill = result["canonical_resume"]["skills"][0]
+        for field in (bullet, skill):
+            self.assertEqual(field["provenance"], [])
+            self.assertEqual(field["verification_state"], "unknown")
+            self.assertNotEqual(field["verification_state"], "source_stated")
+
     def test_unverified_or_related_facts_do_not_validate_unsupported_change(self):
         operation = {
             "schema_version": "resume-change-operation.v1",

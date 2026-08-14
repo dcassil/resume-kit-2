@@ -28,6 +28,24 @@ Relevant contract surfaces:
 - `validateGrounding`
 - `validateFinalResume`
 
+## Restored RKIT-I-0001 Behaviors
+
+- `VerificationState` is exactly `{source_stated, user_verified, imported, inferred, unknown}`. `validateResume` accepts `imported`; rejects `explicitly_missing` as `invalid_verification_state`; and `conflicted` is absent from this enum.
+- `ResolutionState` is exactly `{exact_match, alias_match, verified_fact_match, related_match, possible_match, unknown, explicitly_missing, not_applicable}`. `explicitly_missing` and `not_applicable` are valid resolution states; `conflicted` is absent from this enum.
+- `ResumeChangeOperation` structurally accepts only verbs `{replace, rewrite, insert, remove, move}` and statuses `{proposed, validated, rejected, applied, accepted, modified}`. Missing mandatory fields `reason`, `linked_requirement_ids`, `linked_fact_ids`, or `provenance` must reject with `missing_field`; an unknown verb must reject with `invalid_op`; an unknown status must reject with `invalid_status`.
+- `validateResume` derives required-field enforcement from `CANONICAL_RESUME_SCHEMA.required`, which is exactly `{schema_version, resume_id, source, experience, skills, education}`. Omitting any required field, including `resume_id` or `source`, must reject with `missing_field`.
+- Resume date handling is deterministic:
+  - `YYYY` remains `YYYY` with no warning when the year is valid.
+  - `YYYY-M` and `YYYY-MM` canonicalize to `YYYY-MM` with no warning when the month is valid.
+  - `Mon YYYY` canonicalizes to `YYYY-MM` with an `ambiguous_start_date` or `ambiguous_end_date` warning.
+  - `MM/YYYY` canonicalizes to `YYYY-MM` with an `ambiguous_start_date` or `ambiguous_end_date` warning.
+  - `present` and `current` are valid end-date sentinels and do not invent an end date.
+  - Impossible months such as `2019-13` or `13/2019` reject with `invalid_date`.
+  - Any normalized start date after the normalized end date rejects with `reversed_range`.
+  - Unparseable but not impossible date text remains an ambiguity warning, not a typed rejection.
+- `JobModel` section-4.2 normalization deterministically populates `seniority`, `industries`, `domains`, separate `requirements` and `preferred` arrays, and `terminology: JobTerm[]`. Each `JobTerm` has non-empty `surface`, normalized `canonical`, source in `{title, requirement, description}`, and numeric `weight`; repeated normalization of identical input must produce identical output.
+- `normalizeResume` wraps meaningful claims as per-claim `ResumeField` values. A source-backed claim preserves matching provenance and its valid verification state; a sourceless or malformed-provenance claim defaults to `provenance: []` and `verification_state: unknown`, never a silent `source_stated`.
+
 ## Expected Structure
 
 Future implementation may decompose internally, but tests should assume public APIs are the stable boundary:
@@ -48,11 +66,11 @@ Future implementation may decompose internally, but tests should assume public A
 
 - Accept a valid `CanonicalResume` with contact, summary, experience, skills, education, provenance, and verification state.
 - Reject missing required array fields such as `experience[]` or `skills[]`.
-- Reject unknown verification states.
+- Accept `imported` as a verification state; reject `explicitly_missing`, `conflicted`, and other unknown verification states.
 - Reject malformed provenance entries.
 - Accept optional certifications, awards, projects, and additional sections without changing their meaning.
 - Validate `JobModel` requirements with type, concept, importance, weight, source text, and normalized terms.
-- Validate `ResumeChangeOperation` paths, statuses, before/after values, linked requirements, linked facts, and provenance.
+- Validate `ResumeChangeOperation` paths, the five canonical verbs, the six canonical statuses, before/after values, linked requirements, linked facts, mandatory reason, and provenance.
 
 ### ATS and text normalization
 
@@ -67,7 +85,7 @@ Future implementation may decompose internally, but tests should assume public A
 
 - Normalize inconsistent date formats into a stable representation.
 - Preserve present/current roles without inventing end dates.
-- Reject impossible dates and reversed ranges.
+- Reject impossible dates with `invalid_date` and reversed ranges with `reversed_range`.
 - Report ambiguous dates rather than silently changing meaning.
 
 ### Resume normalization
@@ -76,7 +94,7 @@ Future implementation may decompose internally, but tests should assume public A
 - Preserve role titles and employers exactly where they are factual fields.
 - Keep React, TypeScript, Node, PostgreSQL, Azure, SaaS, REST/API claims from source fixtures.
 - Do not add AWS, GraphQL, Staff title, unsupported metrics, unsupported management scope, or unsupported outcomes.
-- Attach provenance to meaningful claims.
+- Attach provenance to meaningful claims and default sourceless claims to empty provenance plus `unknown`, never `source_stated`.
 - Emit ingest warnings for normalization issues.
 
 ### Job normalization
@@ -86,6 +104,7 @@ Future implementation may decompose internally, but tests should assume public A
 - Normalize concepts such as API architecture/design without dropping source text.
 - Retain exact terminology such as `responsive design`.
 - Assign stable requirement IDs from deterministic input/config rules.
+- Populate `JobTerm` entries deterministically with surface, canonical, source, and weight while keeping preferred requirements separate from required requirements.
 
 ### Requirement resolution
 
