@@ -1,9 +1,18 @@
+import { spawnSync } from "node:child_process";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { PRE_COMMIT_COMMAND, getHookStatus, preCommitHookPath } from "./status.js";
+import { HOOKS_PATH, getHookStatus, preCommitHookPath } from "./status.js";
 
 const START_MARKER = "# straight-jacket:start";
 const END_MARKER = "# straight-jacket:end";
+const HOOK_BODY = `if [ -f ".straight-jacket/manifest.json" ]; then
+  if ! straight-jacket setup --check >/dev/null 2>&1; then
+    echo "Straight Jacket local setup is missing or incomplete."
+    echo "Run: straight-jacket setup"
+    exit 1
+  fi
+fi
+straight-jacket verify && straight-jacket verify --staged`;
 
 export async function installPreCommitHook({ repoRoot }) {
   const hookPath = await preCommitHookPath(repoRoot);
@@ -13,6 +22,7 @@ export async function installPreCommitHook({ repoRoot }) {
   await mkdir(path.dirname(hookPath), { recursive: true });
   await writeFile(hookPath, nextHook, "utf8");
   await chmod(hookPath, 0o755);
+  configureHooksPath(repoRoot);
 
   return {
     ok: true,
@@ -21,7 +31,7 @@ export async function installPreCommitHook({ repoRoot }) {
 }
 
 function upsertHookBlock(existingHook) {
-  const hookBlock = `${START_MARKER}\n${PRE_COMMIT_COMMAND}\n${END_MARKER}`;
+  const hookBlock = `${START_MARKER}\n${HOOK_BODY}\n${END_MARKER}`;
   const withoutDuplicateBlock = existingHook.replace(
     new RegExp(`${escapeRegExp(START_MARKER)}[\\s\\S]*?${escapeRegExp(END_MARKER)}\\n?`, "g"),
     ""
@@ -51,4 +61,13 @@ function trimTrailingNewlines(value) {
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function configureHooksPath(repoRoot) {
+  const result = spawnSync("git", ["-C", repoRoot, "config", "core.hooksPath", HOOKS_PATH], {
+    encoding: "utf8"
+  });
+  if (result.status !== 0) {
+    throw new Error(`HOOKS_PATH_CONFIG_FAILED: ${result.stderr.trim()}`);
+  }
 }

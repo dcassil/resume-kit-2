@@ -9,7 +9,11 @@ Files:
 ```text
 .straight-jacket/manifest.json
 .straight-jacket/manifest.sig
-.straight-jacket/public-key.json
+.straight-jacket/signers.json
+.straight-jacket/signers.sig
+.straight-jacket/registration-public-key.json
+.straight-jacket/registration-key.enc.json
+.straight-jacket/ci-proof.json
 ```
 
 Implementation folder:
@@ -65,9 +69,34 @@ Suggested `.straight-jacket/manifest.sig`:
 
 The signature signs the canonical JSON bytes of the manifest payload only.
 
-## Public Key Shape
+## Signer Registry Shape
 
-Suggested `.straight-jacket/public-key.json`:
+Suggested `.straight-jacket/signers.json`:
+
+```json
+{
+  "version": 1,
+  "repoId": "sha256:...",
+  "registrationKeyId": "sha256:...",
+  "signers": [
+    {
+      "version": 1,
+      "algorithm": "ed25519",
+      "keyId": "sha256:...",
+      "fingerprint": "sha256:...",
+      "publicKey": "base64url...",
+      "registeredAt": "2026-08-12T00:00:00.000Z",
+      "active": true
+    }
+  ]
+}
+```
+
+`.straight-jacket/signers.sig` signs the canonical JSON bytes of `signers.json` with the registration private key.
+
+## Registration Public Key Shape
+
+Suggested `.straight-jacket/registration-public-key.json`:
 
 ```json
 {
@@ -79,7 +108,35 @@ Suggested `.straight-jacket/public-key.json`:
 }
 ```
 
-The public-key fingerprint is computed from canonical public key metadata, not from mutable manifest entries.
+The registration public-key fingerprint is computed from canonical public key metadata. Strong mode uses `.straight-jacket/ci-proof.json` plus the human-controlled `STRAIGHT_JACKET_CI_KEY` secret to detect unauthorized registration metadata replacement.
+
+## CI Proof Shape
+
+Suggested `.straight-jacket/ci-proof.json`:
+
+```json
+{
+  "version": 1,
+  "algorithm": "hmac-sha256",
+  "keyDerivation": {
+    "name": "scrypt",
+    "salt": "straight-jacket-ci-v1",
+    "cost": 16384,
+    "blockSize": 8,
+    "parallelization": 1,
+    "keyLength": 32
+  },
+  "covered": [
+    "registration-public-key",
+    "registration-key",
+    "signers",
+    "signers-signature"
+  ],
+  "proof": "sha256:..."
+}
+```
+
+The proof is an HMAC over canonical registration metadata using `STRAIGHT_JACKET_CI_KEY`. It intentionally does not cover `manifest.json`, so registered local users can still approve protected-file changes without the master password.
 
 ## Canonicalization
 
@@ -156,7 +213,7 @@ Any other manifest algorithm returns `HASH_ALGORITHM_NOT_ALLOWED`.
 
 MVP options:
 
-- derive from `git rev-parse --show-toplevel` plus initial public-key fingerprint
+- derive from `git rev-parse --show-toplevel` plus initial registration public-key fingerprint
 - generate random bytes during `initRepository`
 
 Recommendation:
@@ -174,8 +231,14 @@ Internal functions:
 - `writeManifest(repoRoot, manifest)`
 - `readSignature(repoRoot)`
 - `writeSignature(repoRoot, signature)`
-- `readPublicKey(repoRoot)`
-- `writePublicKey(repoRoot, publicKey)`
+- `readSigners(repoRoot)`
+- `writeSigners(repoRoot, signers)`
+- `readSignersSignature(repoRoot)`
+- `writeSignersSignature(repoRoot, signature)`
+- `readRegistrationPublicKey(repoRoot)`
+- `writeRegistrationPublicKey(repoRoot, publicKey)`
+- `readRegistrationKey(repoRoot)`
+- `writeRegistrationKey(repoRoot, encryptedKey)`
 - `canonicalizeManifest(manifest)`
 - `validateManifestShape(manifest)`
 - `validateEntry(entry, repoRoot)`

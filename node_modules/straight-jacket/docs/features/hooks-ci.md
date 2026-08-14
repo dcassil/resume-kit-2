@@ -20,7 +20,7 @@ Strong enforcement requires at least one verifier outside the AI-editable workin
 
 - required CI check
 - server-side Git hook
-- repository rule that pins trusted public-key fingerprint
+- CI proof verification with a human-controlled `STRAIGHT_JACKET_CI_KEY` secret
 - protected branch configuration
 
 Straight Jacket must never claim local hooks are impossible to bypass.
@@ -41,13 +41,26 @@ templates/hooks/pre-commit
 Installed target:
 
 ```text
-.git/hooks/pre-commit
+.githooks/pre-commit
+```
+
+Local Git config:
+
+```text
+core.hooksPath=.githooks
 ```
 
 Hook content:
 
 ```sh
 #!/bin/sh
+if [ -f ".straight-jacket/manifest.json" ]; then
+  if ! straight-jacket setup --check >/dev/null 2>&1; then
+    echo "Straight Jacket local setup is missing or incomplete."
+    echo "Run: straight-jacket setup"
+    exit 1
+  fi
+fi
 straight-jacket verify && straight-jacket verify --staged
 ```
 
@@ -64,12 +77,13 @@ installHook({ repoRoot })
 Behavior:
 
 1. Verify `repoRoot` is a Git repo root.
-2. Locate `.git/hooks/pre-commit`.
+2. Locate `.githooks/pre-commit`.
 3. If no hook exists, write Straight Jacket hook.
 4. If a hook exists and already contains Straight Jacket block, no-op.
 5. If a hook exists without Straight Jacket block, append a clearly marked block.
 6. Mark hook executable.
-7. Return hook path and status.
+7. Configure `git config core.hooksPath .githooks`.
+8. Return hook path and status.
 
 Output:
 
@@ -78,7 +92,9 @@ Output:
   "ok": true,
   "hook": {
     "installed": true,
-    "path": "/repo/.git/hooks/pre-commit"
+    "path": "/repo/.githooks/pre-commit",
+    "hooksPath": ".githooks",
+    "configuredHooksPath": ".githooks"
   }
 }
 ```
@@ -89,6 +105,7 @@ Use stable markers for idempotent install:
 
 ```sh
 # straight-jacket:start
+straight-jacket setup --check
 straight-jacket verify && straight-jacket verify --staged
 # straight-jacket:end
 ```
@@ -120,19 +137,18 @@ jobs:
         with:
           node-version: 20
       - run: npm install -g straight-jacket
-      - run: straight-jacket verify --json
+      - run: straight-jacket verify
 ```
 
-Strong mode should include a pinned fingerprint supplied by repository settings or CI variables:
+Strong mode should include the CI key generated from the master password during `straight-jacket setup`.
 
 ```sh
-straight-jacket verify --trusted-public-key-fingerprint "$STRAIGHT_JACKET_PUBLIC_KEY_FINGERPRINT"
+straight-jacket verify --ci-key "$STRAIGHT_JACKET_CI_KEY"
 ```
 
-The fingerprint variable must be controlled by humans or repository administrators.
+The CI key is not the master password and cannot unlock signing keys. It must still be controlled by humans or repository administrators, never by an AI agent.
 
-For GitHub Actions, store it as a repository variable named
-`STRAIGHT_JACKET_PUBLIC_KEY_FINGERPRINT`.
+For GitHub Actions, store it as a repository secret named `STRAIGHT_JACKET_CI_KEY`.
 
 ## Server-Side Hook Template
 
@@ -145,8 +161,8 @@ templates/ci/pre-receive
 Behavior:
 
 - verify incoming tree state
-- reject invalid manifests, tampered protected files, and public-key replacement
-- read trusted public-key fingerprint from server-controlled config
+- reject invalid manifests, tampered signer registries, tampered protected files, and registration public-key replacement
+- read trusted CI key from server-controlled config
 
 ## Test Mapping
 
@@ -160,5 +176,5 @@ Future tests:
 
 - existing hook append/idempotency
 - executable bit
-- hook invokes `straight-jacket verify` and `straight-jacket verify --staged`
-- CI template includes external fingerprint guidance
+- hook invokes `straight-jacket setup --check`, `straight-jacket verify`, and `straight-jacket verify --staged`
+- CI template includes CI key secret guidance

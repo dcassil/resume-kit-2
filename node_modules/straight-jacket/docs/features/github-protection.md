@@ -12,7 +12,7 @@ Recommended GitHub setup:
 - admins are included in enforcement.
 - force pushes and branch deletion are disabled.
 - `develop` exists as the integration branch, if the project uses one.
-- `STRAIGHT_JACKET_PUBLIC_KEY_FINGERPRINT` is stored as a GitHub repository variable.
+- `STRAIGHT_JACKET_CI_KEY` is stored as a GitHub Actions secret.
 
 With this setup, a bad commit can still be pushed to an ordinary feature branch, but it cannot merge into `main`.
 
@@ -37,19 +37,20 @@ git commit -m "Add Straight Jacket verifier workflow"
 git push
 ```
 
-## Store The Trusted Fingerprint
+## Store The CI Key
 
-The workflow should verify against a fingerprint that is controlled outside the AI-editable repository tree.
+After `straight-jacket setup`, the CLI prints a CI key derived from the master password. This is not the master password and cannot unlock signing keys. Store only that generated value in GitHub Actions secrets.
 
 ```sh
-fingerprint="$(node -e 'console.log(JSON.parse(require("fs").readFileSync(".straight-jacket/public-key.json", "utf8")).fingerprint)')"
-gh variable set STRAIGHT_JACKET_PUBLIC_KEY_FINGERPRINT --body "$fingerprint"
+gh secret set STRAIGHT_JACKET_CI_KEY
 ```
 
-Check it:
+Paste the generated `sjci_v1_...` value when prompted. Never paste the master password into GitHub, and never ask an AI agent to handle the master password or CI key.
+
+Check that the secret exists:
 
 ```sh
-gh variable list
+gh secret list
 ```
 
 ## Create `develop`

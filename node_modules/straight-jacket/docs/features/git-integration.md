@@ -18,7 +18,7 @@ Git helpers should:
 - detect staged file status
 - read staged blobs for protected paths
 - detect staged deletions
-- detect staged manifest/signature/public-key changes
+- detect staged manifest, signature, signer registry, and registration public-key changes
 - report hook installation status
 - provide stable repo-root path handling
 
@@ -67,8 +67,8 @@ For `scope: "staged"`:
 - use `git diff --cached --name-status --find-renames`
 - detect deleted protected paths
 - detect renamed protected paths
-- inspect staged manifest/signature/public-key state
-- verify staged manifest payload against staged signature and key when those files are staged
+- inspect staged shared Straight Jacket metadata
+- verify staged signer registry and manifest payloads when those files are staged
 
 Useful commands:
 
@@ -77,7 +77,9 @@ git diff --cached --name-status --find-renames
 git show :docs/policy.md
 git show :.straight-jacket/manifest.json
 git show :.straight-jacket/manifest.sig
-git show :.straight-jacket/public-key.json
+git show :.straight-jacket/signers.json
+git show :.straight-jacket/signers.sig
+git show :.straight-jacket/registration-public-key.json
 ```
 
 If a protected file is staged as deleted:
@@ -124,8 +126,10 @@ Expected status shape:
 ```js
 {
   installed: false,
-  path: "/repo/.git/hooks/pre-commit",
-  command: "straight-jacket verify --staged"
+  path: "/repo/.githooks/pre-commit",
+  command: "straight-jacket setup --check && straight-jacket verify && straight-jacket verify --staged",
+  hooksPath: ".githooks",
+  configuredHooksPath: null
 }
 ```
 

@@ -41,6 +41,7 @@ Public orchestration exports:
 - `addProtectedFile(input)`
 - `removeProtectedFile(input)`
 - `updateProtectedFile(input)`
+- `updateProtectedFiles(input)`
 - `renameProtectedFile(input)`
 - `verifyRepository(input)`
 - `listProtectedFiles(input)`
@@ -66,7 +67,7 @@ Public orchestration exports:
 - `LIKELY_RENAME_OR_MOVE`: `<path> appears to contain a protected file moved from another path`
 - `MANIFEST_MISSING`: `Straight Jacket manifest is missing`
 - `MANIFEST_SIGNATURE_MISSING`: `Straight Jacket manifest signature is missing`
-- `PUBLIC_KEY_MISSING`: `Straight Jacket public key is missing`
+- `REGISTRATION_PUBLIC_KEY_MISSING`: `Straight Jacket registration public key is missing`
 
 Unknown codes may use the code as a message, but should still preserve all fields.
 

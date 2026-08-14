@@ -1,4 +1,11 @@
 #!/bin/sh
 # straight-jacket:start
+if [ -f ".straight-jacket/manifest.json" ]; then
+  if ! straight-jacket setup --check >/dev/null 2>&1; then
+    echo "Straight Jacket local setup is missing or incomplete."
+    echo "Run: straight-jacket setup"
+    exit 1
+  fi
+fi
 straight-jacket verify && straight-jacket verify --staged
 # straight-jacket:end
