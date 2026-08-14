@@ -4,16 +4,15 @@ level: task
 title: "REQ-001a: Snapshot data envelope, canonicalizing comparator, and generator"
 short_code: "RKIT-T-0011"
 created_at: 2026-08-14T03:13:54.562491+00:00
-updated_at: 2026-08-14T03:13:54.562491+00:00
+updated_at: 2026-08-14T16:43:28.465948+00:00
 parent: executable-release-gate-e2e
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -30,6 +29,10 @@ initiative_id: RKIT-I-0051
 ## Objective
 
 This task establishes the snapshot mechanics substrate that all 13 data snapshots and the REQ-001 comparison test depend on: a versioned on-disk envelope shape, a shared canonicalizing projection helper, a reusable deep-equality comparator, and a deterministic regeneration script. It matters because it is the load-bearing infrastructure every downstream REQ-001 task consumes — a wrong choice here in envelope shape, canonicalization allowlist, or determinism handling compounds across all thirteen fixtures and the gate wiring built on top of them.
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -85,4 +88,5 @@ Binding scope boundaries: do NOT wire the comparator into the gate yet, and do N
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-14: Task active. Codex-driven execution launched (handoff loop: flag-free `codex exec`, review + both gates before commit). Lane order this session: T-0011 → T-0015 → T-0019 → T-0020 → T-0012 (T-0012 last; its baselines need Daniel's review pre-commit).
+- 2026-08-14: Codex implementation reviewed + verified: `tests/support/snapshot_compare.py` (canonicalize/compare, JSON-pointer diffs, documented volatile allowlist keeping domain IDs), `tools/regenerate_expected_snapshots.py` (stdlib-only, 13 snapshot ids, determinism proven by double-run diff), `fixtures/TEST_SPEC.md` envelope + regenerate/review/commit procedure. PR gate 198 green, smoke green, straight-jacket verify ok. All acceptance criteria met; committing.

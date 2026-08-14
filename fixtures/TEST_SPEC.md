@@ -162,13 +162,42 @@ Snapshots should be reviewed contract artifacts, not accidental implementation o
 - run manifest snapshot,
 - audit report snapshot.
 
+Starting with the REQ-001a snapshot substrate, each expected snapshot uses this envelope:
+
+```json
+{
+  "schema_version": "expected-snapshot.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "comment": ["human review intent formerly stored as expected_observations"],
+  "data": {}
+}
+```
+
+Existing metadata fields are preserved. `data` carries the actual canonicalized output from the relevant public package surface. `comment` carries the former prose `expected_observations` review intent so the human reason for the fixture is retained when the data block is regenerated.
+
+Canonical snapshot comparison sorts all object keys deterministically and preserves array order. It drops only this documented volatile-field allowlist at any object depth:
+
+- RKIT-I-0022 per-invocation run identity: `run_id`, `run_identity`.
+- Per-call/request identity: `invocation_id`, `request_id`, `trace_id`, `span_id`, `call_id`, `session_id`.
+- Process/thread identity: `process_id`, `pid`, `thread_id`.
+- Wall-clock audit fields: `created_at`, `updated_at`, `deleted_at`, `timestamp`, `timestamps`, `started_at`, `finished_at`, `completed_at`, `generated_at`, `observed_at`, `recorded_at`.
+
+Domain identity is not volatile. Snapshot comparison must keep `resume_id`, `job_id`, `fact_id`, `requirement_id`, and `operation_id` because those IDs are part of the fixture contract.
+
+Regeneration procedure:
+
+1. Run `python3 tools/regenerate_expected_snapshots.py --root .` to print the canonical data blocks for all 13 snapshot IDs. The generator is stdlib-only, uses no network or LLM calls, uses fixture `config_hash` `fixture-config-v1`, and drives live `resume_core.normalizeResume`, `normalizeJobModel`, `scoreMatch`, and `rankResumeContent`.
+2. Prove determinism by running the generator twice and diffing the outputs.
+3. Human-review each changed `data` block against the snapshot `comment` and fixture intent.
+4. Commit reviewed envelope updates only after review; do not treat generator output alone as approval.
+
 ## Fixture Validation Tests
 
 - Fixture resumes parse as text.
 - Fixture jobs parse as text.
 - Fixture answers are stable and exact.
 - Invalid operations target existing canonical paths where applicable.
-- Expected snapshots include schema version and config hash.
+- Expected snapshots include schema version, config hash, reviewed status, comment, and data.
 - Fixture IDs are deterministic.
 - No fixture contains accidental unsupported truth that would weaken hallucination tests.
-
