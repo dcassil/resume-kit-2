@@ -4,16 +4,15 @@ level: task
 title: "REQ-007b: Migration-checker tool for the four migration cases"
 short_code: "RKIT-T-0020"
 created_at: 2026-08-14T03:14:05.799098+00:00
-updated_at: 2026-08-14T03:14:05.799098+00:00
+updated_at: 2026-08-14T16:58:28.199589+00:00
 parent: executable-release-gate-e2e
-blocked_by: ["RKIT-T-0019"]
+blocked_by: [RKIT-T-0019]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -30,6 +29,10 @@ initiative_id: RKIT-I-0051
 ## Objective
 
 Implement the missing migration-checker tool (`tools/run_migration_checks.py`) that exercises career-store's migration surface across the four migration cases specified in `tools/TEST_SPEC.md` (lines 47-52). Today the `tool_manifest` declares a `migration_checkers` capability with no implementing tool; this task supplies that real tool so the release gate can prove migrations behave correctly.
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -87,4 +90,4 @@ Binding guidance (approved decision): the tool MUST invoke career-store's PUBLIC
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-14: Codex-driven implementation reviewed + verified. `tools/run_migration_checks.py`: all four cases pass via career-store PUBLIC API (`openCareerStore`, fixed clock); no business logic in the tool (tools_guardrails green). Destructive case is real (facts/evidence row-equality on the copied fixture DB); negative probe confirmed non-zero exit + case name. Deterministic (double-run diff clean). PR 198 + smoke green. Notes: (1) `getMigrationState()` not yet on the store surface (RKIT-A-0001, owned by RKIT-I-0005) — checker probes for it and falls back to read-only DB observation; (2) `tool_manifest.json` registration is owned by REQ-010a/RKIT-T-0016 per this task's own criteria (protected file, password batch). Marking completed.
