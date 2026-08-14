@@ -9,12 +9,23 @@ from typing import Any
 from unicodedata import category as _unicode_category
 from unicodedata import normalize as _unicode_normalize
 
+from .change_operations import (
+    CHANGE_OPERATION_STATUS_TRANSITIONS,
+    append_already_present as _append_already_present,
+    _apply_operation,
+    _apply_preflight_errors,
+    change_validation_shape_errors as _change_validation_shape_errors,
+    grounding_operation_status_errors as _grounding_operation_status_errors,
+    operation_path as _operation_path,
+    operation_status_transition_error as _operation_status_transition_error,
+    pointer_parent_exists as _pointer_parent_exists,
+    pointer_value as _pointer_value,
+)
 from .claim_fields import provenance_index as _provenance_index, weave_claim_fields as _weave_claim_fields
 from .dates import date_key as _parse_date_key, record_date_result as _record_date_result
 from .match_dimensions import _configured_default_weight, _match_dimensions, _score_from_dimensions
 from .match_decision import decide_match, empty_match, match_decision_explanation
 from .matching_config import resolve_matching_config
-from .pointers import _append_already_present, _pointer_parent_exists, _pointer_value, _set_pointer
 from .resume_config import resolve_resume_config
 from .requirement_classification import default_importance, infer_classification
 from .schemas import (
@@ -45,8 +56,6 @@ _VERIFIED_FACT_STATES = {
     VerificationState.USER_VERIFIED.value,
     VerificationState.IMPORTED.value,
 }
-_CHANGE_OPERATION_OPS = {"replace", "rewrite", "insert", "remove", "move"}
-_CHANGE_OPERATION_STATUSES = {status.value for status in ChangeOperationStatus}
 _CONTROL_WHITELIST = {"\n", "\r", "\t"}
 _INVALID_DATE_CODE = "invalid_date"
 _REVERSED_RANGE_CODE = "reversed_range"
@@ -547,26 +556,8 @@ def validateChange(
         errors.append(_issue("missing_field", f"ResumeChangeOperation requires {field_name}.", field_name))
 
     operation_id = str(_item(op, "operation_id", ""))
-    operation_status = str(_item(op, "status", ""))
-    if "status" in op and operation_status not in _CHANGE_OPERATION_STATUSES:
-        errors.append(_issue("invalid_status", "Operation status must be proposed, validated, rejected, applied, accepted, or modified.", "status"))
-    path = _operation_path(op)
-    if not path.startswith("/"):
-        errors.append(_issue("invalid_path", "Operation path must be a JSON pointer.", "path"))
-
-    path_exists, current_value = _pointer_value(resume, path)
-    parent_exists = _pointer_parent_exists(resume, path)
-    operation_kind = str(_item(op, "op", "replace" if path_exists else "insert"))
-    if "op" in op and operation_kind not in _CHANGE_OPERATION_OPS:
-        errors.append(_issue("invalid_op", "Operation op must be insert, move, remove, replace, or rewrite.", "op"))
-    if not parent_exists:
-        errors.append(_issue("invalid_path", "Operation path parent does not exist in the canonical resume.", "path"))
-    if operation_kind == "replace" and not path_exists:
-        errors.append(_issue("missing_target", "Replace operations require an existing target path.", "path"))
-    if operation_kind == "insert" and path_exists and not path.endswith("/-"):
-        errors.append(_issue("target_exists", "Insert operations require a new object member or array append path.", "path"))
-    if "before" in op and _item(op, "before") != current_value and not (_item(op, "before") is None and not path_exists):
-        errors.append(_issue("before_mismatch", "Operation before value does not match current content.", "before"))
+    shape_errors, path, _path_exists, current_value, _operation_kind = _change_validation_shape_errors(resume, op)
+    errors.extend(shape_errors)
 
     requirements = {str(_item(item, "requirement_id")): item for item in _requirements(job) if isinstance(item, dict)}
     linked_requirement_ids = [str(item) for item in _array(_item(op, "linked_requirement_ids", []))]
@@ -623,40 +614,57 @@ def applyChange(working_resume: Any, validated_operation: Any) -> JsonObject:
     operation_id = str(_item(op, "operation_id", "")) if isinstance(op, dict) else ""
     if not isinstance(resume, dict) or not isinstance(op, dict):
         return _result("error", working_resume=copy.deepcopy(resume) if isinstance(resume, dict) else {}, operation_id=operation_id, audit={"applied": False})
-    if _item(op, "status") != ChangeOperationStatus.VALIDATED.value and _item(op, "validation_state") != "validated":
-        return _result("rejected", working_resume=copy.deepcopy(resume), operation_id=operation_id, audit={"applied": False, "reason": "operation_not_validated"})
+    preflight_errors, preflight_reason = _apply_preflight_errors(op)
+    if preflight_errors:
+        return _result(
+            "rejected",
+            working_resume=copy.deepcopy(resume),
+            operation_id=operation_id,
+            errors=preflight_errors,
+            audit={"applied": False, "reason": preflight_reason},
+        )
 
     result_resume = copy.deepcopy(resume)
     path = _operation_path(op)
     before = _item(op, "before")
     after = copy.deepcopy(_item(op, "after"))
+    operation_kind = str(_item(op, "op", "replace"))
     path_exists, current = _pointer_value(result_resume, path)
     if not _pointer_parent_exists(result_resume, path):
         return _result("error", working_resume=result_resume, operation_id=operation_id, audit={"applied": False, "reason": "invalid_path"})
-    if _append_already_present(result_resume, path, after):
+    if operation_kind == "insert" and _append_already_present(result_resume, path, after):
         return _result("ok", working_resume=result_resume, operation_id=operation_id, audit={"applied": False, "already_applied": True, "path": path})
-    if current == after:
+    if operation_kind in {"replace", "rewrite", "insert"} and current == after:
         return _result("ok", working_resume=result_resume, operation_id=operation_id, audit={"applied": False, "already_applied": True})
-    if before != current and not (before is None and not path_exists):
+    if operation_kind == "remove" and not path_exists:
+        return _result("ok", working_resume=result_resume, operation_id=operation_id, audit={"applied": False, "already_applied": True, "path": path})
+    if operation_kind != "move" and before != current and not (before is None and not path_exists):
         return _result("rejected", working_resume=result_resume, operation_id=operation_id, audit={"applied": False, "reason": "before_mismatch"})
-    applied = _set_pointer(result_resume, path, after)
+    applied, result_resume, applied_after, failure_reason = _apply_operation(result_resume, op)
+    if not applied and failure_reason == "already_applied":
+        return _result("ok", working_resume=result_resume, operation_id=operation_id, audit={"applied": False, "already_applied": True, "path": path})
+    if not applied and failure_reason == "before_mismatch":
+        return _result("rejected", working_resume=result_resume, operation_id=operation_id, audit={"applied": False, "reason": failure_reason})
     applied_operation = copy.deepcopy(op)
     if applied:
         applied_operation["status"] = ChangeOperationStatus.APPLIED.value
+    audit = {
+        "applied": applied,
+        "path": path,
+        "before": before,
+        "after": applied_after if applied else None,
+        "linked_fact_ids": _array(_item(op, "linked_fact_ids", [])),
+        "linked_requirement_ids": _array(_item(op, "linked_requirement_ids", [])),
+        "status_transition": "validated->applied" if applied else "not_applied",
+    }
+    if not applied and failure_reason:
+        audit["reason"] = failure_reason
     return _result(
         "ok" if applied else "error",
         working_resume=result_resume,
         operation_id=operation_id,
         applied_operation=applied_operation if applied else None,
-        audit={
-            "applied": applied,
-            "path": path,
-            "before": before,
-            "after": after if applied else None,
-            "linked_fact_ids": _array(_item(op, "linked_fact_ids", [])),
-            "linked_requirement_ids": _array(_item(op, "linked_requirement_ids", [])),
-            "status_transition": "validated->applied" if applied else "not_applied",
-        },
+        audit=audit,
     )
 
 
@@ -705,9 +713,11 @@ def validateFinalResume(
     resume = _unwrap(working_resume, "working_resume")
     config = config or {}
     validation = validateResume(resume)
-    grounding = validateGrounding(resume, career_fact_dtos or [], applied_operations or [], config)
+    operation_status_errors, grounding_operations = _grounding_operation_status_errors(applied_operations or [])
+    grounding = validateGrounding(resume, career_fact_dtos or [], grounding_operations, config)
     scoring = scoreMatch(resume, job_model, career_fact_dtos or [], config)
     errors = list(_item(validation, "errors", []))
+    errors.extend(operation_status_errors)
     errors.extend(_item(scoring, "errors", []))
     if _item(grounding, "status") == "fail":
         errors.extend(_item(grounding, "unsupported_claims", []))
@@ -1383,10 +1393,6 @@ def _facts_support_terms(terms: list[str], fact_index: dict[str, JsonObject], li
             if isinstance(fact, dict) and _fact_allowed(fact, allow_inferred) and _term_in_text(term, _fact_text(fact)):
                 return True
     return False
-
-
-def _operation_path(operation: JsonObject) -> str:
-    return str(_item(operation, "path") or _item(operation, "target_path") or "")
 
 
 def _unresolved_copy(requirement_result: JsonObject) -> JsonObject:

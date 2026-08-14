@@ -389,6 +389,7 @@ class ResumeCoreDomainContractTests(unittest.TestCase):
                 "linked_requirement_ids": ["req_react"],
                 "linked_fact_ids": ["fact_react"],
                 "provenance": [{"source": "test"}],
+                **({"from_path": "/skills/0"} if verb == "move" else {}),
             }
 
         for verb in ("rewrite", "insert", "move"):

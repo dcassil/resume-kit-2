@@ -54,6 +54,12 @@
         "validation_result": {
           "errors": [
             {
+              "code": "missing_linked_fact_ids",
+              "field_path": "linked_fact_ids",
+              "message": "ResumeChangeOperation requires non-empty linked_fact_ids.",
+              "severity": "error"
+            },
+            {
               "code": "unsupported_guarded_claim",
               "details": {
                 "claims": [
@@ -119,6 +125,18 @@
         },
         "validation_result": {
           "errors": [
+            {
+              "code": "missing_linked_requirement_ids",
+              "field_path": "linked_requirement_ids",
+              "message": "ResumeChangeOperation requires non-empty linked_requirement_ids.",
+              "severity": "error"
+            },
+            {
+              "code": "missing_linked_fact_ids",
+              "field_path": "linked_fact_ids",
+              "message": "ResumeChangeOperation requires non-empty linked_fact_ids.",
+              "severity": "error"
+            },
             {
               "code": "unsupported_guarded_claim",
               "details": {
@@ -196,6 +214,18 @@
         "validation_result": {
           "errors": [
             {
+              "code": "missing_linked_requirement_ids",
+              "field_path": "linked_requirement_ids",
+              "message": "ResumeChangeOperation requires non-empty linked_requirement_ids.",
+              "severity": "error"
+            },
+            {
+              "code": "missing_linked_fact_ids",
+              "field_path": "linked_fact_ids",
+              "message": "ResumeChangeOperation requires non-empty linked_fact_ids.",
+              "severity": "error"
+            },
+            {
               "code": "before_mismatch",
               "field_path": "before",
               "message": "Operation before value does not match current content.",
@@ -272,6 +302,18 @@
         "validation_result": {
           "errors": [
             {
+              "code": "missing_linked_requirement_ids",
+              "field_path": "linked_requirement_ids",
+              "message": "ResumeChangeOperation requires non-empty linked_requirement_ids.",
+              "severity": "error"
+            },
+            {
+              "code": "missing_linked_fact_ids",
+              "field_path": "linked_fact_ids",
+              "message": "ResumeChangeOperation requires non-empty linked_fact_ids.",
+              "severity": "error"
+            },
+            {
               "code": "before_mismatch",
               "field_path": "before",
               "message": "Operation before value does not match current content.",
@@ -347,6 +389,18 @@
         },
         "validation_result": {
           "errors": [
+            {
+              "code": "missing_linked_requirement_ids",
+              "field_path": "linked_requirement_ids",
+              "message": "ResumeChangeOperation requires non-empty linked_requirement_ids.",
+              "severity": "error"
+            },
+            {
+              "code": "missing_linked_fact_ids",
+              "field_path": "linked_fact_ids",
+              "message": "ResumeChangeOperation requires non-empty linked_fact_ids.",
+              "severity": "error"
+            },
             {
               "code": "unsupported_guarded_claim",
               "details": {

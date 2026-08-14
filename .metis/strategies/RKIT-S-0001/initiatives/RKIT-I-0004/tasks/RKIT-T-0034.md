@@ -4,14 +4,14 @@ level: task
 title: "Operation lifecycle enforcement: mandatory fields, verb semantics, status machine"
 short_code: "RKIT-T-0034"
 created_at: 2026-08-14T22:54:23.763323+00:00
-updated_at: 2026-08-14T22:54:23.763323+00:00
+updated_at: 2026-08-14T22:56:56.223964+00:00
 parent: resume-core-grounded-change
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0004
 ## Objective
 
 Enforce the section 4.5 operation lifecycle in `resume-core`: `validateChange` rejects operations missing `reason`, `linked_requirement_ids`, `linked_fact_ids`, or `provenance`; the full status machine (proposed → validated → applied → accepted/modified, validated → rejected, invalid transitions are typed errors) is implemented; all five verbs (replace/rewrite/insert/remove/move) have defined, tested apply semantics; and `applyChange` refuses operations missing mandatory fields (RKIT-I-0004 Requirement 6, RKIT-A-0006 item 3).
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -61,4 +63,5 @@ Rationale: status-machine and enforcement semantics are load-bearing for every l
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-14: Task activated in continuous mode (session resuming from HANDOFF). Codex agent launched with binding decisions from the initiative's Detailed Design (transition table constant; final-validation filters to applied/accepted/modified with typed error otherwise; per-field error codes). Prompt at scratchpad t0034-prompt.md. Awaiting report; driver will review diff, independently probe the status machine, and run both gates before commit.
+- 2026-08-14: Implementation complete in working tree. Added internal `resume_core.change_operations` lifecycle helper module with explicit transition table, mandatory-field validation, verb-specific apply semantics, and final-validation applied-operation status filtering. `domain.py` delegates lifecycle mechanics to keep resume-core guardrails green. Added `tests/unit/test_operation_lifecycle_enforcement.py`; strengthened existing unit/contract move fixtures for `from_path`; regenerated `fixtures/expected/rejected-operations.json` for the new mandatory-field errors. Verification green: PR gate 307 tests OK, smoke gate OK, unit discovery 94 tests OK, snapshot regeneration stable by repeated diff checksum. Straight Jacket still reports pre-existing checksum mismatches in protected `tools/pre-commit-resume-cli-guardrails.sh` and `tools/run_tests.py`; neither was edited in this task.

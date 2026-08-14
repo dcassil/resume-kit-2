@@ -59,11 +59,15 @@ def _operation(op: str = "replace", status: str = "proposed") -> dict:
         path = "/skills/0"
         before = "React"
         after = None
+    elif op == "move":
+        path = "/skills/-"
+        before = "React"
+        after = "React"
     else:
         path = "/skills/0"
         before = "React"
         after = "React"
-    return {
+    operation = {
         "schema_version": "resume-change-operation.v1",
         "operation_id": f"op_{op}_{status}",
         "status": status,
@@ -76,6 +80,9 @@ def _operation(op: str = "replace", status: str = "proposed") -> dict:
         "linked_fact_ids": ["fact_react"],
         "provenance": [{"source": "unit", "text": "React"}],
     }
+    if op == "move":
+        operation["from_path"] = "/skills/0"
+    return operation
 
 
 class ChangeOperationStructuralTests(unittest.TestCase):
@@ -106,10 +113,14 @@ class ChangeOperationStructuralTests(unittest.TestCase):
             expected_statuses,
         )
 
-        for status in sorted(expected_statuses):
+        result = resume_core.validateChange(CANONICAL_RESUME, _operation("replace", "proposed"), JOB_MODEL, CAREER_FACTS, {})
+        self.assertEqual(result.get("status"), "ok", result)
+
+        for status in sorted(expected_statuses - {"proposed"}):
             with self.subTest(status=status):
                 result = resume_core.validateChange(CANONICAL_RESUME, _operation("replace", status), JOB_MODEL, CAREER_FACTS, {})
-                self.assertEqual(result.get("status"), "ok", result)
+                self.assertEqual(result.get("status"), "rejected", result)
+                self.assertIn("invalid_status_transition", {error.get("code") for error in result.get("errors", [])})
 
     def test_invalid_status_is_rejected_with_invalid_status(self):
         operation = _operation("replace")
