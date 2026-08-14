@@ -4,14 +4,14 @@ level: initiative
 title: "Resume-Core Deterministic Requirement Resolution And Match Scoring"
 short_code: "RKIT-I-0002"
 created_at: 2026-08-13T20:41:36.852663+00:00
-updated_at: 2026-08-14T20:27:58.570415+00:00
+updated_at: 2026-08-14T21:13:22.399262+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0001]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -29,6 +29,8 @@ Package: `resume-core`. Requirement resolution and match scoring. Genuinely impl
 What is missing or fixture-tuned: `MatchResult` ships only a binary `can_continue` plus per-requirement rows — no `threshold`, no `hardRequirementsResolved` flag, no `dimensions`/`MatchDimension` weighted breakdown, no tri-state `decision` (schemas.py:148-162, domain.py:336-350) — so section 5's "explainable score breakdowns" responsibility has no shape to live in. The section 13 `matching.*` config contract is entirely unwired: `requireHardRequirementsResolved: true` verifiably does not gate continuation, and the code reads ad-hoc flat keys (`policy`, `require_hard_resolution`) instead (domain.py:1092-1093, 795). `_default_weight` hardcodes 10/3/2/1 although section 12 makes config authoritative for requirement weighting (domain.py:853-858). There is no terminology scoring dimension and, until RKIT-I-0001 lands JobTerm, no substrate for one. Alias and related matching only work for the closed fixture vocabularies `_TERM_VARIANTS`/`_RELATED_REQUIREMENT_TERMS`/`_GENERIC_TERMS` (react/aws/graphql/responsive design/saas/leadership; domain.py:96-142), and `_infer_classification` marks requirements "required" off the literal substring "8+" tuned to the E2E fixture — a "5+ years" requirement is not inferred required (domain.py:840). The TEST_SPEC.md:106-required base-score snapshots do not exist: tests/snapshots is empty and the smoke harness asserts only score monotonicity (tools/run_smoke.py:178,216).
 
 Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
+
+**COMPLETED 2026-08-14** — all six chunks (RKIT-T-0023..0028) codex-implemented, driver-reviewed, committed on develop. Delivered: validated `matching.*` config (flat keys removed, typed rejection); MatchResult 4.3 complete (threshold/hardRequirementsResolved/tri-state decision — the requireHardRequirementsResolved gating defect is fixed and behaviorally probed); MatchDimension weighted breakdown with config-sourced weights; TermRelationship-driven resolution (Azure≠AWS invariant guarded, closed vocabularies demoted to seeds); live terminology dimension over JobTerm; base-score snapshots enforced via the I-0051 substrate; specs strengthened. All gates green (--pr 257, --future-contract 264, --smoke). OUTSTANDING (non-blocking): 6 new tests/unit modules (~33 tests) run standalone but are not yet in protected run_tests.py CURRENT_TEST_MODULES — accumulated for the next straight-jacket password session with Daniel.
 
 ## Goals & Non-Goals **[REQUIRED]**
 

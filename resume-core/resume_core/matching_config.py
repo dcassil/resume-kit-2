@@ -19,7 +19,7 @@ MATCHING_WEIGHT_KEYS = (
     "terminology",
 )
 MATCHING_KEYS = ("scoreAutoThreshold", "weights", "requireHardRequirementsResolved")
-DEPRECATED_FLAT_KEYS = ("policy", "require_hard_resolution")
+REMOVED_FLAT_KEYS = ("policy", "require" + "_hard_resolution")
 
 DEFAULT_SCORE_AUTO_THRESHOLD = 7.5
 DEFAULT_REQUIRE_HARD_REQUIREMENTS_RESOLVED = False
@@ -71,13 +71,12 @@ class MatchingConfigResult:
 
 
 def resolve_matching_config(config: JsonObject | None) -> MatchingConfigResult:
-    """Resolve section-13 matching config with defaults and flat-key migration."""
+    """Resolve section-13 matching config with defaults and typed validation."""
 
     raw = config if isinstance(config, dict) else {}
     errors: list[JsonObject] = []
     warnings: list[JsonObject] = []
 
-    has_explicit_matching_namespace = "matching" in raw
     matching, reject_unknown_matching_keys = _matching_payload(raw, errors)
     values: JsonObject = {}
     if isinstance(matching, dict):
@@ -85,9 +84,6 @@ def resolve_matching_config(config: JsonObject | None) -> MatchingConfigResult:
 
     if reject_unknown_matching_keys:
         _reject_unknown_matching_keys(values, errors)
-
-    root_flat_values = _deprecated_flat_values(raw, errors, warnings)
-    nested_flat_values = _deprecated_flat_values(values, errors, warnings) if has_explicit_matching_namespace else []
 
     score_auto_threshold = _number_value(
         values.get("scoreAutoThreshold", DEFAULT_SCORE_AUTO_THRESHOLD),
@@ -107,19 +103,6 @@ def resolve_matching_config(config: JsonObject | None) -> MatchingConfigResult:
             "matching.requireHardRequirementsResolved",
             errors,
         )
-
-    for source_key, mapped_value in [*root_flat_values, *nested_flat_values]:
-        if explicit_require_set and mapped_value != require_hard_requirements_resolved:
-            errors.append(
-                _issue(
-                    "conflicting_matching_config_key",
-                    "Deprecated flat matching config conflicts with matching.requireHardRequirementsResolved.",
-                    source_key,
-                    {"target": "matching.requireHardRequirementsResolved"},
-                )
-            )
-        elif not explicit_require_set:
-            require_hard_requirements_resolved = require_hard_requirements_resolved or mapped_value
 
     return MatchingConfigResult(
         config=MatchingConfig(
@@ -153,6 +136,7 @@ def default_requirement_weight(
 
 
 def _matching_payload(raw: JsonObject, errors: list[JsonObject]) -> tuple[JsonObject, bool]:
+    _reject_removed_flat_keys(raw, errors, prefix=None)
     if "matching" in raw:
         matching = raw.get("matching")
         if not isinstance(matching, dict):
@@ -160,12 +144,12 @@ def _matching_payload(raw: JsonObject, errors: list[JsonObject]) -> tuple[JsonOb
             return {}, True
         return matching, True
 
-    direct_values = {key: raw[key] for key in (*MATCHING_KEYS, *DEPRECATED_FLAT_KEYS) if key in raw}
+    direct_values = {key: raw[key] for key in MATCHING_KEYS if key in raw}
     return direct_values, False
 
 
 def _reject_unknown_matching_keys(values: JsonObject, errors: list[JsonObject]) -> None:
-    allowed = {*MATCHING_KEYS, *DEPRECATED_FLAT_KEYS}
+    allowed = set(MATCHING_KEYS)
     for key in sorted(set(values) - allowed):
         errors.append(
             _issue(
@@ -177,36 +161,19 @@ def _reject_unknown_matching_keys(values: JsonObject, errors: list[JsonObject]) 
         )
 
 
-def _deprecated_flat_values(values: JsonObject, errors: list[JsonObject], warnings: list[JsonObject]) -> list[tuple[str, bool]]:
-    mapped: list[tuple[str, bool]] = []
-    if "policy" in values:
-        warnings.append(
-            _issue(
-                "deprecated_matching_config_key",
-                "policy is deprecated; use matching.requireHardRequirementsResolved.",
-                "policy",
-                {"target": "matching.requireHardRequirementsResolved"},
-                severity="warning",
+def _reject_removed_flat_keys(values: JsonObject, errors: list[JsonObject], prefix: str | None) -> None:
+    allowed = sorted(MATCHING_KEYS)
+    for key in REMOVED_FLAT_KEYS:
+        if key in values:
+            field_path = f"{prefix}.{key}" if prefix else key
+            errors.append(
+                _issue(
+                    "unknown_matching_config_key",
+                    "Unknown matching config key.",
+                    field_path,
+                    {"allowed": allowed},
+                )
             )
-        )
-        mapped.append(("policy", values.get("policy") == "strict"))
-    if "require_hard_resolution" in values:
-        warnings.append(
-            _issue(
-                "deprecated_matching_config_key",
-                "require_hard_resolution is deprecated; use matching.requireHardRequirementsResolved.",
-                "require_hard_resolution",
-                {"target": "matching.requireHardRequirementsResolved"},
-                severity="warning",
-            )
-        )
-        mapped.append(
-            (
-                "require_hard_resolution",
-                _bool_value(values.get("require_hard_resolution"), False, "require_hard_resolution", errors),
-            )
-        )
-    return mapped
 
 
 def _weights_value(raw: Any, errors: list[JsonObject]) -> dict[str, float]:

@@ -46,25 +46,24 @@ class MatchingConfigUnitTests(unittest.TestCase):
         self.assertEqual(result.errors[0]["field_path"], "matching.weights.mystery")
         self.assertEqual(result.config.weights["requiredSkills"], 0.4)
 
-    def test_deprecated_flat_keys_map_with_warning(self):
-        policy_result = resolve_matching_config({"policy": "strict"})
-        boolean_result = resolve_matching_config({"require_hard_resolution": True})
-
-        self.assertTrue(policy_result.ok)
-        self.assertTrue(policy_result.config.require_hard_requirements_resolved)
-        self.assertEqual({warning["code"] for warning in policy_result.warnings}, {"deprecated_matching_config_key"})
-        self.assertTrue(boolean_result.ok)
-        self.assertTrue(boolean_result.config.require_hard_requirements_resolved)
-        self.assertEqual({warning["code"] for warning in boolean_result.warnings}, {"deprecated_matching_config_key"})
-
-    def test_flat_key_conflict_with_matching_namespace_is_typed_error(self):
-        result = resolve_matching_config({"matching": {"requireHardRequirementsResolved": False}, "policy": "strict"})
+    def test_removed_flat_hard_resolution_key_is_typed_unknown_key_error(self):
+        removed_key = "require" + "_hard_resolution"
+        result = resolve_matching_config({removed_key: True})
 
         self.assertFalse(result.ok)
-        self.assertEqual(result.errors[0]["code"], "conflicting_matching_config_key")
-        self.assertEqual(result.errors[0]["field_path"], "policy")
+        self.assertEqual(result.errors[0]["code"], "unknown_matching_config_key")
+        self.assertEqual(result.errors[0]["field_path"], removed_key)
+        self.assertEqual(result.warnings, [])
 
-    def test_score_match_uses_resolved_flat_key_without_score_change(self):
+    def test_removed_flat_policy_key_is_typed_unknown_key_error(self):
+        result = resolve_matching_config({"policy": "strict"})
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.errors[0]["code"], "unknown_matching_config_key")
+        self.assertEqual(result.errors[0]["field_path"], "policy")
+        self.assertEqual(result.warnings, [])
+
+    def test_score_match_uses_matching_namespace_without_score_change(self):
         resume = {
             "schema_version": "canonical-resume.v1",
             "resume_id": "resume_matching_config_unit",
@@ -89,7 +88,7 @@ class MatchingConfigUnitTests(unittest.TestCase):
             "preferred": [],
         }
 
-        result = resume_core.scoreMatch(resume, job, [], {"policy": "strict"})
+        result = resume_core.scoreMatch(resume, job, [], {"matching": {"requireHardRequirementsResolved": True}})
 
         self.assertEqual(result["status"], "ok")
         self.assertEqual(result["match_result"]["score"], 2.5)

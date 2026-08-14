@@ -398,7 +398,7 @@ def _default_config() -> JsonObject:
     return {
         "config_version": CONFIG_VERSION,
         "schema_versions": _schema_versions(),
-        "matching": {"requireHardRequirementsResolved": True, "require_hard_resolution": True},
+        "matching": {"requireHardRequirementsResolved": True},
     }
 
 

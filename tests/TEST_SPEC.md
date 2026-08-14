@@ -179,7 +179,8 @@ Validate the full product behavior:
 - Freeze time where IDs/timestamps affect output.
 - Record package versions, schema versions, model config, config hash, and renderer template version.
 - Run official scoring twice and assert identical results.
-- Snapshot expected deterministic outputs.
+- Assert section-4.3 `MatchResult` fields strictly: `threshold`, `hardRequirementsResolved`, tri-state `decision`, derived `can_continue`, and full `dimensions` in addition to scores and requirement results.
+- Snapshot expected deterministic outputs, including match-result score, threshold, decision, hard-requirement state, and dimensions for smoke/E2E match fixtures.
 - Keep language-model phrasing assertions tolerant, but keep structured fields strict.
 
 ## Pass/Fail Policy
@@ -197,3 +198,4 @@ Release is blocked by:
 - lost learned facts between jobs,
 - duplicate questions for verified facts without legitimate reason,
 - false resolution of unresolved hard requirement.
+- accepting removed flat matching config keys such as `policy` or `require_hard_resolution` instead of requiring the section-13 `matching.*` vocabulary and typed unknown-key rejection.

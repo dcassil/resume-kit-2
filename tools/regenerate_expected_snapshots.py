@@ -20,7 +20,7 @@ from typing import Any
 CONFIG_HASH = "fixture-config-v1"
 SNAPSHOT_SCHEMA_VERSION = "expected-snapshot-data-blocks.v1"
 FIXTURE_CONFIG = {
-    "policy": "strict",
+    "matching": {"requireHardRequirementsResolved": True},
     "requirement_id_prefix": "fixture_req",
     "section_order": ["basics", "summary", "skills", "experience", "education"],
     "max_experience": 2,

@@ -45,7 +45,8 @@ Relevant contract surfaces:
   - Unparseable but not impossible date text remains an ambiguity warning, not a typed rejection.
 - `JobModel` section-4.2 normalization deterministically populates `seniority`, `industries`, `domains`, separate `requirements` and `preferred` arrays, and `terminology: JobTerm[]`. Each `JobTerm` has non-empty `surface`, normalized `canonical`, source in `{title, requirement, description}`, and numeric `weight`; repeated normalization of identical input must produce identical output.
 - `normalizeResume` wraps meaningful claims as per-claim `ResumeField` values. A source-backed claim preserves matching provenance and its valid verification state; a sourceless or malformed-provenance claim defaults to `provenance: []` and `verification_state: unknown`, never a silent `source_stated`.
-- Section-13 matching config is resolved through `resume_core.matching_config.resolve_matching_config`: `matching.scoreAutoThreshold`, `matching.weights.{requiredSkills,experience,roleAlignment,domainIndustry,preferredSkills,terminology}`, and `matching.requireHardRequirementsResolved` are validated with deterministic defaults; unknown keys inside `matching` or `matching.weights` reject with typed config errors; flat `policy` and `require_hard_resolution` remain accepted with deprecation warnings during the migration window and conflict with their matching namespace equivalent rejects.
+- Section-4.3 `MatchResult` output includes `score`, `max_score`, `score_percent`, `threshold`, `hardRequirementsResolved`, tri-state `decision` in `{continue, resolve_gaps, blocked}`, derived `can_continue`, `dimensions`, `requirement_results`, `unresolved_requirement_ids`, `preferred_unresolved_requirement_ids`, and `algorithm_version`; executable tests must assert these fields rather than treating continuation as a binary-only result.
+- Section-13 matching config is resolved through `resume_core.matching_config.resolve_matching_config`: `matching.scoreAutoThreshold`, `matching.weights.{requiredSkills,experience,roleAlignment,domainIndustry,preferredSkills,terminology}`, and `matching.requireHardRequirementsResolved` are the supported vocabulary with deterministic defaults; unknown keys inside `matching` or `matching.weights` reject with typed `unknown_matching_config_key` errors; removed flat keys such as `policy` and `require_hard_resolution` reject instead of mapping to matching config.
 
 ## Expected Structure
 
@@ -122,6 +123,7 @@ Future implementation may decompose internally, but tests should assume public A
 - Run the same resume/job/fact/config input twice and assert identical `MatchResult`.
 - Assert score dimensions add/explain consistently.
 - Assert each match dimension entry carries name, weight, score, contribution, and real requirement/fact evidence refs.
+- Assert every `MatchResult` carries section-4.3 fields: `threshold`, `hardRequirementsResolved`, tri-state `decision`, derived `can_continue`, and full `dimensions`.
 - Assert the terminology dimension scores the fraction of `JobModel.terminology` terms whose job-surface form appears in normalized resume claim text using exact word-boundary matching; canonical-only matches are evidence only and do not count toward the fraction.
 - Assert empty `JobModel.terminology` is neutral with terminology score `1.0` and no evidence.
 - Assert unresolved hard requirements dominate overall continuation decision even if numeric score is high.
@@ -131,9 +133,9 @@ Future implementation may decompose internally, but tests should assume public A
 ### Matching config
 
 - Resolve default section-13 matching config from absent config.
-- Reject unknown keys inside `matching` and `matching.weights` with typed config errors.
-- Map flat `policy: strict` and `require_hard_resolution: true` to `matching.requireHardRequirementsResolved` with deprecation warnings.
-- Reject conflicting flat and namespaced hard-requirement settings.
+- Resolve the section-13 `matching.*` vocabulary: `matching.scoreAutoThreshold`, `matching.requireHardRequirementsResolved`, and `matching.weights.{requiredSkills,experience,roleAlignment,domainIndustry,preferredSkills,terminology}`.
+- Reject unknown keys inside `matching` and `matching.weights` with typed `unknown_matching_config_key` errors.
+- Reject removed flat keys such as `policy` and `require_hard_resolution` with typed `unknown_matching_config_key` errors.
 - Keep scoring behavior stable while routing scoring config reads through the resolved matching config.
 
 ### Selection planning

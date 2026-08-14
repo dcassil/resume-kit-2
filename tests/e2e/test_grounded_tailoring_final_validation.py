@@ -73,7 +73,7 @@ CAREER_FACTS = [
     }
 ]
 
-CONFIG = {"policy": "strict"}
+CONFIG = {"matching": {"requireHardRequirementsResolved": True}}
 
 
 def maybe_await(value):

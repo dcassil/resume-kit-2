@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SURFACE = json.loads((ROOT / "resume-core" / "core_surface.json").read_text(encoding="utf-8"))
 PUBLIC_FUNCTIONS = tuple(SURFACE["public_api"]["functions"])
 PUBLIC_TYPES = tuple(SURFACE["public_api"]["types"])
+MATCHING_STRICT_CONFIG = {"matching": {"requireHardRequirementsResolved": True}}
 
 
 CANONICAL_RESUME = {
@@ -159,8 +160,8 @@ class ResumeCoreDomainContractTests(unittest.TestCase):
         self.assertIn("React", first.get("text", ""))
 
     def test_scoring_is_deterministic_and_keeps_missing_preferred_distinct(self):
-        first = maybe_await(self.core.scoreMatch(CANONICAL_RESUME, JOB_MODEL, CAREER_FACTS, {"policy": "strict"}))
-        second = maybe_await(self.core.scoreMatch(CANONICAL_RESUME, JOB_MODEL, CAREER_FACTS, {"policy": "strict"}))
+        first = maybe_await(self.core.scoreMatch(CANONICAL_RESUME, JOB_MODEL, CAREER_FACTS, MATCHING_STRICT_CONFIG))
+        second = maybe_await(self.core.scoreMatch(CANONICAL_RESUME, JOB_MODEL, CAREER_FACTS, MATCHING_STRICT_CONFIG))
         self.assertEqual(first, second)
         self.assertIn("match_result", first)
         match = first["match_result"]
@@ -449,7 +450,7 @@ class ResumeCoreDomainContractTests(unittest.TestCase):
         self.assertNotIn("staff software engineer", serialized(CANONICAL_RESUME))
 
     def test_final_validation_reports_grounding_and_match_result_without_rendering(self):
-        result = maybe_await(self.core.validateFinalResume(CANONICAL_RESUME, JOB_MODEL, CAREER_FACTS, {"policy": "strict"}))
+        result = maybe_await(self.core.validateFinalResume(CANONICAL_RESUME, JOB_MODEL, CAREER_FACTS, MATCHING_STRICT_CONFIG))
         self.assertIn(result.get("status"), {"pass", "fail", "error"})
         self.assertIn("match_result", result)
         text = serialized(result)

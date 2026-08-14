@@ -4,14 +4,14 @@ level: task
 title: "Chunk 6: Base-score snapshots on I-0051 substrate, TEST_SPEC strengthening, flat-key removal"
 short_code: "RKIT-T-0028"
 created_at: 2026-08-14T19:46:11.403175+00:00
-updated_at: 2026-08-14T19:46:11.403175+00:00
+updated_at: 2026-08-14T21:13:01.391402+00:00
 parent: resume-core-deterministic
-blocked_by: ["RKIT-T-0027"]
+blocked_by: [RKIT-T-0027]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,10 @@ initiative_id: RKIT-I-0002
 ## Objective
 
 Close out the initiative: record base-score snapshots for the smoke and E2E fixtures on the I-0051 snapshot substrate (approved decision: reuse the envelope/generator/comparison-test machinery, not a separate suite), strengthen the specs so the section 4.3 fields and section 13 `matching.*` keys are explicitly required (their absence is what certified binary `can_continue` with ad-hoc config), remove the deprecated flat config keys after migrating all in-repo callers (approved decision: remove at end of I-0002), and verify the initiative's guarded invariants hold end-to-end.
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -78,4 +82,8 @@ Codex-exec: yes with a tight prompt; the flat-key removal sweep needs a careful 
 
 ## Status Updates
 
-*To be added during implementation*
+### 2026-08-14 Chunk 6 implementation
+- Confirmed existing expected match envelopes cover Job A initial, post-AWS, post-GraphQL, final, and Job B initial match results; snapshot comparison asserts full MatchResult data including scores, threshold, hardRequirementsResolved, decision, and dimensions.
+- Removed deprecated flat matching config mapping and migrated matching-config producers in generator, CLI default config, contract tests, and E2E config to `matching.requireHardRequirementsResolved`.
+- Added unit coverage for removed flat-key unknown-key rejection and strengthened non-protected test specs.
+- Focused unit and snapshot comparison checks passed; full gates still pending.
