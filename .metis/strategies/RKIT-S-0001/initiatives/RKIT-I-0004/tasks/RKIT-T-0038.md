@@ -4,14 +4,14 @@ level: task
 title: "Adversarial honesty suite, TEST_SPEC strengthening, unit-module gate wiring"
 short_code: "RKIT-T-0038"
 created_at: 2026-08-14T22:54:23.957714+00:00
-updated_at: 2026-08-14T23:45:30.474365+00:00
+updated_at: 2026-08-14T23:55:05.798177+00:00
 parent: resume-core-grounded-change
 blocked_by: [RKIT-T-0037]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0004
 ## Objective
 
 Close out RKIT-I-0004's Testing Strategy: a consolidated adversarial honesty suite beyond fixtures, per-claim provenance tests, the full operation-lifecycle matrix, TEST_SPEC.md strengthening (mandatory operation fields enumerated, replacing the stale reason reference at TEST_SPEC.md:128), and wiring this initiative's new unit modules into the protected `run_tests.py` gate list (add-only, per the warn-only-hook workflow).
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
