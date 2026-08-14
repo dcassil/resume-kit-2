@@ -4,16 +4,15 @@ level: task
 title: "Schema-backed validateResume against exported constants (resume_id, source)"
 short_code: "RKIT-T-0006"
 created_at: 2026-08-14T03:12:22.551383+00:00
-updated_at: 2026-08-14T03:12:22.551383+00:00
+updated_at: 2026-08-14T15:53:40.210981+00:00
 parent: resume-core-canonical-contracts
-blocked_by: ["RKIT-T-0003"]
+blocked_by: [RKIT-T-0003]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -30,6 +29,10 @@ initiative_id: RKIT-I-0001
 ## Objective
 
 Make `validateResume` enforce the full canonical required-field contract by driving its presence check off the exported `CANONICAL_RESUME_SCHEMA['required']` constant rather than a hand-picked subset. This closes the gap where `resume_id` and `source` — required by the schema — are silently unvalidated today, so structural validation and the exported schema constant can never drift apart again.
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -84,4 +87,4 @@ Codex-exec autonomously implementable: yes — the change is well-scoped to two 
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-14: Implemented `validateResume` required-field enforcement from `CANONICAL_RESUME_SCHEMA["required"]`; added regression coverage for missing `resume_id`/`source`, normalize-then-validate, and `verification_state="imported"`.

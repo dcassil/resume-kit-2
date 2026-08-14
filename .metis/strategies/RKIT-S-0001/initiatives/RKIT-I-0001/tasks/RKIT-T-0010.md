@@ -4,16 +4,15 @@ level: task
 title: "Resume-core TEST_SPEC unit suites and spec-strengthening for restored contracts"
 short_code: "RKIT-T-0010"
 created_at: 2026-08-14T03:12:22.710865+00:00
-updated_at: 2026-08-14T03:12:22.710865+00:00
+updated_at: 2026-08-14T16:12:04.993791+00:00
 parent: resume-core-canonical-contracts
-blocked_by: ["RKIT-T-0005","RKIT-T-0006","RKIT-T-0007","RKIT-T-0008","RKIT-T-0009"]
+blocked_by: [RKIT-T-0005, RKIT-T-0006, RKIT-T-0007, RKIT-T-0008, RKIT-T-0009]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -30,6 +29,10 @@ initiative_id: RKIT-I-0001
 ## Objective
 
 This task pins every behavior restored by RKIT-I-0001 with resume-core unit assertions and matching TEST_SPEC.md entries, so the canonical contracts are locked by tests beyond the shared-DTO contract test. It is authored last, after the behavior tasks land, so its assertions target the real restored signatures rather than anticipated ones — turning the initiative's restored guarantees into an enforceable, regression-proof test surface.
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

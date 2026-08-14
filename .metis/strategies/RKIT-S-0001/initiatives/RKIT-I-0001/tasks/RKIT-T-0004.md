@@ -4,16 +4,15 @@ level: task
 title: "Realign shared-DTO contract test and surface manifests to restored enum/field sets"
 short_code: "RKIT-T-0004"
 created_at: 2026-08-14T03:12:22.465126+00:00
-updated_at: 2026-08-14T03:12:22.465126+00:00
+updated_at: 2026-08-14T16:12:01.908600+00:00
 parent: resume-core-canonical-contracts
-blocked_by: ["RKIT-T-0003","RKIT-T-0005","RKIT-T-0008"]
+blocked_by: [RKIT-T-0003, RKIT-T-0005, RKIT-T-0008]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -30,6 +29,10 @@ initiative_id: RKIT-I-0001
 ## Objective
 
 This task realigns the protected shared-DTO contract test (and, if needed, the resume-core surface manifest) so the contract gate asserts the A-0006 target enum and required-field sets rather than the currently drifted ones. It closes the loop on the enum/shape restoration work by making the gate that guards those DTOs reflect the documented contract, ensuring downstream consumers can rely on a stable, correctly-gated shared-DTO surface.
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

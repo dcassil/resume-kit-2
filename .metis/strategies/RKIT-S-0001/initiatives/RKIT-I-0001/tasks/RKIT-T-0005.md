@@ -4,16 +4,15 @@ level: task
 title: "Restore ResumeChangeOperation shape with structural field validation"
 short_code: "RKIT-T-0005"
 created_at: 2026-08-14T03:12:22.511401+00:00
-updated_at: 2026-08-14T03:12:22.511401+00:00
+updated_at: 2026-08-14T16:12:02.658316+00:00
 parent: resume-core-canonical-contracts
-blocked_by: ["RKIT-T-0003"]
+blocked_by: [RKIT-T-0003]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -30,6 +29,10 @@ initiative_id: RKIT-I-0001
 ## Objective
 
 Restore the `ResumeChangeOperation` DTO in resume-core to its canonical A-0006 / section-4.5 shape and enforce STRUCTURAL validation only in `validateChange`. This re-establishes the change-operation contract (verb set, status set, mandatory grounding fields) that downstream edit/apply machinery in RKIT-I-0004 will build transition and grounding semantics on top of, without prematurely importing that behavior here.
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

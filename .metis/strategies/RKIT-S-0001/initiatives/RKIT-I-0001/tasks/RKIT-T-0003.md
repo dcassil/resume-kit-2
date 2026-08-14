@@ -4,16 +4,15 @@ level: task
 title: "Restore canonical enums + cross-package reader/conflict-record migration"
 short_code: "RKIT-T-0003"
 created_at: 2026-08-14T03:10:17.492366+00:00
-updated_at: 2026-08-14T03:10:17.492366+00:00
+updated_at: 2026-08-14T16:12:00.488698+00:00
 parent: resume-core-canonical-contracts
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -30,6 +29,10 @@ initiative_id: RKIT-I-0001
 ## Objective
 
 Realign the two shared enums in `resume-core/resume_core/schemas.py` (`VerificationState`, `ResolutionState`) to the A-0006 canonical target sets and, in the same lockstep task, reconcile every reader across BOTH resume-core and career-store. This is the load-bearing substrate for the entire resume-core contract chain: because `career_store.VerificationState` IS `resume_core.VerificationState` (identity asserted at `test_shared_dto_schemas_contract.py:78`), the enum edit and its cross-package readers must land together or the tree will not import.
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

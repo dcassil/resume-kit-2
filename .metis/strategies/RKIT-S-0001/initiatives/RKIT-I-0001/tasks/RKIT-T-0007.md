@@ -4,16 +4,15 @@ level: task
 title: "Replace warn-only date handling with canonicalization and typed rejection"
 short_code: "RKIT-T-0007"
 created_at: 2026-08-14T03:12:22.590745+00:00
-updated_at: 2026-08-14T03:12:22.590745+00:00
+updated_at: 2026-08-14T16:00:37.634928+00:00
 parent: resume-core-canonical-contracts
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -30,6 +29,10 @@ initiative_id: RKIT-I-0001
 ## Objective
 
 Replace the current regex warn-only date path in `resume-core` with the A-0006 / REQ-6 canonicalization-and-typed-rejection behavior, so date handling becomes a first-class part of the canonical contracts instead of silently coercing bad input. This task delivers stable `YYYY[-MM]` canonical keys for the four accepted input shapes, adds typed rejection for impossible dates and reversed ranges (new behavior), and preserves ambiguous-but-possible normalization as a warning — giving downstream consumers a deterministic, trustworthy date contract.
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -87,4 +90,4 @@ No task dependencies — startable once the initiative is active. Note the seman
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-14: Implemented date parsing/canonicalization with typed `invalid_date` and `reversed_range` validation. Added focused unit coverage for ambiguous-but-possible dates, impossible months, reversed ranges, canonical clean dates, present/current sentinels, and unparseable strings. Verified `python3 tools/run_gate.py --pr --root .` passes with `Ran 194 tests in 6.744s OK`.

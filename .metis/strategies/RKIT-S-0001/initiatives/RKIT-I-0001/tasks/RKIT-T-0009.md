@@ -4,16 +4,15 @@ level: task
 title: "Weave claim-level ResumeField provenance and verification through normalizeResume"
 short_code: "RKIT-T-0009"
 created_at: 2026-08-14T03:12:22.672535+00:00
-updated_at: 2026-08-14T03:12:22.672535+00:00
+updated_at: 2026-08-14T16:06:25.575081+00:00
 parent: resume-core-canonical-contracts
-blocked_by: ["RKIT-T-0003","RKIT-T-0006"]
+blocked_by: [RKIT-T-0003, RKIT-T-0006]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -30,6 +29,10 @@ initiative_id: RKIT-I-0001
 ## Objective
 
 This task upgrades `normalizeResume` from copy-only provenance handling to real per-claim `ResumeField` provenance/verification weaving, so that every atomic claim (experience bullet, skill entry, summary line) carries a value, a stable `claim_id`, a provenance list, and a `verification_state`. This per-claim substrate is the single most load-bearing RKIT-I-0001 deliverable for RKIT-I-0004's per-claim honesty gate (REQ-5): without it, the downstream honesty enforcement has no per-claim structure to read.
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

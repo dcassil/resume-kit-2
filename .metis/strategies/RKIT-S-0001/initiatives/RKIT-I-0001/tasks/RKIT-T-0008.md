@@ -4,16 +4,15 @@ level: task
 title: "Complete JobModel section 4.2 shape and JobTerm substrate with deterministic population"
 short_code: "RKIT-T-0008"
 created_at: 2026-08-14T03:12:22.631416+00:00
-updated_at: 2026-08-14T03:12:22.631416+00:00
+updated_at: 2026-08-14T16:12:03.416473+00:00
 parent: resume-core-canonical-contracts
-blocked_by: ["RKIT-T-0003"]
+blocked_by: [RKIT-T-0003]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -30,6 +29,10 @@ initiative_id: RKIT-I-0001
 ## Objective
 
 This task completes the `JobModel` DTO to the canonical section-4.2 shape and introduces the `JobTerm` substrate that does not exist today, so the job side of the contract carries seniority, industries, domains, a distinct top-level `preferred[]` array, and a terminology surface. It matters because downstream scoring (RKIT-I-0002) and alignment (RKIT-I-0004) consume this shape, and shipping only the deterministic data structure now unblocks that work without prematurely coupling scoring semantics into the contract layer.
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
