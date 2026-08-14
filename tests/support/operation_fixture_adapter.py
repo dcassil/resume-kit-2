@@ -183,11 +183,11 @@ def expected_reason_observed(fixture: dict[str, Any], validation_result: dict[st
             return True
         if error.get("code") == "unsupported_guarded_claim":
             claims = set(error.get("details", {}).get("claims", []))
-            if expected_reason == "unsupported_scale" and "unsupported_scale" in claims:
+            if expected_reason == "unsupported_scale" and "quantity:20000000:user" in claims:
                 return True
-            if expected_reason == "unsupported_management_scope" and "unsupported_management" in claims:
+            if expected_reason == "unsupported_management_scope" and "quantity:30:engineer" in claims:
                 return True
-            if expected_reason == "related_skill_overreach" and "aws" in claims:
+            if expected_reason == "related_skill_overreach" and "skill:aws" in claims:
                 return True
     return False
 

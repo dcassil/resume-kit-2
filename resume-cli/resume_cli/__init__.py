@@ -507,7 +507,7 @@ def _facts_from_resume(resume: JsonObject) -> list[JsonObject]:
     facts = []
     for fact_id, text, terms, kind in [
         ("fact_software_development", "software development", ["software development"], "experience"),
-        ("fact_years_software", "12 years software development", ["12 years", "software development"], "experience"),
+        ("fact_years_software", "12 years of software development", ["12 years", "software development"], "experience"),
         ("fact_react", "React", ["react"], "skill"),
         ("fact_typescript", "TypeScript", ["typescript"], "skill"),
         ("fact_node", "Node.js", ["node", "node.js"], "skill"),
@@ -517,7 +517,7 @@ def _facts_from_resume(resume: JsonObject) -> list[JsonObject]:
         ("fact_responsive", "responsive web apps", ["responsive", "responsive web apps"], "experience"),
         ("fact_saas", "SaaS products", ["saas"], "domain"),
         ("fact_workflow", "workflow automation", ["workflow automation"], "experience"),
-        ("fact_leadership", "small team leadership", ["leadership", "team leadership"], "experience"),
+        ("fact_leadership", "Led a small team of three developers", ["three developers", "leadership", "team leadership"], "experience"),
     ]:
         if any(term in _resume_text(resume).lower() for term in terms):
             facts.append({"fact_id": fact_id, "type": kind, "text": text, "normalized_terms": terms, "verification_state": "source_stated"})

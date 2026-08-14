@@ -63,7 +63,7 @@
               "code": "unsupported_guarded_claim",
               "details": {
                 "claims": [
-                  "aws"
+                  "skill:aws"
                 ]
               },
               "field_path": "after",
@@ -79,7 +79,7 @@
           ],
           "grounding": {
             "guarded_claims": [
-              "aws"
+              "skill:aws"
             ],
             "supported": false,
             "supporting_fact_ids": [],
@@ -141,7 +141,7 @@
               "code": "unsupported_guarded_claim",
               "details": {
                 "claims": [
-                  "staff_title"
+                  "title:staff"
                 ]
               },
               "field_path": "after",
@@ -169,7 +169,7 @@
           ],
           "grounding": {
             "guarded_claims": [
-              "staff_title"
+              "title:staff"
             ],
             "supported": false,
             "supporting_fact_ids": [],
@@ -235,7 +235,7 @@
               "code": "unsupported_guarded_claim",
               "details": {
                 "claims": [
-                  "unsupported_management"
+                  "quantity:30:engineer"
                 ]
               },
               "field_path": "after",
@@ -257,7 +257,7 @@
           ],
           "grounding": {
             "guarded_claims": [
-              "unsupported_management"
+              "quantity:30:engineer"
             ],
             "supported": false,
             "supporting_fact_ids": [],
@@ -323,7 +323,7 @@
               "code": "unsupported_guarded_claim",
               "details": {
                 "claims": [
-                  "unsupported_scale"
+                  "quantity:20000000:user"
                 ]
               },
               "field_path": "after",
@@ -345,7 +345,7 @@
           ],
           "grounding": {
             "guarded_claims": [
-              "unsupported_scale"
+              "quantity:20000000:user"
             ],
             "supported": false,
             "supporting_fact_ids": [],
@@ -405,7 +405,8 @@
               "code": "unsupported_guarded_claim",
               "details": {
                 "claims": [
-                  "aws"
+                  "skill:aws",
+                  "years:10:aws"
                 ]
               },
               "field_path": "after",
@@ -433,7 +434,8 @@
           ],
           "grounding": {
             "guarded_claims": [
-              "aws"
+              "skill:aws",
+              "years:10:aws"
             ],
             "supported": false,
             "supporting_fact_ids": [],

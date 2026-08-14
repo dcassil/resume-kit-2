@@ -727,7 +727,7 @@ def proposeRewrite(context: dict[str, Any]) -> dict[str, Any]:
             phrases.append(term)
     for fact in usable_facts:
         fact_text = _clean_text(fact.get("text"))
-        if not any(term.lower() in fact_text.lower() for term in usable_terms):
+        if not _contains_years(fact_text) and not any(term.lower() in fact_text.lower() for term in usable_terms):
             phrases.append(fact_text)
 
     unique_phrases: list[str] = []
@@ -774,3 +774,7 @@ def proposeRewrite(context: dict[str, Any]) -> dict[str, Any]:
     result.update({"operations": [operation]})
     result["proposals"] = [operation]
     return result
+
+
+def _contains_years(text: str) -> bool:
+    return bool(re.search(r"\b\d+\+?\s*years?\b|\b(one|two|three|four|five|six|seven|eight|nine|ten)\s+years?\b", text, re.IGNORECASE))

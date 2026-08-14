@@ -4,14 +4,14 @@ level: task
 title: "Claim-level grounding over ResumeField provenance"
 short_code: "RKIT-T-0035"
 created_at: 2026-08-14T22:54:23.813377+00:00
-updated_at: 2026-08-14T23:08:19.418531+00:00
+updated_at: 2026-08-14T23:19:31.241685+00:00
 parent: resume-core-grounded-change
 blocked_by: [RKIT-T-0034]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0004
 ## Objective
 
 Replace resume-level all-or-nothing grounding with per-claim provenance checking over the ResumeField weaving RKIT-I-0001 delivered: every claim extracted per ResumeField requires a provenance chain to a fact whose VerificationState is acceptable for the claim type; one provenanced claim no longer silences checking of all others (`_missing_provenance`, domain.py:1295-1303); `inferred` facts never silently ground a claim requiring verification (RKIT-I-0004 Requirements 5 and 7's verification half).
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

@@ -111,7 +111,8 @@ def generate_snapshots(root: Path) -> dict[str, Any]:
     facts = _career_facts(root)
     aws_facts = [facts["fact_aws"]]
     aws_graphql_facts = [facts["fact_aws"], facts["fact_graphql"]]
-    all_facts = [facts["fact_aws"], facts["fact_graphql"], facts["fact_architecture"]]
+    base_facts = [facts["fact_summary_12_years"], facts["fact_small_team_three_developers"]]
+    all_facts = [*base_facts, facts["fact_aws"], facts["fact_graphql"], facts["fact_architecture"]]
 
     initial_job_a_match = _call(resume_core.scoreMatch, resume, job_a, [], FIXTURE_CONFIG)
     post_aws_match = _call(resume_core.scoreMatch, resume, job_a, aws_facts, FIXTURE_CONFIG)
@@ -216,7 +217,7 @@ def _source_resume(root: Path) -> dict[str, Any]:
         "resume_id": "resume-main",
         "source": {"kind": "fixture", "path": "fixtures/resumes/resume-main.txt"},
         "basics": {"name": lines[0], "headline": lines[1]},
-        "summary": _claim_field("summary_main", summary, "resume"),
+        "summary": _claim_field("summary_main", summary, "resume", fact_id="fact_summary_12_years"),
         "experience": experiences,
         "skills": skills,
         "education": [{"id": "education_1", "text": education_text}],
@@ -237,7 +238,8 @@ def _parse_experience(text: str) -> list[dict[str, Any]]:
         while index < len(lines) and not _is_role_header(lines, index):
             bullet_text = lines[index].lstrip("*-\u25e6 ").strip()
             if bullet_text:
-                bullets.append(_claim_field(f"experience_{len(parsed) + 1}_bullet_{len(bullets) + 1}", bullet_text, "resume"))
+                fact_id = "fact_small_team_three_developers" if "three developers" in _normalize_text(bullet_text) else None
+                bullets.append(_claim_field(f"experience_{len(parsed) + 1}_bullet_{len(bullets) + 1}", bullet_text, "resume", fact_id=fact_id))
             index += 1
         parsed.append(
             {
@@ -313,6 +315,20 @@ def _career_facts(root: Path) -> dict[str, dict[str, Any]]:
             "normalized_terms": ["api architecture", "application architecture", "ten years", "staff title absent"],
             "verification_state": "user_verified",
             "evidence": [{"source": "answer_fixture", "source_id": "answer-architecture", "text": answers["architecture"]}],
+        },
+        "fact_summary_12_years": {
+            "fact_id": "fact_summary_12_years",
+            "text": "12 years of full-stack software development experience.",
+            "normalized_terms": ["12 years", "full stack software development", "software development"],
+            "verification_state": "source_stated",
+            "evidence": [{"source": "resume_fixture", "source_id": "summary_main", "text": "Senior Software Developer with 12 years of full-stack software development experience."}],
+        },
+        "fact_small_team_three_developers": {
+            "fact_id": "fact_small_team_three_developers",
+            "text": "Led a small team of three developers through delivery planning, code review, and release coordination.",
+            "normalized_terms": ["three developers", "delivery planning", "code review"],
+            "verification_state": "source_stated",
+            "evidence": [{"source": "resume_fixture", "source_id": "experience_1_bullet_2", "text": "Led a small team of three developers through delivery planning, code review, and release coordination."}],
         },
     }
 
@@ -505,11 +521,14 @@ def _section(lines: list[str], start: str, end: str | None) -> str:
     return "\n".join(lines[start_index:end_index]).strip()
 
 
-def _claim_field(claim_id: str, value: str, source: str) -> dict[str, Any]:
+def _claim_field(claim_id: str, value: str, source: str, fact_id: str | None = None) -> dict[str, Any]:
+    provenance = {"claim_id": claim_id, "source": source, "text": value}
+    if fact_id:
+        provenance["fact_id"] = fact_id
     return {
         "claim_id": claim_id,
         "value": value,
-        "provenance": [{"claim_id": claim_id, "source": source, "text": value}],
+        "provenance": [provenance],
         "verification_state": "source_stated",
     }
 

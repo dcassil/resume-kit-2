@@ -4,14 +4,14 @@ level: task
 title: "Generalized honesty heuristics: quantity normalization, title ladder, scoped years, structured negation"
 short_code: "RKIT-T-0036"
 created_at: 2026-08-14T22:54:23.858954+00:00
-updated_at: 2026-08-14T22:54:23.858954+00:00
+updated_at: 2026-08-14T23:19:31.795463+00:00
 parent: resume-core-grounded-change
-blocked_by: ["RKIT-T-0035"]
+blocked_by: [RKIT-T-0035]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0004
 ## Objective
 
 Generalize the honesty gate from fixture enumeration to mechanism (RKIT-I-0004 Requirements 2, 3, 4, and 8's negation piece): ANY ungrounded claim is rejected by default-deny over the T-0035 claim walk; `_GUARDED_TERMS` (domain.py:47-53, 1103-1105) is demoted from mechanism to regression fixture; title inflation uses a seniority ladder; years claims normalize number words and scope evidence to the claim's subject; negation checks compare structured fact fields.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -62,4 +64,4 @@ Rationale: the initiative's keystone honesty semantics; open-world default-deny 
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-14: Activated after T-0035 landed (per-claim grounding walk committed; driver probes confirmed pointer-level missing-provenance findings, inferred_fact_not_allowed, verified-state grounding). Codex launched with binding decisions: mechanism-over-enumeration default-deny with lookup-neutralized proof tests, quantity word↔digit table, seniority ladder vs highest evidenced title, subject-scoped years, structured negation; fixture-linkage-not-gate-loosening rule stated. Prompt at scratchpad t0036-prompt.md. Note: driver also purged 16 tracked __pycache__ files and repaired the mangled .gitignore in the T-0035 commit.

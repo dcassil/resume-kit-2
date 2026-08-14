@@ -26,6 +26,16 @@ from .dates import date_key as _parse_date_key, record_date_result as _record_da
 from .grounding import claim_linked_fact_ids as _claim_linked_fact_ids
 from .grounding import grounding_claim_records as _grounding_claim_records
 from .grounding import missing_provenance as _missing_provenance
+from .honesty import _GUARDED_TERMS, _TITLE_RANK_LABELS
+from .honesty import _claim_support as _claim_support
+from .honesty import _extract_years as _extract_years
+from .honesty import _fact_years_met as _fact_years_met
+from .honesty import _guarded_claims as _guarded_claims
+from .honesty import _minimum_required_years as _minimum_required_years
+from .honesty import _title_inflation as _title_inflation
+from .honesty import _title_rank as _title_rank
+from .honesty import _years as _years
+from .honesty import _years_met as _years_met
 from .match_dimensions import _configured_default_weight, _match_dimensions, _score_from_dimensions
 from .match_decision import decide_match, empty_match, match_decision_explanation
 from .matching_config import resolve_matching_config
@@ -77,26 +87,6 @@ _SMART_TRANSLATION = str.maketrans(
         "\uf0b7": "-",
     }
 )
-_GUARDED_TERMS = {
-    "aws": ("aws", "amazon web services"),
-    "graphql": ("graphql", "graph ql"),
-    "staff_title": ("staff software engineer", "staff engineer"),
-    "unsupported_scale": ("20 million", "20m users"),
-    "unsupported_management": ("30 engineers", "managed 30"),
-}
-_NUMBER_WORDS = {
-    "one": 1,
-    "two": 2,
-    "three": 3,
-    "four": 4,
-    "five": 5,
-    "six": 6,
-    "seven": 7,
-    "eight": 8,
-    "nine": 9,
-    "ten": 10,
-}
-_YEARS_RE = re.compile(r"\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\+?\s+years?\b", re.IGNORECASE)
 _GENERIC_TERMS = {
     "a",
     "an",
@@ -577,6 +567,11 @@ def validateChange(
     after_text = _normal_text(_text(_item(op, "after")))
     guarded = _guarded_claims(after_text)
     support_by_claim = _claim_support(guarded, fact_index, linked_fact_ids, bool(_item(policy, "allow_inferred_facts", False)))
+    after_title_rank = _title_rank(_item(op, "after"))
+    if after_title_rank is not None:
+        support_by_claim.update(
+            _claim_support({f"title:{_TITLE_RANK_LABELS[after_title_rank]}"}, fact_index, linked_fact_ids, bool(_item(policy, "allow_inferred_facts", False)))
+        )
     supported_claims = set(support_by_claim)
     supporting_fact_ids = sorted({fact_id for ids in support_by_claim.values() for fact_id in ids})
     grounding = {
@@ -589,7 +584,8 @@ def validateChange(
     unsupported_guarded = guarded - supported_claims
     if unsupported_guarded:
         errors.append(_issue("unsupported_guarded_claim", "Guarded claims require exact supplied verified fact DTO support.", "after", {"claims": sorted(unsupported_guarded)}))
-    if _years(after_text) and not _facts_support_terms(_years(after_text), fact_index, linked_fact_ids, bool(_item(policy, "allow_inferred_facts", False))):
+    unsupported_year_claims = {claim for claim in unsupported_guarded if claim.startswith("years:")}
+    if unsupported_year_claims:
         errors.append(_issue("unsupported_years_claim", "Years-of-experience claims require matching verified fact support.", "after"))
     if guarded and not linked_fact_ids:
         errors.append(_issue("missing_linked_fact", "Guarded changes must link supporting fact IDs.", "linked_fact_ids"))
@@ -698,7 +694,7 @@ def validateGrounding(
         for claim in claim_records
         for fact_id in _claim_linked_fact_ids(claim)
     ]
-    text = _normal_text(_text(resume))
+    text = _normal_text(_grounding_scan_text(resume))
     guarded = _guarded_claims(text)
     supported = set(_claim_support(guarded, fact_index, linked_fact_ids, bool(_item(policy, "allow_inferred_facts", False))))
     unsupported = [{"claim": claim, "reason": "missing_verified_fact"} for claim in sorted(guarded - supported)]
@@ -1058,7 +1054,7 @@ def _resolve_requirement(
     non_year_terms = [term for term in terms if _minimum_required_years(term) is None]
 
     if required_years is not None:
-        years_met, years_evidence = _years_met(resume_text, required_years)
+        years_met, years_evidence = _years_met(resume_text, required_years, non_year_terms)
         if years_met and (not non_year_terms or _terms_in_text(non_year_terms, resume_text)):
             evidence = [{"source": "resume", "terms": non_year_terms, "required_years": required_years, "matched_years": years_evidence}]
             return ResolutionState.EXACT_MATCH.value, [], evidence
@@ -1068,7 +1064,7 @@ def _resolve_requirement(
     blocked_terms = blocked_terms_for(terms, relationship_index, _specific_terms)
     alias_terms = _aliases_for_terms(terms, aliases, blocked_terms)
     if required_years is not None:
-        years_met, years_evidence = _years_met(resume_text, required_years)
+        years_met, years_evidence = _years_met(resume_text, required_years, alias_terms)
         if years_met and alias_terms and _terms_in_text(alias_terms, resume_text):
             evidence = [{"source": "alias", "terms": _matched_terms(alias_terms, resume_text), "required_years": required_years, "matched_years": years_evidence}]
             return ResolutionState.ALIAS_MATCH.value, [], evidence
@@ -1220,25 +1216,6 @@ def _alias_map(config: JsonObject, relationship_index: JsonObject | None = None)
     return aliases
 
 
-def _minimum_required_years(value: Any) -> int | None:
-    matches = _YEARS_RE.findall(str(value))
-    if not matches:
-        return None
-    raw = matches[0].lower()
-    if raw.isdigit():
-        return int(raw)
-    return _NUMBER_WORDS.get(raw)
-
-
-def _years_met(text: str, required_years: int) -> tuple[bool, int | None]:
-    values = [_minimum_required_years(match.group(0)) for match in _YEARS_RE.finditer(str(text))]
-    numeric_values = [value for value in values if value is not None]
-    if not numeric_values:
-        return False, None
-    best = max(numeric_values)
-    return best >= required_years, best
-
-
 def _fact_resolution(
     terms: list[str],
     required_years: int | None,
@@ -1256,7 +1233,7 @@ def _fact_resolution(
         state = str(_item(fact, "verification_state", VerificationState.UNKNOWN.value))
         fact_evidence = {"source": "career_fact", "fact_id": fact_id, "terms": _matched_terms(terms, fact_text)}
         if required_years is not None:
-            met, matched_years = _years_met(fact_text, required_years)
+            met, matched_years = _fact_years_met(fact, required_years, terms)
             fact_evidence["required_years"] = required_years
             fact_evidence["matched_years"] = matched_years
             if not met:
@@ -1284,7 +1261,7 @@ def _fact_relevant(terms: list[str], required_years: int | None, fact_text: str)
     non_year_terms = [term for term in terms if _minimum_required_years(term) is None]
     if non_year_terms and _terms_in_text(non_year_terms, fact_text):
         return True
-    return required_years is not None and _years_met(fact_text, required_years)[0]
+    return required_years is not None and _years_met(fact_text, required_years, terms)[0]
 
 
 def _related_terms_for(terms: list[str], relationship_index: JsonObject | None = None, blocked_terms: set[str] | None = None) -> list[str]:
@@ -1323,6 +1300,21 @@ def _fact_text(fact: JsonObject) -> str:
     return _normal_text(" ".join(_text(item) for item in pieces))
 
 
+def _grounding_scan_text(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (int, float, bool)) or value is None:
+        return ""
+    if isinstance(value, list):
+        return " ".join(_grounding_scan_text(item) for item in value)
+    if isinstance(value, dict):
+        if "value" in value and ("claim_id" in value or "provenance" in value or "verification_state" in value):
+            return _grounding_scan_text(value.get("value"))
+        skipped = {"claim_id", "evidence", "metadata", "provenance", "resume_id", "schema_version", "source"}
+        return " ".join(_grounding_scan_text(item) for key, item in sorted(value.items()) if key not in skipped)
+    return ""
+
+
 def _fact_allowed(fact: JsonObject, allow_inferred: bool) -> bool:
     state = _item(fact, "verification_state", VerificationState.UNKNOWN.value)
     return state in _VERIFIED_FACT_STATES or (allow_inferred and state == VerificationState.INFERRED.value)
@@ -1341,67 +1333,6 @@ def _number(value: Any, default: float) -> float:
         return float(value)
     except (TypeError, ValueError):
         return float(default)
-
-
-def _guarded_claims(text: str) -> set[str]:
-    normalized = _normal_text(text)
-    return {claim for claim, terms in _GUARDED_TERMS.items() if any(_term_in_text(term, normalized) for term in terms)}
-
-
-def _claim_support(guarded: set[str], fact_index: dict[str, JsonObject], linked_fact_ids: list[str], allow_inferred: bool) -> dict[str, list[str]]:
-    supported: dict[str, list[str]] = {}
-    for claim in guarded:
-        terms = _GUARDED_TERMS[claim]
-        for fact_id in linked_fact_ids:
-            fact = _item(fact_index, str(fact_id))
-            if (
-                isinstance(fact, dict)
-                and _fact_allowed(fact, allow_inferred)
-                and not _fact_negates_claim(claim, fact)
-                and any(_term_in_text(term, _fact_text(fact)) for term in terms)
-            ):
-                if claim not in supported:
-                    supported[claim] = []
-                supported[claim].append(str(fact_id))
-    return supported
-
-
-def _fact_negates_claim(claim: str, fact: JsonObject) -> bool:
-    text = _fact_text(fact)
-    if claim == "staff_title" and any(phrase in text for phrase in ("not had staff", "haven t had staff", "not staff engineer", "not staff software engineer")):
-        return True
-    if any(phrase in text for phrase in ("no ", "not ", "never ", "haven t ", "hasn t ", "without ")):
-        claim_terms = _GUARDED_TERMS.get(claim, ())
-        return any(_term_in_text(term, text) for term in claim_terms)
-    return False
-
-
-def _title_inflation(path: str, before: Any, after: Any, support_by_claim: dict[str, list[str]]) -> bool:
-    if not path.endswith("/title"):
-        return False
-    after_text = _normal_text(after)
-    before_text = _normal_text(before)
-    if "staff" not in after_text or "staff" in before_text:
-        return False
-    return not support_by_claim.get("staff_title")
-
-
-def _years(text: str) -> list[str]:
-    return [match.group(0).lower() for match in _YEARS_RE.finditer(text)]
-
-
-def _extract_years(text: str) -> str | None:
-    matches = _years(text)
-    return matches[0] if matches else None
-
-
-def _facts_support_terms(terms: list[str], fact_index: dict[str, JsonObject], linked_fact_ids: list[str], allow_inferred: bool) -> bool:
-    for term in terms:
-        for fact_id in linked_fact_ids:
-            fact = _item(fact_index, str(fact_id))
-            if isinstance(fact, dict) and _fact_allowed(fact, allow_inferred) and _term_in_text(term, _fact_text(fact)):
-                return True
-    return False
 
 
 def _unresolved_copy(requirement_result: JsonObject) -> JsonObject:

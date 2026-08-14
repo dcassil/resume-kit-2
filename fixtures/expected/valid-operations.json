@@ -98,6 +98,7 @@
                   "provenance": [
                     {
                       "claim_id": "experience_1_bullet_3",
+                      "fact_id": "fact_small_team_three_developers",
                       "source": "resume",
                       "text": "Led a small team of three developers through delivery planning, code review, and release coordination."
                     }
@@ -311,6 +312,7 @@
             "provenance": [
               {
                 "claim_id": "summary_main",
+                "fact_id": "fact_summary_12_years",
                 "source": "resume",
                 "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
               },
@@ -409,6 +411,7 @@
                   "provenance": [
                     {
                       "claim_id": "experience_1_bullet_3",
+                      "fact_id": "fact_small_team_three_developers",
                       "source": "resume",
                       "text": "Led a small team of three developers through delivery planning, code review, and release coordination."
                     }
@@ -623,6 +626,7 @@
             "provenance": [
               {
                 "claim_id": "summary_main",
+                "fact_id": "fact_summary_12_years",
                 "source": "resume",
                 "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
               },
@@ -765,6 +769,7 @@
                   "provenance": [
                     {
                       "claim_id": "experience_1_bullet_3",
+                      "fact_id": "fact_small_team_three_developers",
                       "source": "resume",
                       "text": "Led a small team of three developers through delivery planning, code review, and release coordination."
                     }
@@ -979,6 +984,7 @@
             "provenance": [
               {
                 "claim_id": "summary_main",
+                "fact_id": "fact_summary_12_years",
                 "source": "resume",
                 "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
               },
@@ -1028,7 +1034,7 @@
           "errors": [],
           "grounding": {
             "guarded_claims": [
-              "aws"
+              "skill:aws"
             ],
             "supported": true,
             "supporting_fact_ids": [
@@ -1094,7 +1100,7 @@
           "errors": [],
           "grounding": {
             "guarded_claims": [
-              "graphql"
+              "skill:graphql"
             ],
             "supported": true,
             "supporting_fact_ids": [
@@ -1284,6 +1290,7 @@
               "provenance": [
                 {
                   "claim_id": "experience_1_bullet_3",
+                  "fact_id": "fact_small_team_three_developers",
                   "source": "resume",
                   "text": "Led a small team of three developers through delivery planning, code review, and release coordination."
                 }
@@ -1498,6 +1505,7 @@
         "provenance": [
           {
             "claim_id": "summary_main",
+            "fact_id": "fact_summary_12_years",
             "source": "resume",
             "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
           },
