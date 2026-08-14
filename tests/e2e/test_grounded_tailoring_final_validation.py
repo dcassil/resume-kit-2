@@ -18,6 +18,8 @@ import unittest
 
 BASE_RESUME = {
     "schema_version": "test-1",
+    "resume_id": "resume_e2e_base",
+    "source": {"kind": "test_fixture"},
     "basics": {"name": "Dana Candidate", "email": "candidate@example.com"},
     "experience": [
         {

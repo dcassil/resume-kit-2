@@ -11,6 +11,7 @@ from unicodedata import normalize as _unicode_normalize
 
 from .pointers import _append_already_present, _pointer_parent_exists, _pointer_value, _set_pointer
 from .schemas import (
+    CANONICAL_RESUME_SCHEMA,
     ChangeOperationStatus,
     JsonObject,
     RESUME_CHANGE_OPERATION_SCHEMA,
@@ -253,9 +254,7 @@ def validateResume(canonical_resume: Any) -> JsonObject:
     if not isinstance(resume, dict):
         return _result("error", errors=[_issue("invalid_resume", "canonical_resume must be an object.")], warnings=warnings)
 
-    for field_name in ("schema_version", "experience", "skills", "education"):
-        if field_name not in resume:
-            errors.append(_issue("missing_field", f"CanonicalResume requires {field_name}.", field_name))
+    errors.extend(_schema_required_field_errors(resume, CANONICAL_RESUME_SCHEMA, "CanonicalResume"))
     for field_name in ("experience", "skills", "education"):
         if field_name in resume and not isinstance(resume[field_name], list):
             errors.append(_issue("invalid_array", f"{field_name} must be an array.", field_name))
@@ -714,6 +713,14 @@ def _unwrap(value: Any, key: str) -> Any:
     if isinstance(payload, dict) and key in payload:
         return payload[key]
     return payload
+
+
+def _schema_required_field_errors(payload: JsonObject, schema: JsonObject, schema_name: str) -> list[JsonObject]:
+    errors: list[JsonObject] = []
+    for field_name in schema.get("required", []):
+        if isinstance(field_name, str) and field_name not in payload:
+            errors.append(_issue("missing_field", f"{schema_name} requires {field_name}.", field_name))
+    return errors
 
 
 def _array(value: Any) -> list[Any]:

@@ -18,6 +18,8 @@ PUBLIC_TYPES = tuple(SURFACE["public_api"]["types"])
 
 CANONICAL_RESUME = {
     "schema_version": "test-1",
+    "resume_id": "resume_contract_1",
+    "source": {"kind": "test_fixture"},
     "basics": {"name": "Daniel Candidate", "email": "candidate@example.com"},
     "experience": [
         {
