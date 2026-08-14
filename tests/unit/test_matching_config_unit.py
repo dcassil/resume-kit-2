@@ -92,7 +92,7 @@ class MatchingConfigUnitTests(unittest.TestCase):
         result = resume_core.scoreMatch(resume, job, [], {"policy": "strict"})
 
         self.assertEqual(result["status"], "ok")
-        self.assertEqual(result["match_result"]["score"], 0.0)
+        self.assertEqual(result["match_result"]["score"], 2.5)
         self.assertFalse(result["match_result"]["can_continue"])
         self.assertNotIn("warnings", result)
 

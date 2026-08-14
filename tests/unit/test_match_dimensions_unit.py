@@ -113,7 +113,7 @@ class MatchDimensionsUnitTests(unittest.TestCase):
 
         self.assertEqual(match["score"], reconstructed)
 
-    def test_terminology_placeholder_shape(self):
+    def test_empty_terminology_dimension_is_neutral(self):
         match = resume_core.scoreMatch(
             _resume(),
             _job(),
@@ -124,8 +124,8 @@ class MatchDimensionsUnitTests(unittest.TestCase):
         terminology = _dimensions(match)["terminology"]
 
         self.assertEqual(terminology["weight"], 0.2)
-        self.assertEqual(terminology["score"], 0.0)
-        self.assertEqual(terminology["contribution"], 0.0)
+        self.assertEqual(terminology["score"], 1.0)
+        self.assertEqual(terminology["contribution"], 0.2)
         self.assertEqual(terminology["evidence"], [])
 
 

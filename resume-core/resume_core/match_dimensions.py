@@ -7,10 +7,13 @@ to ``experience``, role/title/seniority requirements go to ``roleAlignment``,
 and domain/industry requirements go to ``domainIndustry``. Remaining required or
 contextual requirements go to ``requiredSkills``. If multiple semantic
 dimensions match the same non-preferred requirement, the ambiguous requirement
-falls back by classification instead of inference. ``terminology`` is emitted as
-a section-13 placeholder with its configured weight, score 0, and no evidence
-until Chunk 5 owns live term scoring. Empty non-terminology dimensions are not
-emitted or included in the score denominator.
+falls back by classification instead of inference. ``terminology`` scores the
+fraction of ``JobModel.terminology`` entries whose job-surface form appears in
+normalized resume claim text, using deterministic case-insensitive word
+boundaries. Canonical-only matches are reported as evidence but do not count
+toward the fraction. Empty terminology is neutral: score 1.0 with no evidence.
+Empty non-terminology dimensions are not emitted or included in the score
+denominator.
 """
 
 from __future__ import annotations
@@ -50,7 +53,12 @@ _DOMAIN_HINTS = (
 )
 
 
-def _match_dimensions(requirement_results: list[JsonObject], weights: dict[str, float]) -> list[JsonObject]:
+def _match_dimensions(
+    requirement_results: list[JsonObject],
+    weights: dict[str, float],
+    job_model: JsonObject | None = None,
+    canonical_resume: JsonObject | None = None,
+) -> list[JsonObject]:
     dimensions: list[JsonObject] = []
     by_dimension = {name: [] for name in MATCHING_WEIGHT_KEYS}
     for result in requirement_results:
@@ -60,8 +68,7 @@ def _match_dimensions(requirement_results: list[JsonObject], weights: dict[str, 
         weight = float(weights.get(name, 0.0))
         rows = by_dimension[name]
         if name == "terminology":
-            score = 0.0
-            evidence: list[JsonObject] = []
+            score, evidence = _terminology_score(job_model, canonical_resume)
         elif rows:
             score = _dimension_requirement_score(rows)
             evidence = _dimension_evidence(rows)
@@ -154,6 +161,114 @@ def _dimension_evidence(rows: list[JsonObject]) -> list[JsonObject]:
             entry["fact_ids"] = fact_ids
         evidence.append(entry)
     return evidence
+
+
+def _terminology_score(job_model: JsonObject | None, canonical_resume: JsonObject | None) -> tuple[float, list[JsonObject]]:
+    terms = [term for term in _array(_item(job_model, "terminology", [])) if isinstance(term, dict)]
+    if not terms:
+        return 1.0, []
+
+    claims = _resume_claims(canonical_resume)
+    mirrored = 0
+    evidence: list[JsonObject] = []
+    for index, term in enumerate(terms):
+        surface = str(_item(term, "surface", "")).strip()
+        canonical = str(_item(term, "canonical", "")).strip()
+        surface_refs = _matching_claim_refs(surface, claims)
+        canonical_refs = _matching_claim_refs(canonical, claims) if canonical else []
+        matched_form = "none"
+        where: list[JsonObject] = []
+        if surface_refs:
+            matched_form = "surface"
+            where = surface_refs
+            mirrored += 1
+        elif canonical_refs:
+            matched_form = "canonical_only"
+            where = canonical_refs
+        evidence.append(
+            {
+                "term_ref": f"terminology/{index}",
+                "term": {
+                    key: _item(term, key)
+                    for key in ("surface", "canonical", "source", "weight")
+                    if key in term
+                },
+                "matched_form": matched_form,
+                "where": where,
+            }
+        )
+    return mirrored / len(terms), evidence
+
+
+def _resume_claims(canonical_resume: JsonObject | None) -> list[JsonObject]:
+    claims: list[JsonObject] = []
+
+    def visit(value: Any, path: str) -> None:
+        if isinstance(value, dict):
+            if "value" in value:
+                text = _claim_text(_item(value, "value"))
+                if text:
+                    ref: JsonObject = {"field_path": path, "text": text}
+                    claim_id = _item(value, "claim_id")
+                    if claim_id:
+                        ref["claim_id"] = str(claim_id)
+                    claims.append(ref)
+                return
+            for key, child in value.items():
+                if key == "metadata":
+                    continue
+                visit(child, f"{path}/{key}" if path else str(key))
+            return
+        if isinstance(value, list):
+            for index, child in enumerate(value):
+                visit(child, f"{path}/{index}" if path else str(index))
+            return
+        text = _claim_text(value)
+        if text:
+            claims.append({"field_path": path, "text": text})
+
+    if isinstance(canonical_resume, dict):
+        for field_name in ("summary", "skills", "experience", "education", "projects", "certifications", "awards"):
+            if field_name in canonical_resume:
+                visit(canonical_resume[field_name], field_name)
+    return claims
+
+
+def _matching_claim_refs(term: str, claims: list[JsonObject]) -> list[JsonObject]:
+    if not _normal_text(term):
+        return []
+    refs: list[JsonObject] = []
+    for claim in claims:
+        if _exact_term_in_text(term, _item(claim, "text", "")):
+            ref = {"field_path": _item(claim, "field_path", "")}
+            claim_id = _item(claim, "claim_id")
+            if claim_id:
+                ref["claim_id"] = claim_id
+            refs.append(ref)
+    return refs
+
+
+def _exact_term_in_text(term: Any, text: Any) -> bool:
+    normalized = _normal_text(term)
+    normalized_text = _normal_text(text)
+    if not normalized or not normalized_text:
+        return False
+    pattern = r"(?<![a-z0-9])" + re.escape(normalized) + r"(?![a-z0-9])"
+    return bool(re.search(pattern, normalized_text, re.IGNORECASE))
+
+
+def _claim_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (int, float, bool)):
+        return str(value)
+    if isinstance(value, list):
+        return " ".join(_claim_text(item) for item in value)
+    if isinstance(value, dict):
+        return " ".join(_claim_text(item) for key, item in sorted(value.items()) if key != "metadata")
+    return str(value)
 
 
 def _classification(requirement: JsonObject) -> str:

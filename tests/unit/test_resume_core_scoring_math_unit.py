@@ -69,13 +69,18 @@ class ScoringMathUnitTests(unittest.TestCase):
 
         self.assertEqual(first, second)
         match = first["match_result"]
-        self.assertEqual(match["score"], 7.2)
+        self.assertEqual(match["score"], 10.8)
         self.assertEqual(match["max_score"], 18.0)
-        self.assertEqual(match["score_percent"], 40.0)
+        self.assertEqual(match["score_percent"], 60.0)
         self.assertEqual(match["algorithm_version"], "resume-core.match.v1")
 
     def test_missing_preferred_is_distinct_from_required_blockers(self):
-        match = resume_core.scoreMatch(_resume(), _job(), [], {})["match_result"]
+        match = resume_core.scoreMatch(
+            _resume(),
+            _job(),
+            [],
+            {"matching": {"requireHardRequirementsResolved": True}},
+        )["match_result"]
 
         self.assertEqual(match["unresolved_requirement_ids"], ["req_node"])
         self.assertEqual(match["preferred_unresolved_requirement_ids"], ["pref_aws"])
@@ -89,9 +94,9 @@ class ScoringMathUnitTests(unittest.TestCase):
 
         match = resume_core.scoreMatch(_resume(), _job(), facts, {})["match_result"]
 
-        self.assertEqual(match["score"], 10.8)
+        self.assertEqual(match["score"], 14.4)
         self.assertEqual(match["max_score"], 18.0)
-        self.assertEqual(match["score_percent"], 60.0)
+        self.assertEqual(match["score_percent"], 80.0)
         self.assertEqual(match["unresolved_requirement_ids"], ["req_node"])
         self.assertEqual(match["preferred_unresolved_requirement_ids"], [])
 

@@ -19,8 +19,8 @@
       "fact_graphql",
       "fact_architecture"
     ],
-    "final_score": 88.24,
-    "initial_score": 84.31,
+    "final_score": 93.69,
+    "initial_score": 89.02,
     "job_id": "job-a",
     "matching_algorithm_version": "resume-core.match.v1",
     "operations_applied": [

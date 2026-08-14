@@ -413,7 +413,7 @@ def scoreMatch(
             }
         )
 
-    dimensions = _match_dimensions(requirement_results, matching_config.config.weights)
+    dimensions = _match_dimensions(requirement_results, matching_config.config.weights, job, resume)
     score = _score_from_dimensions(dimensions, max_score)
     threshold = matching_config.config.score_auto_threshold
     hard_requirements_resolved = not unresolved

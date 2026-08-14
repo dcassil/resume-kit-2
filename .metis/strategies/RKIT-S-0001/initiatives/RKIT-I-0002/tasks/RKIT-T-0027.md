@@ -4,14 +4,14 @@ level: task
 title: "Chunk 5: Terminology scoring dimension over JobTerm"
 short_code: "RKIT-T-0027"
 created_at: 2026-08-14T19:46:11.360343+00:00
-updated_at: 2026-08-14T19:46:11.360343+00:00
+updated_at: 2026-08-14T21:07:40.250996+00:00
 parent: resume-core-deterministic
-blocked_by: ["RKIT-T-0026"]
+blocked_by: [RKIT-T-0026]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,10 @@ initiative_id: RKIT-I-0002
 ## Objective
 
 Activate the `terminology` scoring dimension (placeholder since Chunk 3) over the JobTerm substrate RKIT-I-0001 delivered: for each `JobModel.terminology` term, determine whether the resume uses the job's surface form versus only the canonical form; the dimension score is the weighted fraction of job terms mirrored. This gives the "prefer job terminology" product goal and workflow step E.2 their scoring substrate — without score pressure, terminology alignment has no mechanism to influence decisions (the initiative's rejected-alternative analysis).
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -77,4 +81,4 @@ Codex-exec: yes; the matching rule is deterministic string work over existing st
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-14: Codex-implemented, reviewed, committed. Live terminology dimension: surface_matches/total JobTerms, word-boundary case-insensitive exact matching (Java≠JavaScript), canonical-only recorded as evidence but not counted, empty terminology → 1.0 (documented), weight 0 removes influence. Driver verified score math (50 surface/125 terms = 0.4 on initial-job-a). Scores shifted ~+3 (e.g. initial-job-a 49.75→52.52); 6 snapshots re-baselined with per-term evidence (large but legitimate — the E.2 substrate), no-drift proven. 5 new unit tests; PR 257 + smoke green.

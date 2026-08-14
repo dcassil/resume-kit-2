@@ -92,7 +92,7 @@ class RelationshipMatchingUnitTests(unittest.TestCase):
         self.assertEqual(scores["req_graphql"], 0.0)
         self.assertEqual(scores["req_react_native"], 0.0)
         self.assertEqual(scores["req_aws"], 0.0)
-        self.assertEqual(match["score"], 2.8)
+        self.assertEqual(match["score"], 4.0)
         self.assertEqual(match["max_score"], 6.0)
 
 
