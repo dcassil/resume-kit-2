@@ -9,6 +9,7 @@ from typing import Any
 from unicodedata import category as _unicode_category
 from unicodedata import normalize as _unicode_normalize
 
+from .claim_fields import provenance_index as _provenance_index, weave_claim_fields as _weave_claim_fields
 from .dates import date_key as _parse_date_key, record_date_result as _record_date_result
 from .pointers import _append_already_present, _pointer_parent_exists, _pointer_value, _set_pointer
 from .schemas import (
@@ -235,10 +236,12 @@ def normalizeResume(source_resume: Any, config: JsonObject | None = None) -> Jso
     if "verification_state" not in normalized:
         normalized["verification_state"] = VerificationState.SOURCE_STATED.value
 
+    provenance_index = _provenance_index(_array(_item(normalized, "provenance", [])))
     provenance_map = {}
     for entry in _array(_item(normalized, "provenance", [])):
         if isinstance(entry, dict) and "claim_id" in entry:
             provenance_map[str(entry["claim_id"])] = copy.deepcopy(entry)
+    _weave_claim_fields(normalized, provenance_index)
 
     return _result(
         "warning" if warnings else "ok",
