@@ -102,35 +102,191 @@
     ],
     "schema_version": "resume-core.result.v1",
     "selection_plan": {
-      "experience_ids": [
-        "experience_1",
-        "experience_2"
+      "constraint_report": [
+        {
+          "actual": 12,
+          "constraint": "max_skills",
+          "limit": 12,
+          "status": "satisfied"
+        }
       ],
-      "limits": {
-        "max_bullets_per_role": 4,
-        "max_experience": 2,
-        "max_skills": 12
+      "entries": [
+        {
+          "action": "keep",
+          "fact_ids": [],
+          "path": "/experience/0/bullets/0",
+          "reason": "Selected with parent role by deterministic relevance ranking within max_experience.",
+          "relevance": 23,
+          "requirement_ids": []
+        },
+        {
+          "action": "keep",
+          "fact_ids": [],
+          "path": "/experience/0/bullets/1",
+          "reason": "Selected with parent role by deterministic relevance ranking within max_experience.",
+          "relevance": 23,
+          "requirement_ids": []
+        },
+        {
+          "action": "keep",
+          "fact_ids": [],
+          "path": "/experience/0/bullets/2",
+          "reason": "Selected with parent role by deterministic relevance ranking within max_experience.",
+          "relevance": 23,
+          "requirement_ids": []
+        },
+        {
+          "action": "keep",
+          "fact_ids": [],
+          "path": "/experience/0/bullets/3",
+          "reason": "Selected with parent role by deterministic relevance ranking within max_experience.",
+          "relevance": 23,
+          "requirement_ids": []
+        },
+        {
+          "action": "keep",
+          "fact_ids": [],
+          "path": "/skills/5",
+          "reason": "Selected by deterministic relevance ranking within max_skills.",
+          "relevance": 4,
+          "requirement_ids": []
+        },
+        {
+          "action": "keep",
+          "fact_ids": [],
+          "path": "/skills/9",
+          "reason": "Selected by deterministic relevance ranking within max_skills.",
+          "relevance": 3,
+          "requirement_ids": []
+        },
+        {
+          "action": "keep",
+          "fact_ids": [],
+          "path": "/experience/1/bullets/0",
+          "reason": "Selected with parent role by deterministic relevance ranking within max_experience.",
+          "relevance": 2,
+          "requirement_ids": []
+        },
+        {
+          "action": "keep",
+          "fact_ids": [],
+          "path": "/experience/1/bullets/1",
+          "reason": "Selected with parent role by deterministic relevance ranking within max_experience.",
+          "relevance": 2,
+          "requirement_ids": []
+        },
+        {
+          "action": "keep",
+          "fact_ids": [],
+          "path": "/experience/1/bullets/2",
+          "reason": "Selected with parent role by deterministic relevance ranking within max_experience.",
+          "relevance": 2,
+          "requirement_ids": []
+        },
+        {
+          "action": "keep",
+          "fact_ids": [],
+          "path": "/skills/8",
+          "reason": "Selected by deterministic relevance ranking within max_skills.",
+          "relevance": 2,
+          "requirement_ids": []
+        },
+        {
+          "action": "keep",
+          "fact_ids": [],
+          "path": "/skills/0",
+          "reason": "Selected by deterministic relevance ranking within max_skills.",
+          "relevance": 1,
+          "requirement_ids": []
+        },
+        {
+          "action": "keep",
+          "fact_ids": [],
+          "path": "/skills/1",
+          "reason": "Selected by deterministic relevance ranking within max_skills.",
+          "relevance": 1,
+          "requirement_ids": []
+        },
+        {
+          "action": "keep",
+          "fact_ids": [],
+          "path": "/skills/6",
+          "reason": "Selected by deterministic relevance ranking within max_skills.",
+          "relevance": 1,
+          "requirement_ids": []
+        },
+        {
+          "action": "keep",
+          "fact_ids": [],
+          "path": "/skills/10",
+          "reason": "Selected by deterministic relevance ranking within max_skills.",
+          "relevance": 1,
+          "requirement_ids": []
+        },
+        {
+          "action": "keep",
+          "fact_ids": [],
+          "path": "/skills/11",
+          "reason": "Selected by deterministic relevance ranking within max_skills.",
+          "relevance": 1,
+          "requirement_ids": []
+        },
+        {
+          "action": "keep",
+          "fact_ids": [],
+          "path": "/skills/2",
+          "reason": "Selected by deterministic relevance ranking within max_skills.",
+          "relevance": 0,
+          "requirement_ids": []
+        },
+        {
+          "action": "keep",
+          "fact_ids": [],
+          "path": "/skills/3",
+          "reason": "Selected by deterministic relevance ranking within max_skills.",
+          "relevance": 0,
+          "requirement_ids": []
+        },
+        {
+          "action": "keep",
+          "fact_ids": [],
+          "path": "/skills/4",
+          "reason": "Selected by deterministic relevance ranking within max_skills.",
+          "relevance": 0,
+          "requirement_ids": []
+        },
+        {
+          "action": "keep",
+          "fact_ids": [],
+          "path": "/skills/7",
+          "reason": "Selected by deterministic relevance ranking within max_skills.",
+          "relevance": 0,
+          "requirement_ids": []
+        }
+      ],
+      "metadata": {
+        "config_snapshot": {
+          "max_bullets_per_role": 4,
+          "max_experience": 2,
+          "max_skills": 12,
+          "section_order": [
+            "basics",
+            "summary",
+            "skills",
+            "experience",
+            "education"
+          ],
+          "target_pages": null
+        },
+        "target_pages": null
       },
-      "section_order": [
+      "schema_version": "content-selection-plan.v1",
+      "sections": [
         "basics",
         "summary",
         "skills",
         "experience",
         "education"
-      ],
-      "skill_indices": [
-        5,
-        9,
-        8,
-        0,
-        1,
-        6,
-        10,
-        11,
-        2,
-        3,
-        4,
-        7
       ]
     },
     "status": "ok"

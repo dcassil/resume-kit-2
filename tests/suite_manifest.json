@@ -47,7 +47,8 @@
       "state_transitions",
       "change_validation",
       "relationship_matching",
-      "config_parsing"
+      "config_parsing",
+      "selection_planning"
     ],
     "contract": [
       "public_surfaces",
@@ -129,6 +130,9 @@
       "config_parsing": [
         "tests.unit.test_resume_core_config_parsing_unit",
         "tests.unit.test_matching_config_unit"
+      ],
+      "selection_planning": [
+        "tests.unit.test_selection_plan_shape_unit"
       ]
     },
     "hallucination_rejection_fixtures": [

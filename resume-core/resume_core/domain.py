@@ -26,6 +26,7 @@ from .schemas import (
     VerificationState,
     to_json_dict,
 )
+from .selection_plan import build_content_selection_plan
 from .term_relationships import blocked_terms_for, build_term_relationship_index, relationship_bucket
 
 
@@ -505,28 +506,7 @@ def rankResumeContent(canonical_resume: Any, job_model: Any, match_result: Any, 
         return _result("error", selection_plan={}, ranked_content=[])
 
     terms = sorted({term for requirement in _requirements(job) for term in _terms(requirement)})
-    experience_limit = int(_item(config, "max_experience", _item(config, "experience_max", len(_array(_item(resume, "experience", []))))))
-    skills_limit = int(_item(config, "max_skills", _item(config, "skills_max", len(_array(_item(resume, "skills", []))))))
-    bullet_limit = int(_item(config, "max_bullets_per_role", _item(config, "bullets_per_role_max", 999)))
-    ranked: list[JsonObject] = []
-
-    for index, item in enumerate(_array(_item(resume, "experience", []))):
-        item_id = _item(item, "id", f"experience_{index}") if isinstance(item, dict) else f"experience_{index}"
-        ranked.append({"kind": "experience", "id": item_id, "source_index": index, "score": _relevance(_text(item), terms)})
-    for index, item in enumerate(_array(_item(resume, "skills", []))):
-        ranked.append({"kind": "skill", "id": f"skill_{index}", "source_index": index, "score": _relevance(_text(item), terms)})
-
-    ranked.sort(key=lambda item: (-item["score"], item["kind"], item["source_index"]))
-    plan = {
-        "section_order": list(_item(config, "section_order", ["basics", "summary", "skills", "experience", "education"])),
-        "experience_ids": [item["id"] for item in ranked if item["kind"] == "experience"][: max(experience_limit, 0)],
-        "skill_indices": [item["source_index"] for item in ranked if item["kind"] == "skill"][: max(skills_limit, 0)],
-        "limits": {
-            "max_experience": max(experience_limit, 0),
-            "max_skills": max(skills_limit, 0),
-            "max_bullets_per_role": max(bullet_limit, 0),
-        },
-    }
+    plan, ranked = build_content_selection_plan(resume, terms, config)
     return _result("ok", selection_plan=plan, ranked_content=ranked)
 
 

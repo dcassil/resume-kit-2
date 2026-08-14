@@ -15,6 +15,9 @@ from .domain import (
 )
 from .schemas import (
     CANONICAL_RESUME_SCHEMA,
+    CONTENT_SELECTION_CONSTRAINT_REPORT_SCHEMA,
+    CONTENT_SELECTION_ENTRY_SCHEMA,
+    CONTENT_SELECTION_PLAN_SCHEMA,
     ERROR_SCHEMA,
     JOB_MODEL_SCHEMA,
     JOB_REQUIREMENT_SCHEMA,
@@ -26,6 +29,9 @@ from .schemas import (
     TERM_RELATIONSHIP_SCHEMA,
     CanonicalResume,
     ChangeOperationStatus,
+    ContentSelectionConstraintReport,
+    ContentSelectionEntry,
+    ContentSelectionPlan,
     Error,
     ErrorSeverity,
     JobModel,
@@ -47,6 +53,9 @@ from .schemas import (
 
 __all__ = [
     "CANONICAL_RESUME_SCHEMA",
+    "CONTENT_SELECTION_CONSTRAINT_REPORT_SCHEMA",
+    "CONTENT_SELECTION_ENTRY_SCHEMA",
+    "CONTENT_SELECTION_PLAN_SCHEMA",
     "ERROR_SCHEMA",
     "JOB_MODEL_SCHEMA",
     "JOB_REQUIREMENT_SCHEMA",
@@ -58,6 +67,9 @@ __all__ = [
     "TERM_RELATIONSHIP_SCHEMA",
     "CanonicalResume",
     "ChangeOperationStatus",
+    "ContentSelectionConstraintReport",
+    "ContentSelectionEntry",
+    "ContentSelectionPlan",
     "Error",
     "ErrorSeverity",
     "JobModel",

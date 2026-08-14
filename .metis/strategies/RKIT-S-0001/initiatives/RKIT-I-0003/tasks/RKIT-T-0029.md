@@ -4,14 +4,14 @@ level: task
 title: "Chunk 1: ContentSelectionPlan DTO, constraint report, immutability and determinism"
 short_code: "RKIT-T-0029"
 created_at: 2026-08-14T21:14:45.946943+00:00
-updated_at: 2026-08-14T21:14:45.946943+00:00
+updated_at: 2026-08-14T21:23:58.791629+00:00
 parent: resume-core-selection-planning-and
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,10 @@ initiative_id: RKIT-I-0003
 ## Objective
 
 Establish the `ContentSelectionPlan` artifact shape that all later chunks populate: ordered sections, per-entry JSON-path addressing at bullet granularity with action/relevance/reason/requirementIds/factIds, a constraint report, and plan metadata — plus the two structural guarantees (input-resume immutability, run-to-run determinism) as tested invariants. This is the substrate chunk; a wrong DTO shape here compounds through ranking, selection, and the downstream RKIT-I-0004 applyChanges consumer.
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -66,4 +70,10 @@ Codex-exec: yes with a tight prompt; the DTO is consumed by I-0004's applyChange
 
 ## Status Updates
 
-*To be added during implementation*
+### 2026-08-14 implementation checkpoint
+- Added ContentSelectionPlan DTO schema family and exports in resume-core schemas.
+- Reworked rankResumeContent to keep `del match_result`, preserve `ranked_content`, and emit the new `selection_plan` shape with ordered sections, entries, max_skills constraint_report, target_pages, and config_snapshot.
+- Added unit coverage for shape, byte-identical input immutability, and deterministic repeat runs; mapped the module in tests/suite_manifest.json.
+- Strengthened resume-core/shared DTO contracts; focused unit test is green and touched contracts pass when run with package roots on PYTHONPATH.
+- Regenerated selection-plan snapshot twice with no drift; final diff is `fixtures/expected/selection-plan.json` only under fixtures/expected.
+- Verification completed: focused unit green, PR gate green, smoke gate green, Straight Jacket verify clean.

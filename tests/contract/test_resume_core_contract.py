@@ -456,6 +456,30 @@ class ResumeCoreDomainContractTests(unittest.TestCase):
         text = serialized(result)
         self.assertNotRegex(text, r"\b(rendered_output|docx|pdf|sqlite|traceback)\b")
 
+    def test_rank_resume_content_returns_content_selection_plan_shape(self):
+        result = maybe_await(
+            self.core.rankResumeContent(
+                CANONICAL_RESUME,
+                JOB_MODEL,
+                {"match_id": "ignored_until_chunk_3"},
+                {"section_order": ["basics", "summary", "skills", "experience", "education"], "max_skills": 3},
+            )
+        )
+
+        self.assertEqual(result.get("status"), "ok", result)
+        plan = result["selection_plan"]
+        self.assertEqual(
+            set(self.core.CONTENT_SELECTION_PLAN_SCHEMA["required"]),
+            {"schema_version", "sections", "entries", "constraint_report", "metadata"},
+        )
+        self.assertEqual(plan["schema_version"], "content-selection-plan.v1")
+        self.assertEqual(set(plan), {"schema_version", "sections", "entries", "constraint_report", "metadata"})
+        self.assertTrue(plan["entries"])
+        for entry in plan["entries"]:
+            self.assertEqual(set(entry), {"path", "action", "relevance", "reason", "requirement_ids", "fact_ids"})
+        self.assertEqual(plan["constraint_report"][0]["constraint"], "max_skills")
+        self.assertIn("ranked_content", result)
+
 
 if __name__ == "__main__":
     unittest.main()

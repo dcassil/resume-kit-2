@@ -19,6 +19,7 @@ class SharedDtoSchemaContractTests(unittest.TestCase):
             "JobModel",
             "JobRequirement",
             "MatchResult",
+            "ContentSelectionPlan",
             "ResumeChangeOperation",
             "VerificationState",
             "ResolutionState",
@@ -49,6 +50,7 @@ class SharedDtoSchemaContractTests(unittest.TestCase):
                 "dimensions",
                 "requirement_results",
             },
+            "ContentSelectionPlan": {"schema_version", "sections", "entries", "constraint_report", "metadata"},
             "ResumeChangeOperation": {
                 "schema_version",
                 "operation_id",

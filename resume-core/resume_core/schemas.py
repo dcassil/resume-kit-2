@@ -198,6 +198,33 @@ class MatchResult:
 
 
 @dataclass(frozen=True)
+class ContentSelectionEntry:
+    path: str
+    action: str
+    relevance: float
+    reason: str
+    requirement_ids: list[str] = field(default_factory=list)
+    fact_ids: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class ContentSelectionConstraintReport:
+    constraint: str
+    limit: Any
+    actual: Any
+    status: str
+
+
+@dataclass(frozen=True)
+class ContentSelectionPlan:
+    schema_version: str
+    sections: list[str]
+    entries: list[ContentSelectionEntry | JsonObject]
+    constraint_report: list[ContentSelectionConstraintReport | JsonObject]
+    metadata: JsonObject = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class ResumeChangeOperation:
     schema_version: str
     operation_id: str
@@ -394,6 +421,52 @@ MATCH_RESULT_SCHEMA: JsonObject = {
     },
 }
 
+CONTENT_SELECTION_ENTRY_SCHEMA: JsonObject = {
+    "schema_version": "content-selection-entry.v1",
+    "type": "object",
+    "required": ["path", "action", "relevance", "reason", "requirement_ids", "fact_ids"],
+    "properties": {
+        "path": {"type": "string"},
+        "action": {"enum": ["keep", "drop", "reorder"]},
+        "relevance": {"type": "number"},
+        "reason": {"type": "string"},
+        "requirement_ids": {"type": "array", "items": {"type": "string"}},
+        "fact_ids": {"type": "array", "items": {"type": "string"}},
+    },
+}
+
+CONTENT_SELECTION_CONSTRAINT_REPORT_SCHEMA: JsonObject = {
+    "schema_version": "content-selection-constraint-report.v1",
+    "type": "object",
+    "required": ["constraint", "limit", "actual", "status"],
+    "properties": {
+        "constraint": {"type": "string"},
+        "limit": {},
+        "actual": {},
+        "status": {"enum": ["satisfied", "violated", "deficit"]},
+    },
+}
+
+CONTENT_SELECTION_PLAN_SCHEMA: JsonObject = {
+    "schema_version": "content-selection-plan.v1",
+    "type": "object",
+    "required": ["schema_version", "sections", "entries", "constraint_report", "metadata"],
+    "properties": {
+        "schema_version": {"type": "string"},
+        "sections": {"type": "array", "items": {"type": "string"}},
+        "entries": {"type": "array", "items": CONTENT_SELECTION_ENTRY_SCHEMA},
+        "constraint_report": {"type": "array", "items": CONTENT_SELECTION_CONSTRAINT_REPORT_SCHEMA},
+        "metadata": {
+            "type": "object",
+            "required": ["target_pages", "config_snapshot"],
+            "properties": {
+                "target_pages": {},
+                "config_snapshot": {"type": "object"},
+            },
+        },
+    },
+}
+
 RESUME_CHANGE_OPERATION_SCHEMA: JsonObject = {
     "schema_version": "resume-change-operation.v1",
     "type": "object",
@@ -433,5 +506,8 @@ SCHEMAS: dict[str, JsonObject] = {
     "TermRelationship": TERM_RELATIONSHIP_SCHEMA,
     "MatchDimension": MATCH_DIMENSION_SCHEMA,
     "MatchResult": MATCH_RESULT_SCHEMA,
+    "ContentSelectionEntry": CONTENT_SELECTION_ENTRY_SCHEMA,
+    "ContentSelectionConstraintReport": CONTENT_SELECTION_CONSTRAINT_REPORT_SCHEMA,
+    "ContentSelectionPlan": CONTENT_SELECTION_PLAN_SCHEMA,
     "ResumeChangeOperation": RESUME_CHANGE_OPERATION_SCHEMA,
 }
