@@ -45,14 +45,24 @@ BOUNDARY_TEST_MODULES = [
 ]
 
 UNIT_TEST_MODULES = [
+    "tests.unit.test_bullet_selection_unit",
     "tests.unit.test_change_operation_structural",
     "tests.unit.test_enum_membership",
+    "tests.unit.test_infer_classification_unit",
     "tests.unit.test_jobmodel_jobterm_determinism",
+    "tests.unit.test_match_decision_unit",
+    "tests.unit.test_match_dimensions_unit",
+    "tests.unit.test_matching_config_unit",
     "tests.unit.test_normalize_resume_provenance",
+    "tests.unit.test_resume_config_unit",
     "tests.unit.test_resume_core_ats_sanitation_unit",
     "tests.unit.test_resume_core_config_parsing_unit",
     "tests.unit.test_resume_core_relationship_matching_unit",
     "tests.unit.test_resume_core_scoring_math_unit",
+    "tests.unit.test_selection_plan_shape_unit",
+    "tests.unit.test_selection_ranking_unit",
+    "tests.unit.test_term_relationship_resolution_unit",
+    "tests.unit.test_terminology_dimension_unit",
     "tests.unit.test_validate_resume_contracts",
 ]
 
