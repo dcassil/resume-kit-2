@@ -110,6 +110,40 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
             self.assertIn(field, run_state)
         self.assertEqual(run_state["current_checkpoint"], "INIT")
 
+    def test_same_config_runs_get_distinct_ids_and_coexisting_persisted_state(self):
+        first = self.create_run()
+        advanced = maybe_await(self.workflow.advanceCheckpoint(first, "INGEST_RESUME", {"config_validated": True}))
+        self.assertEqual(advanced["status"], "ok")
+
+        second = self.create_run()
+        self.assertNotEqual(first["run_id"], second["run_id"])
+        self.assertEqual(first["config_hash"], second["config_hash"])
+
+        runs_dir = self.workspace / ".workflow" / "runs"
+        self.assertTrue((runs_dir / f"{first['run_id']}.json").exists())
+        self.assertTrue((runs_dir / f"{second['run_id']}.json").exists())
+
+        recovered_first = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=first["run_id"]))
+        self.assertEqual(recovered_first["resume_from_checkpoint"], "INGEST_RESUME")
+        recovered_second = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=second["run_id"]))
+        self.assertEqual(recovered_second["resume_from_checkpoint"], "INIT")
+
+    def test_create_run_tolerates_malformed_workspace_index(self):
+        runs_dir = self.workspace / ".workflow" / "runs"
+        runs_dir.mkdir(parents=True)
+        (runs_dir / "index.json").write_text("[]", encoding="utf-8")
+        run_state = self.create_run()
+        index = json.loads((runs_dir / "index.json").read_text(encoding="utf-8"))
+        self.assertEqual(index.get(run_state["config_hash"]), [run_state["run_id"]])
+
+    def test_workspace_run_index_maps_config_hash_to_all_run_ids(self):
+        first = self.create_run()
+        second = self.create_run()
+        index_path = self.workspace / ".workflow" / "runs" / "index.json"
+        self.assertTrue(index_path.exists())
+        index = json.loads(index_path.read_text(encoding="utf-8"))
+        self.assertEqual(index.get(first["config_hash"]), [first["run_id"], second["run_id"]])
+
     def test_valid_transition_sequence_requires_checkpoint_evidence(self):
         run_state = self.create_run()
         transitions = [

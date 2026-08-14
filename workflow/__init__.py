@@ -38,7 +38,7 @@ _ADVANCE_REQUIREMENTS: dict[str, tuple[str, ...]] = {
 def createRun(workspace: str | Path, config: JsonObject) -> JsonObject:
     workspace_path = Path(workspace)
     config_hash = _stable_hash(config)
-    run_id = f"run_{config_hash[:16]}"
+    run_id = _new_run_id(workspace_path, config_hash)
     run_state = {
         "run_id": run_id,
         "workspace": str(workspace_path),
@@ -68,6 +68,7 @@ def createRun(workspace: str | Path, config: JsonObject) -> JsonObject:
         "already_written_facts": [],
     }
     _persist_run(run_state)
+    _index_run(workspace_path, config_hash, run_id)
     return run_state
 
 
@@ -234,6 +235,38 @@ def assertCanComplete(run_state: JsonObject) -> JsonObject:
 
 def _run_path(workspace: Path, run_id: str) -> Path:
     return workspace / ".workflow" / "runs" / f"{run_id}.json"
+
+
+def _new_run_id(workspace: Path, config_hash: str) -> str:
+    # config_hash stays a manifest field; identity must be unique per createRun
+    # so same-config runs persist side by side (RKIT-I-0022 requirement 1).
+    prefix = f"run_{config_hash[:16]}"
+    runs_dir = workspace / ".workflow" / "runs"
+    existing = {path.stem for path in runs_dir.glob(f"{prefix}*.json")} if runs_dir.exists() else set()
+    sequence = len(existing) + 1
+    run_id = f"{prefix}_{sequence:04d}"
+    while run_id in existing:
+        sequence += 1
+        run_id = f"{prefix}_{sequence:04d}"
+    return run_id
+
+
+def _index_run(workspace: Path, config_hash: str, run_id: str) -> None:
+    index_path = workspace / ".workflow" / "runs" / "index.json"
+    index: JsonObject = {}
+    if index_path.exists():
+        try:
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            index = {}
+    if not isinstance(index, dict):
+        index = {}
+    run_ids = list(index.get(config_hash, []))
+    if run_id not in run_ids:
+        run_ids.append(run_id)
+    index[config_hash] = run_ids
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    index_path.write_text(json.dumps(index, sort_keys=True, indent=2), encoding="utf-8")
 
 
 def _persist_run(run_state: JsonObject) -> None:
