@@ -61,12 +61,13 @@ resume-core
 career-store
 career-mcp
 resume-cli
-resume-agent      # extract once agent workflows grow enough
-resume-render     # extract once output/rendering grows enough
+resume-agent
+resume-render
 resume-plugin     # optional thin host/plugin adapter
+workflow          # cross-package state machine, run manifest, checkpoints
 ```
 
-For MVP, `resume-agent` and `resume-render` may initially live inside the CLI application while preserving the contracts described here. They should become separate packages once they develop independent release/testing concerns.
+The package layout is frozen: `resume-agent`, `resume-render`, and `workflow` are separate top-level packages from the start (enforced by `tests/contract/test_runtime_package_layout_contract.py`), each preserving the contracts described here.
 
 ## Dependency direction
 

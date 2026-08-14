@@ -1,5 +1,15 @@
 # Work Log
 
+## 2026-08-13 Workflow Run-Identity Fix (RKIT-I-0022 chunk 1) + Root-Doc Repairs
+
+- Session: continuation of the same interactive session; Daniel green-lit continuing down the defect table ("Do it"); branch `develop`.
+- Fixed the run-identity collision: `createRun` derived `run_id` solely from the config hash (`workflow/__init__.py:41`), so same-config runs shared one id and overwrote each other's persisted state. Now `run_<confighash16>_<NNNN>` (filesystem-derived sequence — clock-free per the suite's `frozen_time_for_ids` determinism law, a documented deviation from the initiative's timestamp/UUIDv7 sketch), plus `.workflow/runs/index.json` mapping `config_hash → [run_ids]`, with an `isinstance` guard for corrupt index content. Legacy unsuffixed ids stay recoverable and can never collide with new ids.
+- TDD: three RED-first contract tests in `tests/contract/test_workflow_contract.py` (collision/coexistence incl. the overwrite half via recoverRun checkpoint assertions, index mapping, malformed-index tolerance) — all run in the PR gate, unlike the RKIT-I-0004 e2e suite.
+- `workflow_surface.json` `createRun` description realigned to create-only (loading is `recoverRun`'s job) per the initiative's decided rejection of resume-in-place.
+- Adversarial review: 3 skeptics, 0 refutations, high confidence; all mutation probes killed. Residuals (TOCTOU race, id reuse after manual file deletion, index rebuild-on-corruption, CLI INIT-stub accumulation / audit run_identity drift → RKIT-I-0040/0024) recorded in RKIT-I-0022.
+- Root-doc repairs (HANDOFF §6 item 2): fixed the broken focused-worker command in `IMPLEMENTATION_PLAN.md` (3 spots) and `.agents/README.md` (explicit unittest module names, `python3`, `pip install -e .` prerequisite — the corrected command verified green, 18 tests); corrected `PROJECT_STRUCTURE_AND_TEST_STRATEGY.md` folder-table section numbers (resume-core +5, career-store 6, career-mcp 7) and made `run_gate.py --pr` the canonical command (matches suite_manifest); `PRODUCT_VISION_AND_CONTRACTS.md` §3 now lists `workflow` and states the frozen layout instead of "agent/render may live inside the CLI". SMOKE_TEST.md divergence deliberately left to RKIT-I-0051 REQ-011.
+- Verification: PR gate 191 tests OK, smoke OK, future-contract OK, workflow guardrails OK, tests-guardrails OK.
+
 ## 2026-08-13 validateFinalResume Applied-Operations Fix (RKIT-I-0004 chunk 1)
 
 - Session: Claude Code interactive continuation of the audit session; branch `develop`; Daniel green-lit HANDOFF §6 item 1 with "continue".

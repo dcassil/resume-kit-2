@@ -50,18 +50,18 @@ Rules:
 The canonical current test command is:
 
 ```sh
-python3 tools/run_tests.py --root .
+python3 tools/run_gate.py --pr --root .
 ```
 
-That command creates an isolated editable install from `pyproject.toml` before running the current executable contract and boundary suite. Future package API contracts remain available under `tests/contract/` and should be added to the canonical runner as implementations land.
+This matches `tests/suite_manifest.json` `runner_commands.canonical`. The gate runner creates an isolated editable install from `pyproject.toml` before running the current executable contract and boundary suite (`tools/run_tests.py` is the lower-level runner it drives; invoking it directly is equivalent but the gate entry point is canonical). Future package API contracts remain available under `tests/contract/` and should be added to the canonical runner as implementations land.
 
 ## Folder Purposes
 
 | Folder | Purpose | Primary contract source |
 |---|---|---|
-| `resume-core/` | Deterministic schemas, normalization, validation, matching, grounding, selection, and change application. | Product sections 3, 4, 12, 13, 14 |
-| `career-store/` | Local SQLite career knowledge, evidence, verification state, conflict detection, and transactional persistence. | Product section 5 |
-| `career-mcp/` | Narrow semantic MCP surface over career-store with no raw SQL or unrestricted mutation. | Product section 6 |
+| `resume-core/` | Deterministic schemas, normalization, validation, matching, grounding, selection, and change application. | Product sections 3, 4, 5, 12, 13, 14 |
+| `career-store/` | Local SQLite career knowledge, evidence, verification state, conflict detection, and transactional persistence. | Product section 6 |
+| `career-mcp/` | Narrow semantic MCP surface over career-store with no raw SQL or unrestricted mutation. | Product section 7 |
 | `resume-agent/` | Schema-constrained semantic extraction, questions, answer interpretation, and rewrite proposals. | Product section 8 |
 | `resume-render/` | Semantic-neutral Markdown/DOCX/PDF rendering, layout measurement, and rendered-output validation. | Product section 9 |
 | `resume-cli/` | Reference orchestrator and command surface for the full local workflow. | Product section 10 |

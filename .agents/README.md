@@ -12,7 +12,7 @@ Make one contract test group green at a time. Keep the first implementation smal
 
 Before handing back, run the package guardrail itself, not just a smoke check, and report the result.
 
-After edits, run only `python -m unittest tests.contract.test_<package>*contract tests.boundary.test*<package>_guardrails`; if it fails, fix before final. Do not run repo-wide gates. Do not edit guardrails/manifests/tests.
+After edits, run only `python3 -m unittest tests.contract.test_<package>_contract tests.boundary.test_<package>_guardrails` (explicit module names — unittest does not glob dotted names; requires a prior `pip install -e .` from the repo root); if it fails, fix before final. Do not run repo-wide gates. Do not edit guardrails/manifests/tests.
 
 For `resume-core`, avoid bare/helper names and method calls matching `normalize(`, `validate(`, `sanitize(`, `score(`, `get(`, `rank(`, or `apply(` unless it is an allowed public API. The guard scanner inspects public definitions/exports, but workers should still avoid names that make ownership unclear.
 
