@@ -1,4 +1,9 @@
-"""Deterministic content selection plan construction."""
+"""Deterministic content selection plan construction.
+
+Experience bullets are selected per role by relevance first, then original
+bullet order. Structural maxima are applied after ranking and before entries
+are emitted, so caller-proposed rankings cannot force over-max keep actions.
+"""
 
 from __future__ import annotations
 
@@ -7,6 +12,12 @@ from typing import Any
 from .resume_config import ResumeConfig
 from .selection_ranking import UNLINKED_RELEVANCE
 from .schemas import JsonObject
+
+
+MATCH_RELEVANCE_KEEP = "match_relevance_keep"
+UNLINKED_FILL = "unlinked_fill"
+MAX_CONSTRAINT_OVERFLOW = "max_constraint_overflow"
+UNLINKED_LOW_RELEVANCE = "unlinked_low_relevance"
 
 
 def build_content_selection_plan(
@@ -61,11 +72,7 @@ def _selection_entries(
                     "path": f"/skills/{source_index}",
                     "action": "keep" if selected else "drop",
                     "relevance": relevance["relevance"],
-                    "reason": (
-                        "Selected by deterministic relevance ranking within max_skills."
-                        if selected
-                        else "Dropped by deterministic relevance ranking beyond max_skills."
-                    ),
+                    "reason": _ranked_reason(relevance, selected),
                     "requirement_ids": relevance["requirement_ids"],
                     "fact_ids": relevance["fact_ids"],
                 }
@@ -104,11 +111,7 @@ def _role_entry(source_index: int, relevance: JsonObject, selected: bool) -> Jso
         "path": f"/experience/{source_index}",
         "action": "keep" if selected else "drop",
         "relevance": relevance["relevance"],
-        "reason": (
-            "Selected by deterministic relevance ranking within max_experience."
-            if selected
-            else "Dropped by deterministic relevance ranking beyond max_experience."
-        ),
+        "reason": _ranked_reason(relevance, selected),
         "requirement_ids": relevance["requirement_ids"],
         "fact_ids": relevance["fact_ids"],
     }
@@ -116,11 +119,11 @@ def _role_entry(source_index: int, relevance: JsonObject, selected: bool) -> Jso
 
 def _bullet_entry(source_index: int, bullet_index: int, relevance: JsonObject, selected: bool, parent_selected: bool) -> JsonObject:
     if selected:
-        reason = "Selected with parent role by deterministic relevance ranking within max_experience."
+        reason = MATCH_RELEVANCE_KEEP if _match_derived(relevance) else UNLINKED_FILL
     elif parent_selected:
-        reason = "Dropped by deterministic relevance ranking beyond max_bullets_per_role."
+        reason = MAX_CONSTRAINT_OVERFLOW if _match_derived(relevance) else UNLINKED_LOW_RELEVANCE
     else:
-        reason = "Dropped with parent role by deterministic relevance ranking beyond max_experience."
+        reason = MAX_CONSTRAINT_OVERFLOW
     return {
         "path": f"/experience/{source_index}/bullets/{bullet_index}",
         "action": "keep" if selected else "drop",
@@ -142,16 +145,39 @@ def _constraint_report(
         for index, role in enumerate(experience)
         if (_item(role, "id", f"experience_{index}") if isinstance(role, dict) else f"experience_{index}") in selected_experience
     ]
-    selected_bullet_counts = [_selected_bullet_count(role, config.bullets_per_role.max) for _index, role in selected_roles]
-    max_selected_bullet_count = max(selected_bullet_counts, default=0)
-    min_selected_bullet_count = min(selected_bullet_counts, default=0)
+    selected_bullet_counts = [
+        {
+            "role_index": index,
+            "role_id": _item(role, "id", f"experience_{index}") if isinstance(role, dict) else f"experience_{index}",
+            "path": f"/experience/{index}/bullets",
+            "actual": _selected_bullet_count(role, config.bullets_per_role.max),
+        }
+        for index, role in selected_roles
+    ]
+    count_values = [row["actual"] for row in selected_bullet_counts]
+    max_selected_bullet_count = max(count_values, default=0)
+    min_selected_bullet_count = min(count_values, default=0)
+    min_bullets_report = _min_report("min_bullets_per_role", config.bullets_per_role.min, min_selected_bullet_count)
+    role_deficits = [
+        {
+            "role_index": row["role_index"],
+            "role_id": row["role_id"],
+            "path": row["path"],
+            "limit": config.bullets_per_role.min,
+            "actual": row["actual"],
+        }
+        for row in selected_bullet_counts
+        if row["actual"] < config.bullets_per_role.min
+    ]
+    if role_deficits:
+        min_bullets_report["role_deficits"] = role_deficits
     return [
         _max_report("max_skills", config.skills.max, len(skills)),
         _min_report("min_skills", config.skills.min, len(skills)),
         _max_report("max_experience", config.experience.max, len(experience)),
         _min_report("min_experience", config.experience.min, len(experience)),
         _max_report("max_bullets_per_role", config.bullets_per_role.max, max_selected_bullet_count),
-        _min_report("min_bullets_per_role", config.bullets_per_role.min, min_selected_bullet_count),
+        min_bullets_report,
     ]
 
 
@@ -197,6 +223,16 @@ def _path_relevance(entry_relevance: dict[str, JsonObject], path: str) -> JsonOb
             "rank_key": (-UNLINKED_RELEVANCE, 0, 0, 0, -1, path),
         },
     )
+
+
+def _ranked_reason(relevance: JsonObject, selected: bool) -> str:
+    if selected:
+        return MATCH_RELEVANCE_KEEP if _match_derived(relevance) else UNLINKED_FILL
+    return MAX_CONSTRAINT_OVERFLOW if _match_derived(relevance) else UNLINKED_LOW_RELEVANCE
+
+
+def _match_derived(relevance: JsonObject) -> bool:
+    return bool(_array(_item(relevance, "requirement_ids", []))) and float(_item(relevance, "relevance", UNLINKED_RELEVANCE)) > UNLINKED_RELEVANCE
 
 
 def _item(mapping: Any, key: str, default: Any = None) -> Any:

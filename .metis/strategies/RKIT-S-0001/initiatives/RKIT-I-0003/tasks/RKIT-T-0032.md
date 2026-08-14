@@ -4,14 +4,14 @@ level: task
 title: "Chunk 4: Bullet-level selection with unconditional match-derived traceability"
 short_code: "RKIT-T-0032"
 created_at: 2026-08-14T21:14:46.083741+00:00
-updated_at: 2026-08-14T21:14:46.083741+00:00
+updated_at: 2026-08-14T21:43:50.077268+00:00
 parent: resume-core-selection-planning-and
-blocked_by: ["RKIT-T-0031"]
+blocked_by: [RKIT-T-0031]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,10 @@ initiative_id: RKIT-I-0003
 ## Objective
 
 Extend selection to bullet granularity: plan entries address individual experience bullets by JSON path (not whole sections), `resume.bulletsPerRole` min/max enforce per role, and every match-derived keep/drop decision unconditionally carries reason + requirementIds/factIds (tightening the old "when supplied" wording). Also enforce that agent output cannot override structural maxima (regression-guarded).
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
