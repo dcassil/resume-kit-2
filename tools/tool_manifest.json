@@ -7,9 +7,7 @@
     "snapshot_review_helpers",
     "architecture_import_checkers",
     "migration_checkers",
-    "release_checks",
-    "audit_validators",
-    "render_parse_back_validators"
+    "release_checks"
   ],
   "release_blocking_expectations": [
     "build_package_import_success",
@@ -135,6 +133,26 @@
       "writes": [],
       "release_blocking": true,
       "description": "Validates stable fixture truth, exact answer text, invalid operations, and reviewed expected snapshots."
+    },
+    {
+      "path": "tools/regenerate_expected_snapshots.py",
+      "kind": "snapshot_review_helper",
+      "supports_gate": ["pr", "main", "release"],
+      "invokes_surfaces": ["resume-core public APIs", "tests/support/snapshot_compare.py", "fixture files"],
+      "reads": ["fixtures/resumes/", "fixtures/jobs/", "fixtures/answers/", "fixtures/operations/", "fixtures/fixture_manifest.json", "fixtures/expected/", "resume-core/", "tests/support/snapshot_compare.py"],
+      "writes": ["fixtures/expected/ when run with --write"],
+      "release_blocking": true,
+      "description": "Regenerates canonical expected snapshot data blocks from fixture inputs and resume-core public APIs, printing JSON by default and updating fixtures/expected only when --write is supplied."
+    },
+    {
+      "path": "tools/run_migration_checks.py",
+      "kind": "migration_checker",
+      "supports_gate": ["pr", "main", "release"],
+      "invokes_surfaces": ["career-store public migration API", "fixtures/migrations/expected-post-migration.json", "fixtures/migrations/previous-schema-career.db"],
+      "reads": ["career-store/", "resume-core/", "fixtures/migrations/expected-post-migration.json", "fixtures/migrations/previous-schema-career.db"],
+      "writes": ["temporary SQLite migration check workspaces"],
+      "release_blocking": true,
+      "description": "Runs deterministic career-store migration checks for fresh migration, idempotent re-run, upgrade from the previous schema fixture, and destructive-change detection."
     },
     {
       "path": "tools/tests_guardrails.py",

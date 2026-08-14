@@ -27,8 +27,6 @@ class ToolsContractTests(unittest.TestCase):
                 "architecture_import_checkers",
                 "migration_checkers",
                 "release_checks",
-                "audit_validators",
-                "render_parse_back_validators",
             },
         )
 

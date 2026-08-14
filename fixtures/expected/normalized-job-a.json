@@ -7,5 +7,939 @@
     "required 8+ years, React, TypeScript, API architecture/design, responsive design, SaaS",
     "preferred AWS, GraphQL, technical leadership",
     "every requirement retains source text and normalized terms"
-  ]
+  ],
+  "comment": [
+    "required 8+ years, React, TypeScript, API architecture/design, responsive design, SaaS",
+    "preferred AWS, GraphQL, technical leadership",
+    "every requirement retains source text and normalized terms"
+  ],
+  "data": {
+    "job_model": {
+      "company": "Example Product Platform",
+      "domains": [
+        "API architecture",
+        "Cloud infrastructure",
+        "Responsive design",
+        "Full-stack software development"
+      ],
+      "industries": [
+        "SaaS"
+      ],
+      "job_id": "job-a",
+      "metadata": {},
+      "preferred": [
+        {
+          "classification": "preferred",
+          "concept": "AWS experience.",
+          "importance": "medium",
+          "normalized_terms": [
+            "amazon web services",
+            "aws"
+          ],
+          "requirement_id": "fixture_req_5_a1cdaa2a",
+          "source_text": "AWS experience.",
+          "weight": 3.0,
+          "years": null
+        },
+        {
+          "classification": "preferred",
+          "concept": "GraphQL API experience.",
+          "importance": "medium",
+          "normalized_terms": [
+            "api",
+            "apis",
+            "graph ql",
+            "graphql",
+            "rest api",
+            "rest apis"
+          ],
+          "requirement_id": "fixture_req_6_3ef16ea5",
+          "source_text": "GraphQL API experience.",
+          "weight": 3.0,
+          "years": null
+        },
+        {
+          "classification": "preferred",
+          "concept": "Technical leadership through mentoring, design review, or cross-team architecture work.",
+          "importance": "medium",
+          "normalized_terms": [
+            "architecture",
+            "code review",
+            "cross",
+            "cross team architecture",
+            "delivery planning",
+            "design review",
+            "leadership",
+            "led a small team",
+            "mentoring",
+            "review",
+            "team",
+            "team leadership",
+            "technical",
+            "technical leadership",
+            "work"
+          ],
+          "requirement_id": "fixture_req_7_b8f2ddc2",
+          "source_text": "Technical leadership through mentoring, design review, or cross-team architecture work.",
+          "weight": 3.0,
+          "years": null
+        }
+      ],
+      "requirements": [
+        {
+          "classification": "required",
+          "concept": "8+ years of software engineering experience building production applications.",
+          "importance": "high",
+          "normalized_terms": [
+            "8 years",
+            "engineering",
+            "full stack software development",
+            "software",
+            "software development",
+            "software engineering",
+            "software engineering experience",
+            "years"
+          ],
+          "requirement_id": "fixture_req_0_58105daf",
+          "source_text": "8+ years of software engineering experience building production applications.",
+          "weight": 10.0,
+          "years": "8+ years"
+        },
+        {
+          "classification": "required",
+          "concept": "Strong React and TypeScript experience.",
+          "importance": "high",
+          "normalized_terms": [
+            "react",
+            "type script",
+            "typescript"
+          ],
+          "requirement_id": "fixture_req_1_3ff8909e",
+          "source_text": "Strong React and TypeScript experience.",
+          "weight": 10.0,
+          "years": null
+        },
+        {
+          "classification": "required",
+          "concept": "Experience with API architecture/design for distributed product systems.",
+          "importance": "high",
+          "normalized_terms": [
+            "api",
+            "api architecture",
+            "api architecture design",
+            "api design",
+            "apis",
+            "application architecture",
+            "architecture",
+            "designed apis",
+            "designed rest apis",
+            "rest api",
+            "rest api design",
+            "rest apis"
+          ],
+          "requirement_id": "fixture_req_2_e55af3cd",
+          "source_text": "Experience with API architecture/design for distributed product systems.",
+          "weight": 10.0,
+          "years": null
+        },
+        {
+          "classification": "required",
+          "concept": "Experience delivering responsive design across desktop and mobile surfaces.",
+          "importance": "high",
+          "normalized_terms": [
+            "across",
+            "desktop",
+            "desktop and mobile",
+            "mobile",
+            "responsive",
+            "responsive apps",
+            "responsive design",
+            "responsive web applications",
+            "responsive web apps",
+            "surfaces"
+          ],
+          "requirement_id": "fixture_req_3_fd10e4a4",
+          "source_text": "Experience delivering responsive design across desktop and mobile surfaces.",
+          "weight": 10.0,
+          "years": null
+        },
+        {
+          "classification": "required",
+          "concept": "Background building or operating SaaS products.",
+          "importance": "high",
+          "normalized_terms": [
+            "multi tenant saas",
+            "saas",
+            "software as a service"
+          ],
+          "requirement_id": "fixture_req_4_8f8157ef",
+          "source_text": "Background building or operating SaaS products.",
+          "weight": 10.0,
+          "years": null
+        }
+      ],
+      "schema_version": "job-model.v1",
+      "seniority": "staff",
+      "source": {
+        "kind": "fixture",
+        "path": "fixtures/jobs/job-a-staff-software-engineer.txt"
+      },
+      "terminology": [
+        {
+          "canonical": "staff",
+          "source": "title",
+          "surface": "Staff",
+          "weight": 1.0
+        },
+        {
+          "canonical": "software",
+          "source": "title",
+          "surface": "Software",
+          "weight": 1.0
+        },
+        {
+          "canonical": "engineer",
+          "source": "title",
+          "surface": "Engineer",
+          "weight": 1.0
+        },
+        {
+          "canonical": "8 years of software engineering experience building production applications",
+          "source": "requirement",
+          "surface": "8+ years of software engineering experience building production applications.",
+          "weight": 10.0
+        },
+        {
+          "canonical": "8 years",
+          "source": "requirement",
+          "surface": "8+ years",
+          "weight": 10.0
+        },
+        {
+          "canonical": "engineering",
+          "source": "requirement",
+          "surface": "engineering",
+          "weight": 10.0
+        },
+        {
+          "canonical": "full stack software development",
+          "source": "requirement",
+          "surface": "full stack software development",
+          "weight": 10.0
+        },
+        {
+          "canonical": "software",
+          "source": "requirement",
+          "surface": "software",
+          "weight": 10.0
+        },
+        {
+          "canonical": "software development",
+          "source": "requirement",
+          "surface": "software development",
+          "weight": 10.0
+        },
+        {
+          "canonical": "software engineering",
+          "source": "requirement",
+          "surface": "software engineering",
+          "weight": 10.0
+        },
+        {
+          "canonical": "software engineering experience",
+          "source": "requirement",
+          "surface": "software engineering experience",
+          "weight": 10.0
+        },
+        {
+          "canonical": "years",
+          "source": "requirement",
+          "surface": "years",
+          "weight": 10.0
+        },
+        {
+          "canonical": "strong react and typescript experience",
+          "source": "requirement",
+          "surface": "Strong React and TypeScript experience.",
+          "weight": 10.0
+        },
+        {
+          "canonical": "react",
+          "source": "requirement",
+          "surface": "React",
+          "weight": 10.0
+        },
+        {
+          "canonical": "type script",
+          "source": "requirement",
+          "surface": "type script",
+          "weight": 10.0
+        },
+        {
+          "canonical": "typescript",
+          "source": "requirement",
+          "surface": "TypeScript",
+          "weight": 10.0
+        },
+        {
+          "canonical": "experience with api architecture design for distributed product systems",
+          "source": "requirement",
+          "surface": "Experience with API architecture/design for distributed product systems.",
+          "weight": 10.0
+        },
+        {
+          "canonical": "api",
+          "source": "requirement",
+          "surface": "API",
+          "weight": 10.0
+        },
+        {
+          "canonical": "api architecture",
+          "source": "requirement",
+          "surface": "API architecture",
+          "weight": 10.0
+        },
+        {
+          "canonical": "api architecture design",
+          "source": "requirement",
+          "surface": "API architecture/design",
+          "weight": 10.0
+        },
+        {
+          "canonical": "api design",
+          "source": "requirement",
+          "surface": "api design",
+          "weight": 10.0
+        },
+        {
+          "canonical": "apis",
+          "source": "requirement",
+          "surface": "apis",
+          "weight": 10.0
+        },
+        {
+          "canonical": "application architecture",
+          "source": "requirement",
+          "surface": "application architecture",
+          "weight": 10.0
+        },
+        {
+          "canonical": "architecture",
+          "source": "requirement",
+          "surface": "architecture",
+          "weight": 10.0
+        },
+        {
+          "canonical": "designed apis",
+          "source": "requirement",
+          "surface": "designed apis",
+          "weight": 10.0
+        },
+        {
+          "canonical": "designed rest apis",
+          "source": "requirement",
+          "surface": "designed rest apis",
+          "weight": 10.0
+        },
+        {
+          "canonical": "rest api",
+          "source": "requirement",
+          "surface": "rest api",
+          "weight": 10.0
+        },
+        {
+          "canonical": "rest api design",
+          "source": "requirement",
+          "surface": "rest api design",
+          "weight": 10.0
+        },
+        {
+          "canonical": "rest apis",
+          "source": "requirement",
+          "surface": "rest apis",
+          "weight": 10.0
+        },
+        {
+          "canonical": "experience delivering responsive design across desktop and mobile surfaces",
+          "source": "requirement",
+          "surface": "Experience delivering responsive design across desktop and mobile surfaces.",
+          "weight": 10.0
+        },
+        {
+          "canonical": "across",
+          "source": "requirement",
+          "surface": "across",
+          "weight": 10.0
+        },
+        {
+          "canonical": "desktop",
+          "source": "requirement",
+          "surface": "desktop",
+          "weight": 10.0
+        },
+        {
+          "canonical": "desktop and mobile",
+          "source": "requirement",
+          "surface": "desktop and mobile",
+          "weight": 10.0
+        },
+        {
+          "canonical": "mobile",
+          "source": "requirement",
+          "surface": "mobile",
+          "weight": 10.0
+        },
+        {
+          "canonical": "responsive",
+          "source": "requirement",
+          "surface": "responsive",
+          "weight": 10.0
+        },
+        {
+          "canonical": "responsive apps",
+          "source": "requirement",
+          "surface": "responsive apps",
+          "weight": 10.0
+        },
+        {
+          "canonical": "responsive design",
+          "source": "requirement",
+          "surface": "responsive design",
+          "weight": 10.0
+        },
+        {
+          "canonical": "responsive web applications",
+          "source": "requirement",
+          "surface": "responsive web applications",
+          "weight": 10.0
+        },
+        {
+          "canonical": "responsive web apps",
+          "source": "requirement",
+          "surface": "responsive web apps",
+          "weight": 10.0
+        },
+        {
+          "canonical": "surfaces",
+          "source": "requirement",
+          "surface": "surfaces",
+          "weight": 10.0
+        },
+        {
+          "canonical": "background building or operating saas products",
+          "source": "requirement",
+          "surface": "Background building or operating SaaS products.",
+          "weight": 10.0
+        },
+        {
+          "canonical": "multi tenant saas",
+          "source": "requirement",
+          "surface": "multi tenant saas",
+          "weight": 10.0
+        },
+        {
+          "canonical": "saas",
+          "source": "requirement",
+          "surface": "SaaS",
+          "weight": 10.0
+        },
+        {
+          "canonical": "software as a service",
+          "source": "requirement",
+          "surface": "software as a service",
+          "weight": 10.0
+        },
+        {
+          "canonical": "aws experience",
+          "source": "requirement",
+          "surface": "AWS experience.",
+          "weight": 3.0
+        },
+        {
+          "canonical": "amazon web services",
+          "source": "requirement",
+          "surface": "amazon web services",
+          "weight": 3.0
+        },
+        {
+          "canonical": "aws",
+          "source": "requirement",
+          "surface": "AWS",
+          "weight": 3.0
+        },
+        {
+          "canonical": "graphql api experience",
+          "source": "requirement",
+          "surface": "GraphQL API experience.",
+          "weight": 3.0
+        },
+        {
+          "canonical": "graph ql",
+          "source": "requirement",
+          "surface": "graph ql",
+          "weight": 3.0
+        },
+        {
+          "canonical": "graphql",
+          "source": "requirement",
+          "surface": "GraphQL",
+          "weight": 3.0
+        },
+        {
+          "canonical": "technical leadership through mentoring design review or cross team architecture work",
+          "source": "requirement",
+          "surface": "Technical leadership through mentoring, design review, or cross-team architecture work.",
+          "weight": 3.0
+        },
+        {
+          "canonical": "code review",
+          "source": "requirement",
+          "surface": "code review",
+          "weight": 3.0
+        },
+        {
+          "canonical": "cross",
+          "source": "requirement",
+          "surface": "cross",
+          "weight": 3.0
+        },
+        {
+          "canonical": "cross team architecture",
+          "source": "requirement",
+          "surface": "cross-team architecture",
+          "weight": 3.0
+        },
+        {
+          "canonical": "delivery planning",
+          "source": "requirement",
+          "surface": "delivery planning",
+          "weight": 3.0
+        },
+        {
+          "canonical": "design review",
+          "source": "requirement",
+          "surface": "design review",
+          "weight": 3.0
+        },
+        {
+          "canonical": "leadership",
+          "source": "requirement",
+          "surface": "leadership",
+          "weight": 3.0
+        },
+        {
+          "canonical": "led a small team",
+          "source": "requirement",
+          "surface": "led a small team",
+          "weight": 3.0
+        },
+        {
+          "canonical": "mentoring",
+          "source": "requirement",
+          "surface": "mentoring",
+          "weight": 3.0
+        },
+        {
+          "canonical": "review",
+          "source": "requirement",
+          "surface": "review",
+          "weight": 3.0
+        },
+        {
+          "canonical": "team",
+          "source": "requirement",
+          "surface": "team",
+          "weight": 3.0
+        },
+        {
+          "canonical": "team leadership",
+          "source": "requirement",
+          "surface": "team leadership",
+          "weight": 3.0
+        },
+        {
+          "canonical": "technical",
+          "source": "requirement",
+          "surface": "Technical",
+          "weight": 3.0
+        },
+        {
+          "canonical": "technical leadership",
+          "source": "requirement",
+          "surface": "Technical leadership",
+          "weight": 3.0
+        },
+        {
+          "canonical": "work",
+          "source": "requirement",
+          "surface": "work",
+          "weight": 3.0
+        },
+        {
+          "canonical": "staff software engineer example product platform required qualifications 8 years of software engineering experience building production applications strong react and typescript experience experience with api architecture design for distributed product systems experience delivering responsive design across desktop and mobile surfaces background building or operating saas products preferred qualifications aws experience graphql api experience technical leadership through mentoring design review or cross team architecture work",
+          "source": "description",
+          "surface": "Staff Software Engineer\nExample Product Platform\n\nRequired qualifications:\n- 8+ years of software engineering experience building production applications.\n- Strong React and TypeScript experience.\n- Experience with API architecture/design for distributed product systems.\n- Experience delivering responsive design across desktop and mobile surfaces.\n- Background building or operating SaaS products.\n\nPreferred qualifications:\n- AWS experience.\n- GraphQL API experience.\n- Technical leadership through mentoring, design review, or cross-team architecture work.",
+          "weight": 1.0
+        },
+        {
+          "canonical": "staff",
+          "source": "description",
+          "surface": "Staff",
+          "weight": 1.0
+        },
+        {
+          "canonical": "software",
+          "source": "description",
+          "surface": "Software",
+          "weight": 1.0
+        },
+        {
+          "canonical": "engineer",
+          "source": "description",
+          "surface": "Engineer",
+          "weight": 1.0
+        },
+        {
+          "canonical": "example",
+          "source": "description",
+          "surface": "Example",
+          "weight": 1.0
+        },
+        {
+          "canonical": "platform",
+          "source": "description",
+          "surface": "Platform",
+          "weight": 1.0
+        },
+        {
+          "canonical": "years",
+          "source": "description",
+          "surface": "years",
+          "weight": 1.0
+        },
+        {
+          "canonical": "engineering",
+          "source": "description",
+          "surface": "engineering",
+          "weight": 1.0
+        },
+        {
+          "canonical": "react",
+          "source": "description",
+          "surface": "React",
+          "weight": 1.0
+        },
+        {
+          "canonical": "typescript",
+          "source": "description",
+          "surface": "TypeScript",
+          "weight": 1.0
+        },
+        {
+          "canonical": "api",
+          "source": "description",
+          "surface": "API",
+          "weight": 1.0
+        },
+        {
+          "canonical": "architecture",
+          "source": "description",
+          "surface": "architecture",
+          "weight": 1.0
+        },
+        {
+          "canonical": "responsive",
+          "source": "description",
+          "surface": "responsive",
+          "weight": 1.0
+        },
+        {
+          "canonical": "across",
+          "source": "description",
+          "surface": "across",
+          "weight": 1.0
+        },
+        {
+          "canonical": "desktop",
+          "source": "description",
+          "surface": "desktop",
+          "weight": 1.0
+        },
+        {
+          "canonical": "mobile",
+          "source": "description",
+          "surface": "mobile",
+          "weight": 1.0
+        },
+        {
+          "canonical": "surfaces",
+          "source": "description",
+          "surface": "surfaces",
+          "weight": 1.0
+        },
+        {
+          "canonical": "saas",
+          "source": "description",
+          "surface": "SaaS",
+          "weight": 1.0
+        },
+        {
+          "canonical": "aws",
+          "source": "description",
+          "surface": "AWS",
+          "weight": 1.0
+        },
+        {
+          "canonical": "graphql",
+          "source": "description",
+          "surface": "GraphQL",
+          "weight": 1.0
+        },
+        {
+          "canonical": "technical",
+          "source": "description",
+          "surface": "Technical",
+          "weight": 1.0
+        },
+        {
+          "canonical": "leadership",
+          "source": "description",
+          "surface": "leadership",
+          "weight": 1.0
+        },
+        {
+          "canonical": "mentoring",
+          "source": "description",
+          "surface": "mentoring",
+          "weight": 1.0
+        },
+        {
+          "canonical": "review",
+          "source": "description",
+          "surface": "review",
+          "weight": 1.0
+        },
+        {
+          "canonical": "cross team",
+          "source": "description",
+          "surface": "cross-team",
+          "weight": 1.0
+        },
+        {
+          "canonical": "work",
+          "source": "description",
+          "surface": "work",
+          "weight": 1.0
+        },
+        {
+          "canonical": "8 years",
+          "source": "description",
+          "surface": "8+ years",
+          "weight": 1.0
+        },
+        {
+          "canonical": "amazon web services",
+          "source": "description",
+          "surface": "amazon web services",
+          "weight": 1.0
+        },
+        {
+          "canonical": "api architecture",
+          "source": "description",
+          "surface": "API architecture",
+          "weight": 1.0
+        },
+        {
+          "canonical": "api architecture design",
+          "source": "description",
+          "surface": "API architecture/design",
+          "weight": 1.0
+        },
+        {
+          "canonical": "api design",
+          "source": "description",
+          "surface": "api design",
+          "weight": 1.0
+        },
+        {
+          "canonical": "apis",
+          "source": "description",
+          "surface": "apis",
+          "weight": 1.0
+        },
+        {
+          "canonical": "application architecture",
+          "source": "description",
+          "surface": "application architecture",
+          "weight": 1.0
+        },
+        {
+          "canonical": "code review",
+          "source": "description",
+          "surface": "code review",
+          "weight": 1.0
+        },
+        {
+          "canonical": "cross",
+          "source": "description",
+          "surface": "cross",
+          "weight": 1.0
+        },
+        {
+          "canonical": "cross team architecture",
+          "source": "description",
+          "surface": "cross-team architecture",
+          "weight": 1.0
+        },
+        {
+          "canonical": "delivery planning",
+          "source": "description",
+          "surface": "delivery planning",
+          "weight": 1.0
+        },
+        {
+          "canonical": "design review",
+          "source": "description",
+          "surface": "design review",
+          "weight": 1.0
+        },
+        {
+          "canonical": "designed apis",
+          "source": "description",
+          "surface": "designed apis",
+          "weight": 1.0
+        },
+        {
+          "canonical": "designed rest apis",
+          "source": "description",
+          "surface": "designed rest apis",
+          "weight": 1.0
+        },
+        {
+          "canonical": "desktop and mobile",
+          "source": "description",
+          "surface": "desktop and mobile",
+          "weight": 1.0
+        },
+        {
+          "canonical": "full stack software development",
+          "source": "description",
+          "surface": "full stack software development",
+          "weight": 1.0
+        },
+        {
+          "canonical": "graph ql",
+          "source": "description",
+          "surface": "graph ql",
+          "weight": 1.0
+        },
+        {
+          "canonical": "led a small team",
+          "source": "description",
+          "surface": "led a small team",
+          "weight": 1.0
+        },
+        {
+          "canonical": "multi tenant saas",
+          "source": "description",
+          "surface": "multi tenant saas",
+          "weight": 1.0
+        },
+        {
+          "canonical": "responsive apps",
+          "source": "description",
+          "surface": "responsive apps",
+          "weight": 1.0
+        },
+        {
+          "canonical": "responsive design",
+          "source": "description",
+          "surface": "responsive design",
+          "weight": 1.0
+        },
+        {
+          "canonical": "responsive web applications",
+          "source": "description",
+          "surface": "responsive web applications",
+          "weight": 1.0
+        },
+        {
+          "canonical": "responsive web apps",
+          "source": "description",
+          "surface": "responsive web apps",
+          "weight": 1.0
+        },
+        {
+          "canonical": "rest api",
+          "source": "description",
+          "surface": "rest api",
+          "weight": 1.0
+        },
+        {
+          "canonical": "rest api design",
+          "source": "description",
+          "surface": "rest api design",
+          "weight": 1.0
+        },
+        {
+          "canonical": "rest apis",
+          "source": "description",
+          "surface": "rest apis",
+          "weight": 1.0
+        },
+        {
+          "canonical": "software as a service",
+          "source": "description",
+          "surface": "software as a service",
+          "weight": 1.0
+        },
+        {
+          "canonical": "software development",
+          "source": "description",
+          "surface": "software development",
+          "weight": 1.0
+        },
+        {
+          "canonical": "software engineering",
+          "source": "description",
+          "surface": "software engineering",
+          "weight": 1.0
+        },
+        {
+          "canonical": "software engineering experience",
+          "source": "description",
+          "surface": "software engineering experience",
+          "weight": 1.0
+        },
+        {
+          "canonical": "team",
+          "source": "description",
+          "surface": "team",
+          "weight": 1.0
+        },
+        {
+          "canonical": "team leadership",
+          "source": "description",
+          "surface": "team leadership",
+          "weight": 1.0
+        },
+        {
+          "canonical": "technical leadership",
+          "source": "description",
+          "surface": "Technical leadership",
+          "weight": 1.0
+        },
+        {
+          "canonical": "type script",
+          "source": "description",
+          "surface": "type script",
+          "weight": 1.0
+        }
+      ],
+      "title": "Staff Software Engineer"
+    },
+    "schema_version": "resume-core.result.v1",
+    "status": "ok",
+    "warnings": []
+  }
 }

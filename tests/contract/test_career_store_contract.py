@@ -101,9 +101,21 @@ class CareerStoreSurfaceManifestTests(unittest.TestCase):
         )
 
     def test_manifest_keeps_truth_states_distinct(self):
-        self.assertTrue({"source_stated", "user_verified", "inferred", "unknown", "explicitly_missing", "conflicted"} <= VERIFICATION_STATES)
+        self.assertEqual(VERIFICATION_STATES, {"source_stated", "user_verified", "imported", "inferred", "unknown"})
         self.assertTrue({"alias", "equivalent", "related", "contradicts"} <= RELATIONSHIP_TYPES)
-        self.assertTrue({"exact_match", "alias_match", "related_match", "possible_match", "unknown"} <= RESOLUTION_STATES)
+        self.assertEqual(
+            RESOLUTION_STATES,
+            {
+                "exact_match",
+                "alias_match",
+                "verified_fact_match",
+                "related_match",
+                "possible_match",
+                "unknown",
+                "explicitly_missing",
+                "not_applicable",
+            },
+        )
 
     def test_manifest_defines_safe_contracts_for_every_surface(self):
         surfaces = {surface["name"]: surface for surface in SURFACE["surfaces"]}

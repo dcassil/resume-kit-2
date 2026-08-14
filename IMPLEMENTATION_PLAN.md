@@ -67,7 +67,7 @@ When handing work to another agent, include:
 - The current expected red/green state for that package.
 - The exact test command the agent should make green first.
 - The exact guardrail command the agent must run before and after edits.
-- The focused final command: `python -m unittest tests.contract.test_<package>*contract tests.boundary.test*<package>_guardrails`.
+- The focused final command: `python3 -m unittest tests.contract.test_<package>_contract tests.boundary.test_<package>_guardrails` (explicit module names — unittest does not glob dotted names; requires a prior `pip install -e .` from the repo root).
 - Any known blockers, assumptions, or intentionally deferred behavior.
 
 Agents receiving a handoff must:
@@ -76,7 +76,7 @@ Agents receiving a handoff must:
 - Start by running the named package guardrail and package contract suite.
 - Make one test group green at a time before broadening scope.
 - Keep the first implementation small and contract-driven; do not write broad modules before the first focused contract group is green.
-- After edits, run only `python -m unittest tests.contract.test_<package>*contract tests.boundary.test*<package>_guardrails`; if it fails, fix before final. Do not run repo-wide gates. Do not edit guardrails/manifests/tests.
+- After edits, run only `python3 -m unittest tests.contract.test_<package>_contract tests.boundary.test_<package>_guardrails`; if it fails, fix before final. Do not run repo-wide gates. Do not edit guardrails/manifests/tests.
 - Preserve all existing guards, boundary tests, manifests, fixture truth, and suite gates.
 - Report whether remaining failures are expected TDD failures or real regressions.
 - Stop and ask the user before changing cross-package contracts, ownership boundaries, or fixture truth.
@@ -113,10 +113,10 @@ Work from narrow to broad:
 4. Related integration or fixture tests.
 5. `python3 tools/run_gate.py --pr --root .`.
 
-For focused package workers, use only the package contract plus package boundary guardrail command:
+For focused package workers, use only the package contract plus package boundary guardrail command (explicit module names — unittest does not glob dotted names; run `pip install -e .` from the repo root once first, or the packages will not import):
 
 ```bash
-python -m unittest tests.contract.test_<package>*contract tests.boundary.test*<package>_guardrails
+python3 -m unittest tests.contract.test_<package>_contract tests.boundary.test_<package>_guardrails
 ```
 
 Do not run repo-wide gates from worker prompts unless the handoff explicitly says the package is complete and ready for orchestration-level validation.

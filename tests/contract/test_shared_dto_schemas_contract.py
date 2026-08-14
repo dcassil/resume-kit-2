@@ -33,10 +33,20 @@ class SharedDtoSchemaContractTests(unittest.TestCase):
             "Result": {"schema_version", "status"},
             "Error": {"code", "message", "severity"},
             "CanonicalResume": {"schema_version", "resume_id", "source", "experience", "skills", "education"},
-            "JobModel": {"schema_version", "job_id", "requirements"},
+            "JobModel": {"schema_version", "job_id", "requirements", "preferred", "industries", "domains", "terminology"},
             "JobRequirement": {"requirement_id", "classification", "concept", "importance", "weight", "source_text", "normalized_terms"},
             "MatchResult": {"schema_version", "match_id", "job_id", "resume_id", "score", "max_score", "requirement_results"},
-            "ResumeChangeOperation": {"schema_version", "operation_id", "status", "op", "path"},
+            "ResumeChangeOperation": {
+                "schema_version",
+                "operation_id",
+                "status",
+                "op",
+                "path",
+                "reason",
+                "linked_requirement_ids",
+                "linked_fact_ids",
+                "provenance",
+            },
         }
         for schema_name, required_fields in expected.items():
             with self.subTest(schema_name=schema_name):
@@ -45,7 +55,7 @@ class SharedDtoSchemaContractTests(unittest.TestCase):
     def test_resume_core_enums_preserve_truth_and_match_states(self):
         self.assertEqual(
             {state.value for state in resume_core.VerificationState},
-            {"source_stated", "user_verified", "inferred", "unknown", "explicitly_missing", "conflicted"},
+            {"source_stated", "user_verified", "imported", "inferred", "unknown"},
         )
         self.assertEqual(
             {state.value for state in resume_core.ResolutionState},
@@ -57,7 +67,7 @@ class SharedDtoSchemaContractTests(unittest.TestCase):
                 "possible_match",
                 "unknown",
                 "explicitly_missing",
-                "conflicted",
+                "not_applicable",
             },
         )
 

@@ -4,7 +4,7 @@
 
 `src/signing/` owns human authorization, key material, signatures, and password-protected private key storage.
 
-Verification must require only public material. Mutation must require private signing authority unlocked by a human password.
+Verification must require only public material. Registration must require the master password. Protected-file mutation must require private local signing authority unlocked by a local human password.
 
 ## Expected Files
 
@@ -55,7 +55,9 @@ Use Node built-in `node:crypto` before adding dependencies.
 Repo-readable:
 
 ```text
-.straight-jacket/public-key.json
+.straight-jacket/registration-public-key.json
+.straight-jacket/signers.json
+.straight-jacket/signers.sig
 ```
 
 Ignored local private material:

@@ -35,6 +35,8 @@ Use a small deterministic resume containing:
 - A bullet using the phrase `responsive web apps`
 - At least one smart quote/non-breaking-space/odd bullet character to test sanitation
 
+Use `fixtures/resumes/resume-main.txt`.
+
 ## Job fixture
 
 Use a job description containing:
@@ -45,11 +47,17 @@ Required:
 - React
 - API design
 - Responsive design
+- SaaS
 
 Preferred:
 
 - AWS
-- SaaS
+
+Use `fixtures/jobs/job-a-staff-software-engineer.txt`.
+
+## Answer fixture
+
+Use `fixtures/answers/aws.txt` for the AWS gap-resolution answer.
 
 The fixture should deliberately use wording that differs slightly from the resume while remaining legitimately equivalent.
 
@@ -98,7 +106,7 @@ Expected:
 Run:
 
 ```text
-resume ingest fixtures/resume-smoke.*
+resume ingest fixtures/resumes/resume-main.txt
 ```
 
 Expected:
@@ -155,7 +163,7 @@ Expected:
 Run:
 
 ```text
-resume job ingest fixtures/job-smoke.txt
+resume job ingest fixtures/jobs/job-a-staff-software-engineer.txt
 ```
 
 Expected:
@@ -180,7 +188,7 @@ Expected:
 - API design resolves or becomes a legitimate related/verified-fact match.
 - Responsive design is recognized as exact/alias/related or becomes a resolution candidate.
 - AWS remains missing/unresolved.
-- SaaS status follows fixture truth.
+- SaaS is classified as required, matching fixture truth.
 - Requirement-level reasoning is visible.
 
 Run the same score again without changing state.
@@ -200,7 +208,7 @@ Expected:
 - Code, not agent, selects what needs resolution.
 - Agent question references only selected requirement context.
 
-Answer fixture question with a known confirmation, for example:
+Answer fixture question with `fixtures/answers/aws.txt`, for example:
 
 ```text
 Yes, I used AWS for about 6 years, primarily EC2, S3, Lambda, and RDS.

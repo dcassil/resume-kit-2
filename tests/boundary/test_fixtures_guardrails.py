@@ -91,6 +91,48 @@ class FixturesGuardrailTests(unittest.TestCase):
         finally:
             shutil.rmtree(temp)
 
+    def test_snapshot_without_data_envelope_is_hard_blocked(self):
+        temp = make_temp_repo()
+        try:
+            snapshot = temp / "fixtures" / "expected" / "run-manifest.json"
+            data = json.loads(snapshot.read_text(encoding="utf-8"))
+            del data["data"]
+            snapshot.write_text(json.dumps(data), encoding="utf-8")
+            result = run_guardrail(temp)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Expected snapshot is missing 'data'", result.stdout)
+            self.assertIn("T-0012 expected snapshot envelope", result.stdout)
+        finally:
+            shutil.rmtree(temp)
+
+    def test_snapshot_without_comment_is_hard_blocked(self):
+        temp = make_temp_repo()
+        try:
+            snapshot = temp / "fixtures" / "expected" / "run-manifest.json"
+            data = json.loads(snapshot.read_text(encoding="utf-8"))
+            del data["comment"]
+            snapshot.write_text(json.dumps(data), encoding="utf-8")
+            result = run_guardrail(temp)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Expected snapshot is missing 'comment'", result.stdout)
+            self.assertIn("T-0012 expected snapshot envelope", result.stdout)
+        finally:
+            shutil.rmtree(temp)
+
+    def test_snapshot_null_data_without_deferral_comment_is_hard_blocked(self):
+        temp = make_temp_repo()
+        try:
+            snapshot = temp / "fixtures" / "expected" / "run-manifest.json"
+            data = json.loads(snapshot.read_text(encoding="utf-8"))
+            data["data"] = None
+            snapshot.write_text(json.dumps(data), encoding="utf-8")
+            result = run_guardrail(temp)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("data=null without a comment explaining the deferral", result.stdout)
+            self.assertIn("Populate data with structured snapshot contents", result.stdout)
+        finally:
+            shutil.rmtree(temp)
+
     def test_operation_targeting_unknown_path_is_hard_blocked(self):
         temp = make_temp_repo()
         try:

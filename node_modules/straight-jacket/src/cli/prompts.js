@@ -11,7 +11,7 @@ export async function readPromptLines(stdin) {
 
 export async function readPassword(stdin, stderr) {
   if (stdin.isTTY && stderr?.isTTY) {
-    return readHiddenLine(stdin, stderr, "Straight Jacket password: ");
+    return readHiddenLine(stdin, stderr, "Straight Jacket local password: ");
   }
 
   const [password] = await readPromptLines(stdin);
@@ -19,9 +19,52 @@ export async function readPassword(stdin, stderr) {
 }
 
 export async function readPasswordConfirmation(stdin, stderr) {
+  return readNamedPasswordConfirmation(stdin, stderr, {
+    passwordPrompt: "Create Straight Jacket local password: ",
+    confirmationPrompt: "Confirm Straight Jacket local password: "
+  });
+}
+
+export async function readMasterAndLocalPasswordConfirmation(stdin, stderr) {
   if (stdin.isTTY && stderr?.isTTY) {
-    const password = await readHiddenLine(stdin, stderr, "Create Straight Jacket password: ");
-    const confirmation = await readHiddenLine(stdin, stderr, "Confirm Straight Jacket password: ");
+    const masterPassword = await readHiddenLine(stdin, stderr, "Create Straight Jacket master password: ");
+    const masterConfirmation = await readHiddenLine(stdin, stderr, "Confirm Straight Jacket master password: ");
+    const localPassword = await readHiddenLine(stdin, stderr, "Create Straight Jacket local password: ");
+    const localConfirmation = await readHiddenLine(stdin, stderr, "Confirm Straight Jacket local password: ");
+    return { masterPassword, masterConfirmation, localPassword, localConfirmation };
+  }
+
+  const [masterPassword, masterConfirmation, localPasswordInput, localConfirmationInput] = await readPromptLines(stdin);
+  const hasLocalPassword = localPasswordInput !== undefined && localPasswordInput !== "";
+  const hasLocalConfirmation = localConfirmationInput !== undefined && localConfirmationInput !== "";
+  return {
+    masterPassword: masterPassword ?? "",
+    masterConfirmation: masterConfirmation ?? "",
+    localPassword: hasLocalPassword ? localPasswordInput : masterPassword ?? "",
+    localConfirmation: hasLocalConfirmation ? localConfirmationInput : masterConfirmation ?? ""
+  };
+}
+
+export async function readSetupPasswords(stdin, stderr) {
+  if (stdin.isTTY && stderr?.isTTY) {
+    const masterPassword = await readHiddenLine(stdin, stderr, "Straight Jacket master password: ");
+    const localPassword = await readHiddenLine(stdin, stderr, "Create Straight Jacket local password: ");
+    const localConfirmation = await readHiddenLine(stdin, stderr, "Confirm Straight Jacket local password: ");
+    return { masterPassword, localPassword, localConfirmation };
+  }
+
+  const [masterPassword, localPassword, localConfirmation] = await readPromptLines(stdin);
+  return {
+    masterPassword: masterPassword ?? "",
+    localPassword: localPassword ?? "",
+    localConfirmation: localConfirmation ?? ""
+  };
+}
+
+async function readNamedPasswordConfirmation(stdin, stderr, prompts) {
+  if (stdin.isTTY && stderr?.isTTY) {
+    const password = await readHiddenLine(stdin, stderr, prompts.passwordPrompt);
+    const confirmation = await readHiddenLine(stdin, stderr, prompts.confirmationPrompt);
     return { password, confirmation };
   }
 

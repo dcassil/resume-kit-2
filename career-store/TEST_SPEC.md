@@ -65,6 +65,7 @@ Tests should expect durable storage around these data areas:
 
 - Store `source_stated` facts from resume evidence.
 - Store `user_verified` only after explicit simulated user confirmation.
+- Store `imported` facts from external durable sources without treating them as user-confirmed.
 - Store `inferred` facts as discovery-only.
 - Store `unknown` when evidence is insufficient.
 - Reject silent `inferred -> user_verified` escalation.
@@ -84,7 +85,8 @@ Tests should expect durable storage around these data areas:
 - Return minimum necessary evidence.
 - Return deterministic ordering for identical inputs.
 - Find candidate matches for job requirements.
-- Distinguish exact, alias, related, possible, unknown, and explicitly missing states in returned DTOs.
+- Distinguish exact, alias, verified-fact, related, possible, unknown, explicitly missing, and not-applicable states in returned DTOs.
+- Return conflicts as conflict records instead of encoding conflicts as verification or resolution states.
 
 ### Conflict detection
 

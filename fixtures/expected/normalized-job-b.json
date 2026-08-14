@@ -7,5 +7,599 @@
     "required React, Node.js, GraphQL, AWS",
     "preferred PostgreSQL and SaaS",
     "AWS and GraphQL are intended to resolve from facts learned during Job A"
-  ]
+  ],
+  "comment": [
+    "required React, Node.js, GraphQL, AWS",
+    "preferred PostgreSQL and SaaS",
+    "AWS and GraphQL are intended to resolve from facts learned during Job A"
+  ],
+  "data": {
+    "job_model": {
+      "company": "Example Growth Systems",
+      "domains": [
+        "API architecture",
+        "Cloud infrastructure",
+        "Full-stack software development"
+      ],
+      "industries": [
+        "SaaS"
+      ],
+      "job_id": "job-b",
+      "metadata": {},
+      "preferred": [
+        {
+          "classification": "preferred",
+          "concept": "PostgreSQL experience.",
+          "importance": "medium",
+          "normalized_terms": [
+            "postgres",
+            "postgresql"
+          ],
+          "requirement_id": "fixture_req_4_8fd3c8fc",
+          "source_text": "PostgreSQL experience.",
+          "weight": 3.0,
+          "years": null
+        },
+        {
+          "classification": "preferred",
+          "concept": "SaaS product background.",
+          "importance": "medium",
+          "normalized_terms": [
+            "multi tenant saas",
+            "saas",
+            "software as a service"
+          ],
+          "requirement_id": "fixture_req_5_f4df372d",
+          "source_text": "SaaS product background.",
+          "weight": 3.0,
+          "years": null
+        }
+      ],
+      "requirements": [
+        {
+          "classification": "required",
+          "concept": "React experience for production web applications.",
+          "importance": "high",
+          "normalized_terms": [
+            "react",
+            "web"
+          ],
+          "requirement_id": "fixture_req_0_66ee47a4",
+          "source_text": "React experience for production web applications.",
+          "weight": 10.0,
+          "years": null
+        },
+        {
+          "classification": "required",
+          "concept": "Node.js service development.",
+          "importance": "high",
+          "normalized_terms": [
+            "js",
+            "node",
+            "node js",
+            "nodejs",
+            "service"
+          ],
+          "requirement_id": "fixture_req_1_1f330851",
+          "source_text": "Node.js service development.",
+          "weight": 10.0,
+          "years": null
+        },
+        {
+          "classification": "required",
+          "concept": "GraphQL API design or maintenance.",
+          "importance": "high",
+          "normalized_terms": [
+            "api",
+            "api architecture",
+            "api architecture design",
+            "api design",
+            "apis",
+            "application architecture",
+            "designed apis",
+            "designed rest apis",
+            "graph ql",
+            "graphql",
+            "maintenance",
+            "rest api",
+            "rest api design",
+            "rest apis"
+          ],
+          "requirement_id": "fixture_req_2_bdba1a3e",
+          "source_text": "GraphQL API design or maintenance.",
+          "weight": 10.0,
+          "years": null
+        },
+        {
+          "classification": "required",
+          "concept": "AWS experience for application infrastructure.",
+          "importance": "high",
+          "normalized_terms": [
+            "amazon web services",
+            "application",
+            "aws",
+            "infrastructure"
+          ],
+          "requirement_id": "fixture_req_3_c3f15cdb",
+          "source_text": "AWS experience for application infrastructure.",
+          "weight": 10.0,
+          "years": null
+        }
+      ],
+      "schema_version": "job-model.v1",
+      "seniority": "senior",
+      "source": {
+        "kind": "fixture",
+        "path": "fixtures/jobs/job-b-senior-full-stack-engineer.txt"
+      },
+      "terminology": [
+        {
+          "canonical": "senior",
+          "source": "title",
+          "surface": "Senior",
+          "weight": 1.0
+        },
+        {
+          "canonical": "full",
+          "source": "title",
+          "surface": "Full",
+          "weight": 1.0
+        },
+        {
+          "canonical": "stack",
+          "source": "title",
+          "surface": "Stack",
+          "weight": 1.0
+        },
+        {
+          "canonical": "engineer",
+          "source": "title",
+          "surface": "Engineer",
+          "weight": 1.0
+        },
+        {
+          "canonical": "react experience for production web applications",
+          "source": "requirement",
+          "surface": "React experience for production web applications.",
+          "weight": 10.0
+        },
+        {
+          "canonical": "react",
+          "source": "requirement",
+          "surface": "React",
+          "weight": 10.0
+        },
+        {
+          "canonical": "web",
+          "source": "requirement",
+          "surface": "web",
+          "weight": 10.0
+        },
+        {
+          "canonical": "node js service development",
+          "source": "requirement",
+          "surface": "Node.js service development.",
+          "weight": 10.0
+        },
+        {
+          "canonical": "js",
+          "source": "requirement",
+          "surface": "js",
+          "weight": 10.0
+        },
+        {
+          "canonical": "node",
+          "source": "requirement",
+          "surface": "Node",
+          "weight": 10.0
+        },
+        {
+          "canonical": "node js",
+          "source": "requirement",
+          "surface": "Node.js",
+          "weight": 10.0
+        },
+        {
+          "canonical": "nodejs",
+          "source": "requirement",
+          "surface": "nodejs",
+          "weight": 10.0
+        },
+        {
+          "canonical": "service",
+          "source": "requirement",
+          "surface": "service",
+          "weight": 10.0
+        },
+        {
+          "canonical": "graphql api design or maintenance",
+          "source": "requirement",
+          "surface": "GraphQL API design or maintenance.",
+          "weight": 10.0
+        },
+        {
+          "canonical": "api",
+          "source": "requirement",
+          "surface": "API",
+          "weight": 10.0
+        },
+        {
+          "canonical": "api architecture",
+          "source": "requirement",
+          "surface": "api architecture",
+          "weight": 10.0
+        },
+        {
+          "canonical": "api architecture design",
+          "source": "requirement",
+          "surface": "api architecture design",
+          "weight": 10.0
+        },
+        {
+          "canonical": "api design",
+          "source": "requirement",
+          "surface": "API design",
+          "weight": 10.0
+        },
+        {
+          "canonical": "apis",
+          "source": "requirement",
+          "surface": "apis",
+          "weight": 10.0
+        },
+        {
+          "canonical": "application architecture",
+          "source": "requirement",
+          "surface": "application architecture",
+          "weight": 10.0
+        },
+        {
+          "canonical": "designed apis",
+          "source": "requirement",
+          "surface": "designed apis",
+          "weight": 10.0
+        },
+        {
+          "canonical": "designed rest apis",
+          "source": "requirement",
+          "surface": "designed rest apis",
+          "weight": 10.0
+        },
+        {
+          "canonical": "graph ql",
+          "source": "requirement",
+          "surface": "graph ql",
+          "weight": 10.0
+        },
+        {
+          "canonical": "graphql",
+          "source": "requirement",
+          "surface": "GraphQL",
+          "weight": 10.0
+        },
+        {
+          "canonical": "maintenance",
+          "source": "requirement",
+          "surface": "maintenance",
+          "weight": 10.0
+        },
+        {
+          "canonical": "rest api",
+          "source": "requirement",
+          "surface": "rest api",
+          "weight": 10.0
+        },
+        {
+          "canonical": "rest api design",
+          "source": "requirement",
+          "surface": "rest api design",
+          "weight": 10.0
+        },
+        {
+          "canonical": "rest apis",
+          "source": "requirement",
+          "surface": "rest apis",
+          "weight": 10.0
+        },
+        {
+          "canonical": "aws experience for application infrastructure",
+          "source": "requirement",
+          "surface": "AWS experience for application infrastructure.",
+          "weight": 10.0
+        },
+        {
+          "canonical": "amazon web services",
+          "source": "requirement",
+          "surface": "amazon web services",
+          "weight": 10.0
+        },
+        {
+          "canonical": "application",
+          "source": "requirement",
+          "surface": "application",
+          "weight": 10.0
+        },
+        {
+          "canonical": "aws",
+          "source": "requirement",
+          "surface": "AWS",
+          "weight": 10.0
+        },
+        {
+          "canonical": "infrastructure",
+          "source": "requirement",
+          "surface": "infrastructure",
+          "weight": 10.0
+        },
+        {
+          "canonical": "postgresql experience",
+          "source": "requirement",
+          "surface": "PostgreSQL experience.",
+          "weight": 3.0
+        },
+        {
+          "canonical": "postgres",
+          "source": "requirement",
+          "surface": "postgres",
+          "weight": 3.0
+        },
+        {
+          "canonical": "postgresql",
+          "source": "requirement",
+          "surface": "PostgreSQL",
+          "weight": 3.0
+        },
+        {
+          "canonical": "saas product background",
+          "source": "requirement",
+          "surface": "SaaS product background.",
+          "weight": 3.0
+        },
+        {
+          "canonical": "multi tenant saas",
+          "source": "requirement",
+          "surface": "multi tenant saas",
+          "weight": 3.0
+        },
+        {
+          "canonical": "saas",
+          "source": "requirement",
+          "surface": "SaaS",
+          "weight": 3.0
+        },
+        {
+          "canonical": "software as a service",
+          "source": "requirement",
+          "surface": "software as a service",
+          "weight": 3.0
+        },
+        {
+          "canonical": "senior full stack engineer example growth systems required qualifications react experience for production web applications node js service development graphql api design or maintenance aws experience for application infrastructure preferred qualifications postgresql experience saas product background",
+          "source": "description",
+          "surface": "Senior Full Stack Engineer\nExample Growth Systems\n\nRequired qualifications:\n- React experience for production web applications.\n- Node.js service development.\n- GraphQL API design or maintenance.\n- AWS experience for application infrastructure.\n\nPreferred qualifications:\n- PostgreSQL experience.\n- SaaS product background.",
+          "weight": 1.0
+        },
+        {
+          "canonical": "senior",
+          "source": "description",
+          "surface": "Senior",
+          "weight": 1.0
+        },
+        {
+          "canonical": "full",
+          "source": "description",
+          "surface": "Full",
+          "weight": 1.0
+        },
+        {
+          "canonical": "stack",
+          "source": "description",
+          "surface": "Stack",
+          "weight": 1.0
+        },
+        {
+          "canonical": "engineer",
+          "source": "description",
+          "surface": "Engineer",
+          "weight": 1.0
+        },
+        {
+          "canonical": "example",
+          "source": "description",
+          "surface": "Example",
+          "weight": 1.0
+        },
+        {
+          "canonical": "growth",
+          "source": "description",
+          "surface": "Growth",
+          "weight": 1.0
+        },
+        {
+          "canonical": "react",
+          "source": "description",
+          "surface": "React",
+          "weight": 1.0
+        },
+        {
+          "canonical": "web",
+          "source": "description",
+          "surface": "web",
+          "weight": 1.0
+        },
+        {
+          "canonical": "node js",
+          "source": "description",
+          "surface": "Node.js",
+          "weight": 1.0
+        },
+        {
+          "canonical": "service",
+          "source": "description",
+          "surface": "service",
+          "weight": 1.0
+        },
+        {
+          "canonical": "graphql",
+          "source": "description",
+          "surface": "GraphQL",
+          "weight": 1.0
+        },
+        {
+          "canonical": "api",
+          "source": "description",
+          "surface": "API",
+          "weight": 1.0
+        },
+        {
+          "canonical": "maintenance",
+          "source": "description",
+          "surface": "maintenance",
+          "weight": 1.0
+        },
+        {
+          "canonical": "aws",
+          "source": "description",
+          "surface": "AWS",
+          "weight": 1.0
+        },
+        {
+          "canonical": "application",
+          "source": "description",
+          "surface": "application",
+          "weight": 1.0
+        },
+        {
+          "canonical": "infrastructure",
+          "source": "description",
+          "surface": "infrastructure",
+          "weight": 1.0
+        },
+        {
+          "canonical": "postgresql",
+          "source": "description",
+          "surface": "PostgreSQL",
+          "weight": 1.0
+        },
+        {
+          "canonical": "saas",
+          "source": "description",
+          "surface": "SaaS",
+          "weight": 1.0
+        },
+        {
+          "canonical": "amazon web services",
+          "source": "description",
+          "surface": "amazon web services",
+          "weight": 1.0
+        },
+        {
+          "canonical": "api architecture",
+          "source": "description",
+          "surface": "api architecture",
+          "weight": 1.0
+        },
+        {
+          "canonical": "api architecture design",
+          "source": "description",
+          "surface": "api architecture design",
+          "weight": 1.0
+        },
+        {
+          "canonical": "api design",
+          "source": "description",
+          "surface": "API design",
+          "weight": 1.0
+        },
+        {
+          "canonical": "apis",
+          "source": "description",
+          "surface": "apis",
+          "weight": 1.0
+        },
+        {
+          "canonical": "application architecture",
+          "source": "description",
+          "surface": "application architecture",
+          "weight": 1.0
+        },
+        {
+          "canonical": "designed apis",
+          "source": "description",
+          "surface": "designed apis",
+          "weight": 1.0
+        },
+        {
+          "canonical": "designed rest apis",
+          "source": "description",
+          "surface": "designed rest apis",
+          "weight": 1.0
+        },
+        {
+          "canonical": "graph ql",
+          "source": "description",
+          "surface": "graph ql",
+          "weight": 1.0
+        },
+        {
+          "canonical": "js",
+          "source": "description",
+          "surface": "js",
+          "weight": 1.0
+        },
+        {
+          "canonical": "multi tenant saas",
+          "source": "description",
+          "surface": "multi tenant saas",
+          "weight": 1.0
+        },
+        {
+          "canonical": "node",
+          "source": "description",
+          "surface": "Node",
+          "weight": 1.0
+        },
+        {
+          "canonical": "nodejs",
+          "source": "description",
+          "surface": "nodejs",
+          "weight": 1.0
+        },
+        {
+          "canonical": "postgres",
+          "source": "description",
+          "surface": "postgres",
+          "weight": 1.0
+        },
+        {
+          "canonical": "rest api",
+          "source": "description",
+          "surface": "rest api",
+          "weight": 1.0
+        },
+        {
+          "canonical": "rest api design",
+          "source": "description",
+          "surface": "rest api design",
+          "weight": 1.0
+        },
+        {
+          "canonical": "rest apis",
+          "source": "description",
+          "surface": "rest apis",
+          "weight": 1.0
+        },
+        {
+          "canonical": "software as a service",
+          "source": "description",
+          "surface": "software as a service",
+          "weight": 1.0
+        }
+      ],
+      "title": "Senior Full Stack Engineer"
+    },
+    "schema_version": "resume-core.result.v1",
+    "status": "ok",
+    "warnings": []
+  }
 }

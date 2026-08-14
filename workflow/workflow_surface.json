@@ -72,7 +72,7 @@
   "surfaces": [
     {
       "name": "createRun",
-      "description": "Create or load run state with run ID, config hash, schema/package versions, and initial stage metadata.",
+      "description": "Create run state with a unique per-invocation run ID, config hash, schema/package versions, and initial stage metadata; loading persisted state is recoverRun's job.",
       "input_contract": {
         "required": [
           "workspace",

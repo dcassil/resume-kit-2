@@ -71,7 +71,10 @@ The skill should forbid:
 
 - editing `.straight-jacket/manifest.json`
 - editing `.straight-jacket/manifest.sig`
-- editing `.straight-jacket/public-key.json`
+- editing `.straight-jacket/signers.json`
+- editing `.straight-jacket/signers.sig`
+- editing `.straight-jacket/registration-public-key.json`
+- editing `.straight-jacket/registration-key.enc.json`
 - deleting hooks to bypass checks
 - committing with `--no-verify` to bypass checks
 - asking the user to share a password in chat

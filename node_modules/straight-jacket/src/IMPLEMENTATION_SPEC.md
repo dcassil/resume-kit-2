@@ -26,6 +26,7 @@ src/mcp.js
 - `addProtectedFile`
 - `removeProtectedFile`
 - `updateProtectedFile`
+- `updateProtectedFiles`
 - `renameProtectedFile`
 - `verifyRepository`
 - `listProtectedFiles`

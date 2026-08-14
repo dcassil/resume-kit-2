@@ -155,6 +155,7 @@ def run_smoke(root: Path, workspace: Path, keep_workspace: bool) -> None:
     requirement_ids = {item.get("requirement_id") for item in job.get("requirements", [])}
     for requirement_id in ["req_react", "req_api", "req_responsive", "req_aws", "req_saas"]:
         require(requirement_id in requirement_ids, f"job ingest missed {requirement_id}")
+    require_job_requirement_classification(job, "req_saas", "required")
 
     initial_match = run_cli(resume_cli, ["match"], workspace)
     repeat_match = run_cli(resume_cli, ["match"], workspace)
@@ -272,6 +273,21 @@ def require_requirement(match_result: JsonObject, requirement_id: str, allowed_s
             require("evidence" in item or item.get("status") == "unresolved", f"{requirement_id} missed requirement-level evidence")
             return item
     raise SmokeFailure(f"match result missed requirement {requirement_id}")
+
+
+def require_job_requirement_classification(job: JsonObject, requirement_id: str, expected_classification: str) -> None:
+    matches = [
+        item
+        for section in ("requirements", "preferred")
+        for item in job.get(section, [])
+        if item.get("requirement_id") == requirement_id
+    ]
+    require(matches, f"job ingest missed {requirement_id}")
+    classifications = {str(item.get("classification")) for item in matches}
+    require(
+        classifications == {expected_classification},
+        f"{requirement_id} classification {sorted(classifications)!r} != {expected_classification!r}",
+    )
 
 
 def require_json(path: Path, label: str) -> JsonObject:

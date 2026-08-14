@@ -25,7 +25,7 @@ def run_future_contract_gate(root: Path) -> int:
     return run_test_runner(
         root,
         ["--future-contract"],
-        "Running future contract gate: full package contracts plus boundary guardrails.",
+        "Running future contract gate: forward-looking full package-contract superset.",
     )
 
 
@@ -69,7 +69,7 @@ def main(argv: list[str] | None = None) -> int:
     gate.add_argument(
         "--future-contract",
         action="store_true",
-        help="Run the full package contract target plus boundary guardrails.",
+        help="Run the forward-looking full package-contract superset gate.",
     )
     gate.add_argument("--smoke", action="store_true", help="Run the installed package smoke harness.")
     gate.add_argument("--main", action="store_true", help="Run the main gate: PR gate plus smoke harness.")

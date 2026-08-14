@@ -6,5 +6,42 @@
   "expected_observations": [
     "manifest records run ID, base hash, job ID, config hash, schema/package/template/model versions",
     "manifest records initial/final scores, facts added/verified, operations applied/rejected, validations, and outputs"
-  ]
+  ],
+  "comment": [
+    "manifest records run ID, base hash, job ID, config hash, schema/package/template/model versions",
+    "manifest records initial/final scores, facts added/verified, operations applied/rejected, validations, and outputs"
+  ],
+  "data": {
+    "base_resume_id": "resume-main",
+    "config_hash": "fixture-config-v1",
+    "facts_verified": [
+      "fact_aws",
+      "fact_graphql",
+      "fact_architecture"
+    ],
+    "final_score": 100.0,
+    "initial_score": 94.92,
+    "job_id": "job-a",
+    "matching_algorithm_version": "resume-core.match.v1",
+    "operations_applied": [
+      "op_add_aws_skill",
+      "op_add_graphql_skill",
+      "op_rewrite_api_architecture"
+    ],
+    "operations_rejected": [
+      "invalid-related-skill-overreach",
+      "invalid-title-inflation",
+      "invalid-unsupported-management",
+      "invalid-unsupported-scale",
+      "invalid-years-inflation"
+    ],
+    "output_artifact_paths": [],
+    "schema_version": "run-manifest.fixture.v1",
+    "schema_versions": {
+      "canonical_resume": "canonical-resume.v1",
+      "job": "job-model.v1",
+      "match": "match-result.v1"
+    },
+    "validation_status": "pass"
+  }
 }

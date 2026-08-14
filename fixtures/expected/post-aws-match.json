@@ -7,5 +7,299 @@
     "AWS preferred requirement resolves from explicit user answer",
     "six years is preserved",
     "match reruns after fact verification"
-  ]
+  ],
+  "comment": [
+    "AWS preferred requirement resolves from explicit user answer",
+    "six years is preserved",
+    "match reruns after fact verification"
+  ],
+  "data": {
+    "match_result": {
+      "algorithm_version": "resume-core.match.v1",
+      "can_continue": true,
+      "explanations": [
+        "No required hard gate is blocking continuation."
+      ],
+      "job_id": "job-a",
+      "match_id": "match_2bb8ca5b3180",
+      "max_score": 59.0,
+      "preferred_unresolved_requirement_ids": [],
+      "requirement_results": [
+        {
+          "blocking": false,
+          "classification": "required",
+          "concept": "8+ years of software engineering experience building production applications.",
+          "evidence": [
+            {
+              "matched_years": 12,
+              "required_years": 8,
+              "source": "resume",
+              "terms": [
+                "engineering",
+                "full stack software development",
+                "software",
+                "software development",
+                "software engineering",
+                "software engineering experience",
+                "years"
+              ]
+            }
+          ],
+          "matched_fact_ids": [],
+          "max_score": 10.0,
+          "normalized_terms": [
+            "8 years",
+            "engineering",
+            "full stack software development",
+            "software",
+            "software development",
+            "software engineering",
+            "software engineering experience",
+            "years"
+          ],
+          "requirement_id": "fixture_req_0_58105daf",
+          "resolution_state": "exact_match",
+          "score": 10.0,
+          "source_text": "8+ years of software engineering experience building production applications.",
+          "unresolved": false
+        },
+        {
+          "blocking": false,
+          "classification": "required",
+          "concept": "Strong React and TypeScript experience.",
+          "evidence": [
+            {
+              "source": "resume",
+              "terms": [
+                "react",
+                "typescript"
+              ]
+            }
+          ],
+          "matched_fact_ids": [],
+          "max_score": 10.0,
+          "normalized_terms": [
+            "react",
+            "type script",
+            "typescript"
+          ],
+          "requirement_id": "fixture_req_1_3ff8909e",
+          "resolution_state": "exact_match",
+          "score": 10.0,
+          "source_text": "Strong React and TypeScript experience.",
+          "unresolved": false
+        },
+        {
+          "blocking": false,
+          "classification": "required",
+          "concept": "Experience with API architecture/design for distributed product systems.",
+          "evidence": [
+            {
+              "source": "resume",
+              "terms": [
+                "api",
+                "apis",
+                "designed rest apis",
+                "rest api",
+                "rest apis"
+              ]
+            }
+          ],
+          "matched_fact_ids": [],
+          "max_score": 10.0,
+          "normalized_terms": [
+            "api",
+            "api architecture",
+            "api architecture design",
+            "api design",
+            "apis",
+            "application architecture",
+            "architecture",
+            "designed apis",
+            "designed rest apis",
+            "rest api",
+            "rest api design",
+            "rest apis"
+          ],
+          "requirement_id": "fixture_req_2_e55af3cd",
+          "resolution_state": "exact_match",
+          "score": 10.0,
+          "source_text": "Experience with API architecture/design for distributed product systems.",
+          "unresolved": false
+        },
+        {
+          "blocking": false,
+          "classification": "required",
+          "concept": "Experience delivering responsive design across desktop and mobile surfaces.",
+          "evidence": [
+            {
+              "source": "resume",
+              "terms": [
+                "across",
+                "desktop",
+                "desktop and mobile",
+                "mobile",
+                "responsive",
+                "responsive web apps"
+              ]
+            }
+          ],
+          "matched_fact_ids": [],
+          "max_score": 10.0,
+          "normalized_terms": [
+            "across",
+            "desktop",
+            "desktop and mobile",
+            "mobile",
+            "responsive",
+            "responsive apps",
+            "responsive design",
+            "responsive web applications",
+            "responsive web apps",
+            "surfaces"
+          ],
+          "requirement_id": "fixture_req_3_fd10e4a4",
+          "resolution_state": "exact_match",
+          "score": 10.0,
+          "source_text": "Experience delivering responsive design across desktop and mobile surfaces.",
+          "unresolved": false
+        },
+        {
+          "blocking": false,
+          "classification": "required",
+          "concept": "Background building or operating SaaS products.",
+          "evidence": [
+            {
+              "source": "resume",
+              "terms": [
+                "multi tenant saas",
+                "saas"
+              ]
+            }
+          ],
+          "matched_fact_ids": [],
+          "max_score": 10.0,
+          "normalized_terms": [
+            "multi tenant saas",
+            "saas",
+            "software as a service"
+          ],
+          "requirement_id": "fixture_req_4_8f8157ef",
+          "resolution_state": "exact_match",
+          "score": 10.0,
+          "source_text": "Background building or operating SaaS products.",
+          "unresolved": false
+        },
+        {
+          "blocking": false,
+          "classification": "preferred",
+          "concept": "AWS experience.",
+          "evidence": [
+            {
+              "fact_id": "fact_aws",
+              "source": "career_fact",
+              "terms": [
+                "amazon web services",
+                "aws"
+              ]
+            }
+          ],
+          "matched_fact_ids": [
+            "fact_aws"
+          ],
+          "max_score": 3.0,
+          "normalized_terms": [
+            "amazon web services",
+            "aws"
+          ],
+          "requirement_id": "fixture_req_5_a1cdaa2a",
+          "resolution_state": "verified_fact_match",
+          "score": 3.0,
+          "source_text": "AWS experience.",
+          "unresolved": false
+        },
+        {
+          "blocking": false,
+          "classification": "preferred",
+          "concept": "GraphQL API experience.",
+          "evidence": [
+            {
+              "source": "resume",
+              "terms": [
+                "api",
+                "apis",
+                "rest api",
+                "rest apis"
+              ]
+            }
+          ],
+          "matched_fact_ids": [],
+          "max_score": 3.0,
+          "normalized_terms": [
+            "api",
+            "apis",
+            "graph ql",
+            "graphql",
+            "rest api",
+            "rest apis"
+          ],
+          "requirement_id": "fixture_req_6_3ef16ea5",
+          "resolution_state": "exact_match",
+          "score": 3.0,
+          "source_text": "GraphQL API experience.",
+          "unresolved": false
+        },
+        {
+          "blocking": false,
+          "classification": "preferred",
+          "concept": "Technical leadership through mentoring, design review, or cross-team architecture work.",
+          "evidence": [
+            {
+              "source": "resume",
+              "terms": [
+                "code review",
+                "delivery planning",
+                "leadership",
+                "led a small team",
+                "review",
+                "team",
+                "team leadership"
+              ]
+            }
+          ],
+          "matched_fact_ids": [],
+          "max_score": 3.0,
+          "normalized_terms": [
+            "architecture",
+            "code review",
+            "cross",
+            "cross team architecture",
+            "delivery planning",
+            "design review",
+            "leadership",
+            "led a small team",
+            "mentoring",
+            "review",
+            "team",
+            "team leadership",
+            "technical",
+            "technical leadership",
+            "work"
+          ],
+          "requirement_id": "fixture_req_7_b8f2ddc2",
+          "resolution_state": "exact_match",
+          "score": 3.0,
+          "source_text": "Technical leadership through mentoring, design review, or cross-team architecture work.",
+          "unresolved": false
+        }
+      ],
+      "resume_id": "resume-main",
+      "schema_version": "match-result.v1",
+      "score": 59.0,
+      "score_percent": 100.0,
+      "unresolved_requirement_ids": []
+    },
+    "schema_version": "resume-core.result.v1",
+    "status": "ok"
+  }
 }

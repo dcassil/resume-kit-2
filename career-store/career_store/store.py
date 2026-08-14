@@ -17,10 +17,9 @@ _VERIFICATION_STATES = {
     # Confirmation policy keeps inferred/unknown distinct from user_verified.
     "source_stated",
     "user_verified",
+    "imported",
     "inferred",
     "unknown",
-    "explicitly_missing",
-    "conflicted",
 }
 _RELATIONSHIP_TYPES = {"alias", "equivalent", "related", "contradicts"}
 _RESOLUTION_STATES = {
@@ -31,7 +30,7 @@ _RESOLUTION_STATES = {
     "possible_match",
     "unknown",
     "explicitly_missing",
-    "conflicted",
+    "not_applicable",
 }
 _FORBIDDEN_RESULT_KEYS = {
     "raw_sql",
@@ -139,7 +138,7 @@ _TERM_ALIASES: dict[str, set[str]] = {
 }
 _AWS_SERVICE_TERMS = {"ec2", "s3", "lambda", "rds", "iam"}
 _RESOLUTION_RANK = {
-    "conflicted": 0,
+    "not_applicable": 0,
     "unknown": 1,
     "explicitly_missing": 2,
     "possible_match": 3,
@@ -235,14 +234,17 @@ class CareerStore:
         normalized = _normalized_terms(fact)
         fact_id = str(fact.get("fact_id") or _stable_id("fact", fact.get("type", "fact"), "|".join(normalized), fact.get("text", "")))
         requested_state = _state_value(fact.get("verification_state", "unknown"))
+        original_requested_state = requested_state
         if requested_state == "user_verified" and not _has_explicit_confirmation(policy, evidence, source):
             requested_state = "unknown"
             confirmation_required = True
         else:
             confirmation_required = requested_state in {"inferred", "unknown"} and not policy.get("allow_inferred_final", True)
+        conflicts = self._detect_conflicts({**fact, "fact_id": fact_id, "normalized_terms": normalized})
+        if original_requested_state == "conflicted":
+            conflicts.append(_legacy_state_conflict({**fact, "fact_id": fact_id}, original_requested_state))
         if requested_state not in _VERIFICATION_STATES:
             requested_state = "unknown"
-        conflicts = self._detect_conflicts({**fact, "fact_id": fact_id, "normalized_terms": normalized})
         mutation_status = "created"
         with self._connect() as conn:
             existing = conn.execute(
@@ -512,8 +514,11 @@ class CareerStore:
                 },
             }
             matches.append(item)
-            conflicts.extend(self._conflicts_for_fact(fact["fact_id"]))
-            if best["resolution_state"] in {"unknown", "possible_match", "explicitly_missing", "conflicted"}:
+            conflicts.extend(best.get("conflicts", []))
+            for candidate in candidates:
+                conflicts.extend(candidate.get("conflicts", []))
+                conflicts.extend(self._conflicts_for_fact(candidate["fact"]["fact_id"]))
+            if best["resolution_state"] in {"unknown", "possible_match", "explicitly_missing"}:
                 unresolved.append(
                     {
                         "requirement_id": requirement_id,
@@ -897,10 +902,9 @@ class CareerStore:
         precedence = {
             "unknown": 0,
             "inferred": 1,
-            "explicitly_missing": 2,
+            "imported": 2,
             "source_stated": 3,
-            "conflicted": 4,
-            "user_verified": 5,
+            "user_verified": 4,
         }
         return requested_state if precedence.get(requested_state, 0) >= precedence.get(current_state, 0) else current_state
 
@@ -916,6 +920,7 @@ class CareerStore:
             overlap = _meaningful_overlap(requirement_set, fact_terms)
             if overlap:
                 resolution, metadata = _direct_resolution(fact, requirement_year, fact_terms)
+                conflicts = list(metadata.pop("conflicts", []))
                 ranked.append(
                     (
                         _RESOLUTION_RANK[resolution],
@@ -927,6 +932,7 @@ class CareerStore:
                             "resolution_state": resolution,
                             "match_terms": sorted(overlap),
                             "metadata": metadata,
+                            "conflicts": conflicts,
                         },
                     )
                 )
@@ -993,6 +999,7 @@ class CareerStore:
             fact = self._fact_from_row(self._fact_row(fact_id))
             fact_terms = self._fact_match_terms(fact_id)
             _, metadata = _direct_resolution(fact, requirement_year, fact_terms)
+            conflicts = list(metadata.pop("conflicts", []))
             if relationship_type in {"alias", "equivalent"}:
                 resolution = "possible_match" if metadata.get("years_satisfied") is False else "alias_match"
                 return {
@@ -1000,6 +1007,7 @@ class CareerStore:
                     "match_terms": sorted(overlap),
                     "relationship_id": relationship["relationship_id"],
                     "metadata": metadata,
+                    "conflicts": conflicts,
                 }
             if relationship_type == "related":
                 resolution = "related_match" if policy.get("allow_related_as_equivalent") else "possible_match"
@@ -1010,13 +1018,24 @@ class CareerStore:
                     "match_terms": sorted(overlap),
                     "relationship_id": relationship["relationship_id"],
                     "metadata": metadata,
+                    "conflicts": conflicts,
                 }
             if relationship_type == "contradicts":
+                conflict = _conflict_object(
+                    sorted([fact_id, other_id]),
+                    "contradicts_relationship",
+                    {
+                        "relationship_id": relationship["relationship_id"],
+                        "relationship_type": "contradicts",
+                    },
+                )
+                conflicts.append(conflict)
                 return {
-                    "resolution_state": "conflicted",
+                    "resolution_state": "possible_match",
                     "match_terms": sorted(overlap),
                     "relationship_id": relationship["relationship_id"],
                     "metadata": metadata,
+                    "conflicts": conflicts,
                 }
         return None
 
@@ -1164,8 +1183,8 @@ def _required_years(requirement: JsonObject) -> int | None:
 
 def _direct_resolution(fact: JsonObject, requirement_year: int | None, fact_terms: set[str]) -> tuple[str, JsonObject]:
     if fact["verification_state"] == "conflicted":
-        return "conflicted", {}
-    if fact["verification_state"] == "explicitly_missing":
+        return "possible_match", {"conflicts": [_legacy_state_conflict(fact, "conflicted")]}
+    if fact.get("resolution_state") == "explicitly_missing":
         return "explicitly_missing", {}
     fact_year_text = " ".join([str(fact.get("text", "")), *fact.get("normalized_terms", [])])
     fact_year = _year_claim(fact_year_text, fact_terms)
@@ -1197,6 +1216,17 @@ def _merged_metadata(existing: JsonObject, incoming: Any) -> JsonObject:
 
 def _state_value(value: Any) -> str:
     return str(getattr(value, "value", value))
+
+
+def _legacy_state_conflict(fact: JsonObject, state: str) -> JsonObject:
+    return _conflict_object(
+        [str(fact.get("fact_id", ""))],
+        f"legacy {state} verification state",
+        {
+            "verification_state": state,
+            "fact_id": str(fact.get("fact_id", "")),
+        },
+    )
 
 
 def _has_explicit_confirmation(policy: JsonObject, evidence: JsonObject | None, source: str) -> bool:

@@ -28,10 +28,9 @@
   "verification_states": [
     "source_stated",
     "user_verified",
+    "imported",
     "inferred",
-    "unknown",
-    "explicitly_missing",
-    "conflicted"
+    "unknown"
   ],
   "relationship_types": [
     "alias",
@@ -47,7 +46,7 @@
     "possible_match",
     "unknown",
     "explicitly_missing",
-    "conflicted"
+    "not_applicable"
   ],
   "forbidden_public_api": [
     "executeSql",
@@ -158,7 +157,7 @@
     },
     {
       "name": "findCandidateMatches",
-      "description": "Match job requirements to stored facts while distinguishing exact, alias, related, possible, unknown, missing, and conflicted states.",
+      "description": "Match job requirements to stored facts while distinguishing exact, alias, related, possible, unknown, explicitly missing, and not-applicable states; conflicts are returned as conflict records.",
       "input_contract": {
         "required_fields": ["requirements", "policy"],
         "optional_fields": ["job_id", "include_evidence"]

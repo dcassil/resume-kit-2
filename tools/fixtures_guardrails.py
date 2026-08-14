@@ -29,6 +29,15 @@ INVALID_OPERATION_REASONS = {
     "years_inflation",
     "related_skill_overreach",
 }
+REQUIRED_EXPECTED_SNAPSHOT_FIELDS = [
+    "fixture_id",
+    "schema_version",
+    "config_hash",
+    "reviewed",
+    "expected_observations",
+    "comment",
+    "data",
+]
 
 
 @dataclass(frozen=True)
@@ -230,11 +239,27 @@ def validate_expected_snapshots(root: Path, manifest: dict) -> list[Failure]:
         if failure:
             failures.append(failure)
             continue
-        for field in ["fixture_id", "schema_version", "config_hash", "reviewed", "expected_observations"]:
+        for field in REQUIRED_EXPECTED_SNAPSHOT_FIELDS:
             if field not in snapshot:
-                failures.append(Failure(path, f"Expected snapshot is missing '{field}'.", "Snapshots must be reviewed contract artifacts, not accidental output."))
+                failures.append(
+                    Failure(
+                        path,
+                        f"Expected snapshot is missing '{field}'.",
+                        "Restore the T-0012 expected snapshot envelope: fixture_id, schema_version, config_hash, reviewed, expected_observations, comment, and data.",
+                    )
+                )
         if snapshot.get("reviewed") is not True:
             failures.append(Failure(path, "Expected snapshot must be marked reviewed=true.", "Review and mark the snapshot before using it as a contract artifact."))
+        if "data" in snapshot and snapshot["data"] is None:
+            comment = snapshot.get("comment")
+            if not comment or "defer" not in json.dumps(comment).lower():
+                failures.append(
+                    Failure(
+                        path,
+                        "Expected snapshot has data=null without a comment explaining the deferral.",
+                        "Populate data with structured snapshot contents, or keep data=null only with a comment that explicitly explains the deferred stage.",
+                    )
+                )
     return failures
 
 

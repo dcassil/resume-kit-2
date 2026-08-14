@@ -52,7 +52,7 @@ Installer must be idempotent. Running it repeatedly should not duplicate the mar
 ```js
 {
   installed: false,
-  path: "/repo/.git/hooks/pre-commit",
+  path: "/repo/.githooks/pre-commit",
   command: "straight-jacket verify --staged",
   localHookAdvisory: true
 }

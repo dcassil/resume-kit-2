@@ -63,6 +63,21 @@ class ToolsGuardrailTests(unittest.TestCase):
         finally:
             shutil.rmtree(temp)
 
+    def test_required_capability_without_tool_kind_is_hard_blocked(self):
+        temp = make_temp_repo()
+        try:
+            manifest_path = temp / "tools" / "tool_manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["required_capabilities"].append("phantom_validators")
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            result = run_guardrail(temp)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("phantom_validators", result.stdout)
+            self.assertIn("phantom_validator", result.stdout)
+            self.assertIn("no implementing tool kind", result.stdout)
+        finally:
+            shutil.rmtree(temp)
+
     def test_hidden_scoring_logic_is_hard_blocked(self):
         temp = make_temp_repo()
         try:

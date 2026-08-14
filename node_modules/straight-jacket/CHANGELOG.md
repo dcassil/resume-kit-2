@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.0.0 - 2026-08-13
+
+- Replaced CI trust-root pinning with a master-password-derived `STRAIGHT_JACKET_CI_KEY` proof model.
+- Added `.straight-jacket/ci-proof.json` and `straight-jacket verify --ci-key` for GitHub Actions enforcement.
+- Updated setup output to print a CI-only key for humans to store as a GitHub Actions secret without exposing the master password.
+- Restored the release workflow and converted verifier workflows to use `STRAIGHT_JACKET_CI_KEY`.
+
+## 0.1.11 - 2026-08-13
+
+- Added master-password registration authority and per-developer local signer registration.
+- Added committed signer registry metadata, encrypted registration key support, and manifest verification against active registered signers.
+- Added `straight-jacket setup` and `straight-jacket setup --check` for clean repo initialization and fresh clone registration.
+- Moved hook installation to committed `.githooks/pre-commit` with `core.hooksPath=.githooks` and local setup checks.
+
+## 0.1.10 - 2026-08-12
+
+- Expanded human-readable verification failures with locked file lists and human authorization commands.
+- Updated generated GitHub Actions workflows to use detailed human verification output instead of JSON logs.
+- Fixed batch `remove` to skip shell-expanded unregistered paths while removing registered matches.
+
 ## 0.1.8 - 2026-08-12
 
 - Added a `Release` workflow that publishes the npm package, tag, and GitHub release on every push to `main`.

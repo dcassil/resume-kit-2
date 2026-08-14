@@ -13,15 +13,10 @@
   ],
   "required_gates": {
     "future_contract": [
-      "resume_core_contract",
-      "career_store_contract",
-      "career_mcp_contract",
-      "workflow_contract",
-      "resume_agent_contract",
-      "resume_render_contract",
-      "resume_cli_contract",
-      "resume_plugin_contract",
-      "package_boundary_guardrails"
+      "pr",
+      "full_package_contract_surfaces",
+      "smoke",
+      "grounded_tailoring_e2e"
     ],
     "pr": [
       "unit",
@@ -90,7 +85,51 @@
       "second_job_reuse",
       "failure_recovery",
       "audit_reconstruction"
+    ],
+    "hallucination_rejection_fixtures": [
+      "tests.contract.test_honesty_fixtures_validate_change"
     ]
+  },
+  "category_modules": {
+    "unit": {
+      "schema_parsing": [
+        "tests.unit.test_validate_resume_contracts",
+        "tests.unit.test_enum_membership"
+      ],
+      "ats_sanitation": [
+        "tests.unit.test_resume_core_ats_sanitation_unit"
+      ],
+      "date_normalization": [
+        "tests.unit.test_validate_resume_contracts"
+      ],
+      "requirement_normalization": [
+        "tests.unit.test_jobmodel_jobterm_determinism"
+      ],
+      "scoring_math": [
+        "tests.unit.test_resume_core_scoring_math_unit"
+      ],
+      "state_transitions": [
+        "tests.unit.test_enum_membership",
+        "tests.unit.test_change_operation_structural"
+      ],
+      "change_validation": [
+        "tests.unit.test_change_operation_structural"
+      ],
+      "relationship_matching": [
+        "tests.unit.test_resume_core_relationship_matching_unit"
+      ],
+      "config_parsing": [
+        "tests.unit.test_resume_core_config_parsing_unit"
+      ]
+    },
+    "hallucination_rejection_fixtures": [
+      "tests.contract.test_honesty_fixtures_validate_change"
+    ]
+  },
+  "category_mapping_notes": {
+    "unit": {
+      "state_transitions": "Mapped to RKIT-I-0001 chunk 6 (RKIT-T-0010) enum and status membership coverage; resume-core does not expose a standalone state-machine transition API in this tier."
+    }
   },
   "determinism_requirements": [
     "isolated_temp_directories",
@@ -120,10 +159,12 @@
     "main": "python3 tools/run_gate.py --main --root .",
     "smoke": "python3 tools/run_gate.py --smoke --root .",
     "future_contract": "python3 tools/run_gate.py --future-contract --root .",
-    "boundary": "python3 -m unittest tests.boundary.test_resume_core_guardrails tests.boundary.test_career_store_guardrails tests.boundary.test_career_mcp_guardrails tests.boundary.test_resume_agent_guardrails tests.boundary.test_resume_render_guardrails tests.boundary.test_resume_cli_guardrails tests.boundary.test_resume_plugin_guardrails tests.boundary.test_workflow_guardrails tests.boundary.test_fixtures_guardrails tests.boundary.test_tests_guardrails tests.boundary.test_tools_guardrails",
+    "boundary": "python3 -m unittest tests.boundary.test_architecture_lint_guardrails tests.boundary.test_resume_core_guardrails tests.boundary.test_career_store_guardrails tests.boundary.test_career_mcp_guardrails tests.boundary.test_resume_agent_guardrails tests.boundary.test_resume_render_guardrails tests.boundary.test_resume_cli_guardrails tests.boundary.test_resume_plugin_guardrails tests.boundary.test_workflow_guardrails tests.boundary.test_fixtures_guardrails tests.boundary.test_tests_guardrails tests.boundary.test_tools_guardrails",
     "fixtures": "python3 -m unittest tests.contract.test_fixtures_contract tests.boundary.test_fixtures_guardrails",
+    "snapshots": "python3 -m unittest tests.snapshots.test_expected_snapshots_match_live_output",
     "contract_current": "python3 -m unittest discover -s tests/contract",
     "contract_tdd": "python3 -m unittest discover -s tests/contract",
+    "e2e": "python3 -m unittest tests.e2e.test_grounded_tailoring_final_validation",
     "guardrails": "python3 tools/tests_guardrails.py --root ."
   }
 }

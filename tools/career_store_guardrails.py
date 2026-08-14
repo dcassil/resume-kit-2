@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+from architecture_lint import scan_python_architecture
+
 
 ALLOWED_SURFACES = {
     "searchFacts",
@@ -39,10 +41,9 @@ REQUIRED_TYPES = {
 REQUIRED_VERIFICATION_STATES = {
     "source_stated",
     "user_verified",
+    "imported",
     "inferred",
     "unknown",
-    "explicitly_missing",
-    "conflicted",
 }
 
 REQUIRED_RELATIONSHIP_TYPES = {"alias", "equivalent", "related", "contradicts"}
@@ -55,7 +56,7 @@ REQUIRED_RESOLUTION_STATES = {
     "possible_match",
     "unknown",
     "explicitly_missing",
-    "conflicted",
+    "not_applicable",
 }
 
 MUTATING_SURFACES = {"upsertFact", "verifyFact", "addEvidence", "addRelationship", "recordJobMatch"}
@@ -171,7 +172,7 @@ def validate_surface(root: Path, surface: dict) -> list[Failure]:
             Failure(
                 path,
                 "Verification states are misaligned with career-store/TEST_SPEC.md.",
-                "Keep source_stated, user_verified, inferred, unknown, explicitly_missing, and conflicted states distinct.",
+                "Keep source_stated, user_verified, imported, inferred, and unknown states distinct.",
             )
         )
     if set(surface.get("relationship_types", [])) != REQUIRED_RELATIONSHIP_TYPES:
@@ -187,7 +188,7 @@ def validate_surface(root: Path, surface: dict) -> list[Failure]:
             Failure(
                 path,
                 "Resolution states are misaligned with career-store/TEST_SPEC.md.",
-                "Keep exact, alias, verified, related, possible, unknown, missing, and conflicted outcomes distinct.",
+                "Keep exact_match, alias_match, verified_fact_match, related_match, possible_match, unknown, explicitly_missing, and not_applicable outcomes distinct.",
             )
         )
     forbidden = set(surface.get("forbidden_public_api", []))
@@ -459,6 +460,7 @@ def run(root: Path) -> list[Failure]:
         text = path.read_text(encoding="utf-8")
         if path.suffix == ".py":
             failures.extend(scan_python_imports(path, text))
+            failures.extend(scan_python_architecture("career-store", path, text))
             failures.extend(scan_python_public_api(path, text))
         else:
             failures.extend(scan_text_public_api(path, text))

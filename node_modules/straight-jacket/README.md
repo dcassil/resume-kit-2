@@ -50,13 +50,22 @@ requires a pull request and the `verify` status check. See
 
 ```sh
 straight-jacket --help
-straight-jacket init --help
-straight-jacket init
+straight-jacket setup --help
+straight-jacket setup
 node bin/straight-jacket.mjs list --json
 node bin/straight-jacket.mjs verify --json
 straight-jacket add 'tools/pre-commit-*' --reason "Hook scripts"
 straight-jacket remove 'tools/pre-commit-*'
 ```
+
+When `straight-jacket setup` creates the repository metadata, it prints a
+`STRAIGHT_JACKET_CI_KEY` value for GitHub Actions. Store that generated value as
+a GitHub Actions secret. Do not paste the master password into GitHub, and do
+not give either the master password or CI key to an AI agent.
+
+Existing repositories with the older `.straight-jacket/public-key.json` format
+can run `straight-jacket setup` once to verify locked files and upgrade to the
+committed signer registry plus `.straight-jacket/ci-proof.json`.
 
 ## Development
 

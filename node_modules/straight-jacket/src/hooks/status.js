@@ -1,23 +1,30 @@
 import { readFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
-import { getGitDir } from "../git/repo.js";
 
-export const PRE_COMMIT_COMMAND = "straight-jacket verify && straight-jacket verify --staged";
+export const HOOKS_PATH = ".githooks";
+export const PRE_COMMIT_COMMAND = "straight-jacket setup --check && straight-jacket verify && straight-jacket verify --staged";
 
 export async function getHookStatus({ repoRoot }) {
   const hookPath = await preCommitHookPath(repoRoot);
   const hook = await readHookIfPresent(hookPath);
+  const configuredHooksPath = getConfiguredHooksPath(repoRoot);
 
   return {
-    installed: hook.includes(PRE_COMMIT_COMMAND),
+    installed: hook.includes("straight-jacket setup --check") &&
+      hook.includes("straight-jacket verify") &&
+      hook.includes("straight-jacket verify --staged") &&
+      configuredHooksPath === HOOKS_PATH,
     path: hookPath,
     command: PRE_COMMIT_COMMAND,
+    hooksPath: HOOKS_PATH,
+    configuredHooksPath,
     localHookAdvisory: true
   };
 }
 
 export async function preCommitHookPath(repoRoot) {
-  return path.join(await getGitDir(repoRoot), "hooks", "pre-commit");
+  return path.join(repoRoot, HOOKS_PATH, "pre-commit");
 }
 
 async function readHookIfPresent(hookPath) {
@@ -29,4 +36,14 @@ async function readHookIfPresent(hookPath) {
     }
     throw error;
   }
+}
+
+function getConfiguredHooksPath(repoRoot) {
+  const result = spawnSync("git", ["-C", repoRoot, "config", "--get", "core.hooksPath"], {
+    encoding: "utf8"
+  });
+  if (result.status !== 0) {
+    return null;
+  }
+  return result.stdout.trim() || null;
 }

@@ -4,43 +4,91 @@ import path from "node:path";
 import { assertGitRepoRoot } from "../git/repo.js";
 import { canonicalizeJson } from "../manifest/canonical-json.js";
 import {
+  registrationKeyPath,
+  registrationPublicKeyPath,
+  ciProofPath,
   manifestPath,
   publicKeyPath,
+  signersPath,
+  signersSignaturePath,
   signaturePath,
   writeManifest,
-  writePublicKey,
+  writeRegistrationKey,
+  writeRegistrationPublicKey,
+  writeCiProof,
+  writeSigners,
+  writeSignersSignature,
   writeSignature
 } from "../manifest/read-write.js";
 import { createSigningKey, exportPublicKey } from "../signing/keys.js";
+import { ciSecretInstructions, createCiProof, deriveCiKey } from "../signing/ci-proof.js";
 import { encryptPrivateKey, writeEncryptedPrivateKey } from "../signing/private-key-store.js";
+import { createSignerRecord, createSignerRegistry } from "../signing/signer-registry.js";
 import { signPayload } from "../signing/signatures.js";
 import { createCodedError } from "./errors.js";
 
-export async function initRepository({ repoRoot, password, now } = {}) {
+export async function initRepository({ repoRoot, password, masterPassword, localPassword, now } = {}) {
   await assertGitRepoRoot(repoRoot);
   await assertNotInitialized(repoRoot);
-  const keyPair = await createSigningKey();
-  const publicKey = await exportPublicKey(keyPair);
+  const registrationPassword = masterPassword ?? password;
+  const signerPassword = localPassword ?? password;
+  const registrationKeyPair = await createSigningKey();
+  const localKeyPair = await createSigningKey();
+  const registrationPublicKey = await exportPublicKey(registrationKeyPair);
+  const localPublicKey = await exportPublicKey(localKeyPair);
   const manifest = createEmptyManifest({
     repoId: createRepoId(),
-    keyId: publicKey.keyId
+    keyId: localPublicKey.keyId
+  });
+  const signerRegistry = createSignerRegistry({
+    repoId: manifest.repoId,
+    registrationKeyId: registrationPublicKey.keyId,
+    signers: [
+      createSignerRecord({
+        publicKey: localPublicKey,
+        registeredAt: now
+      })
+    ]
   });
   const signature = await signPayload({
     payload: canonicalizeJson(manifest),
-    privateKey: keyPair.privateKey,
-    keyId: publicKey.keyId,
+    privateKey: localKeyPair.privateKey,
+    keyId: localPublicKey.keyId,
+    now
+  });
+  const signersSignature = await signPayload({
+    payload: canonicalizeJson(signerRegistry),
+    privateKey: registrationKeyPair.privateKey,
+    keyId: registrationPublicKey.keyId,
     now
   });
   const encryptedPrivateKey = await encryptPrivateKey({
-    privateKey: keyPair.privateKey,
-    password,
-    publicKeyFingerprint: publicKey.fingerprint
+    privateKey: localKeyPair.privateKey,
+    password: signerPassword,
+    publicKeyFingerprint: localPublicKey.fingerprint
+  });
+  const encryptedRegistrationKey = await encryptPrivateKey({
+    privateKey: registrationKeyPair.privateKey,
+    password: registrationPassword,
+    publicKeyFingerprint: registrationPublicKey.fingerprint
+  });
+  const ciKey = await deriveCiKey({ masterPassword: registrationPassword });
+  const ciProof = createCiProof({
+    ciKey,
+    registrationPublicKey,
+    registrationKey: encryptedRegistrationKey,
+    signerRegistry,
+    signerRegistrySignature: signersSignature
   });
 
   await mkdir(path.join(repoRoot, ".straight-jacket", "local"), { recursive: true });
   await writeManifest(repoRoot, manifest);
   await writeSignature(repoRoot, signature);
-  await writePublicKey(repoRoot, publicKey);
+  await writeSigners(repoRoot, signerRegistry);
+  await writeSignersSignature(repoRoot, signersSignature);
+  await writeRegistrationPublicKey(repoRoot, registrationPublicKey);
+  await writeRegistrationKey(repoRoot, encryptedRegistrationKey);
+  await writeCiProof(repoRoot, ciProof);
   await writeEncryptedPrivateKey(repoRoot, encryptedPrivateKey);
   await writeFile(path.join(repoRoot, ".straight-jacket", "local", ".gitignore"), "*\n", "utf8");
 
@@ -48,8 +96,15 @@ export async function initRepository({ repoRoot, password, now } = {}) {
     ok: true,
     manifestPath: manifestPath(repoRoot),
     signaturePath: signaturePath(repoRoot),
-    publicKeyPath: publicKeyPath(repoRoot),
-    fingerprint: publicKey.fingerprint
+    signersPath: signersPath(repoRoot),
+    signersSignaturePath: signersSignaturePath(repoRoot),
+    registrationPublicKeyPath: registrationPublicKeyPath(repoRoot),
+    registrationKeyPath: registrationKeyPath(repoRoot),
+    ciProofPath: ciProofPath(repoRoot),
+    publicKeyPath: registrationPublicKeyPath(repoRoot),
+    fingerprint: registrationPublicKey.fingerprint,
+    localSignerKeyId: localPublicKey.keyId,
+    ci: ciSecretInstructions(ciKey)
   };
 }
 
@@ -78,6 +133,11 @@ async function assertNotInitialized(repoRoot) {
     manifestPath(repoRoot),
     signaturePath(repoRoot),
     publicKeyPath(repoRoot),
+    signersPath(repoRoot),
+    signersSignaturePath(repoRoot),
+    registrationPublicKeyPath(repoRoot),
+    registrationKeyPath(repoRoot),
+    ciProofPath(repoRoot),
     path.join(repoRoot, ".straight-jacket", "local", "private-key.json")
   ];
 

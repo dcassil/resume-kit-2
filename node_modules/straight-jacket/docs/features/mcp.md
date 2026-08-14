@@ -74,7 +74,7 @@ Rules:
 - read-only
 - no password
 - no diagnostic signature bypass
-- may accept external fingerprint only if supplied by trusted host configuration, not by model-generated repo files
+- may accept CI proof state only through trusted host configuration, not by model-generated repo files
 
 ### `straight_jacket_explain_violation`
 

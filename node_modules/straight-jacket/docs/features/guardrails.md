@@ -89,7 +89,7 @@ Future checks:
 - MCP is read-only by default.
 - Passwords are interactive-only in CLI.
 - Manifest trust requires signature verification.
-- Public-key replacement requires external fingerprint approval.
+- Registration metadata replacement requires a valid CI proof checked with `STRAIGHT_JACKET_CI_KEY`.
 - Local hooks are advisory.
 
 ## Updating Guardrails

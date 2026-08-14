@@ -21,10 +21,10 @@ Implement:
 
 Done when:
 
-- `initRepository` writes manifest, signature, public key, and encrypted local private key
+- `initRepository` writes manifest, signatures, signer registry, registration public key, encrypted registration key, and encrypted local private key
 - manifest starts empty
 - repo metadata does not contain the password
-- public key fingerprint is stable
+- registration public key fingerprint is stable
 
 ## Milestone 2: Add And Verify Happy Path
 
@@ -75,9 +75,9 @@ Target tests:
 
 Implement:
 
-- missing manifest/signature/public-key checks
+- missing manifest/signature/signer-registry/registration-public-key checks
 - invalid signature checks
-- public-key fingerprint pinning
+- CI key proof verification
 - duplicate path detection
 - case-collision detection
 - absolute/escape rejection
@@ -113,7 +113,7 @@ Done when:
 
 - `verifyRepository({ scope: "staged" })` catches staged tampering
 - status reports local hooks as advisory
-- CI template includes external fingerprint pinning guidance
+- CI template includes CI key secret guidance
 
 ## Milestone 6: CLI Surface
 
@@ -171,7 +171,7 @@ Implement:
 Done when:
 
 - skill teaches agents to respect protected files
-- CI template documents external fingerprint pinning
+- CI template documents CI key secret setup
 
 ## Suggested Build Order
 

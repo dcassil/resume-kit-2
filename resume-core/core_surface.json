@@ -100,7 +100,7 @@
     },
     {
       "name": "normalizeJobModel",
-      "description": "Normalize job requirements with deterministic requirement IDs, classifications, weights, source text, and normalized terms.",
+      "description": "Normalize job requirements with deterministic requirement IDs, classifications, weights, source text, normalized terms, seniority, concepts, preferred requirements, and terminology.",
       "input_contract": {
         "required_fields": ["source_job", "config"]
       },
@@ -179,7 +179,7 @@
       "name": "validateFinalResume",
       "description": "Run final deterministic validation over a working resume and match result before rendering/export.",
       "input_contract": {
-        "required_fields": ["working_resume", "job_model", "career_fact_dtos", "config"]
+        "required_fields": ["working_resume", "job_model", "career_fact_dtos", "config", "applied_operations"]
       },
       "output_contract": {
         "required_fields": ["schema_version", "status", "final_resume", "match_result", "errors", "warnings"],

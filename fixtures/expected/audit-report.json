@@ -7,5 +7,50 @@
     "audit reconstructs source resume, job, config, questions, answers, facts, operations, validations, and outputs",
     "audit includes rejected adversarial operations and deterministic rejection reasons",
     "audit omits unnecessary sensitive raw data"
-  ]
+  ],
+  "comment": [
+    "audit reconstructs source resume, job, config, questions, answers, facts, operations, validations, and outputs",
+    "audit includes rejected adversarial operations and deterministic rejection reasons",
+    "audit omits unnecessary sensitive raw data"
+  ],
+  "data": {
+    "config_hash": "fixture-config-v1",
+    "final_validation_status": "pass",
+    "fixture_set_id": "resume-kit-contract-fixtures-v1",
+    "normalized_refs": {
+      "job_ids": [
+        "job-a",
+        "job-b"
+      ],
+      "resume_id": "resume-main"
+    },
+    "operation_validation": {
+      "accepted": [
+        "op_add_aws_skill",
+        "op_add_graphql_skill",
+        "op_rewrite_api_architecture"
+      ],
+      "rejected": [
+        "invalid-related-skill-overreach",
+        "invalid-title-inflation",
+        "invalid-unsupported-management",
+        "invalid-unsupported-scale",
+        "invalid-years-inflation"
+      ]
+    },
+    "schema_version": "audit-report.fixture.v1",
+    "sensitive_raw_data_omitted": true,
+    "source_refs": {
+      "answers": [
+        "fixtures/answers/aws.txt",
+        "fixtures/answers/graphql.txt",
+        "fixtures/answers/architecture.txt"
+      ],
+      "jobs": [
+        "fixtures/jobs/job-a-staff-software-engineer.txt",
+        "fixtures/jobs/job-b-senior-full-stack-engineer.txt"
+      ],
+      "resume": "fixtures/resumes/resume-main.txt"
+    }
+  }
 }
