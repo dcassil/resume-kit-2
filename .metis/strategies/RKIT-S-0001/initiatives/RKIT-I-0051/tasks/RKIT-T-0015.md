@@ -4,16 +4,15 @@ level: task
 title: "REQ-002: Execute all five honesty fixtures through validateChange"
 short_code: "RKIT-T-0015"
 created_at: 2026-08-14T03:14:05.590586+00:00
-updated_at: 2026-08-14T03:14:05.590586+00:00
+updated_at: 2026-08-14T16:43:39.661706+00:00
 parent: executable-release-gate-e2e
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -30,6 +29,8 @@ initiative_id: RKIT-I-0051
 ## Objective
 
 Wire all five `fixtures/operations/invalid-*.json` honesty fixtures through `resume_core.validateChange` in the PR gate tier so each is asserted rejected, closing the confirmed gap that ZERO of the honesty fixtures currently execute through `validateChange`. This delivers an executable, deterministic honesty-rejection contract that proves the core actually blocks the fabrication scenarios it claims to guard against — the difference between a claimed guarantee and a demonstrated one.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -88,4 +89,5 @@ APPROVED DECISION (red baselines) — binding: the Azure-as-AWS `related_skill_o
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-14: Codex-driven implementation reviewed + committed. All FIVE fixtures reject today — including Azure→AWS related-skill-overreach (no xfail needed; the runtime-probe xfail scaffold is in place if it ever regresses). Reason correspondence is honest: `expected_reason` maps to core error vocabulary (`unsupported_guarded_claim` + specific claim in details, `unsupported_years_claim` for years_inflation). Files: `tests/contract/test_honesty_fixtures_validate_change.py`, `tests/support/operation_fixture_adapter.py`, `suite_manifest.json` mapping under hallucination_rejection_fixtures. New tests 5/5 green standalone; PR 198 + smoke green.
+- OPEN CRITERION (task stays active): "module in PR gate's executed set" — `tools/run_tests.py` hard-codes CURRENT_TEST_MODULES and is straight-jacket protected. Adding `tests.contract.test_honesty_fixtures_validate_change` is batched with T-0021's unit-tier wiring for one Daniel password session (A-0006 strengthen-only realignment).

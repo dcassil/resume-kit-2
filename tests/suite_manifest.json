@@ -90,6 +90,9 @@
       "second_job_reuse",
       "failure_recovery",
       "audit_reconstruction"
+    ],
+    "hallucination_rejection_fixtures": [
+      "tests.contract.test_honesty_fixtures_validate_change"
     ]
   },
   "determinism_requirements": [
