@@ -167,21 +167,138 @@ class ResumeCoreDomainContractTests(unittest.TestCase):
         self.assertNotIn("staff software engineer", text)
         self.assertNotRegex(text, r"\b20 million\b|\b30 engineers\b")
 
+    def test_job_model_section_4_2_fields_are_deterministically_populated(self):
+        source_job = {
+            "title": "Senior Platform Engineer",
+            "company": "Example SaaS",
+            "requirements": [
+                {
+                    "requirement_id": "req_react",
+                    "classification": "required",
+                    "concept": "React",
+                    "source_text": "Required React experience",
+                    "normalized_terms": ["react"],
+                },
+                {
+                    "requirement_id": "req_aws",
+                    "classification": "preferred",
+                    "concept": "AWS",
+                    "source_text": "Preferred AWS experience",
+                    "normalized_terms": ["aws"],
+                },
+            ],
+        }
+        first = maybe_await(self.core.normalizeJobModel(source_job))
+        second = maybe_await(self.core.normalizeJobModel(source_job))
+        self.assertEqual(first, second)
+        self.assertEqual(first.get("status"), "ok", first)
+
+        job_model = first["job_model"]
+        self.assertEqual(job_model["seniority"], "senior")
+        self.assertEqual(job_model["industries"], ["SaaS"])
+        self.assertEqual(len(job_model["requirements"]), 1)
+        self.assertEqual(len(job_model["preferred"]), 1)
+        self.assertEqual(job_model["requirements"][0]["requirement_id"], "req_react")
+        self.assertEqual(job_model["preferred"][0]["requirement_id"], "req_aws")
+        self.assertTrue(job_model["terminology"])
+        for term in job_model["terminology"]:
+            self.assertTrue(term.get("surface"))
+            self.assertTrue(term.get("canonical"))
+            self.assertIn(term.get("source"), {"title", "requirement", "description"})
+
     def test_unverified_or_related_facts_do_not_validate_unsupported_change(self):
         operation = {
+            "schema_version": "resume-change-operation.v1",
             "operation_id": "op_aws_inflation",
             "status": "proposed",
+            "op": "insert",
             "path": "/skills/-",
+            "reason": "Prefer AWS only when it is grounded in supplied facts.",
             "before": None,
             "after": "AWS, ten years",
             "linked_requirement_ids": ["req_aws"],
             "linked_fact_ids": ["fact_react"],
+            "provenance": [{"source": "test"}],
         }
         result = maybe_await(self.core.validateChange(CANONICAL_RESUME, operation, JOB_MODEL, CAREER_FACTS, {"require_verified": True}))
         self.assertIn(result.get("status"), {"rejected", "error"})
         text = serialized(result)
         self.assertIn("aws", text)
         self.assertNotIn("validation_state\": \"validated", text)
+
+    def test_change_operation_verbs_are_structurally_validated(self):
+        def operation_for(verb):
+            if verb == "insert":
+                return {
+                    "schema_version": "resume-change-operation.v1",
+                    "operation_id": f"op_{verb}",
+                    "status": "proposed",
+                    "op": verb,
+                    "path": "/skills/-",
+                    "reason": "Exercise the canonical change operation verb set.",
+                    "before": None,
+                    "after": "React",
+                    "linked_requirement_ids": ["req_react"],
+                    "linked_fact_ids": ["fact_react"],
+                    "provenance": [{"source": "test"}],
+                }
+            return {
+                "schema_version": "resume-change-operation.v1",
+                "operation_id": f"op_{verb}",
+                "status": "proposed",
+                "op": verb,
+                "path": "/skills/0",
+                "reason": "Exercise the canonical change operation verb set.",
+                "before": "React",
+                "after": "React",
+                "linked_requirement_ids": ["req_react"],
+                "linked_fact_ids": ["fact_react"],
+                "provenance": [{"source": "test"}],
+            }
+
+        for verb in ("rewrite", "insert", "move"):
+            with self.subTest(verb=verb):
+                result = maybe_await(self.core.validateChange(CANONICAL_RESUME, operation_for(verb), JOB_MODEL, CAREER_FACTS, {}))
+                self.assertEqual(result.get("status"), "ok", result)
+                self.assertEqual(result["validated_operation"].get("op"), verb)
+
+        for verb in ("add", "foo"):
+            with self.subTest(verb=verb):
+                operation = operation_for("insert")
+                operation["op"] = verb
+                result = maybe_await(self.core.validateChange(CANONICAL_RESUME, operation, JOB_MODEL, CAREER_FACTS, {}))
+                self.assertEqual(result.get("status"), "rejected", result)
+                error_codes = {error.get("code") for error in result.get("errors", [])}
+                self.assertIn("invalid_op", error_codes)
+
+    def test_change_operation_required_fields_and_status_are_structurally_validated(self):
+        operation = {
+            "schema_version": "resume-change-operation.v1",
+            "operation_id": "op_missing_reason",
+            "status": "proposed",
+            "op": "insert",
+            "path": "/skills/-",
+            "before": None,
+            "after": "React",
+            "linked_requirement_ids": ["req_react"],
+            "linked_fact_ids": ["fact_react"],
+            "provenance": [{"source": "test"}],
+        }
+        result = maybe_await(self.core.validateChange(CANONICAL_RESUME, operation, JOB_MODEL, CAREER_FACTS, {}))
+        self.assertEqual(result.get("status"), "rejected", result)
+        missing_fields = {
+            error.get("field_path")
+            for error in result.get("errors", [])
+            if error.get("code") == "missing_field"
+        }
+        self.assertIn("reason", missing_fields)
+
+        operation["reason"] = "Exercise invalid status structural validation."
+        operation["status"] = "done"
+        result = maybe_await(self.core.validateChange(CANONICAL_RESUME, operation, JOB_MODEL, CAREER_FACTS, {}))
+        self.assertEqual(result.get("status"), "rejected", result)
+        error_codes = {error.get("code") for error in result.get("errors", [])}
+        self.assertIn("invalid_status", error_codes)
 
     def test_apply_change_requires_validated_operation_and_preserves_base_resume(self):
         operation = {

@@ -100,7 +100,7 @@
     },
     {
       "name": "normalizeJobModel",
-      "description": "Normalize job requirements with deterministic requirement IDs, classifications, weights, source text, and normalized terms.",
+      "description": "Normalize job requirements with deterministic requirement IDs, classifications, weights, source text, normalized terms, seniority, concepts, preferred requirements, and terminology.",
       "input_contract": {
         "required_fields": ["source_job", "config"]
       },

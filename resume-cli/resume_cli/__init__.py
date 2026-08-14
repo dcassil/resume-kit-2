@@ -138,6 +138,13 @@ def _ingest_job(workspace: Path, job_file: Path) -> JsonObject:
     if normalized.get("status") == "error":
         return _error("schema_error", "job validation failed")
     job = dict(normalized.get("job_model", {}))
+    # Compatibility shim (RKIT-I-0001/T-0008): JobModel now splits preferred
+    # requirements into a distinct `preferred` array. This CLI still reads only
+    # `requirements`, so fold preferred into the requirements superset (preferred
+    # is preserved alongside, not dropped) to keep ingest lossless. Proper
+    # preferred-vs-required handling is owned by the resume-cli initiative
+    # (RKIT-I-0036/0037); remove this shim when that lands.
+    job["requirements"] = [*job.get("requirements", []), *job.get("preferred", [])]
     _write_json(_paths(workspace)["job_current"], job)
     return {
         "status": "ok",
@@ -930,14 +937,27 @@ def _unique_text(items: list[str]) -> list[str]:
 
 
 def _core_operation(operation: JsonObject) -> JsonObject:
+    # Compatibility shim (RKIT-I-0001/T-0005): ResumeChangeOperation now requires
+    # schema_version, op, reason, and provenance as structural fields. The fake
+    # proposal adapter emits operation_type/facts_used/provenance-dict; forward and
+    # derive the canonical fields so the grounded operation validates on its merits.
+    # Proper reason/provenance emission is owned by the resume-agent/resume-cli
+    # tailoring initiatives (RKIT-I-0016/0038); revisit when they land.
+    fact_ids = list(operation.get("facts_used", []))
+    op_type = str(operation.get("operation_type", "replace_text"))
+    verb = "replace" if op_type in {"replace_text", "replace"} else op_type
     return {
+        "schema_version": "resume-change-operation.v1",
         "operation_id": str(operation.get("operation_id", "op_proposed")),
         "status": str(operation.get("status", "proposed")),
+        "op": verb,
         "path": _target_path(str(operation.get("target_path", ""))),
         "before": operation.get("before"),
         "after": operation.get("after"),
-        "linked_fact_ids": list(operation.get("facts_used", [])),
+        "reason": str(operation.get("reason") or "Grounded rewrite aligning the bullet to job terminology using allowed facts."),
+        "linked_fact_ids": fact_ids,
         "linked_requirement_ids": list(operation.get("requirements_targeted", [])),
+        "provenance": [{"kind": "fact", "ref": fid} for fid in fact_ids],
         "metadata": {"agent_operation": operation},
     }
 
@@ -966,14 +986,20 @@ def _json_pointer_value(document: Any, pointer: str) -> Any:
 
 
 def _hallucinated_operation(before: Any, path: str) -> JsonObject:
+    # Structurally complete so it is rejected on GROUNDING (unsupported 20M-users
+    # claim), not on missing required fields (RKIT-I-0001/T-0005).
     return {
+        "schema_version": "resume-change-operation.v1",
         "operation_id": "op_hallucinated_scale",
         "status": "proposed",
+        "op": "replace",
         "path": path,
         "before": before,
         "after": "Architected enterprise React platforms serving 20 million users globally.",
+        "reason": "Attempted scale-inflation rewrite (should be rejected as ungrounded).",
         "linked_requirement_ids": ["req_react"],
         "linked_fact_ids": ["fact_react"],
+        "provenance": [{"kind": "fact", "ref": "fact_react"}],
     }
 
 

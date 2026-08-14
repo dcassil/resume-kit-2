@@ -9,9 +9,11 @@ from typing import Any
 from unicodedata import category as _unicode_category
 from unicodedata import normalize as _unicode_normalize
 
+from .pointers import _append_already_present, _pointer_parent_exists, _pointer_value, _set_pointer
 from .schemas import (
     ChangeOperationStatus,
     JsonObject,
+    RESUME_CHANGE_OPERATION_SCHEMA,
     RequirementClassification,
     ResolutionState,
     VerificationState,
@@ -27,7 +29,13 @@ _RESOLVED = {
     ResolutionState.ALIAS_MATCH.value,
     ResolutionState.VERIFIED_FACT_MATCH.value,
 }
-_VERIFIED_FACT_STATES = {VerificationState.SOURCE_STATED.value, VerificationState.USER_VERIFIED.value, "imported"}
+_VERIFIED_FACT_STATES = {
+    VerificationState.SOURCE_STATED.value,
+    VerificationState.USER_VERIFIED.value,
+    VerificationState.IMPORTED.value,
+}
+_CHANGE_OPERATION_OPS = {"replace", "rewrite", "insert", "remove", "move"}
+_CHANGE_OPERATION_STATUSES = {status.value for status in ChangeOperationStatus}
 _CONTROL_WHITELIST = {"\n", "\r", "\t"}
 _SMART_TRANSLATION = str.maketrans(
     {
@@ -140,6 +148,31 @@ _RELATED_REQUIREMENT_TERMS = {
     "aws": ("azure", "cloud infrastructure", "cloud services"),
     "graphql": ("rest api", "rest apis", "api design"),
 }
+_SENIORITY_HINTS = (
+    ("junior", re.compile(r"\b(junior|jr\.?)\b", re.IGNORECASE)),
+    ("mid-level", re.compile(r"\b(mid[- ]level|midlevel)\b", re.IGNORECASE)),
+    ("senior", re.compile(r"\b(senior|sr\.?)\b", re.IGNORECASE)),
+    ("staff", re.compile(r"\bstaff\b", re.IGNORECASE)),
+    ("principal", re.compile(r"\bprincipal\b", re.IGNORECASE)),
+    ("lead", re.compile(r"\blead\b", re.IGNORECASE)),
+    ("manager", re.compile(r"\bmanager\b", re.IGNORECASE)),
+    ("director", re.compile(r"\bdirector\b", re.IGNORECASE)),
+    ("executive", re.compile(r"\b(vp|vice president|head of|chief)\b", re.IGNORECASE)),
+)
+_INDUSTRY_HINTS = (
+    ("SaaS", re.compile(r"\b(saas|software as a service)\b", re.IGNORECASE)),
+    ("FinTech", re.compile(r"\b(fintech|financial technology|payments?|banking)\b", re.IGNORECASE)),
+    ("Healthcare", re.compile(r"\b(healthcare|health care|medical|clinical)\b", re.IGNORECASE)),
+    ("E-commerce", re.compile(r"\b(e[- ]?commerce|marketplace|retail)\b", re.IGNORECASE)),
+    ("Education", re.compile(r"\b(edtech|education|learning platform)\b", re.IGNORECASE)),
+)
+_DOMAIN_HINTS = (
+    ("API architecture", re.compile(r"\b(api architecture|api design|rest apis?|graphql)\b", re.IGNORECASE)),
+    ("Cloud infrastructure", re.compile(r"\b(cloud infrastructure|aws|azure|gcp|kubernetes)\b", re.IGNORECASE)),
+    ("Responsive design", re.compile(r"\b(responsive design|responsive web|mobile)\b", re.IGNORECASE)),
+    ("Data engineering", re.compile(r"\b(data engineering|etl|analytics pipeline)\b", re.IGNORECASE)),
+    ("Full-stack software development", re.compile(r"\b(full[- ]stack|frontend|backend)\b", re.IGNORECASE)),
+)
 
 
 def sanitizeText(text: Any, rules: JsonObject | None = None) -> JsonObject:
@@ -263,15 +296,40 @@ def normalizeJobModel(source_job: Any, config: JsonObject | None = None) -> Json
         raw_requirements = []
         warnings.append(_issue("invalid_requirements", "requirements must be an array.", "requirements"))
 
-    requirements = [_requirement(item, index, config) for index, item in enumerate(raw_requirements)]
+    raw_preferred = _item(job, "preferred", [])
+    if isinstance(raw_preferred, str):
+        raw_preferred = _requirements_from_text(raw_preferred)
+    if raw_preferred is None:
+        raw_preferred = []
+    if not isinstance(raw_preferred, list):
+        raw_preferred = []
+        warnings.append(_issue("invalid_preferred", "preferred must be an array.", "preferred"))
+
+    normalized_requirements = [_requirement(item, index, config) for index, item in enumerate(raw_requirements)]
+    preferred_start = len(normalized_requirements)
+    normalized_preferred = [
+        _requirement(_preferred_source(item), preferred_start + index, config) for index, item in enumerate(raw_preferred)
+    ]
+    all_requirements = _dedupe_requirements([*normalized_requirements, *normalized_preferred])
+    requirements = [item for item in all_requirements if _classification(item) != RequirementClassification.PREFERRED.value]
+    preferred = [item for item in all_requirements if _classification(item) == RequirementClassification.PREFERRED.value]
+    title = _optional_text(_item(job, "title"))
+    company = _optional_text(_item(job, "company"))
+    description = _job_description(job)
+    job_text = " ".join(part for part in [title or "", company or "", description, _text(all_requirements)] if part)
     model = {
         "schema_version": _item(job, "schema_version", "job-model.v1"),
         "job_id": _item(job, "job_id") or _stable_id("job", _text(job)),
-        "title": _item(job, "title"),
-        "company": _item(job, "company"),
+        "title": title,
+        "company": company,
+        "seniority": _optional_text(_item(job, "seniority")) or _seniority_from_title(title),
+        "industries": _concepts(_item(job, "industries"), _INDUSTRY_HINTS, job_text),
+        "domains": _concepts(_item(job, "domains"), _DOMAIN_HINTS, job_text),
         "source": copy.deepcopy(_item(job, "source", {"kind": "structured"})),
         "metadata": copy.deepcopy(_item(job, "metadata", {})),
         "requirements": requirements,
+        "preferred": preferred,
+        "terminology": _job_terms(title, requirements, preferred, description),
     }
     return _result("warning" if warnings else "ok", job_model=model, warnings=warnings)
 
@@ -451,24 +509,29 @@ def validateChange(
         return _result("error", operation_id="", validation_state="rejected", errors=[_issue("invalid_operation", "operation and canonical_resume must be objects.")], grounding=grounding)
 
     errors: list[JsonObject] = []
+    required_fields = set(RESUME_CHANGE_OPERATION_SCHEMA["required"])
+    for field_name in sorted(required_fields - set(op)):
+        errors.append(_issue("missing_field", f"ResumeChangeOperation requires {field_name}.", field_name))
+
     operation_id = str(_item(op, "operation_id", ""))
-    if _item(op, "status", ChangeOperationStatus.PROPOSED.value) != ChangeOperationStatus.PROPOSED.value:
-        errors.append(_issue("invalid_status", "Only proposed operations can be validated.", "status"))
+    operation_status = str(_item(op, "status", ""))
+    if "status" in op and operation_status not in _CHANGE_OPERATION_STATUSES:
+        errors.append(_issue("invalid_status", "Operation status must be proposed, validated, rejected, applied, accepted, or modified.", "status"))
     path = _operation_path(op)
     if not path.startswith("/"):
         errors.append(_issue("invalid_path", "Operation path must be a JSON pointer.", "path"))
 
     path_exists, current_value = _pointer_value(resume, path)
     parent_exists = _pointer_parent_exists(resume, path)
-    operation_kind = str(_item(op, "op", "replace" if path_exists else "add"))
-    if operation_kind not in {"add", "replace", "remove"}:
-        errors.append(_issue("invalid_op", "Operation op must be add, replace, or remove.", "op"))
+    operation_kind = str(_item(op, "op", "replace" if path_exists else "insert"))
+    if "op" in op and operation_kind not in _CHANGE_OPERATION_OPS:
+        errors.append(_issue("invalid_op", "Operation op must be insert, move, remove, replace, or rewrite.", "op"))
     if not parent_exists:
         errors.append(_issue("invalid_path", "Operation path parent does not exist in the canonical resume.", "path"))
     if operation_kind == "replace" and not path_exists:
         errors.append(_issue("missing_target", "Replace operations require an existing target path.", "path"))
-    if operation_kind == "add" and path_exists and not path.endswith("/-"):
-        errors.append(_issue("target_exists", "Add operations require a new object member or array append path.", "path"))
+    if operation_kind == "insert" and path_exists and not path.endswith("/-"):
+        errors.append(_issue("target_exists", "Insert operations require a new object member or array append path.", "path"))
     if "before" in op and _item(op, "before") != current_value and not (_item(op, "before") is None and not path_exists):
         errors.append(_issue("before_mismatch", "Operation before value does not match current content.", "before"))
 
@@ -785,6 +848,148 @@ def _requirement(raw: Any, index: int, config: JsonObject) -> JsonObject:
     }
 
 
+def _preferred_source(raw: Any) -> Any:
+    if isinstance(raw, dict):
+        preferred = copy.deepcopy(raw)
+        preferred["classification"] = RequirementClassification.PREFERRED.value
+        return preferred
+    return {"source_text": str(raw), "concept": str(raw), "classification": RequirementClassification.PREFERRED.value}
+
+
+def _dedupe_requirements(requirements: list[JsonObject]) -> list[JsonObject]:
+    seen: set[str] = set()
+    unique: list[JsonObject] = []
+    for requirement in requirements:
+        requirement_id = str(_item(requirement, "requirement_id", ""))
+        key = requirement_id or _stable_id("req", _text(requirement))
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(requirement)
+    return unique
+
+
+def _optional_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _job_description(job: JsonObject) -> str:
+    for key in ("description", "job_description", "raw_description", "raw_text"):
+        value = _item(job, key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def _seniority_from_title(title: str | None) -> str | None:
+    if not title:
+        return None
+    for seniority, pattern in _SENIORITY_HINTS:
+        if pattern.search(title):
+            return seniority
+    return None
+
+
+def _concepts(raw: Any, hints: tuple[tuple[str, re.Pattern[str]], ...], source_text: str) -> list[Any]:
+    if isinstance(raw, list):
+        concepts: list[Any] = []
+        seen: set[str] = set()
+        for item in raw:
+            if isinstance(item, dict):
+                copied = copy.deepcopy(item)
+                key = _normal_text(copied)
+            else:
+                copied = str(item).strip()
+                key = _normal_text(copied)
+            if copied and key and key not in seen:
+                seen.add(key)
+                concepts.append(copied)
+        return concepts
+    return [label for label, pattern in hints if pattern.search(source_text)]
+
+
+def _job_terms(
+    title: str | None,
+    requirements: list[JsonObject],
+    preferred: list[JsonObject],
+    description: str,
+) -> list[JsonObject]:
+    terms: list[JsonObject] = []
+    seen: set[tuple[str, str]] = set()
+
+    def add(surface: Any, canonical: Any, source: str, weight: Any = 1.0) -> None:
+        surface_text = str(surface).strip()
+        canonical_text = _normal_text(canonical)
+        if not surface_text or not canonical_text:
+            return
+        key = (source, canonical_text)
+        if key in seen:
+            return
+        seen.add(key)
+        terms.append(
+            {
+                "surface": surface_text,
+                "canonical": canonical_text,
+                "source": source,
+                "weight": round(_number(weight, 1.0), 4),
+            }
+        )
+
+    if title:
+        for token in _ordered_term_surfaces(title, include_full_text=False):
+            add(token, token, "title", 1.0)
+
+    for requirement in [*requirements, *preferred]:
+        source_text = str(_item(requirement, "source_text") or _item(requirement, "concept") or "").strip()
+        weight = _item(requirement, "weight", 1.0)
+        if source_text:
+            add(source_text, source_text, "requirement", weight)
+        for term in _terms(requirement):
+            add(_requirement_term_surface(source_text, term), term, "requirement", weight)
+
+    if description:
+        for token in _ordered_term_surfaces(description, include_full_text=True):
+            add(token, token, "description", 1.0)
+
+    return terms
+
+
+def _ordered_term_surfaces(text: str, include_full_text: bool) -> list[str]:
+    surfaces: list[str] = []
+    if include_full_text and _normal_text(text):
+        surfaces.append(text.strip())
+    for match in re.finditer(r"[A-Za-z][A-Za-z0-9.+#-]*", text):
+        surface = match.group(0).strip(" .;:,")
+        if _specific_term(surface) and surface not in surfaces:
+            surfaces.append(surface)
+    for term in _terms_for(text):
+        surface = _literal_surface(text, term)
+        if surface not in surfaces:
+            surfaces.append(surface)
+    return surfaces
+
+
+def _literal_surface(text: str, canonical: Any) -> str:
+    canonical_text = _normal_text(canonical)
+    if not text or not canonical_text:
+        return str(canonical).strip()
+    pattern = r"\b" + r"[\W_]+".join(re.escape(part) for part in canonical_text.split()) + r"\b"
+    match = re.search(pattern, text, re.IGNORECASE)
+    if match:
+        return text[match.start() : match.end()]
+    return str(canonical).strip()
+
+
+def _requirement_term_surface(source_text: str, canonical: Any) -> str:
+    surface = _literal_surface(source_text, canonical)
+    if _normal_text(surface) == _normal_text(canonical):
+        return surface
+    return source_text.strip() or surface
+
+
 def _resolve_requirement(
     requirement: JsonObject,
     terms: list[str],
@@ -862,7 +1067,11 @@ def _default_weight(classification: str, importance: Any) -> float:
 def _requirements(job: Any) -> list[JsonObject]:
     if not isinstance(job, dict):
         return []
-    return [item for item in _array(_item(job, "requirements", [])) if isinstance(item, dict)]
+    unique: dict[str, JsonObject] = {}
+    for item in [*_array(_item(job, "requirements", [])), *_array(_item(job, "preferred", []))]:
+        if isinstance(item, dict):
+            unique.setdefault(str(_item(item, "requirement_id", _stable_id("req", item))), item)
+    return list(unique.values())
 
 
 def _classification(requirement: JsonObject) -> str:
@@ -1018,13 +1227,14 @@ def _fact_resolution(
             fact_evidence["matched_years"] = matched_years
             if not met:
                 continue
-        if state == VerificationState.EXPLICITLY_MISSING.value:
+        resolution_state = str(_item(fact, "resolution_state", ""))
+        if resolution_state == ResolutionState.EXPLICITLY_MISSING.value:
             explicit_missing.append(fact_id)
             evidence.append({**fact_evidence, "resolution_state": ResolutionState.EXPLICITLY_MISSING.value})
         elif _fact_allowed(fact, allow_inferred):
             verified.append(fact_id)
             evidence.append(fact_evidence)
-        elif str(_item(fact, "resolution_state", "")) == ResolutionState.RELATED_MATCH.value:
+        elif resolution_state == ResolutionState.RELATED_MATCH.value:
             related.append(fact_id)
             evidence.append({**fact_evidence, "resolution_state": ResolutionState.RELATED_MATCH.value})
     if explicit_missing:
@@ -1164,77 +1374,6 @@ def _facts_support_terms(terms: list[str], fact_index: dict[str, JsonObject], li
 
 def _operation_path(operation: JsonObject) -> str:
     return str(_item(operation, "path") or _item(operation, "target_path") or "")
-
-
-def _pointer_value(document: Any, pointer: str) -> tuple[bool, Any]:
-    if not pointer.startswith("/"):
-        return False, None
-    current = document
-    for token in pointer.strip("/").split("/"):
-        token = token.replace("~1", "/").replace("~0", "~")
-        if isinstance(current, dict) and token in current:
-            current = current[token]
-        elif isinstance(current, list) and token.isdigit() and int(token) < len(current):
-            current = current[int(token)]
-        elif isinstance(current, list) and token == "-":
-            return False, None
-        else:
-            return False, None
-    return True, current
-
-
-def _pointer_parent_exists(document: Any, pointer: str) -> bool:
-    if not pointer.startswith("/"):
-        return False
-    tokens = [token.replace("~1", "/").replace("~0", "~") for token in pointer.strip("/").split("/")]
-    if not tokens:
-        return False
-    current = document
-    for token in tokens[:-1]:
-        if isinstance(current, dict) and token in current:
-            current = current[token]
-        elif isinstance(current, list) and token.isdigit() and int(token) < len(current):
-            current = current[int(token)]
-        else:
-            return False
-    final = tokens[-1]
-    return isinstance(current, dict) or (isinstance(current, list) and (final == "-" or final.isdigit()))
-
-
-def _append_already_present(document: Any, pointer: str, value: Any) -> bool:
-    if not pointer.endswith("/-"):
-        return False
-    parent_pointer = pointer[:-2]
-    exists, parent = _pointer_value(document, parent_pointer)
-    return bool(exists and isinstance(parent, list) and value in parent)
-
-
-def _set_pointer(document: JsonObject, pointer: str, value: Any) -> bool:
-    if not pointer.startswith("/"):
-        return False
-    tokens = [token.replace("~1", "/").replace("~0", "~") for token in pointer.strip("/").split("/")]
-    current: Any = document
-    for token in tokens[:-1]:
-        if isinstance(current, dict):
-            if token not in current:
-                current[token] = {}
-            current = current[token]
-        elif isinstance(current, list) and token.isdigit() and int(token) < len(current):
-            current = current[int(token)]
-        else:
-            return False
-    final = tokens[-1] if tokens else ""
-    if isinstance(current, dict):
-        current[final] = value
-        return True
-    if isinstance(current, list):
-        if final == "-":
-            current.append(value)
-            return True
-        if final.isdigit() and int(final) < len(current):
-            current[int(final)] = value
-            return True
-    return False
 
 
 def _unresolved_copy(requirement_result: JsonObject) -> JsonObject:

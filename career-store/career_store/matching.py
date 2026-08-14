@@ -26,14 +26,15 @@ NORMALIZATION_VERSION = "career-store.normalize.v1"
 _VERIFIED_STATES = {
     VerificationState.SOURCE_STATED.value,
     VerificationState.USER_VERIFIED.value,
+    VerificationState.IMPORTED.value,
 }
+# Search ranking only; no confirmation or verification-state mutation occurs here.
 _SEARCH_STATE_PRIORITY = {
     VerificationState.USER_VERIFIED.value: 0,
     VerificationState.SOURCE_STATED.value: 1,
-    VerificationState.INFERRED.value: 2,
-    VerificationState.UNKNOWN.value: 3,
-    VerificationState.EXPLICITLY_MISSING.value: 4,
-    VerificationState.CONFLICTED.value: 5,
+    VerificationState.IMPORTED.value: 2,
+    VerificationState.INFERRED.value: 3,
+    VerificationState.UNKNOWN.value: 4,
 }
 _RESOLUTION_PRIORITY = {
     ResolutionState.EXACT_MATCH.value: 0,
@@ -42,8 +43,8 @@ _RESOLUTION_PRIORITY = {
     ResolutionState.RELATED_MATCH.value: 3,
     ResolutionState.POSSIBLE_MATCH.value: 4,
     ResolutionState.UNKNOWN.value: 5,
-    ResolutionState.EXPLICITLY_MISSING.value: 6,
-    ResolutionState.CONFLICTED.value: 7,
+    "explicitly_missing": 6,
+    ResolutionState.NOT_APPLICABLE.value: 7,
 }
 _SMART_TRANSLATION = str.maketrans(
     {
@@ -247,7 +248,7 @@ def resolve_relationship_label(relationship_type: Any, policy: JsonObject | None
             return ResolutionState.ALIAS_MATCH.value
         return ResolutionState.RELATED_MATCH.value
     if relationship == RelationshipType.CONTRADICTS.value:
-        return ResolutionState.CONFLICTED.value
+        return ResolutionState.POSSIBLE_MATCH.value
     return ResolutionState.POSSIBLE_MATCH.value
 
 
@@ -289,6 +290,7 @@ def match_requirement_to_facts(
 
         resolution_state = _direct_resolution(fact) if direct_score > 0 else resolve_relationship_label(_item(relationship, "relationship_type"), policy)
         evidence = [{"source": "fact_terms", "fact_id": fact_id, "matched_terms": sorted(set(req_terms) & set(fact_terms(fact)))}]
+        conflicts = _match_conflicts(req_id, fact, relationship, related_fact_id, resolution_state)
         if relationship is not None:
             evidence.append(
                 {
@@ -308,6 +310,7 @@ def match_requirement_to_facts(
                 "matched_terms": sorted(set(req_terms) & set(fact_terms(fact))),
                 "relationship_id": _item(relationship, "relationship_id") if relationship else None,
                 "evidence": evidence,
+                "conflicts": conflicts,
             }
         )
 
@@ -327,9 +330,12 @@ def match_requirements_to_facts(
 
     matches: list[JsonObject] = []
     unresolved: list[JsonObject] = []
+    conflicts: list[JsonObject] = []
     for requirement in requirements:
         requirement_matches = match_requirement_to_facts(requirement, facts, relationships, policy)
         matches.extend(requirement_matches)
+        for match in requirement_matches:
+            conflicts.extend(_item(match, "conflicts", []))
         if not any(_item(match, "resolution_state") in _resolved_states(policy) for match in requirement_matches):
             unresolved.append(
                 {
@@ -344,7 +350,7 @@ def match_requirements_to_facts(
         "status": "ok",
         "matches": matches,
         "unresolved": unresolved,
-        "conflicts": [],
+        "conflicts": _dedupe_conflicts(conflicts),
         "audit": {"algorithm_version": ALGORITHM_VERSION},
     }
 
@@ -459,10 +465,10 @@ def _term_overlap_score(required_terms: list[str], candidate_terms: list[str]) -
 
 def _direct_resolution(fact: JsonObject) -> str:
     state = _state_value(_item(fact, "verification_state"))
-    if state == VerificationState.CONFLICTED.value:
-        return ResolutionState.CONFLICTED.value
-    if state == VerificationState.EXPLICITLY_MISSING.value:
-        return ResolutionState.EXPLICITLY_MISSING.value
+    if str(_item(fact, "resolution_state", "")) == "explicitly_missing":
+        return "explicitly_missing"
+    if state == "conflicted":
+        return ResolutionState.POSSIBLE_MATCH.value
     if state == VerificationState.UNKNOWN.value:
         return ResolutionState.UNKNOWN.value
     if state == VerificationState.INFERRED.value:
@@ -502,8 +508,8 @@ def _match_score(resolution_state: str, direct_score: int) -> float:
         ResolutionState.RELATED_MATCH.value: 0.45,
         ResolutionState.POSSIBLE_MATCH.value: 0.25,
         ResolutionState.UNKNOWN.value: 0.0,
-        ResolutionState.EXPLICITLY_MISSING.value: 0.0,
-        ResolutionState.CONFLICTED.value: 0.0,
+        "explicitly_missing": 0.0,
+        ResolutionState.NOT_APPLICABLE.value: 0.0,
     }.get(resolution_state, 0.0)
     return round(base + min(direct_score, 10) / 1000, 4)
 
@@ -529,6 +535,61 @@ def _resolved_states(policy: JsonObject | None) -> set[str]:
     if bool(_item(policy, "allow_related_as_resolved")):
         states.add(ResolutionState.RELATED_MATCH.value)
     return states
+
+
+def _match_conflicts(
+    requirement_id: str,
+    fact: JsonObject,
+    relationship: JsonObject | None,
+    related_fact_id: str | None,
+    resolution_state: str,
+) -> list[JsonObject]:
+    conflicts: list[JsonObject] = []
+    if _state_value(_item(fact, "verification_state")) == "conflicted":
+        conflicts.append(
+            {
+                "conflict_id": _stable_id("conflict", {"reason": "legacy_conflicted_verification_state", "fact_id": _fact_id(fact)}),
+                "fact_ids": [_fact_id(fact)],
+                "reason": "legacy_conflicted_verification_state",
+                "status": "open",
+                "evidence_ids": _evidence_ids(fact),
+                "metadata": {
+                    "requirement_id": requirement_id,
+                    "resolution_state": resolution_state,
+                    "verification_state": "conflicted",
+                },
+            }
+        )
+    if relationship is not None and _relationship_type_value(_item(relationship, "relationship_type")) == RelationshipType.CONTRADICTS.value:
+        fact_ids = sorted({_fact_id(fact), str(related_fact_id or "")} - {""})
+        conflicts.append(
+            {
+                "conflict_id": _stable_id(
+                    "conflict",
+                    {
+                        "reason": "contradicts_relationship",
+                        "relationship_id": str(_item(relationship, "relationship_id", "")),
+                        "fact_ids": fact_ids,
+                    },
+                ),
+                "fact_ids": fact_ids,
+                "reason": "contradicts_relationship",
+                "status": "open",
+                "evidence_ids": [],
+                "metadata": {
+                    "relationship_id": str(_item(relationship, "relationship_id", "")),
+                    "relationship_type": RelationshipType.CONTRADICTS.value,
+                    "requirement_id": requirement_id,
+                    "resolution_state": resolution_state,
+                },
+            }
+        )
+    return conflicts
+
+
+def _dedupe_conflicts(conflicts: list[JsonObject]) -> list[JsonObject]:
+    deduped = {str(_item(conflict, "conflict_id", "")): conflict for conflict in conflicts if _item(conflict, "conflict_id")}
+    return [deduped[key] for key in sorted(deduped)]
 
 
 def _pair_conflicts(left: JsonObject, right: JsonObject) -> list[JsonObject]:

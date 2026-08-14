@@ -32,10 +32,9 @@ class ErrorSeverity(str, Enum):
 class VerificationState(str, Enum):
     SOURCE_STATED = "source_stated"
     USER_VERIFIED = "user_verified"
+    IMPORTED = "imported"
     INFERRED = "inferred"
     UNKNOWN = "unknown"
-    EXPLICITLY_MISSING = "explicitly_missing"
-    CONFLICTED = "conflicted"
 
 
 class ResolutionState(str, Enum):
@@ -46,7 +45,7 @@ class ResolutionState(str, Enum):
     POSSIBLE_MATCH = "possible_match"
     UNKNOWN = "unknown"
     EXPLICITLY_MISSING = "explicitly_missing"
-    CONFLICTED = "conflicted"
+    NOT_APPLICABLE = "not_applicable"
 
 
 class RequirementClassification(str, Enum):
@@ -58,8 +57,10 @@ class RequirementClassification(str, Enum):
 class ChangeOperationStatus(str, Enum):
     PROPOSED = "proposed"
     VALIDATED = "validated"
-    APPLIED = "applied"
     REJECTED = "rejected"
+    APPLIED = "applied"
+    ACCEPTED = "accepted"
+    MODIFIED = "modified"
 
 
 @dataclass(frozen=True)
@@ -123,12 +124,25 @@ class JobRequirement:
 
 
 @dataclass(frozen=True)
+class JobTerm:
+    surface: str
+    canonical: str
+    source: str
+    weight: float
+
+
+@dataclass(frozen=True)
 class JobModel:
     schema_version: str
     job_id: str
     requirements: list[JobRequirement | JsonObject]
+    preferred: list[JobRequirement | JsonObject] = field(default_factory=list)
     title: str | None = None
     company: str | None = None
+    seniority: str | None = None
+    industries: list[str | JsonObject] = field(default_factory=list)
+    domains: list[str | JsonObject] = field(default_factory=list)
+    terminology: list[JobTerm | JsonObject] = field(default_factory=list)
     source: JsonObject = field(default_factory=dict)
     metadata: JsonObject = field(default_factory=dict)
 
@@ -169,6 +183,7 @@ class ResumeChangeOperation:
     status: ChangeOperationStatus | str
     op: str
     path: str
+    reason: str
     before: Any = None
     after: Any = None
     linked_requirement_ids: list[str] = field(default_factory=list)
@@ -259,16 +274,35 @@ JOB_REQUIREMENT_SCHEMA: JsonObject = {
     },
 }
 
+JOB_TERM_SCHEMA: JsonObject = {
+    "schema_version": "job-term.v1",
+    "type": "object",
+    "required": ["surface", "canonical", "source", "weight"],
+    "properties": {
+        "surface": {"type": "string"},
+        "canonical": {"type": "string"},
+        "source": {"enum": ["title", "requirement", "description"]},
+        "weight": {"type": "number"},
+    },
+}
+
 JOB_MODEL_SCHEMA: JsonObject = {
     "schema_version": "job-model.v1",
     "type": "object",
-    "required": ["schema_version", "job_id", "requirements"],
+    "required": ["schema_version", "job_id", "requirements", "preferred", "industries", "domains", "terminology"],
     "properties": {
         "schema_version": {"type": "string"},
         "job_id": {"type": "string"},
         "title": {"type": ["string", "null"]},
         "company": {"type": ["string", "null"]},
+        "seniority": {"type": ["string", "null"]},
+        "industries": {"type": "array", "items": {"type": ["string", "object"]}},
+        "domains": {"type": "array", "items": {"type": ["string", "object"]}},
         "requirements": {"type": "array", "items": JOB_REQUIREMENT_SCHEMA},
+        "preferred": {"type": "array", "items": JOB_REQUIREMENT_SCHEMA},
+        "terminology": {"type": "array", "items": JOB_TERM_SCHEMA},
+        "source": {"type": "object"},
+        "metadata": {"type": "object"},
     },
 }
 
@@ -292,13 +326,24 @@ MATCH_RESULT_SCHEMA: JsonObject = {
 RESUME_CHANGE_OPERATION_SCHEMA: JsonObject = {
     "schema_version": "resume-change-operation.v1",
     "type": "object",
-    "required": ["schema_version", "operation_id", "status", "op", "path"],
+    "required": [
+        "schema_version",
+        "operation_id",
+        "status",
+        "op",
+        "path",
+        "reason",
+        "linked_requirement_ids",
+        "linked_fact_ids",
+        "provenance",
+    ],
     "properties": {
         "schema_version": {"type": "string"},
         "operation_id": {"type": "string"},
         "status": {"enum": [state.value for state in ChangeOperationStatus]},
-        "op": {"type": "string"},
+        "op": {"enum": ["replace", "rewrite", "insert", "remove", "move"]},
         "path": {"type": "string"},
+        "reason": {"type": "string"},
         "before": {},
         "after": {},
         "linked_requirement_ids": {"type": "array", "items": {"type": "string"}},
@@ -313,6 +358,7 @@ SCHEMAS: dict[str, JsonObject] = {
     "CanonicalResume": CANONICAL_RESUME_SCHEMA,
     "JobModel": JOB_MODEL_SCHEMA,
     "JobRequirement": JOB_REQUIREMENT_SCHEMA,
+    "JobTerm": JOB_TERM_SCHEMA,
     "MatchResult": MATCH_RESULT_SCHEMA,
     "ResumeChangeOperation": RESUME_CHANGE_OPERATION_SCHEMA,
 }

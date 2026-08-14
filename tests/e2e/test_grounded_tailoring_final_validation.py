@@ -91,27 +91,33 @@ def load_core_module(test_case: unittest.TestCase):
 
 def grounded_aws_operation():
     return {
-        "operation_id": "op_add_aws",
+        "schema_version": "resume-change-operation.v1",
+        "operation_id": "op_insert_aws",
         "status": "proposed",
-        "op": "add",
+        "op": "insert",
         "path": "/skills/-",
+        "reason": "Add AWS only because supplied career facts ground the requirement.",
         "before": None,
         "after": "AWS",
         "linked_requirement_ids": ["req_aws"],
         "linked_fact_ids": ["fact_aws"],
+        "provenance": [{"source": "test"}],
     }
 
 
 def hallucinated_graphql_operation():
     return {
-        "operation_id": "op_add_graphql",
+        "schema_version": "resume-change-operation.v1",
+        "operation_id": "op_insert_graphql",
         "status": "proposed",
-        "op": "add",
+        "op": "insert",
         "path": "/skills/-",
+        "reason": "GraphQL must still be rejected when ungrounded.",
         "before": None,
         "after": "GraphQL",
         "linked_requirement_ids": [],
         "linked_fact_ids": [],
+        "provenance": [{"source": "test"}],
     }
 
 
