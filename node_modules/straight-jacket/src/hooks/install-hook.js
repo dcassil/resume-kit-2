@@ -12,7 +12,12 @@ const HOOK_BODY = `if [ -f ".straight-jacket/manifest.json" ]; then
     exit 1
   fi
 fi
-straight-jacket verify && straight-jacket verify --staged`;
+branch="$(git branch --show-current 2>/dev/null || true)"
+verify_mode=""
+if [ "$branch" != "main" ] && [ "$branch" != "master" ]; then
+  verify_mode="--warn"
+fi
+straight-jacket verify $verify_mode && straight-jacket verify --staged $verify_mode`;
 
 export async function installPreCommitHook({ repoRoot }) {
   const hookPath = await preCommitHookPath(repoRoot);

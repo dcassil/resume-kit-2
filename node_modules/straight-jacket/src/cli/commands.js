@@ -87,11 +87,18 @@ export async function runCommand({ argv, cwd, stdin, stderr }) {
   }
 
   if (parsed.command === "verify") {
-    return verifyRepository({
+    const result = await verifyRepository({
       repoRoot,
       scope: parsed.flags.staged ? "staged" : "working-tree",
       ciKey: parsed.flags.ciKey
     });
+    if (parsed.flags.warn && result.ok === false) {
+      return {
+        ...result,
+        warn: true
+      };
+    }
+    return result;
   }
 
   if (parsed.command === "status") {

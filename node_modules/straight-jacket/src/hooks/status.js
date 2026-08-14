@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 
 export const HOOKS_PATH = ".githooks";
-export const PRE_COMMIT_COMMAND = "straight-jacket setup --check && straight-jacket verify && straight-jacket verify --staged";
+export const PRE_COMMIT_COMMAND = "straight-jacket setup --check && straight-jacket verify [--warn on non-main branches] && straight-jacket verify --staged [--warn on non-main branches]";
 
 export async function getHookStatus({ repoRoot }) {
   const hookPath = await preCommitHookPath(repoRoot);
@@ -14,6 +14,7 @@ export async function getHookStatus({ repoRoot }) {
     installed: hook.includes("straight-jacket setup --check") &&
       hook.includes("straight-jacket verify") &&
       hook.includes("straight-jacket verify --staged") &&
+      hook.includes("verify_mode=\"--warn\"") &&
       configuredHooksPath === HOOKS_PATH,
     path: hookPath,
     command: PRE_COMMIT_COMMAND,

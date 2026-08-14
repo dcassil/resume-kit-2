@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.2 - 2026-08-14
+
+- Added `straight-jacket verify --warn` to print verification violations without a failing exit code.
+- Updated the pre-commit hook to use warn mode on branches other than `main` or `master`.
+- Added warning-mode messaging that protected-branch PRs still require approved locked changes.
+
 ## 1.0.0 - 2026-08-13
 
 - Replaced CI trust-root pinning with a master-password-derived `STRAIGHT_JACKET_CI_KEY` proof model.

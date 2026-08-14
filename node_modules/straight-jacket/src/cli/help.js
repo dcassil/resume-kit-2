@@ -54,15 +54,17 @@ const COMMAND_HELP = {
     ]
   },
   verify: {
-    usage: "straight-jacket verify [--staged] [--ci-key <sjci_v1_...>] [--json]",
+    usage: "straight-jacket verify [--staged] [--warn] [--ci-key <sjci_v1_...>] [--json]",
     summary: "Verify signed metadata and protected file integrity.",
     details: [
       "Read-only. Exits 0 when verification passes and 1 when violations are found.",
       "--staged verifies staged Git content for pre-commit and CI-style checks.",
+      "--warn prints the same violation message but exits 0, with a reminder that protected-branch PRs still require approval.",
       "--ci-key verifies the committed CI proof against the GitHub Actions secret."
     ],
     examples: [
       "straight-jacket verify",
+      "straight-jacket verify --warn",
       "straight-jacket verify --staged --json",
       "straight-jacket verify --ci-key \"$STRAIGHT_JACKET_CI_KEY\""
     ]

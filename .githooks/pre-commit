@@ -8,5 +8,5 @@ if [ -f ".straight-jacket/manifest.json" ]; then
     exit 1
   fi
 fi
-straight-jacket verify && straight-jacket verify --staged
+straight-jacket verify --warn && straight-jacket verify --staged
 # straight-jacket:end

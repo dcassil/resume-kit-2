@@ -40,7 +40,7 @@ function humanOutput(result) {
   }
 
   if (result.ok === false && Array.isArray(result.violations)) {
-    return humanVerificationFailure(result.violations);
+    return humanVerificationFailure(result.violations, { warn: result.warn === true });
   }
 
   if (result.ok === true && result.ci?.ciKey) {
@@ -62,7 +62,7 @@ function humanCiSetupOutput(result) {
   ].join("\n") + "\n";
 }
 
-function humanVerificationFailure(violations) {
+function humanVerificationFailure(violations, { warn = false } = {}) {
   const lockedPaths = uniqueSorted(violations.flatMap(lockedPathsForViolation));
   const lines = [
     "Straight Jacket verification failed.",
@@ -104,6 +104,11 @@ function humanVerificationFailure(violations) {
         lines.push(`  ${command}`);
       }
     }
+  }
+
+  if (warn) {
+    lines.push("");
+    lines.push("Warning mode: this command did not fail, but before a PR to a protected branch will pass the locked changes must be approved.");
   }
 
   return `${lines.join("\n")}\n`;
