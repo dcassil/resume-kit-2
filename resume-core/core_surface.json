@@ -113,7 +113,8 @@
       "name": "scoreMatch",
       "description": "Produce deterministic official match scoring and requirement-level explanations from supplied resume, job, fact DTOs, and config.",
       "input_contract": {
-        "required_fields": ["canonical_resume", "job_model", "career_fact_dtos", "config"]
+        "required_fields": ["canonical_resume", "job_model", "career_fact_dtos", "config"],
+        "optional_fields": ["term_relationships"]
       },
       "output_contract": {
         "required_fields": ["schema_version", "status", "match_result"],

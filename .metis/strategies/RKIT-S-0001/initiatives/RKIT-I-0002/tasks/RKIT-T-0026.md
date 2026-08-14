@@ -4,14 +4,14 @@ level: task
 title: "Chunk 4: Relationship-driven alias/related resolution and classification generalization"
 short_code: "RKIT-T-0026"
 created_at: 2026-08-14T19:46:11.317799+00:00
-updated_at: 2026-08-14T19:46:11.317799+00:00
+updated_at: 2026-08-14T21:01:49.007261+00:00
 parent: resume-core-deterministic
-blocked_by: ["RKIT-T-0025"]
+blocked_by: [RKIT-T-0025]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,10 @@ initiative_id: RKIT-I-0002
 ## Objective
 
 Generalize alias/related resolution beyond the closed fixture vocabularies: introduce a `TermRelationship` input ({from, to, kind: alias/related/parent/child/contradicts, provenance}) that callers supply from career-store stored relationships, demoting `_TERM_VARIANTS` / `_RELATED_REQUIREMENT_TERMS` / `_GENERIC_TERMS` (domain.py:96-142) to seed/fixture data. Also generalize `_infer_classification` so any "N+ years" phrasing marks a requirement required — not the literal "8+" tuned to the E2E fixture (domain.py:840). Resolution today only works for react/aws/graphql/responsive-design/saas/leadership; this chunk makes it work for arbitrary vocabularies without new code.
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -78,4 +82,4 @@ Codex-exec: yes with a tight prompt; the ladder-rung mapping and the Azure/AWS i
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-14: Codex-implemented, reviewed, committed. New `term_relationships.py` (TermRelationship schema + merge/sort/index) and `requirement_classification.py` (general N+ years inference). Rung mapping conservative (alias→alias; related/parent/child→related only; contradicts blocks positive resolution). Azure→AWS invariant regression-tested (related_match, score 0, blocking, hardRequirementsResolved false). Shuffled-input determinism tested. Seed vocabularies preserved: ZERO snapshot drift. core_surface.json realigned (non-protected). 8 new unit tests green; PR 257 + smoke green; no career_store import.

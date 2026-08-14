@@ -104,7 +104,8 @@
         "tests.unit.test_validate_resume_contracts"
       ],
       "requirement_normalization": [
-        "tests.unit.test_jobmodel_jobterm_determinism"
+        "tests.unit.test_jobmodel_jobterm_determinism",
+        "tests.unit.test_infer_classification_unit"
       ],
       "scoring_math": [
         "tests.unit.test_resume_core_scoring_math_unit",
@@ -121,7 +122,8 @@
         "tests.unit.test_change_operation_structural"
       ],
       "relationship_matching": [
-        "tests.unit.test_resume_core_relationship_matching_unit"
+        "tests.unit.test_resume_core_relationship_matching_unit",
+        "tests.unit.test_term_relationship_resolution_unit"
       ],
       "config_parsing": [
         "tests.unit.test_resume_core_config_parsing_unit",

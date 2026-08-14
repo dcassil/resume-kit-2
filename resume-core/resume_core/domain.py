@@ -15,6 +15,7 @@ from .match_dimensions import _configured_default_weight, _match_dimensions, _sc
 from .match_decision import decide_match, empty_match, match_decision_explanation
 from .matching_config import resolve_matching_config
 from .pointers import _append_already_present, _pointer_parent_exists, _pointer_value, _set_pointer
+from .requirement_classification import default_importance, infer_classification
 from .schemas import (
     CANONICAL_RESUME_SCHEMA,
     ChangeOperationStatus,
@@ -25,6 +26,7 @@ from .schemas import (
     VerificationState,
     to_json_dict,
 )
+from .term_relationships import blocked_terms_for, build_term_relationship_index, relationship_bucket
 
 
 SCHEMA_VERSION = "resume-core.result.v1"
@@ -347,21 +349,31 @@ def scoreMatch(
     job_model: Any,
     career_fact_dtos: list[JsonObject] | None = None,
     config: JsonObject | None = None,
+    term_relationships: list[JsonObject] | None = None,
 ) -> JsonObject:
-    """Score resume and job fit from supplied resume, job, fact DTO, and config data."""
+    """Score resume and job fit from supplied resume, job, fact DTO, relationships, and config data."""
 
     resume = _unwrap(canonical_resume, "canonical_resume")
     job = _unwrap(job_model, "job_model")
     config = config or {}
     matching_config = resolve_matching_config(config)
+    relationship_index, relationship_errors = build_term_relationship_index(
+        term_relationships,
+        _TERM_VARIANTS,
+        _RELATED_REQUIREMENT_TERMS,
+        _issue,
+        _normal_text,
+    )
     facts = [item for item in career_fact_dtos or [] if isinstance(item, dict)]
     if not isinstance(resume, dict) or not isinstance(job, dict):
         return _result("error", match_result=_empty_match())
     if matching_config.errors:
         return _result("error", match_result=_empty_match(), errors=matching_config.errors, warnings=matching_config.warnings)
+    if relationship_errors:
+        return _result("rejected", match_result=_empty_match(), errors=relationship_errors, warnings=matching_config.warnings)
 
     resume_text = _normal_text(_text(resume))
-    aliases = _alias_map(config)
+    aliases = _alias_map(config, relationship_index)
     fact_index = _fact_index(facts)
     requirement_results: list[JsonObject] = []
     unresolved: list[str] = []
@@ -375,7 +387,7 @@ def scoreMatch(
         weight = _number(_item(requirement, "weight"), 1.0)
         terms = _terms(requirement)
         max_score += max(weight, 0.0)
-        state, matched_fact_ids, evidence = _resolve_requirement(requirement, terms, resume_text, aliases, fact_index, config)
+        state, matched_fact_ids, evidence = _resolve_requirement(requirement, terms, resume_text, aliases, relationship_index, fact_index, config)
 
         requirement_score = weight if state in _RESOLVED else 0.0
         blocking = classification == RequirementClassification.REQUIRED.value and state not in _RESOLVED
@@ -836,19 +848,19 @@ def _requirement(raw: Any, index: int, config: JsonObject) -> JsonObject:
     if isinstance(raw, str):
         source_text = raw
         concept = raw
-        classification = _infer_classification(raw)
+        classification = infer_classification(raw)
         terms = _terms_for(raw)
-        importance = _default_importance(classification)
+        importance = default_importance(classification)
         requirement_id = _stable_requirement_id(index, concept, config)
         years = _extract_years(raw)
         weight = _configured_default_weight(config, classification, importance, concept, source_text, terms, years)
     elif isinstance(raw, dict):
         source_text = str(_item(raw, "source_text") or _item(raw, "concept") or "")
         concept = str(_item(raw, "concept") or source_text)
-        classification = str(_item(raw, "classification") or _infer_classification(source_text))
+        classification = str(_item(raw, "classification") or infer_classification(source_text))
         raw_terms = _item(raw, "normalized_terms")
         terms = [str(term).lower() for term in raw_terms] if isinstance(raw_terms, list) else _terms_for(concept)
-        importance = str(_item(raw, "importance") or _default_importance(classification))
+        importance = str(_item(raw, "importance") or default_importance(classification))
         requirement_id = str(_item(raw, "requirement_id") or _stable_requirement_id(index, concept, config))
         years = _item(raw, "years") or _extract_years(source_text)
         weight = _number(
@@ -1025,6 +1037,7 @@ def _resolve_requirement(
     terms: list[str],
     resume_text: str,
     aliases: dict[str, set[str]],
+    relationship_index: JsonObject,
     fact_index: dict[str, JsonObject],
     config: JsonObject,
 ) -> tuple[str, list[str], list[JsonObject]]:
@@ -1040,7 +1053,8 @@ def _resolve_requirement(
     elif _terms_in_text(terms, resume_text):
         return ResolutionState.EXACT_MATCH.value, [], [{"source": "resume", "terms": _matched_terms(terms, resume_text)}]
 
-    alias_terms = _aliases_for_terms(terms, aliases)
+    blocked_terms = blocked_terms_for(terms, relationship_index, _specific_terms)
+    alias_terms = _aliases_for_terms(terms, aliases, blocked_terms)
     if required_years is not None:
         years_met, years_evidence = _years_met(resume_text, required_years)
         if years_met and alias_terms and _terms_in_text(alias_terms, resume_text):
@@ -1053,11 +1067,11 @@ def _resolve_requirement(
     if fact_state:
         return fact_state, fact_ids, fact_evidence
 
-    related_terms = _related_terms_for(terms)
+    related_terms = _related_terms_for(terms, relationship_index, blocked_terms)
     if related_terms and _terms_in_text(related_terms, resume_text):
         return ResolutionState.RELATED_MATCH.value, [], [{"source": "resume", "terms": _matched_terms(related_terms, resume_text), "reason": "related_not_equivalent"}]
 
-    possible_terms = _possible_terms(terms)
+    possible_terms = _possible_terms(terms, blocked_terms)
     if possible_terms and _terms_in_text(possible_terms, resume_text):
         return ResolutionState.POSSIBLE_MATCH.value, [], [{"source": "resume", "terms": _matched_terms(possible_terms, resume_text), "reason": "partial_overlap"}]
 
@@ -1067,23 +1081,6 @@ def _resolve_requirement(
 def _stable_requirement_id(index: int, concept: str, config: JsonObject) -> str:
     prefix = str(_item(config, "requirement_id_prefix", "req"))
     return f"{prefix}_{index}_{hashlib.sha256(concept.lower().encode('utf-8')).hexdigest()[:8]}"
-
-
-def _infer_classification(text: str) -> str:
-    lowered = text.lower()
-    if "preferred" in lowered or "nice to have" in lowered:
-        return RequirementClassification.PREFERRED.value
-    if "required" in lowered or "must" in lowered or "8+" in lowered or "requirement" in lowered:
-        return RequirementClassification.REQUIRED.value
-    return RequirementClassification.CONTEXTUAL.value
-
-
-def _default_importance(classification: str) -> str:
-    if classification == RequirementClassification.REQUIRED.value:
-        return "high"
-    if classification == RequirementClassification.PREFERRED.value:
-        return "medium"
-    return "low"
 
 
 def _requirements(job: Any) -> list[JsonObject]:
@@ -1172,11 +1169,12 @@ def _variant_group(term: str) -> tuple[str, tuple[str, ...]] | None:
     return None
 
 
-def _aliases_for_terms(terms: list[str], aliases: dict[str, set[str]]) -> list[str]:
+def _aliases_for_terms(terms: list[str], aliases: dict[str, set[str]], blocked_terms: set[str] | None = None) -> list[str]:
     alias_terms: set[str] = set()
     for term in _specific_terms(terms):
         alias_terms.update(_item(aliases, term, set()))
-    return sorted(term for term in alias_terms if _specific_term(term))
+    blocked = blocked_terms or set()
+    return sorted(term for term in alias_terms if _specific_term(term) and term not in blocked)
 
 
 def _matched_terms(terms: list[str], text: str) -> list[str]:
@@ -1198,13 +1196,15 @@ def _term_in_text(term: Any, text: str) -> bool:
     return normalized in words or f"{normalized}s" in words or (normalized.endswith("s") and normalized[:-1] in words)
 
 
-def _alias_map(config: JsonObject) -> dict[str, set[str]]:
+def _alias_map(config: JsonObject, relationship_index: JsonObject | None = None) -> dict[str, set[str]]:
     raw = _item(config, "aliases", _item(config, "alias_map", {}))
     aliases: dict[str, set[str]] = {}
     if isinstance(raw, dict):
         for key, value in raw.items():
             alias_values = value if isinstance(value, list) else [value]
             aliases[_normal_text(key)] = {_normal_text(item) for item in alias_values if _normal_text(item)}
+    for key, values in relationship_bucket(relationship_index, "alias").items():
+        aliases.setdefault(key, set()).update(values)
     return aliases
 
 
@@ -1275,20 +1275,22 @@ def _fact_relevant(terms: list[str], required_years: int | None, fact_text: str)
     return required_years is not None and _years_met(fact_text, required_years)[0]
 
 
-def _related_terms_for(terms: list[str]) -> list[str]:
+def _related_terms_for(terms: list[str], relationship_index: JsonObject | None = None, blocked_terms: set[str] | None = None) -> list[str]:
     related: set[str] = set()
     for term in _specific_terms(terms):
-        related.update(_RELATED_REQUIREMENT_TERMS.get(term, ()))
-    return sorted(related)
+        related.update(relationship_bucket(relationship_index, "related").get(term, set()))
+    blocked = blocked_terms or set()
+    return sorted(term for term in related if term not in blocked)
 
 
-def _possible_terms(terms: list[str]) -> list[str]:
+def _possible_terms(terms: list[str], blocked_terms: set[str] | None = None) -> list[str]:
     possible: set[str] = set()
     for term in terms:
         for part in _normal_text(term).split():
             if _specific_term(part):
                 possible.add(part)
-    return sorted(possible - set(_specific_terms(terms)))
+    blocked = blocked_terms or set()
+    return sorted((possible - set(_specific_terms(terms))) - blocked)
 
 
 def _fact_index(facts: list[JsonObject]) -> dict[str, JsonObject]:

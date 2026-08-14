@@ -63,6 +63,14 @@ class ChangeOperationStatus(str, Enum):
     MODIFIED = "modified"
 
 
+class TermRelationshipKind(str, Enum):
+    ALIAS = "alias"
+    RELATED = "related"
+    PARENT = "parent"
+    CHILD = "child"
+    CONTRADICTS = "contradicts"
+
+
 @dataclass(frozen=True)
 class Error:
     code: str
@@ -299,6 +307,18 @@ JOB_TERM_SCHEMA: JsonObject = {
     },
 }
 
+TERM_RELATIONSHIP_SCHEMA: JsonObject = {
+    "schema_version": "term-relationship.v1",
+    "type": "object",
+    "required": ["from", "to", "kind", "provenance"],
+    "properties": {
+        "from": {"type": "string"},
+        "to": {"type": "string"},
+        "kind": {"enum": [kind.value for kind in TermRelationshipKind]},
+        "provenance": {},
+    },
+}
+
 JOB_MODEL_SCHEMA: JsonObject = {
     "schema_version": "job-model.v1",
     "type": "object",
@@ -410,6 +430,7 @@ SCHEMAS: dict[str, JsonObject] = {
     "JobModel": JOB_MODEL_SCHEMA,
     "JobRequirement": JOB_REQUIREMENT_SCHEMA,
     "JobTerm": JOB_TERM_SCHEMA,
+    "TermRelationship": TERM_RELATIONSHIP_SCHEMA,
     "MatchDimension": MATCH_DIMENSION_SCHEMA,
     "MatchResult": MATCH_RESULT_SCHEMA,
     "ResumeChangeOperation": RESUME_CHANGE_OPERATION_SCHEMA,
