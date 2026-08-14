@@ -4,20 +4,20 @@ level: initiative
 title: "Resume-Core Selection Planning And Structural Constraints"
 short_code: "RKIT-I-0003"
 created_at: 2026-08-13T20:41:36.874684+00:00
-updated_at: 2026-08-13T20:41:36.874684+00:00
+updated_at: 2026-08-14T21:14:43.182776+00:00
 parent: resume-kit-2-full-product-buildout
-blocked_by: ["RKIT-I-0002"]
+blocked_by: [RKIT-I-0002]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/discovery"
+  - "#phase/decompose"
 
 
 exit_criteria_met: false
 estimated_complexity: M
 strategy_id: RKIT-S-0001
-initiative_id: NULL
+initiative_id: resume-core-selection-planning-and
 ---
 
 # Resume-Core Selection Planning And Structural Constraints Initiative
