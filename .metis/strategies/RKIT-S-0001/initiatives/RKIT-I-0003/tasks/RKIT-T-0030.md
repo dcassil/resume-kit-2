@@ -4,14 +4,14 @@ level: task
 title: "Chunk 2: Section 13 resume.* config wiring - min/max, sectionOrder, targetPages"
 short_code: "RKIT-T-0030"
 created_at: 2026-08-14T21:14:45.994575+00:00
-updated_at: 2026-08-14T21:14:45.994575+00:00
+updated_at: 2026-08-14T21:30:37.983572+00:00
 parent: resume-core-selection-planning-and
-blocked_by: ["RKIT-T-0029"]
+blocked_by: [RKIT-T-0029]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,10 @@ initiative_id: RKIT-I-0003
 ## Objective
 
 Make the section 13 `resume.*` config namespace authoritative for selection: validated min AND max for skills, experience entries, and bulletsPerRole; `sectionOrder` (fixing the default divergence — section 13 says `['summary','skills','experience','projects','education']`, code says `['basics',...]` without projects, domain.py:423); and `targetPages` recorded in the plan. Replaces the ad-hoc flat `max_skills` key (domain.py:410-412) following the same accessor pattern as I-0002's `matching.*` wiring (deprecate now, remove at initiative end).
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -63,4 +67,8 @@ Recommended Agent: opus + high
 
 ## Status Updates
 
-*To be added during implementation*
+### 2026-08-14
+- Added `resume_core.resume_config.resolve_resume_config` for section-13 `resume.*` config with typed validation, defaults, section order, target pages, and deprecated flat `max_skills` mapping.
+- Wired `rankResumeContent` and selection-plan construction through the resolved config; max overflow drops ranked content and min shortfalls emit `deficit` rows without fabricating content.
+- Regenerated snapshots twice; only `fixtures/expected/selection-plan.json` changed under `fixtures/expected`.
+- Verification passed: `tests.unit.test_resume_config_unit`, snapshot no-drift regeneration, PR gate, smoke gate, and Straight Jacket verify.

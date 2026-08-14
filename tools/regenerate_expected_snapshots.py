@@ -22,10 +22,12 @@ SNAPSHOT_SCHEMA_VERSION = "expected-snapshot-data-blocks.v1"
 FIXTURE_CONFIG = {
     "matching": {"requireHardRequirementsResolved": True},
     "requirement_id_prefix": "fixture_req",
-    "section_order": ["basics", "summary", "skills", "experience", "education"],
-    "max_experience": 2,
-    "max_skills": 12,
-    "max_bullets_per_role": 4,
+    "resume": {
+        "sectionOrder": ["summary", "skills", "experience", "projects", "education"],
+        "experience": {"min": 0, "max": 2},
+        "skills": {"min": 0, "max": 12},
+        "bulletsPerRole": {"min": 0, "max": 4},
+    },
 }
 
 

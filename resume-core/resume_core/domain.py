@@ -15,6 +15,7 @@ from .match_dimensions import _configured_default_weight, _match_dimensions, _sc
 from .match_decision import decide_match, empty_match, match_decision_explanation
 from .matching_config import resolve_matching_config
 from .pointers import _append_already_present, _pointer_parent_exists, _pointer_value, _set_pointer
+from .resume_config import resolve_resume_config
 from .requirement_classification import default_importance, infer_classification
 from .schemas import (
     CANONICAL_RESUME_SCHEMA,
@@ -504,10 +505,22 @@ def rankResumeContent(canonical_resume: Any, job_model: Any, match_result: Any, 
     config = config or {}
     if not isinstance(resume, dict) or not isinstance(job, dict):
         return _result("error", selection_plan={}, ranked_content=[])
+    resume_config = resolve_resume_config(config)
+    if resume_config.errors:
+        return _result(
+            "error",
+            selection_plan={},
+            ranked_content=[],
+            errors=resume_config.errors,
+            warnings=resume_config.warnings,
+        )
 
     terms = sorted({term for requirement in _requirements(job) for term in _terms(requirement)})
-    plan, ranked = build_content_selection_plan(resume, terms, config)
-    return _result("ok", selection_plan=plan, ranked_content=ranked)
+    plan, ranked = build_content_selection_plan(resume, terms, resume_config.config)
+    fields: JsonObject = {"selection_plan": plan, "ranked_content": ranked}
+    if resume_config.warnings:
+        fields["warnings"] = resume_config.warnings
+    return _result("ok", **fields)
 
 
 def validateChange(

@@ -56,11 +56,13 @@ JOB_MODEL = {
 }
 
 CONFIG = {
-    "section_order": ["basics", "summary", "skills", "experience", "education"],
-    "max_experience": 2,
-    "max_skills": 2,
-    "max_bullets_per_role": 4,
-    "target_pages": 1,
+    "resume": {
+        "sectionOrder": ["summary", "skills", "experience", "projects", "education"],
+        "experience": {"min": 0, "max": 2},
+        "skills": {"min": 0, "max": 2},
+        "bulletsPerRole": {"min": 0, "max": 4},
+        "targetPages": 1,
+    },
 }
 
 
@@ -74,7 +76,7 @@ class SelectionPlanShapeUnitTests(unittest.TestCase):
         plan = self._plan()
 
         self.assertEqual(plan["schema_version"], "content-selection-plan.v1")
-        self.assertEqual(plan["sections"], CONFIG["section_order"])
+        self.assertEqual(plan["sections"], CONFIG["resume"]["sectionOrder"])
         self.assertTrue(plan["entries"])
         self.assertEqual(set(plan), {"schema_version", "sections", "entries", "constraint_report", "metadata"})
 
@@ -99,12 +101,15 @@ class SelectionPlanShapeUnitTests(unittest.TestCase):
     def test_constraint_report_truthfully_records_skills_cap(self):
         plan = self._plan()
 
-        self.assertEqual(
-            plan["constraint_report"],
-            [{"constraint": "max_skills", "limit": 2, "actual": 3, "status": "violated"}],
-        )
-        self.assertEqual(plan["metadata"]["target_pages"], 1)
-        self.assertEqual(plan["metadata"]["config_snapshot"], CONFIG)
+        constraints = {row["constraint"]: row for row in plan["constraint_report"]}
+        self.assertEqual(constraints["max_skills"], {"constraint": "max_skills", "limit": 2, "actual": 3, "status": "violated"})
+        self.assertEqual(constraints["min_skills"]["status"], "satisfied")
+        self.assertEqual(constraints["max_experience"]["status"], "satisfied")
+        self.assertEqual(constraints["min_experience"]["status"], "satisfied")
+        self.assertEqual(constraints["max_bullets_per_role"]["status"], "satisfied")
+        self.assertEqual(constraints["min_bullets_per_role"]["status"], "satisfied")
+        self.assertEqual(plan["metadata"]["target_pages"], 1.0)
+        self.assertEqual(plan["metadata"]["config_snapshot"], CONFIG["resume"])
 
     def test_rank_resume_content_preserves_input_resume_byte_identically(self):
         resume_before = json.dumps(CANONICAL_RESUME, sort_keys=True, separators=(",", ":"))

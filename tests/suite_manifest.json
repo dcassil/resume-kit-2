@@ -129,7 +129,8 @@
       ],
       "config_parsing": [
         "tests.unit.test_resume_core_config_parsing_unit",
-        "tests.unit.test_matching_config_unit"
+        "tests.unit.test_matching_config_unit",
+        "tests.unit.test_resume_config_unit"
       ],
       "selection_planning": [
         "tests.unit.test_selection_plan_shape_unit"

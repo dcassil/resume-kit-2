@@ -462,7 +462,7 @@ class ResumeCoreDomainContractTests(unittest.TestCase):
                 CANONICAL_RESUME,
                 JOB_MODEL,
                 {"match_id": "ignored_until_chunk_3"},
-                {"section_order": ["basics", "summary", "skills", "experience", "education"], "max_skills": 3},
+                {"resume": {"sectionOrder": ["summary", "skills", "experience", "projects", "education"], "skills": {"max": 3}}},
             )
         )
 

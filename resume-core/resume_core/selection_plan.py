@@ -5,26 +5,20 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from .resume_config import ResumeConfig
 from .schemas import JsonObject, to_json_dict
 
 
-def build_content_selection_plan(resume: JsonObject, terms: list[str], config: JsonObject) -> tuple[JsonObject, list[JsonObject]]:
+def build_content_selection_plan(resume: JsonObject, terms: list[str], config: ResumeConfig) -> tuple[JsonObject, list[JsonObject]]:
     """Return the ContentSelectionPlan DTO and legacy ranked content."""
 
     experience = _array(_item(resume, "experience", []))
     skills = _array(_item(resume, "skills", []))
-    section_order = list(_item(config, "section_order", ["basics", "summary", "skills", "experience", "education"]))
-    experience_limit = int(_item(config, "max_experience", _item(config, "experience_max", len(experience))))
-    skills_limit = int(_item(config, "max_skills", _item(config, "skills_max", len(skills))))
-    bullet_limit = int(_item(config, "max_bullets_per_role", _item(config, "bullets_per_role_max", 999)))
-    target_pages = _item(config, "target_pages", _item(config, "targetPages", None))
-    effective_config = {
-        "section_order": section_order,
-        "max_experience": max(experience_limit, 0),
-        "max_skills": max(skills_limit, 0),
-        "max_bullets_per_role": max(bullet_limit, 0),
-        "target_pages": target_pages,
-    }
+    section_order = list(config.section_order)
+    experience_limit = _effective_limit(config.experience.max, len(experience))
+    skills_limit = _effective_limit(config.skills.max, len(skills))
+    bullet_limit = config.bullets_per_role.max
+    target_pages = config.target_pages
     ranked: list[JsonObject] = []
 
     for index, item in enumerate(experience):
@@ -34,26 +28,18 @@ def build_content_selection_plan(resume: JsonObject, terms: list[str], config: J
         ranked.append({"kind": "skill", "id": f"skill_{index}", "source_index": index, "score": _relevance(_text(item), terms)})
 
     ranked.sort(key=lambda item: (-item["score"], item["kind"], item["source_index"]))
-    selected_experience_ids = [item["id"] for item in ranked if item["kind"] == "experience"][: max(experience_limit, 0)]
-    selected_skill_indices = [item["source_index"] for item in ranked if item["kind"] == "skill"][: max(skills_limit, 0)]
+    selected_experience_ids = [item["id"] for item in ranked if item["kind"] == "experience"][:experience_limit]
+    selected_skill_indices = [item["source_index"] for item in ranked if item["kind"] == "skill"][:skills_limit]
     selected_experience = set(selected_experience_ids)
     selected_skills = set(selected_skill_indices)
-    entries = _selection_entries(ranked, experience, selected_experience, selected_skills)
-    skills_status = "satisfied" if len(skills) <= max(skills_limit, 0) else "violated"
+    entries = _selection_entries(ranked, experience, selected_experience, selected_skills, bullet_limit)
     return (
         {
             "schema_version": "content-selection-plan.v1",
             "sections": section_order,
             "entries": entries,
-            "constraint_report": [
-                {
-                    "constraint": "max_skills",
-                    "limit": max(skills_limit, 0),
-                    "actual": len(skills),
-                    "status": skills_status,
-                }
-            ],
-            "metadata": {"target_pages": target_pages, "config_snapshot": effective_config},
+            "constraint_report": _constraint_report(experience, skills, selected_experience, config),
+            "metadata": {"target_pages": target_pages, "config_snapshot": config.to_dict()},
         },
         ranked,
     )
@@ -64,6 +50,7 @@ def _selection_entries(
     experience: list[Any],
     selected_experience: set[Any],
     selected_skills: set[Any],
+    bullet_limit: int | None,
 ) -> list[JsonObject]:
     entries: list[JsonObject] = []
     for item in ranked:
@@ -95,7 +82,8 @@ def _selection_entries(
             entries.append(_role_entry(source_index, relevance, role_selected))
             continue
         for bullet_index, _bullet in enumerate(bullets):
-            entries.append(_bullet_entry(source_index, bullet_index, relevance, role_selected))
+            bullet_selected = role_selected and (bullet_limit is None or bullet_index < bullet_limit)
+            entries.append(_bullet_entry(source_index, bullet_index, relevance, bullet_selected, role_selected))
     return entries
 
 
@@ -114,19 +102,72 @@ def _role_entry(source_index: int, relevance: int, selected: bool) -> JsonObject
     }
 
 
-def _bullet_entry(source_index: int, bullet_index: int, relevance: int, selected: bool) -> JsonObject:
+def _bullet_entry(source_index: int, bullet_index: int, relevance: int, selected: bool, parent_selected: bool) -> JsonObject:
+    if selected:
+        reason = "Selected with parent role by deterministic relevance ranking within max_experience."
+    elif parent_selected:
+        reason = "Dropped by deterministic relevance ranking beyond max_bullets_per_role."
+    else:
+        reason = "Dropped with parent role by deterministic relevance ranking beyond max_experience."
     return {
         "path": f"/experience/{source_index}/bullets/{bullet_index}",
         "action": "keep" if selected else "drop",
         "relevance": relevance,
-        "reason": (
-            "Selected with parent role by deterministic relevance ranking within max_experience."
-            if selected
-            else "Dropped with parent role by deterministic relevance ranking beyond max_experience."
-        ),
+        "reason": reason,
         "requirement_ids": [],
         "fact_ids": [],
     }
+
+
+def _constraint_report(
+    experience: list[Any],
+    skills: list[Any],
+    selected_experience: set[Any],
+    config: ResumeConfig,
+) -> list[JsonObject]:
+    selected_roles = [
+        (index, role)
+        for index, role in enumerate(experience)
+        if (_item(role, "id", f"experience_{index}") if isinstance(role, dict) else f"experience_{index}") in selected_experience
+    ]
+    selected_bullet_counts = [
+        len(_array(_item(role, "bullets", []))) if isinstance(role, dict) else 0
+        for _index, role in selected_roles
+    ]
+    max_selected_bullet_count = max(selected_bullet_counts, default=0)
+    min_selected_bullet_count = min(selected_bullet_counts, default=0)
+    return [
+        _max_report("max_skills", config.skills.max, len(skills)),
+        _min_report("min_skills", config.skills.min, len(skills)),
+        _max_report("max_experience", config.experience.max, len(experience)),
+        _min_report("min_experience", config.experience.min, len(experience)),
+        _max_report("max_bullets_per_role", config.bullets_per_role.max, max_selected_bullet_count),
+        _min_report("min_bullets_per_role", config.bullets_per_role.min, min_selected_bullet_count),
+    ]
+
+
+def _max_report(constraint: str, limit: int | None, actual: int) -> JsonObject:
+    return {
+        "constraint": constraint,
+        "limit": limit,
+        "actual": actual,
+        "status": "satisfied" if limit is None or actual <= limit else "violated",
+    }
+
+
+def _min_report(constraint: str, limit: int, actual: int) -> JsonObject:
+    return {
+        "constraint": constraint,
+        "limit": limit,
+        "actual": actual,
+        "status": "satisfied" if actual >= limit else "deficit",
+    }
+
+
+def _effective_limit(limit: int | None, actual: int) -> int:
+    if limit is None:
+        return actual
+    return max(limit, 0)
 
 
 def _item(mapping: Any, key: str, default: Any = None) -> Any:

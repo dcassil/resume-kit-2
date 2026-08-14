@@ -108,6 +108,36 @@
           "constraint": "max_skills",
           "limit": 12,
           "status": "satisfied"
+        },
+        {
+          "actual": 12,
+          "constraint": "min_skills",
+          "limit": 0,
+          "status": "satisfied"
+        },
+        {
+          "actual": 2,
+          "constraint": "max_experience",
+          "limit": 2,
+          "status": "satisfied"
+        },
+        {
+          "actual": 2,
+          "constraint": "min_experience",
+          "limit": 0,
+          "status": "satisfied"
+        },
+        {
+          "actual": 4,
+          "constraint": "max_bullets_per_role",
+          "limit": 4,
+          "status": "satisfied"
+        },
+        {
+          "actual": 3,
+          "constraint": "min_bullets_per_role",
+          "limit": 0,
+          "status": "satisfied"
         }
       ],
       "entries": [
@@ -266,26 +296,35 @@
       ],
       "metadata": {
         "config_snapshot": {
-          "max_bullets_per_role": 4,
-          "max_experience": 2,
-          "max_skills": 12,
-          "section_order": [
-            "basics",
+          "bulletsPerRole": {
+            "max": 4,
+            "min": 0
+          },
+          "experience": {
+            "max": 2,
+            "min": 0
+          },
+          "sectionOrder": [
             "summary",
             "skills",
             "experience",
+            "projects",
             "education"
           ],
-          "target_pages": null
+          "skills": {
+            "max": 12,
+            "min": 0
+          },
+          "targetPages": null
         },
         "target_pages": null
       },
       "schema_version": "content-selection-plan.v1",
       "sections": [
-        "basics",
         "summary",
         "skills",
         "experience",
+        "projects",
         "education"
       ]
     },
