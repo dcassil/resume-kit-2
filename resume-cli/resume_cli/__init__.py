@@ -278,8 +278,9 @@ def _validate(workspace: Path) -> JsonObject:
     working = _read_json(paths["resume_working"], {})
     job = _read_json(paths["job_current"], {})
     facts = _all_facts(workspace)
-    final = validateFinalResume(working, job, facts, _config(workspace).get("matching", {}))
-    grounding = validateGrounding(working, facts, [], {})
+    applied_operations = _applied_operations_for_validation(workspace)
+    final = validateFinalResume(working, job, facts, _config(workspace).get("matching", {}), applied_operations)
+    grounding = validateGrounding(working, facts, applied_operations, {})
     validations = {
         "final_match": final.get("match_result", {}),
         "grounding": grounding.get("status"),
@@ -289,6 +290,30 @@ def _validate(workspace: Path) -> JsonObject:
     }
     _write_json(paths["reports_dir"] / "validations.json", validations)
     return {"status": "ok", "exit_code": 0, "validations": validations}
+
+
+def _applied_operations_for_validation(workspace: Path) -> list[JsonObject]:
+    operations = _read_json(_paths(workspace)["operations_dir"] / "tailor.json", {})
+    validated_by_id = {
+        str(item.get("operation_id")): item
+        for item in operations.get("validated", [])
+        if isinstance(item, dict) and item.get("operation_id")
+    }
+    applied_operations: list[JsonObject] = []
+    for applied in operations.get("applied", []):
+        if not isinstance(applied, dict):
+            continue
+        operation_id = str(applied.get("operation_id", ""))
+        operation = dict(validated_by_id.get(operation_id, applied))
+        operation["operation_id"] = operation_id or str(operation.get("operation_id", ""))
+        operation["status"] = "applied"
+        audit = applied.get("audit", {})
+        if isinstance(audit, dict):
+            for key in ("path", "before", "after", "linked_fact_ids", "linked_requirement_ids"):
+                if key not in operation and key in audit:
+                    operation[key] = audit[key]
+        applied_operations.append(operation)
+    return applied_operations
 
 
 def _export(workspace: Path, fmt: str) -> JsonObject:

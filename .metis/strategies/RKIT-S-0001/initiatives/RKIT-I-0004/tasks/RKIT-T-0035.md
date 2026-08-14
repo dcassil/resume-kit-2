@@ -4,14 +4,14 @@ level: task
 title: "Claim-level grounding over ResumeField provenance"
 short_code: "RKIT-T-0035"
 created_at: 2026-08-14T22:54:23.813377+00:00
-updated_at: 2026-08-14T22:54:23.813377+00:00
+updated_at: 2026-08-14T23:08:19.418531+00:00
 parent: resume-core-grounded-change
-blocked_by: ["RKIT-T-0034"]
+blocked_by: [RKIT-T-0034]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0004
 ## Objective
 
 Replace resume-level all-or-nothing grounding with per-claim provenance checking over the ResumeField weaving RKIT-I-0001 delivered: every claim extracted per ResumeField requires a provenance chain to a fact whose VerificationState is acceptable for the claim type; one provenanced claim no longer silences checking of all others (`_missing_provenance`, domain.py:1295-1303); `inferred` facts never silently ground a claim requiring verification (RKIT-I-0004 Requirements 5 and 7's verification half).
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -61,4 +63,6 @@ Rationale: core grounding-model rework across domain.py touching the initiative'
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-14: Activated after T-0034 landed (commit with change_operations.py, gates 307/smoke green, driver probes confirmed status machine + mandatory-field enforcement + final-validation status filtering). Codex launched with binding decisions: per-claim walk over claim_fields.py weaving, pointer-carrying findings, inferred-never-grounds rule, base+applied-op claim union; guarded-terms mechanism explicitly out of scope (T-0036). Prompt at scratchpad t0035-prompt.md.
+- 2026-08-14: Implementation session baseline read complete. Confirmed `validateGrounding` still uses whole-resume guarded text plus `_missing_provenance(resume)`, and `_missing_provenance` is all-or-nothing over root `resume.provenance`. T-0034 status filter exists in `change_operations.py` and final validation already passes only applied/accepted/modified ops to grounding. Straight Jacket verify is pre-existing red on protected `tools/pre-commit-resume-cli-guardrails.sh` and `tools/run_tests.py`; no protected edits planned.
+- 2026-08-14: Implementation complete in working tree. Added `resume_core.grounding` for claim-record collection and per-claim verified provenance checks, wired `validateGrounding` to use base ResumeField claims plus applied-operation claims, and kept `inferred` non-grounding for claim verification. Added focused unit coverage for mixed per-claim provenance, pointer/claim identity findings, inferred-vs-verified fact behavior, applied-operation claim grounding, deterministic ordering, and the legacy-root-provenance compatibility bridge needed to avoid T-0036-style wholesale default-deny of unlinked legacy base fields. Smoke exposed that `resume-cli validate` was dropping applied operations, so `resume-cli` now reconstructs applied operations from `operations/tailor.json` and passes them into final validation/grounding; contract coverage strengthened for tailor→validate grounding pass. Verification green: PR gate 307 tests OK, smoke OK, unit discovery 100 tests OK, E2E 6 tests OK via `PYTHONPATH=resume-core` because direct `python3 -m unittest tests.e2e...` cannot import the editable package in this shell. Snapshot regeneration wrote 13 blocks twice and left `fixtures/expected/` with no diff.

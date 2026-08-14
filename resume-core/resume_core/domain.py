@@ -23,6 +23,9 @@ from .change_operations import (
 )
 from .claim_fields import provenance_index as _provenance_index, weave_claim_fields as _weave_claim_fields
 from .dates import date_key as _parse_date_key, record_date_result as _record_date_result
+from .grounding import claim_linked_fact_ids as _claim_linked_fact_ids
+from .grounding import grounding_claim_records as _grounding_claim_records
+from .grounding import missing_provenance as _missing_provenance
 from .match_dimensions import _configured_default_weight, _match_dimensions, _score_from_dimensions
 from .match_decision import decide_match, empty_match, match_decision_explanation
 from .matching_config import resolve_matching_config
@@ -683,11 +686,17 @@ def validateGrounding(
         return _result("error", unsupported_claims=[], missing_provenance=[], warnings=[])
 
     fact_index = _fact_index(facts)
-    linked_fact_ids = [
+    operation_linked_fact_ids = [
         str(fact_id)
         for operation in applied_operations or []
         if isinstance(operation, dict)
         for fact_id in _array(_item(operation, "linked_fact_ids", []))
+    ]
+    claim_records = _grounding_claim_records(resume, applied_operations or [])
+    linked_fact_ids = operation_linked_fact_ids + [
+        fact_id
+        for claim in claim_records
+        for fact_id in _claim_linked_fact_ids(claim)
     ]
     text = _normal_text(_text(resume))
     guarded = _guarded_claims(text)
@@ -697,7 +706,7 @@ def validateGrounding(
         for fact in facts:
             if _item(fact, "verification_state") == VerificationState.INFERRED.value and _term_in_text(_fact_text(fact), text):
                 unsupported.append({"claim": str(_item(fact, "fact_id", "")), "reason": "inferred_fact_not_allowed"})
-    missing_provenance = _missing_provenance(resume)
+    missing_provenance = _missing_provenance(claim_records, fact_index)
     return _result("fail" if unsupported or missing_provenance else "pass", unsupported_claims=unsupported, missing_provenance=missing_provenance, warnings=[])
 
 
@@ -1449,17 +1458,6 @@ def _resolution_group(value: str) -> str:
     if value == ResolutionState.EXPLICITLY_MISSING.value:
         return "missing"
     return "unknown"
-
-
-def _missing_provenance(resume: JsonObject) -> list[JsonObject]:
-    provenance = _array(_item(resume, "provenance", []))
-    if provenance:
-        return []
-    claims = []
-    for field_name in ("summary", "skills", "experience", "projects"):
-        if _item(resume, field_name):
-            claims.append({"field_path": field_name, "reason": "missing_provenance"})
-    return claims
 
 
 def _duplicate_warnings(resume: JsonObject) -> list[JsonObject]:

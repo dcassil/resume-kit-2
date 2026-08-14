@@ -187,6 +187,8 @@ class ResumeCliCommandContractTests(unittest.TestCase):
         serialized = json.dumps(result, sort_keys=True).lower()
         self.assertIn("validated", serialized)
         self.assertIn("rejected", serialized)
+        validation = normalize_result(run_cli(self.cli, ["validate"], self.workspace))
+        self.assertEqual(validation.get("validations", {}).get("grounding"), "pass", validation)
 
     def test_validate_runs_final_gates_and_rejects_unverified_inferred_claims(self):
         run_cli(self.cli, ["init"], self.workspace)

@@ -4,14 +4,14 @@ level: task
 title: "Operation lifecycle enforcement: mandatory fields, verb semantics, status machine"
 short_code: "RKIT-T-0034"
 created_at: 2026-08-14T22:54:23.763323+00:00
-updated_at: 2026-08-14T22:56:56.223964+00:00
+updated_at: 2026-08-14T23:08:16.622828+00:00
 parent: resume-core-grounded-change
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0004
 ## Objective
 
 Enforce the section 4.5 operation lifecycle in `resume-core`: `validateChange` rejects operations missing `reason`, `linked_requirement_ids`, `linked_fact_ids`, or `provenance`; the full status machine (proposed → validated → applied → accepted/modified, validated → rejected, invalid transitions are typed errors) is implemented; all five verbs (replace/rewrite/insert/remove/move) have defined, tested apply semantics; and `applyChange` refuses operations missing mandatory fields (RKIT-I-0004 Requirement 6, RKIT-A-0006 item 3).
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
