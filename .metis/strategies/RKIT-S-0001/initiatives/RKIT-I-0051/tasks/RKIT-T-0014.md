@@ -4,7 +4,7 @@ level: task
 title: "REQ-001d: Strengthen fixtures_guardrails to require data envelope"
 short_code: "RKIT-T-0014"
 created_at: 2026-08-14T03:14:05.548625+00:00
-updated_at: 2026-08-14T17:22:36.418141+00:00
+updated_at: 2026-08-14T17:59:04.347698+00:00
 parent: executable-release-gate-e2e
 blocked_by: [RKIT-T-0012]
 archived: false
@@ -12,7 +12,7 @@ archived: false
 tags:
   - "#task"
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -29,6 +29,8 @@ initiative_id: RKIT-I-0051
 ## Objective
 
 Strengthen the `validate_expected_snapshots` guardrail in `tools/fixtures_guardrails.py` so the expected-snapshot manifest can never silently regress to prose-only stubs: every snapshot must now carry the structured `data` envelope (or a documented `data:null` + `comment` for deferred stages) and a `comment` field, on top of the existing metadata checks. This makes REQ-001b's populated snapshots the enforced floor, closing the loophole that let reviewed fixtures degrade back to prose without failing the gate.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

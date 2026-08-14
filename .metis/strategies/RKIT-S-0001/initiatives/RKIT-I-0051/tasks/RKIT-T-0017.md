@@ -4,7 +4,7 @@ level: task
 title: "REQ-010b: tools_guardrails capability-has-tool backstop"
 short_code: "RKIT-T-0017"
 created_at: 2026-08-14T03:14:05.672153+00:00
-updated_at: 2026-08-14T17:28:05.919337+00:00
+updated_at: 2026-08-14T17:59:09.450363+00:00
 parent: executable-release-gate-e2e
 blocked_by: [RKIT-T-0016]
 archived: false
@@ -12,7 +12,7 @@ archived: false
 tags:
   - "#task"
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -29,6 +29,8 @@ initiative_id: RKIT-I-0051
 ## Objective
 
 This task installs the durable enforcement backstop in the tools guardrail so the tool manifest can never again declare a phantom capability. For every entry in `required_capabilities` it asserts that at least one `tools[]` entry supplies a matching implementing kind, hard-blocking otherwise. This is what makes the REQ-010 honesty fix (RKIT-T-0016) self-enforcing rather than a one-time cleanup.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

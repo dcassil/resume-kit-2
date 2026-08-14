@@ -4,7 +4,7 @@ level: task
 title: "REQ-001c: Snapshot-comparison test diffing live outputs against baselines"
 short_code: "RKIT-T-0013"
 created_at: 2026-08-14T03:14:05.508491+00:00
-updated_at: 2026-08-14T17:20:15.022653+00:00
+updated_at: 2026-08-14T17:59:03.998371+00:00
 parent: executable-release-gate-e2e
 blocked_by: [RKIT-T-0011, RKIT-T-0012]
 archived: false
@@ -12,7 +12,7 @@ archived: false
 tags:
   - "#task"
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -29,6 +29,8 @@ initiative_id: RKIT-I-0051
 ## Objective
 
 This task makes the snapshots executable rather than prose: for every snapshot carrying a non-null data block, it regenerates the live output deterministically and asserts canonicalized deep-equality against the committed baseline via the REQ-001a comparator. It is the test that turns the reviewed data baselines into an enforced contract — failing loudly and naming the divergent pointer the moment a live output drifts from what was reviewed.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

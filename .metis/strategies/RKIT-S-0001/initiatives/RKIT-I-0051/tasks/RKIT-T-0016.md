@@ -4,7 +4,7 @@ level: task
 title: "REQ-010a: tool_manifest capability honesty, implement two and defer two"
 short_code: "RKIT-T-0016"
 created_at: 2026-08-14T03:14:05.631317+00:00
-updated_at: 2026-08-14T17:24:38.095987+00:00
+updated_at: 2026-08-14T17:59:08.735579+00:00
 parent: executable-release-gate-e2e
 blocked_by: [RKIT-T-0011, RKIT-T-0020]
 archived: false
@@ -12,7 +12,7 @@ archived: false
 tags:
   - "#task"
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -29,6 +29,8 @@ initiative_id: RKIT-I-0051
 ## Objective
 
 Make `tool_manifest.json` honest about which required capabilities are actually backed by a real tool. This task retains the two capabilities that gain a real implementing tool in Wave 1 (`snapshot_review_helpers`, `migration_checkers`) and removes the two that do not yet have an implementation (`render_parse_back_validators`, `audit_validators`), realigning the contract test and protected spec so the manifest, its tests, and its documentation all agree. It matters because the manifest is a PROTECTED release-gate artifact whose contract test asserts an exact capability set — a dishonest manifest either blocks the gate falsely or claims capabilities that do not exist.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

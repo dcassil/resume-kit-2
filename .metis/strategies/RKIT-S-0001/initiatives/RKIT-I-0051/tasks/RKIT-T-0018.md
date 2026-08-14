@@ -4,7 +4,7 @@ level: task
 title: "REQ-010c: Redefine future-contract as distinct package-contract gate"
 short_code: "RKIT-T-0018"
 created_at: 2026-08-14T03:14:05.713153+00:00
-updated_at: 2026-08-14T17:30:13.798744+00:00
+updated_at: 2026-08-14T17:59:10.758768+00:00
 parent: executable-release-gate-e2e
 blocked_by: []
 archived: false
@@ -12,7 +12,7 @@ archived: false
 tags:
   - "#task"
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -29,6 +29,8 @@ initiative_id: RKIT-I-0051
 ## Objective
 
 Resolve the orphaned `--future-contract` flag by redefining it as a genuinely distinct forward-looking package-contract gate rather than a vestigial alias of `--pr`. This task makes `--future-contract` run the extra package contracts that the current gate omits and pins its single canonical role in the docs, so the release path has a clear, non-overlapping distinction between the current gate and the full-package-contract gate.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
