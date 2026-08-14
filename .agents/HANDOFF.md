@@ -1,3 +1,46 @@
+# Handoff — 2026-08-14 EVENING (I-0051 W1 + I-0002 + I-0003 COMPLETE, continuous codex mode)
+
+Read this first. Supersedes the two handoffs below (kept for the defect table, ADR summaries, depth caveats, straight-jacket details).
+
+## 1. State right now (everything on develop, PUSHED through `60de793`)
+
+- **DONE + pushed today**: RKIT-I-0051 Wave 1 (12 tasks, incl. the password lane `84503f9`), **RKIT-I-0002** (matching: MatchResult 4.3 w/ threshold+hardRequirementsResolved+tri-state decision, gating defect FIXED and behaviorally probed, MatchDimension weighted breakdown, TermRelationship-driven resolution w/ Azure≠AWS invariant, live terminology dimension, flat matching keys REMOVED, v0.2.0), **RKIT-I-0003** (selection: ContentSelectionPlan DTO, resume.* config w/ §13 sectionOrder + basics pinned as render header, match-result-driven ranking — `del match_result` gone — bullet-level selection w/ unconditional traceability, max_skills removed, v0.3.0).
+- Gates at head: `--pr` 258 green, `--future-contract` 265 green, `--smoke` green, straight-jacket verify clean.
+- Daniel merged develop→main via PR #8 mid-session; local/remote reconciled (merge commit `df36379`).
+
+## 2. Standing instructions from Daniel (this session)
+
+**Continuous mode authorized**: decompose next initiative → orchestrate codex agents per task → review + run BOTH gates → commit per task → complete initiative → bump version → push develop → repeat. Do NOT ask unless a genuinely unanswerable question. Stop only past ~75% context at a good stopping point with a handoff (this doc).
+
+**Pre-commit hook**: Daniel said he will change straight-jacket pre-commit to WARN (not block) so protected files can be edited during work, with a **single approve/update-locks commit at the end before a PR to main passes**. NOT yet verified in this session — test with a protected edit before relying on it.
+
+## 3. PENDING: run_tests.py wiring batch (do this when hook warns, or via Daniel password)
+
+New `tests/unit` modules created in I-0002/I-0003 that are mapped in suite_manifest but NOT yet in protected `tools/run_tests.py` CURRENT_TEST_MODULES (they run standalone; behaviors covered indirectly by contract/snapshot tests):
+`test_matching_config_unit, test_match_decision_unit, test_match_dimensions_unit, test_term_relationship_resolution_unit, test_infer_classification_unit, test_terminology_dimension_unit, test_selection_plan_shape_unit, test_resume_config_unit, test_selection_ranking_unit, test_bullet_selection_unit` (~60 tests). Add-only edit; then the single re-register/approve commit.
+
+## 4. The proven loop (reuse verbatim)
+
+Per task: (1) Metis task → active; (2) write tight prompt file to scratchpad — task-doc path + binding decisions + FORBIDDEN protected list + verify commands incl. snapshot regenerate ×2 no-drift; (3) `cat prompt | codex exec --cd <repo> -o out.txt - > full.log 2>&1` in background (flag-free — flags get classifier-blocked); (4) review report + diff, independently probe anything load-bearing (e.g. the T-0024 gating probe), review snapshot diffs YOURSELF (Daniel delegated baseline review in continuous mode); (5) run `--pr` AND `--smoke` (add `--future-contract` on close-out chunks); (6) commit per task w/ trailer, Metis → completed. Initiative close: version bump in pyproject.toml (minor per initiative), push develop, update memory + this handoff.
+
+Codex quality has been high (11 tasks today, zero rejects; two driver interventions: float-noise rounding in matching_config `default_requirement_weight`, and independent gating verification). Snapshot churn is normal for scoring changes — review the per-snapshot summary codex reports.
+
+## 5. Next work
+
+- **RKIT-I-0004** (grounded change lifecycle + final validation) — NOW UNBLOCKED (I-0002 done). Owns the honesty-gate defect (5-entry fixture lookup at domain.py:47-53,1103-1105) and applied-operations threading. Its chunk-1 (validateFinalResume fix) was already done 08-13. Same decompose→execute flow; it consumes MatchResult/plan/claim-provenance substrates that are all now real.
+- After I-0004: resume-core is done; next tier = career-store (I-0005..0008) or the CLI/workflow initiatives; check `blocked_by` frontmatter.
+- Wave 2 of I-0051 stays blocked on RKIT-I-0041.
+
+## 6. Gotchas rediscovered today
+
+- MCP metis `create_document` still fails parent resolution — use `metis create task --initiative RKIT-I-00NN "title"`; task files then need Read-before-Write to populate (frontmatter regenerates `blocked_by: []` — set the chain in the file body write).
+- Every resume-core initiative is a SERIAL chain (all tasks touch domain.py) — do not parallelize codex agents in one worktree.
+- `git add resume-core` sweeps `__pycache__` — `.gitignore` now covers it (added today) but stay alert.
+- Metis phase transitions rewrite task files (duplicate "## Acceptance Criteria" headers appear — harmless).
+- `python3 tools/regenerate_expected_snapshots.py --root . --write` twice + `git diff --stat fixtures/expected/` is the no-drift proof; FIXTURE_CONFIG now uses `matching.*`/`resume.*` namespaces (flat keys are typed errors).
+
+---
+
 # Handoff — 2026-08-14 (RKIT-I-0001 COMPLETE, codex-driven execution)
 
 Read this first. It supersedes the "next steps" of the 2026-08-13 handoff below (design review + decomposition are DONE). Everything else below (defect table, ADRs, depth caveats, command caveats) still applies.
