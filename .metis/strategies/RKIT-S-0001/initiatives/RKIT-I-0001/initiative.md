@@ -4,20 +4,20 @@ level: initiative
 title: "Resume-Core Canonical Contracts, Validation, And Normalization"
 short_code: "RKIT-I-0001"
 created_at: 2026-08-13T20:41:36.829485+00:00
-updated_at: 2026-08-13T20:41:36.829485+00:00
-parent: resume-kit-2-full-product-buildout
+updated_at: 2026-08-14T03:08:26.349769+00:00
+parent: RKIT-S-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/discovery"
+  - "#phase/decompose"
 
 
 exit_criteria_met: false
 estimated_complexity: M
 strategy_id: RKIT-S-0001
-initiative_id: NULL
+initiative_id: resume-core-canonical-contracts
 ---
 
 # Resume-Core Canonical Contracts, Validation, And Normalization Initiative
@@ -100,3 +100,18 @@ Decomposition guidance (dependency-ordered chunks; actual Metis task decompositi
 4. `JobModel` section 4.2 completion including the `JobTerm` substrate and `parseJobDescription` population.
 5. Claim-level `ResumeField` provenance weaving through `normalizeResume`.
 6. TEST_SPEC unit suites for this scope plus the spec-strengthening edits.
+
+## Design Review & Approved Decisions (2026-08-13)
+
+Design review completed 2026-08-13 via a 5-agent verification workflow, code-grounded against `develop @ 4156687`. Daniel approved the decomposition and the decisions below.
+
+**Verification correction to the Context/Requirements framing.** `explicitly_missing` and `conflicted` are ALREADY enum members on both `VerificationState` (schemas.py:32-38) and `ResolutionState` (schemas.py:41-49) — they are not "drift to add." The RKIT-A-0006 restoration is: VerificationState → exactly {`source_stated`, `user_verified`, `imported`, `inferred`, `unknown`} (ADD `imported`, REMOVE `explicitly_missing` + `conflicted`); ResolutionState → exactly {`exact_match`, `alias_match`, `verified_fact_match`, `related_match`, `possible_match`, `unknown`, `explicitly_missing`, `not_applicable`} (ADD `not_applicable`, REMOVE `conflicted`, KEEP `explicitly_missing`). **Cross-package hazard (previously unaccounted):** `career_store.VerificationState` IS `resume_core.VerificationState` (single shared object, pinned by test_shared_dto_schemas_contract.py:78); career-store `matching.py`/`store.py` read `.CONFLICTED`/`.EXPLICITLY_MISSING` as load-bearing enum attributes and drive real conflict resolution (store.py:1166-1169). The enum edit therefore breaks career-store at import time unless its readers migrate in the SAME task — the root task is cross-package by necessity, not a resume-core-only change. Also corrected: impossible-month rejection (2019-13) is NEW behavior (today silently coerced to None, then surfaced only as a generic ambiguous warning), not a tightening of an existing reject; and there is no `reason` field on ResumeChangeOperation today (must be ADDED, not merely made mandatory). MatchResult §4.3 is explicitly OUT of scope here (owned by RKIT-I-0002) despite A-0006 item 4 listing it.
+
+**Approved decisions:**
+1. **Conflict representation:** Introduce a first-class conflict-record path in career-store; migrate `matching.py`/`store.py` to emit conflict records instead of the removed enum member. Preserves current conflict-detection behavior with correct contracts. The root enum task owns this lockstep migration.
+2. **Claim-level provenance weaving:** Ships in THIS initiative. `normalizeResume` emits honest per-claim `ResumeField` (empty provenance + `unknown` for sourceless claims — NEVER silent `source_stated`); semantic enforcement stays in RKIT-I-0004.
+3. **Field naming:** Preserve existing snake_case (`linked_requirement_ids`, `linked_fact_ids`); the contract doc's camelCase is notation, not a wire-format change.
+4. **validateResume:** Enforce the full `CANONICAL_RESUME_SCHEMA.required` set (adds `resume_id`, `source`) via a hand-rolled stdlib walker over the exported constants — no jsonschema dependency.
+5. **Dates:** Reject impossible months and reversed ranges with typed errors (`invalid_date` / `reversed_range`); ambiguous-but-possible formats normalize with a warning.
+
+**Decomposition:** 8 tasks (see child tasks). Root task = enum restoration + cross-package reader/conflict-record migration + shared-DTO contract-test realignment under A-0006 (opus + high); everything else in the resume-core chain (RKIT-I-0002/0003/0004) depends on it.

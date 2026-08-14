@@ -4,19 +4,19 @@ level: initiative
 title: "Executable Release Gate: E2E, Persistence, Recovery, Migration, and Snapshot Coverage"
 short_code: "RKIT-I-0051"
 created_at: 2026-08-13T21:58:49.672624+00:00
-updated_at: 2026-08-13T21:58:49.672624+00:00
+updated_at: 2026-08-14T03:08:26.594220+00:00
 parent: RKIT-S-0001
 blocked_by: []
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/discovery"
+  - "#phase/decompose"
 
 
 exit_criteria_met: false
 estimated_complexity: L
-strategy_id: NULL
+strategy_id: RKIT-S-0001
 initiative_id: executable-release-gate-e2e
 ---
 
@@ -92,3 +92,18 @@ This initiative IS the testing initiative for the release tiers; its own verific
 5. Wave 2b — release-candidate runner + CI wiring; DOCX real-artifact assertion (REQ-008, NFR-002).
 
 Task decomposition happens after this initiative passes design review; Wave 1 tasks have no cross-initiative blockers, Wave 2 tasks declare RKIT-I-0041.
+
+## Design Review & Approved Decisions (2026-08-13)
+
+Design review completed 2026-08-13, code-grounded against `develop @ 4156687`. Daniel approved the Wave 1 decomposition and the decisions below. Wave 2 remains out of scope (blocked on RKIT-I-0041).
+
+**Verification corrections.** REQ-002 is worse than stated — ZERO (not 1) of the five `fixtures/operations/invalid-*.json` execute through `resume_core.validateChange` today (the runtime validateChange tests build inline operations; `test_fixtures_contract` checks only static metadata). REQ-011's canonical-command sub-item is a phantom: `PROJECT_STRUCTURE_AND_TEST_STRATEGY.md` and `tests/TEST_SPEC.md` ALREADY both name `run_gate.py --pr` as canonical — the real REQ-011 gap is `SMOKE_TEST.md`'s non-existent fixtures (`resume-smoke.*`/`job-smoke.txt`) and the SaaS required-vs-preferred truth case (Job A makes SaaS Required; SMOKE_TEST lists it Preferred; run_smoke asserts ingestion but not classification). `tests/e2e` is no longer literally empty (holds the DoD-10-14 regression added 08-13), but no canonical-workflow E2E exists.
+
+**Approved decisions:**
+1. **Snapshot comparator:** Hybrid canonicalized-projection deep-equality. Envelope = `{schema_version, config_hash, reviewed, comment(former prose), data}`; canonicalize (sort keys, drop volatile run-identity/timestamp fields per suite_manifest `determinism_requirements`, incl. the RKIT-I-0022 per-invocation identity) then assert full equality.
+2. **--future-contract:** Redefine as the distinct full-package-contract gate — make `FUTURE_CONTRACT_TEST_MODULES` a genuine superset of `CURRENT_TEST_MODULES` and wire it into the release path (not retire).
+3. **Red-baseline representation:** `xfail`/`expectedFailure` inside the normal suite, annotated with the owning package-initiative id, excluded from gate-blocking via category mapping. Only truly-passing honesty fixtures stay in the blocking `hallucination_rejection` category.
+4. **REQ-009 boundary:** REQ-009 writes ONLY I-0001-stable unit cases now (ats_sanitation, scoring_math, config_parsing) and DEFERS date/requirement/change/state/verification-resolution-enum unit cases to RKIT-I-0001 chunk 6 (documented in-file), to avoid throwaway tests against soon-to-change surfaces.
+5. **Manifest honesty:** Implement the two capabilities whose behavior lands in Wave 1 (`snapshot_review_helpers`, `migration_checkers`); REMOVE `render_parse_back_validators` + `audit_validators` from `required_capabilities` (defer to Wave 2 owners); add a `tools_guardrails` capability-has-tool backstop so a phantom capability can never be declared again.
+
+**Decomposition:** 12 tasks across sub-waves 1a/1b/1c (see child tasks). All Wave 1; no cross-initiative blockers. Every protected-surface edit (straight-jacket manifest, boundary tests) carries the A-0006 strengthen-only realignment constraint + re-registration.
