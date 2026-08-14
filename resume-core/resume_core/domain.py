@@ -36,9 +36,12 @@ from .honesty import _title_inflation as _title_inflation
 from .honesty import _title_rank as _title_rank
 from .honesty import _years as _years
 from .honesty import _years_met as _years_met
+from .guardrails_config import resolve_guardrails_config
 from .match_dimensions import _configured_default_weight, _match_dimensions, _score_from_dimensions
 from .match_decision import decide_match, empty_match, match_decision_explanation
 from .matching_config import resolve_matching_config
+from .quality_warnings import duplicate_warnings as _duplicate_warnings
+from .quality_warnings import keyword_warnings as _keyword_warnings
 from .resume_config import resolve_resume_config
 from .requirement_classification import default_importance, infer_classification
 from .schemas import (
@@ -362,6 +365,7 @@ def scoreMatch(
     job = _unwrap(job_model, "job_model")
     config = config or {}
     matching_config = resolve_matching_config(config)
+    guardrails_config = resolve_guardrails_config(config)
     relationship_index, relationship_errors = build_term_relationship_index(
         term_relationships,
         _TERM_VARIANTS,
@@ -372,10 +376,12 @@ def scoreMatch(
     facts = [item for item in career_fact_dtos or [] if isinstance(item, dict)]
     if not isinstance(resume, dict) or not isinstance(job, dict):
         return _result("error", match_result=_empty_match())
-    if matching_config.errors:
-        return _result("error", match_result=_empty_match(), errors=matching_config.errors, warnings=matching_config.warnings)
+    config_errors = [*matching_config.errors, *guardrails_config.errors]
+    config_warnings = [*matching_config.warnings, *guardrails_config.warnings]
+    if config_errors:
+        return _result("error", match_result=_empty_match(), errors=config_errors, warnings=config_warnings)
     if relationship_errors:
-        return _result("rejected", match_result=_empty_match(), errors=relationship_errors, warnings=matching_config.warnings)
+        return _result("rejected", match_result=_empty_match(), errors=relationship_errors, warnings=config_warnings)
 
     resume_text = _normal_text(_text(resume))
     aliases = _alias_map(config, relationship_index)
@@ -392,7 +398,15 @@ def scoreMatch(
         weight = _number(_item(requirement, "weight"), 1.0)
         terms = _terms(requirement)
         max_score += max(weight, 0.0)
-        state, matched_fact_ids, evidence = _resolve_requirement(requirement, terms, resume_text, aliases, relationship_index, fact_index, config)
+        state, matched_fact_ids, evidence = _resolve_requirement(
+            requirement,
+            terms,
+            resume_text,
+            aliases,
+            relationship_index,
+            fact_index,
+            guardrails_config.config.allow_inferred,
+        )
 
         requirement_score = weight if state in _RESOLVED else 0.0
         blocking = classification == RequirementClassification.REQUIRED.value and state not in _RESOLVED
@@ -538,10 +552,20 @@ def validateChange(
     op = _unwrap(operation, "operation")
     job = _unwrap(job_model, "job_model")
     policy = policy or {}
+    guardrails_config = resolve_guardrails_config(policy)
     facts = [item for item in career_fact_dtos or [] if isinstance(item, dict)]
     grounding = {"supported": False, "supporting_fact_ids": [], "supporting_requirement_ids": [], "guarded_claims": []}
     if not isinstance(resume, dict) or not isinstance(op, dict):
         return _result("error", operation_id="", validation_state="rejected", errors=[_issue("invalid_operation", "operation and canonical_resume must be objects.")], grounding=grounding)
+    if guardrails_config.errors:
+        return _result(
+            "rejected",
+            operation_id=str(_item(op, "operation_id", "")),
+            validation_state="rejected",
+            errors=guardrails_config.errors,
+            warnings=guardrails_config.warnings,
+            grounding=grounding,
+        )
 
     errors: list[JsonObject] = []
     required_fields = set(RESUME_CHANGE_OPERATION_SCHEMA["required"])
@@ -566,11 +590,12 @@ def validateChange(
 
     after_text = _normal_text(_text(_item(op, "after")))
     guarded = _guarded_claims(after_text)
-    support_by_claim = _claim_support(guarded, fact_index, linked_fact_ids, bool(_item(policy, "allow_inferred_facts", False)))
+    allow_inferred = guardrails_config.config.allow_inferred
+    support_by_claim = _claim_support(guarded, fact_index, linked_fact_ids, allow_inferred)
     after_title_rank = _title_rank(_item(op, "after"))
     if after_title_rank is not None:
         support_by_claim.update(
-            _claim_support({f"title:{_TITLE_RANK_LABELS[after_title_rank]}"}, fact_index, linked_fact_ids, bool(_item(policy, "allow_inferred_facts", False)))
+            _claim_support({f"title:{_TITLE_RANK_LABELS[after_title_rank]}"}, fact_index, linked_fact_ids, allow_inferred)
         )
     supported_claims = set(support_by_claim)
     supporting_fact_ids = sorted({fact_id for ids in support_by_claim.values() for fact_id in ids})
@@ -677,9 +702,18 @@ def validateGrounding(
 
     resume = _unwrap(working_resume, "working_resume")
     policy = policy or {}
+    guardrails_config = resolve_guardrails_config(policy)
     facts = [item for item in career_fact_dtos or [] if isinstance(item, dict)]
     if not isinstance(resume, dict):
         return _result("error", unsupported_claims=[], missing_provenance=[], warnings=[])
+    if guardrails_config.errors:
+        return _result(
+            "error",
+            unsupported_claims=[],
+            missing_provenance=[],
+            errors=guardrails_config.errors,
+            warnings=guardrails_config.warnings,
+        )
 
     fact_index = _fact_index(facts)
     operation_linked_fact_ids = [
@@ -696,9 +730,10 @@ def validateGrounding(
     ]
     text = _normal_text(_grounding_scan_text(resume))
     guarded = _guarded_claims(text)
-    supported = set(_claim_support(guarded, fact_index, linked_fact_ids, bool(_item(policy, "allow_inferred_facts", False))))
+    allow_inferred = guardrails_config.config.allow_inferred
+    supported = set(_claim_support(guarded, fact_index, linked_fact_ids, allow_inferred))
     unsupported = [{"claim": claim, "reason": "missing_verified_fact"} for claim in sorted(guarded - supported)]
-    if not _item(policy, "allow_inferred_facts", False):
+    if not allow_inferred:
         for fact in facts:
             if _item(fact, "verification_state") == VerificationState.INFERRED.value and _term_in_text(_fact_text(fact), text):
                 unsupported.append({"claim": str(_item(fact, "fact_id", "")), "reason": "inferred_fact_not_allowed"})
@@ -1047,9 +1082,8 @@ def _resolve_requirement(
     aliases: dict[str, set[str]],
     relationship_index: JsonObject,
     fact_index: dict[str, JsonObject],
-    config: JsonObject,
+    allow_inferred: bool,
 ) -> tuple[str, list[str], list[JsonObject]]:
-    allow_inferred = bool(_item(config, "allow_inferred_facts", False))
     required_years = _minimum_required_years(_item(requirement, "years") or _item(requirement, "source_text") or _item(requirement, "concept"))
     non_year_terms = [term for term in terms if _minimum_required_years(term) is None]
 
@@ -1389,29 +1423,6 @@ def _resolution_group(value: str) -> str:
     if value == ResolutionState.EXPLICITLY_MISSING.value:
         return "missing"
     return "unknown"
-
-
-def _duplicate_warnings(resume: JsonObject) -> list[JsonObject]:
-    warnings: list[JsonObject] = []
-    seen: set[str] = set()
-    for item in _array(_item(resume, "skills", [])):
-        key = _normal_text(item)
-        if key in seen:
-            warnings.append(_issue("duplicate_skill", "Duplicate skill detected.", "skills"))
-        seen.add(key)
-    return warnings
-
-
-def _keyword_warnings(resume: JsonObject) -> list[JsonObject]:
-    warnings: list[JsonObject] = []
-    words = _normal_text(_text(resume)).split()
-    if not words:
-        return warnings
-    for word in sorted(set(words)):
-        if len(word) > 2 and words.count(word) > max(8, len(words) // 5):
-            warnings.append(_issue("possible_keyword_stuffing", "Repeated term detected.", "resume", {"term": word}))
-            break
-    return warnings
 
 
 def _relevance(text: Any, terms: list[str]) -> int:

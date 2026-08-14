@@ -4,14 +4,14 @@ level: task
 title: "Generalized honesty heuristics: quantity normalization, title ladder, scoped years, structured negation"
 short_code: "RKIT-T-0036"
 created_at: 2026-08-14T22:54:23.858954+00:00
-updated_at: 2026-08-14T23:19:31.795463+00:00
+updated_at: 2026-08-14T23:37:38.975190+00:00
 parent: resume-core-grounded-change
 blocked_by: [RKIT-T-0035]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0004
 ## Objective
 
 Generalize the honesty gate from fixture enumeration to mechanism (RKIT-I-0004 Requirements 2, 3, 4, and 8's negation piece): ANY ungrounded claim is rejected by default-deny over the T-0035 claim walk; `_GUARDED_TERMS` (domain.py:47-53, 1103-1105) is demoted from mechanism to regression fixture; title inflation uses a seniority ladder; years claims normalize number words and scope evidence to the claim's subject; negation checks compare structured fact fields.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

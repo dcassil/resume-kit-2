@@ -91,7 +91,7 @@ class ConfigParsingUnitTests(unittest.TestCase):
         facts = [{"fact_id": "fact_aws", "text": "AWS", "verification_state": "inferred"}]
 
         default_match = resume_core.scoreMatch(resume, job, facts, {})["match_result"]
-        allowed_match = resume_core.scoreMatch(resume, job, facts, {"allow_inferred_facts": True})["match_result"]
+        allowed_match = resume_core.scoreMatch(resume, job, facts, {"guardrails": {"allow_inferred_facts": True}})["match_result"]
 
         self.assertEqual(default_match["requirement_results"][0]["resolution_state"], "unknown")
         self.assertEqual(default_match["score"], 2.0)

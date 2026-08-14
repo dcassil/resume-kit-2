@@ -94,7 +94,12 @@ class ClaimLevelGroundingTests(unittest.TestCase):
         self.assertEqual(result.get("missing_provenance"), [])
 
     def test_inferred_fact_does_not_ground_claim_requiring_verification(self):
-        result = resume_core.validateGrounding(_aws_resume(), [_aws_fact("inferred")], [], {"allow_inferred_facts": True})
+        result = resume_core.validateGrounding(
+            _aws_resume(),
+            [_aws_fact("inferred")],
+            [],
+            {"guardrails": {"allow_inferred_facts": True}},
+        )
 
         self.assertEqual(result.get("status"), "fail", result)
         finding = result["missing_provenance"][0]
