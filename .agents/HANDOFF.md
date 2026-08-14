@@ -14,10 +14,9 @@ Read this first. Supersedes the two handoffs below (kept for the defect table, A
 
 **Pre-commit hook**: Daniel said he will change straight-jacket pre-commit to WARN (not block) so protected files can be edited during work, with a **single approve/update-locks commit at the end before a PR to main passes**. NOT yet verified in this session — test with a protected edit before relying on it.
 
-## 3. PENDING: run_tests.py wiring batch (do this when hook warns, or via Daniel password)
+## 3. run_tests.py wiring: DONE (`1a786a6`) — hook is now WARN-ONLY (verified)
 
-New `tests/unit` modules created in I-0002/I-0003 that are mapped in suite_manifest but NOT yet in protected `tools/run_tests.py` CURRENT_TEST_MODULES (they run standalone; behaviors covered indirectly by contract/snapshot tests):
-`test_matching_config_unit, test_match_decision_unit, test_match_dimensions_unit, test_term_relationship_resolution_unit, test_infer_classification_unit, test_terminology_dimension_unit, test_selection_plan_shape_unit, test_resume_config_unit, test_selection_ranking_unit, test_bullet_selection_unit` (~60 tests). Add-only edit; then the single re-register/approve commit.
+Daniel converted the straight-jacket pre-commit to warn mode; the 10 I-0002/I-0003 unit modules are wired into CURRENT_TEST_MODULES. **PR gate is now 307 tests** (was 258), future-contract + smoke green. Protected files may be edited freely mid-work now (commit prints a warning); the ONE remaining obligation is **Daniel's single approve/update-locks commit before a PR to main will pass** — accumulate protected edits and remind him at PR time. `straight-jacket verify` will report CHECKSUM_MISMATCH for run_tests.py (+ any future protected edits) until that approval commit.
 
 ## 4. The proven loop (reuse verbatim)
 
