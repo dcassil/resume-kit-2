@@ -163,6 +163,11 @@ class ResumeCoreDomainContractTests(unittest.TestCase):
         second = maybe_await(self.core.scoreMatch(CANONICAL_RESUME, JOB_MODEL, CAREER_FACTS, {"policy": "strict"}))
         self.assertEqual(first, second)
         self.assertIn("match_result", first)
+        match = first["match_result"]
+        self.assertEqual(match["threshold"], 7.5)
+        self.assertIn(match["decision"], {"continue", "resolve_gaps", "blocked"})
+        self.assertEqual(match["can_continue"], match["decision"] == "continue")
+        self.assertTrue(match["hardRequirementsResolved"])
         text = serialized(first)
         self.assertIn("req_react", text)
         self.assertIn("req_aws", text)

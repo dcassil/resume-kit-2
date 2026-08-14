@@ -43,6 +43,7 @@
       "date_normalization",
       "requirement_normalization",
       "scoring_math",
+      "match_decision",
       "state_transitions",
       "change_validation",
       "relationship_matching",
@@ -107,6 +108,9 @@
       ],
       "scoring_math": [
         "tests.unit.test_resume_core_scoring_math_unit"
+      ],
+      "match_decision": [
+        "tests.unit.test_match_decision_unit"
       ],
       "state_transitions": [
         "tests.unit.test_enum_membership",

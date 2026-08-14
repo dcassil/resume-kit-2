@@ -11,6 +11,7 @@ from unicodedata import normalize as _unicode_normalize
 
 from .claim_fields import provenance_index as _provenance_index, weave_claim_fields as _weave_claim_fields
 from .dates import date_key as _parse_date_key, record_date_result as _record_date_result
+from .match_decision import decide_match, empty_match, match_decision_explanation
 from .matching_config import resolve_matching_config
 from .pointers import _append_already_present, _pointer_parent_exists, _pointer_value, _set_pointer
 from .schemas import (
@@ -399,7 +400,9 @@ def scoreMatch(
             }
         )
 
-    strict = matching_config.config.require_hard_requirements_resolved
+    threshold = matching_config.config.score_auto_threshold
+    hard_requirements_resolved = not unresolved
+    decision = decide_match(score, threshold, hard_requirements_resolved, matching_config.config)
     match = {
         "schema_version": "match-result.v1",
         "match_id": _stable_id("match", f"{_item(resume, 'resume_id', '')}:{_item(job, 'job_id', '')}:{score}:{unresolved}"),
@@ -408,11 +411,14 @@ def scoreMatch(
         "score": round(score, 4),
         "max_score": round(max_score, 4),
         "score_percent": round(score * 100 / max_score, 2) if max_score else 0.0,
+        "threshold": threshold,
+        "hardRequirementsResolved": hard_requirements_resolved,
+        "decision": decision,
         "requirement_results": requirement_results,
         "unresolved_requirement_ids": unresolved,
         "preferred_unresolved_requirement_ids": preferred_unresolved,
-        "can_continue": not unresolved or not strict,
-        "explanations": ["Required unresolved requirements block continuation." if unresolved and strict else "No required hard gate is blocking continuation."],
+        "can_continue": decision == "continue",
+        "explanations": [match_decision_explanation(decision)],
         "algorithm_version": ALGORITHM_VERSION,
     }
     return _result("ok", match_result=match)
@@ -1485,15 +1491,4 @@ def _relevance(text: Any, terms: list[str]) -> int:
 
 
 def _empty_match() -> JsonObject:
-    return {
-        "schema_version": "match-result.v1",
-        "match_id": "match_empty",
-        "job_id": "",
-        "resume_id": "",
-        "score": 0.0,
-        "max_score": 0.0,
-        "requirement_results": [],
-        "unresolved_requirement_ids": [],
-        "can_continue": False,
-        "algorithm_version": ALGORITHM_VERSION,
-    }
+    return empty_match(ALGORITHM_VERSION)

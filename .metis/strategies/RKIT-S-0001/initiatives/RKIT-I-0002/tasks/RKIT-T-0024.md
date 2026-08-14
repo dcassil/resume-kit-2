@@ -4,14 +4,14 @@ level: task
 title: "Chunk 2: MatchResult 4.3 completion - threshold, hardRequirementsResolved, decision"
 short_code: "RKIT-T-0024"
 created_at: 2026-08-14T19:46:11.232911+00:00
-updated_at: 2026-08-14T19:46:11.232911+00:00
+updated_at: 2026-08-14T20:40:46.667602+00:00
 parent: resume-core-deterministic
-blocked_by: ["RKIT-T-0023"]
+blocked_by: [RKIT-T-0023]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,10 @@ initiative_id: RKIT-I-0002
 ## Objective
 
 Complete `MatchResult` to the section 4.3 / RKIT-A-0006 item 4 contract: add `threshold` (from `matching.scoreAutoThreshold`), `hardRequirementsResolved` (bool), and the tri-state `decision` (`continue` / `resolve_gaps` / `blocked`) computed by a pure decision function. Critically, this chunk FIXES the audit's empirically verified defect: `matching.requireHardRequirementsResolved: true` currently does NOT gate continuation (domain.py:1092-1093). After this chunk, an unresolved hard requirement under that config yields `decision: 'blocked'`.
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -77,4 +81,5 @@ Codex-exec: yes with a tight prompt; driver must run the snapshot regenerate and
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-14: Chunk 2 implemented. Added MatchResult `threshold`, `hardRequirementsResolved`, and tri-state `decision`; added pure `decide_match`; `can_continue` is now derived from `decision == "continue"`. Audit reproduction test failed pre-fix on missing decision fields, then passed after implementation. Regenerated the five match snapshots; PR and smoke gates passed.
+- 2026-08-14 (driver review): independent behavioral probe confirmed the gating fix — unresolved hard requirement + requireHardRequirementsResolved=true → decision `blocked` (also via legacy `policy:"strict"`); false → `resolve_gaps`. Snapshot diff reviewed: only 3 new fields + explanation text, zero score/requirement shifts. Committed; unit-module gate wiring deferred to the end-of-initiative password batch.

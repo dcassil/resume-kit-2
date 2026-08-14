@@ -17,9 +17,11 @@
     "match_result": {
       "algorithm_version": "resume-core.match.v1",
       "can_continue": true,
+      "decision": "continue",
       "explanations": [
-        "No required hard gate is blocking continuation."
+        "No required hard gate is blocking continuation and score meets threshold."
       ],
+      "hardRequirementsResolved": true,
       "job_id": "job-a",
       "match_id": "match_ddc6ca75639e",
       "max_score": 59.0,
@@ -296,6 +298,7 @@
       "schema_version": "match-result.v1",
       "score": 56.0,
       "score_percent": 94.92,
+      "threshold": 7.5,
       "unresolved_requirement_ids": []
     },
     "schema_version": "resume-core.result.v1",

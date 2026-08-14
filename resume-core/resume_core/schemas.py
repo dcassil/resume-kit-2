@@ -167,6 +167,9 @@ class MatchResult:
     resume_id: str
     score: float
     max_score: float
+    threshold: float
+    hardRequirementsResolved: bool
+    decision: str
     requirement_results: list[RequirementMatch | JsonObject]
     unresolved_requirement_ids: list[str] = field(default_factory=list)
     can_continue: bool = True
@@ -309,7 +312,18 @@ JOB_MODEL_SCHEMA: JsonObject = {
 MATCH_RESULT_SCHEMA: JsonObject = {
     "schema_version": "match-result.v1",
     "type": "object",
-    "required": ["schema_version", "match_id", "job_id", "resume_id", "score", "max_score", "requirement_results"],
+    "required": [
+        "schema_version",
+        "match_id",
+        "job_id",
+        "resume_id",
+        "score",
+        "max_score",
+        "threshold",
+        "hardRequirementsResolved",
+        "decision",
+        "requirement_results",
+    ],
     "properties": {
         "schema_version": {"type": "string"},
         "match_id": {"type": "string"},
@@ -317,6 +331,9 @@ MATCH_RESULT_SCHEMA: JsonObject = {
         "resume_id": {"type": "string"},
         "score": {"type": "number"},
         "max_score": {"type": "number"},
+        "threshold": {"type": "number"},
+        "hardRequirementsResolved": {"type": "boolean"},
+        "decision": {"enum": ["continue", "resolve_gaps", "blocked"]},
         "requirement_results": {"type": "array"},
         "unresolved_requirement_ids": {"type": "array", "items": {"type": "string"}},
         "can_continue": {"type": "boolean"},
