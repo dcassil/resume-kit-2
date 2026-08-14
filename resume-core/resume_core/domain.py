@@ -28,6 +28,7 @@ from .schemas import (
     to_json_dict,
 )
 from .selection_plan import build_content_selection_plan
+from .selection_ranking import _rank_content_by_match_result
 from .term_relationships import blocked_terms_for, build_term_relationship_index, relationship_bucket
 
 
@@ -499,7 +500,6 @@ def getUnresolvedRequirements(match_result: Any, policy: JsonObject | None = Non
 def rankResumeContent(canonical_resume: Any, job_model: Any, match_result: Any, config: JsonObject | None = None) -> JsonObject:
     """Build a deterministic content ranking while preserving the base resume."""
 
-    del match_result
     resume = _unwrap(canonical_resume, "canonical_resume")
     job = _unwrap(job_model, "job_model")
     config = config or {}
@@ -515,8 +515,8 @@ def rankResumeContent(canonical_resume: Any, job_model: Any, match_result: Any, 
             warnings=resume_config.warnings,
         )
 
-    terms = sorted({term for requirement in _requirements(job) for term in _terms(requirement)})
-    plan, ranked = build_content_selection_plan(resume, terms, resume_config.config)
+    ranked, entry_relevance = _rank_content_by_match_result(resume, match_result)
+    plan, ranked = build_content_selection_plan(resume, ranked, entry_relevance, resume_config.config)
     fields: JsonObject = {"selection_plan": plan, "ranked_content": ranked}
     if resume_config.warnings:
         fields["warnings"] = resume_config.warnings

@@ -133,7 +133,8 @@
         "tests.unit.test_resume_config_unit"
       ],
       "selection_planning": [
-        "tests.unit.test_selection_plan_shape_unit"
+        "tests.unit.test_selection_plan_shape_unit",
+        "tests.unit.test_selection_ranking_unit"
       ]
     },
     "hallucination_rejection_fixtures": [

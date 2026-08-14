@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
 from .resume_config import ResumeConfig
-from .schemas import JsonObject, to_json_dict
+from .selection_ranking import UNLINKED_RELEVANCE
+from .schemas import JsonObject
 
 
-def build_content_selection_plan(resume: JsonObject, terms: list[str], config: ResumeConfig) -> tuple[JsonObject, list[JsonObject]]:
+def build_content_selection_plan(
+    resume: JsonObject,
+    ranked: list[JsonObject],
+    entry_relevance: dict[str, JsonObject],
+    config: ResumeConfig,
+) -> tuple[JsonObject, list[JsonObject]]:
     """Return the ContentSelectionPlan DTO and legacy ranked content."""
 
     experience = _array(_item(resume, "experience", []))
@@ -19,20 +24,11 @@ def build_content_selection_plan(resume: JsonObject, terms: list[str], config: R
     skills_limit = _effective_limit(config.skills.max, len(skills))
     bullet_limit = config.bullets_per_role.max
     target_pages = config.target_pages
-    ranked: list[JsonObject] = []
-
-    for index, item in enumerate(experience):
-        item_id = _item(item, "id", f"experience_{index}") if isinstance(item, dict) else f"experience_{index}"
-        ranked.append({"kind": "experience", "id": item_id, "source_index": index, "score": _relevance(_text(item), terms)})
-    for index, item in enumerate(skills):
-        ranked.append({"kind": "skill", "id": f"skill_{index}", "source_index": index, "score": _relevance(_text(item), terms)})
-
-    ranked.sort(key=lambda item: (-item["score"], item["kind"], item["source_index"]))
     selected_experience_ids = [item["id"] for item in ranked if item["kind"] == "experience"][:experience_limit]
     selected_skill_indices = [item["source_index"] for item in ranked if item["kind"] == "skill"][:skills_limit]
     selected_experience = set(selected_experience_ids)
     selected_skills = set(selected_skill_indices)
-    entries = _selection_entries(ranked, experience, selected_experience, selected_skills, bullet_limit)
+    entries = _selection_entries(ranked, experience, selected_experience, selected_skills, bullet_limit, entry_relevance)
     return (
         {
             "schema_version": "content-selection-plan.v1",
@@ -51,26 +47,27 @@ def _selection_entries(
     selected_experience: set[Any],
     selected_skills: set[Any],
     bullet_limit: int | None,
+    entry_relevance: dict[str, JsonObject],
 ) -> list[JsonObject]:
     entries: list[JsonObject] = []
     for item in ranked:
         kind = item["kind"]
         source_index = int(item["source_index"])
-        relevance = item["score"]
         if kind == "skill":
             selected = source_index in selected_skills
+            relevance = _path_relevance(entry_relevance, f"/skills/{source_index}")
             entries.append(
                 {
                     "path": f"/skills/{source_index}",
                     "action": "keep" if selected else "drop",
-                    "relevance": relevance,
+                    "relevance": relevance["relevance"],
                     "reason": (
                         "Selected by deterministic relevance ranking within max_skills."
                         if selected
                         else "Dropped by deterministic relevance ranking beyond max_skills."
                     ),
-                    "requirement_ids": [],
-                    "fact_ids": [],
+                    "requirement_ids": relevance["requirement_ids"],
+                    "fact_ids": relevance["fact_ids"],
                 }
             )
             continue
@@ -79,30 +76,45 @@ def _selection_entries(
         role = experience[source_index] if source_index < len(experience) else {}
         bullets = _array(_item(role, "bullets", [])) if isinstance(role, dict) else []
         if not bullets:
-            entries.append(_role_entry(source_index, relevance, role_selected))
+            entries.append(_role_entry(source_index, _path_relevance(entry_relevance, f"/experience/{source_index}"), role_selected))
             continue
-        for bullet_index, _bullet in enumerate(bullets):
-            bullet_selected = role_selected and (bullet_limit is None or bullet_index < bullet_limit)
-            entries.append(_bullet_entry(source_index, bullet_index, relevance, bullet_selected, role_selected))
+        ranked_bullets = sorted(
+            range(len(bullets)),
+            key=lambda bullet_index: tuple(
+                _path_relevance(entry_relevance, f"/experience/{source_index}/bullets/{bullet_index}")["rank_key"]
+            ),
+        )
+        selected_bullets = set(ranked_bullets if bullet_limit is None else ranked_bullets[:bullet_limit])
+        for bullet_index in ranked_bullets:
+            bullet_selected = role_selected and bullet_index in selected_bullets
+            entries.append(
+                _bullet_entry(
+                    source_index,
+                    bullet_index,
+                    _path_relevance(entry_relevance, f"/experience/{source_index}/bullets/{bullet_index}"),
+                    bullet_selected,
+                    role_selected,
+                )
+            )
     return entries
 
 
-def _role_entry(source_index: int, relevance: int, selected: bool) -> JsonObject:
+def _role_entry(source_index: int, relevance: JsonObject, selected: bool) -> JsonObject:
     return {
         "path": f"/experience/{source_index}",
         "action": "keep" if selected else "drop",
-        "relevance": relevance,
+        "relevance": relevance["relevance"],
         "reason": (
             "Selected by deterministic relevance ranking within max_experience."
             if selected
             else "Dropped by deterministic relevance ranking beyond max_experience."
         ),
-        "requirement_ids": [],
-        "fact_ids": [],
+        "requirement_ids": relevance["requirement_ids"],
+        "fact_ids": relevance["fact_ids"],
     }
 
 
-def _bullet_entry(source_index: int, bullet_index: int, relevance: int, selected: bool, parent_selected: bool) -> JsonObject:
+def _bullet_entry(source_index: int, bullet_index: int, relevance: JsonObject, selected: bool, parent_selected: bool) -> JsonObject:
     if selected:
         reason = "Selected with parent role by deterministic relevance ranking within max_experience."
     elif parent_selected:
@@ -112,10 +124,10 @@ def _bullet_entry(source_index: int, bullet_index: int, relevance: int, selected
     return {
         "path": f"/experience/{source_index}/bullets/{bullet_index}",
         "action": "keep" if selected else "drop",
-        "relevance": relevance,
+        "relevance": relevance["relevance"],
         "reason": reason,
-        "requirement_ids": [],
-        "fact_ids": [],
+        "requirement_ids": relevance["requirement_ids"],
+        "fact_ids": relevance["fact_ids"],
     }
 
 
@@ -130,10 +142,7 @@ def _constraint_report(
         for index, role in enumerate(experience)
         if (_item(role, "id", f"experience_{index}") if isinstance(role, dict) else f"experience_{index}") in selected_experience
     ]
-    selected_bullet_counts = [
-        len(_array(_item(role, "bullets", []))) if isinstance(role, dict) else 0
-        for _index, role in selected_roles
-    ]
+    selected_bullet_counts = [_selected_bullet_count(role, config.bullets_per_role.max) for _index, role in selected_roles]
     max_selected_bullet_count = max(selected_bullet_counts, default=0)
     min_selected_bullet_count = min(selected_bullet_counts, default=0)
     return [
@@ -170,6 +179,26 @@ def _effective_limit(limit: int | None, actual: int) -> int:
     return max(limit, 0)
 
 
+def _selected_bullet_count(role: Any, limit: int | None) -> int:
+    count = len(_array(_item(role, "bullets", []))) if isinstance(role, dict) else 0
+    if limit is None:
+        return count
+    return min(count, max(limit, 0))
+
+
+def _path_relevance(entry_relevance: dict[str, JsonObject], path: str) -> JsonObject:
+    return _item(
+        entry_relevance,
+        path,
+        {
+            "relevance": UNLINKED_RELEVANCE,
+            "requirement_ids": [],
+            "fact_ids": [],
+            "rank_key": (-UNLINKED_RELEVANCE, 0, 0, 0, -1, path),
+        },
+    )
+
+
 def _item(mapping: Any, key: str, default: Any = None) -> Any:
     if isinstance(mapping, dict) and key in mapping:
         return mapping[key]
@@ -178,41 +207,3 @@ def _item(mapping: Any, key: str, default: Any = None) -> Any:
 
 def _array(value: Any) -> list[Any]:
     return value if isinstance(value, list) else []
-
-
-def _text(value: Any) -> str:
-    value = to_json_dict(value)
-    if value is None:
-        return ""
-    if isinstance(value, str):
-        return value
-    if isinstance(value, (int, float, bool)):
-        return str(value)
-    if isinstance(value, list):
-        return " ".join(_text(item) for item in value)
-    if isinstance(value, dict):
-        return " ".join(_text(item) for key, item in sorted(value.items()) if key != "metadata")
-    return str(value)
-
-
-def _normal_text(value: Any) -> str:
-    text = str(value).lower()
-    text = text.replace("&", " and ")
-    text = re.sub(r"[^a-z0-9]+", " ", text)
-    return " ".join(text.split())
-
-
-def _term_in_text(term: Any, text: str) -> bool:
-    normalized = _normal_text(term)
-    normalized_text = _normal_text(text)
-    if not normalized or not normalized_text:
-        return False
-    if " " in normalized:
-        return normalized in normalized_text
-    words = normalized_text.split()
-    return normalized in words or f"{normalized}s" in words or (normalized.endswith("s") and normalized[:-1] in words)
-
-
-def _relevance(text: Any, terms: list[str]) -> int:
-    normalized = _normal_text(text)
-    return sum(1 for term in terms if _term_in_text(term, normalized))

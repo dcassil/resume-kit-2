@@ -4,14 +4,14 @@ level: task
 title: "Chunk 3: Match-result-driven relevance ranking replacing the discard stub"
 short_code: "RKIT-T-0031"
 created_at: 2026-08-14T21:14:46.040617+00:00
-updated_at: 2026-08-14T21:14:46.040617+00:00
+updated_at: 2026-08-14T21:38:52.510738+00:00
 parent: resume-core-selection-planning-and
-blocked_by: ["RKIT-T-0030"]
+blocked_by: [RKIT-T-0030]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,10 @@ initiative_id: RKIT-I-0003
 ## Objective
 
 Remove the `del match_result` discard (domain.py:402) and make relevance ranking actually consume the I-0002 MatchResult: content linked to resolved/required requirements outranks unlinked content; ranking deterministically reflects requirement resolution state. This is the core of the initiative — relevance ranking against the job finally has substrate.
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -64,4 +68,4 @@ Recommended Agent: opus + high
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-14: Implemented MatchResult-driven content ranking in a new `selection_ranking.py` module, wired `rankResumeContent` through it, and added focused unit coverage for resolution-state sensitivity, deterministic replay, relevance-based overflow dropping, and claim-field linkage.

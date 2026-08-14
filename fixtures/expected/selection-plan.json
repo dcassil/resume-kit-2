@@ -16,87 +16,137 @@
   "data": {
     "ranked_content": [
       {
+        "fact_ids": [],
         "id": "experience_1",
         "kind": "experience",
-        "score": 23,
+        "requirement_ids": [
+          "fixture_req_0_58105daf",
+          "fixture_req_4_8f8157ef"
+        ],
+        "score": 3.0,
         "source_index": 0
       },
       {
+        "fact_ids": [],
+        "id": "experience_2",
+        "kind": "experience",
+        "requirement_ids": [
+          "fixture_req_0_58105daf"
+        ],
+        "score": 3.0,
+        "source_index": 1
+      },
+      {
+        "fact_ids": [],
+        "id": "skill_0",
+        "kind": "skill",
+        "requirement_ids": [
+          "fixture_req_1_3ff8909e"
+        ],
+        "score": 3.0,
+        "source_index": 0
+      },
+      {
+        "fact_ids": [],
+        "id": "skill_1",
+        "kind": "skill",
+        "requirement_ids": [
+          "fixture_req_1_3ff8909e"
+        ],
+        "score": 3.0,
+        "source_index": 1
+      },
+      {
+        "fact_ids": [],
         "id": "skill_5",
         "kind": "skill",
-        "score": 4,
+        "requirement_ids": [
+          "fixture_req_2_e55af3cd",
+          "fixture_req_6_3ef16ea5"
+        ],
+        "score": 3.0,
         "source_index": 5
       },
       {
-        "id": "skill_9",
-        "kind": "skill",
-        "score": 3,
-        "source_index": 9
-      },
-      {
-        "id": "experience_2",
-        "kind": "experience",
-        "score": 2,
-        "source_index": 1
-      },
-      {
-        "id": "skill_8",
-        "kind": "skill",
-        "score": 2,
-        "source_index": 8
-      },
-      {
-        "id": "skill_0",
-        "kind": "skill",
-        "score": 1,
-        "source_index": 0
-      },
-      {
-        "id": "skill_1",
-        "kind": "skill",
-        "score": 1,
-        "source_index": 1
-      },
-      {
+        "fact_ids": [],
         "id": "skill_6",
         "kind": "skill",
-        "score": 1,
+        "requirement_ids": [
+          "fixture_req_4_8f8157ef"
+        ],
+        "score": 3.0,
         "source_index": 6
       },
       {
+        "fact_ids": [],
+        "id": "skill_8",
+        "kind": "skill",
+        "requirement_ids": [
+          "fixture_req_3_fd10e4a4"
+        ],
+        "score": 3.0,
+        "source_index": 8
+      },
+      {
+        "fact_ids": [],
+        "id": "skill_9",
+        "kind": "skill",
+        "requirement_ids": [
+          "fixture_req_7_b8f2ddc2"
+        ],
+        "score": 3.0,
+        "source_index": 9
+      },
+      {
+        "fact_ids": [],
         "id": "skill_10",
         "kind": "skill",
-        "score": 1,
+        "requirement_ids": [
+          "fixture_req_5_a1cdaa2a"
+        ],
+        "score": 3.0,
         "source_index": 10
       },
       {
+        "fact_ids": [],
         "id": "skill_11",
         "kind": "skill",
-        "score": 1,
+        "requirement_ids": [
+          "fixture_req_6_3ef16ea5"
+        ],
+        "score": 3.0,
         "source_index": 11
       },
       {
+        "fact_ids": [],
         "id": "skill_2",
         "kind": "skill",
-        "score": 0,
+        "requirement_ids": [],
+        "score": 1.0,
         "source_index": 2
       },
       {
+        "fact_ids": [],
         "id": "skill_3",
         "kind": "skill",
-        "score": 0,
+        "requirement_ids": [],
+        "score": 1.0,
         "source_index": 3
       },
       {
+        "fact_ids": [],
         "id": "skill_4",
         "kind": "skill",
-        "score": 0,
+        "requirement_ids": [],
+        "score": 1.0,
         "source_index": 4
       },
       {
+        "fact_ids": [],
         "id": "skill_7",
         "kind": "skill",
-        "score": 0,
+        "requirement_ids": [],
+        "score": 1.0,
         "source_index": 7
       }
     ],
@@ -146,55 +196,61 @@
           "fact_ids": [],
           "path": "/experience/0/bullets/0",
           "reason": "Selected with parent role by deterministic relevance ranking within max_experience.",
-          "relevance": 23,
-          "requirement_ids": []
+          "relevance": 3.0,
+          "requirement_ids": [
+            "fixture_req_1_3ff8909e",
+            "fixture_req_4_8f8157ef",
+            "fixture_req_7_b8f2ddc2"
+          ]
         },
         {
           "action": "keep",
           "fact_ids": [],
           "path": "/experience/0/bullets/1",
           "reason": "Selected with parent role by deterministic relevance ranking within max_experience.",
-          "relevance": 23,
-          "requirement_ids": []
+          "relevance": 3.0,
+          "requirement_ids": [
+            "fixture_req_2_e55af3cd",
+            "fixture_req_6_3ef16ea5",
+            "fixture_req_7_b8f2ddc2"
+          ]
         },
         {
           "action": "keep",
           "fact_ids": [],
           "path": "/experience/0/bullets/2",
           "reason": "Selected with parent role by deterministic relevance ranking within max_experience.",
-          "relevance": 23,
-          "requirement_ids": []
+          "relevance": 3.0,
+          "requirement_ids": [
+            "fixture_req_7_b8f2ddc2"
+          ]
         },
         {
           "action": "keep",
           "fact_ids": [],
           "path": "/experience/0/bullets/3",
           "reason": "Selected with parent role by deterministic relevance ranking within max_experience.",
-          "relevance": 23,
-          "requirement_ids": []
+          "relevance": 3.0,
+          "requirement_ids": [
+            "fixture_req_3_fd10e4a4"
+          ]
         },
         {
           "action": "keep",
           "fact_ids": [],
-          "path": "/skills/5",
-          "reason": "Selected by deterministic relevance ranking within max_skills.",
-          "relevance": 4,
-          "requirement_ids": []
-        },
-        {
-          "action": "keep",
-          "fact_ids": [],
-          "path": "/skills/9",
-          "reason": "Selected by deterministic relevance ranking within max_skills.",
-          "relevance": 3,
-          "requirement_ids": []
+          "path": "/experience/1/bullets/2",
+          "reason": "Selected with parent role by deterministic relevance ranking within max_experience.",
+          "relevance": 3.0,
+          "requirement_ids": [
+            "fixture_req_7_b8f2ddc2"
+          ]
         },
         {
           "action": "keep",
           "fact_ids": [],
           "path": "/experience/1/bullets/0",
           "reason": "Selected with parent role by deterministic relevance ranking within max_experience.",
-          "relevance": 2,
+          "relevance": 1.0,
           "requirement_ids": []
         },
         {
@@ -202,23 +258,7 @@
           "fact_ids": [],
           "path": "/experience/1/bullets/1",
           "reason": "Selected with parent role by deterministic relevance ranking within max_experience.",
-          "relevance": 2,
-          "requirement_ids": []
-        },
-        {
-          "action": "keep",
-          "fact_ids": [],
-          "path": "/experience/1/bullets/2",
-          "reason": "Selected with parent role by deterministic relevance ranking within max_experience.",
-          "relevance": 2,
-          "requirement_ids": []
-        },
-        {
-          "action": "keep",
-          "fact_ids": [],
-          "path": "/skills/8",
-          "reason": "Selected by deterministic relevance ranking within max_skills.",
-          "relevance": 2,
+          "relevance": 1.0,
           "requirement_ids": []
         },
         {
@@ -226,47 +266,88 @@
           "fact_ids": [],
           "path": "/skills/0",
           "reason": "Selected by deterministic relevance ranking within max_skills.",
-          "relevance": 1,
-          "requirement_ids": []
+          "relevance": 3.0,
+          "requirement_ids": [
+            "fixture_req_1_3ff8909e"
+          ]
         },
         {
           "action": "keep",
           "fact_ids": [],
           "path": "/skills/1",
           "reason": "Selected by deterministic relevance ranking within max_skills.",
-          "relevance": 1,
-          "requirement_ids": []
+          "relevance": 3.0,
+          "requirement_ids": [
+            "fixture_req_1_3ff8909e"
+          ]
+        },
+        {
+          "action": "keep",
+          "fact_ids": [],
+          "path": "/skills/5",
+          "reason": "Selected by deterministic relevance ranking within max_skills.",
+          "relevance": 3.0,
+          "requirement_ids": [
+            "fixture_req_2_e55af3cd",
+            "fixture_req_6_3ef16ea5"
+          ]
         },
         {
           "action": "keep",
           "fact_ids": [],
           "path": "/skills/6",
           "reason": "Selected by deterministic relevance ranking within max_skills.",
-          "relevance": 1,
-          "requirement_ids": []
+          "relevance": 3.0,
+          "requirement_ids": [
+            "fixture_req_4_8f8157ef"
+          ]
+        },
+        {
+          "action": "keep",
+          "fact_ids": [],
+          "path": "/skills/8",
+          "reason": "Selected by deterministic relevance ranking within max_skills.",
+          "relevance": 3.0,
+          "requirement_ids": [
+            "fixture_req_3_fd10e4a4"
+          ]
+        },
+        {
+          "action": "keep",
+          "fact_ids": [],
+          "path": "/skills/9",
+          "reason": "Selected by deterministic relevance ranking within max_skills.",
+          "relevance": 3.0,
+          "requirement_ids": [
+            "fixture_req_7_b8f2ddc2"
+          ]
         },
         {
           "action": "keep",
           "fact_ids": [],
           "path": "/skills/10",
           "reason": "Selected by deterministic relevance ranking within max_skills.",
-          "relevance": 1,
-          "requirement_ids": []
+          "relevance": 3.0,
+          "requirement_ids": [
+            "fixture_req_5_a1cdaa2a"
+          ]
         },
         {
           "action": "keep",
           "fact_ids": [],
           "path": "/skills/11",
           "reason": "Selected by deterministic relevance ranking within max_skills.",
-          "relevance": 1,
-          "requirement_ids": []
+          "relevance": 3.0,
+          "requirement_ids": [
+            "fixture_req_6_3ef16ea5"
+          ]
         },
         {
           "action": "keep",
           "fact_ids": [],
           "path": "/skills/2",
           "reason": "Selected by deterministic relevance ranking within max_skills.",
-          "relevance": 0,
+          "relevance": 1.0,
           "requirement_ids": []
         },
         {
@@ -274,7 +355,7 @@
           "fact_ids": [],
           "path": "/skills/3",
           "reason": "Selected by deterministic relevance ranking within max_skills.",
-          "relevance": 0,
+          "relevance": 1.0,
           "requirement_ids": []
         },
         {
@@ -282,7 +363,7 @@
           "fact_ids": [],
           "path": "/skills/4",
           "reason": "Selected by deterministic relevance ranking within max_skills.",
-          "relevance": 0,
+          "relevance": 1.0,
           "requirement_ids": []
         },
         {
@@ -290,7 +371,7 @@
           "fact_ids": [],
           "path": "/skills/7",
           "reason": "Selected by deterministic relevance ranking within max_skills.",
-          "relevance": 0,
+          "relevance": 1.0,
           "requirement_ids": []
         }
       ],
