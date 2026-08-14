@@ -9,5 +9,389 @@
     "title inflation rejected",
     "AWS years inflation rejected",
     "Azure as proof of AWS rejected"
-  ]
+  ],
+  "comment": [
+    "unsupported scale rejected",
+    "unsupported management scope rejected",
+    "title inflation rejected",
+    "AWS years inflation rejected",
+    "Azure as proof of AWS rejected"
+  ],
+  "data": {
+    "operations": [
+      {
+        "operation": {
+          "after": "AWS",
+          "before": null,
+          "linked_fact_ids": [],
+          "linked_requirement_ids": [
+            "fixture_req_5_a1cdaa2a"
+          ],
+          "op": "insert",
+          "operation_id": "invalid-related-skill-overreach",
+          "path": "/skills/-",
+          "provenance": [
+            {
+              "source": "operation_fixture",
+              "source_id": "invalid-related-skill-overreach",
+              "text": "Azure may be related cloud experience but is not exact or verified AWS evidence."
+            }
+          ],
+          "reason": "Azure may be related cloud experience but is not exact or verified AWS evidence.",
+          "schema_version": "resume-change-operation.v1",
+          "status": "proposed"
+        },
+        "operation_fixture": {
+          "after": "AWS",
+          "before": "Azure",
+          "expected_reason": "related_skill_overreach",
+          "expected_status": "rejected",
+          "fixture_id": "invalid-related-skill-overreach",
+          "notes": "Azure may be related cloud experience but is not exact or verified AWS evidence.",
+          "schema_version": "operation-fixture.v1",
+          "target_path": "/skills"
+        },
+        "validation_result": {
+          "errors": [
+            {
+              "code": "unsupported_guarded_claim",
+              "details": {
+                "claims": [
+                  "aws"
+                ]
+              },
+              "field_path": "after",
+              "message": "Guarded claims require exact supplied verified fact DTO support.",
+              "severity": "error"
+            },
+            {
+              "code": "missing_linked_fact",
+              "field_path": "linked_fact_ids",
+              "message": "Guarded changes must link supporting fact IDs.",
+              "severity": "error"
+            }
+          ],
+          "grounding": {
+            "guarded_claims": [
+              "aws"
+            ],
+            "supported": false,
+            "supporting_fact_ids": [],
+            "supporting_requirement_ids": [
+              "fixture_req_5_a1cdaa2a"
+            ]
+          },
+          "operation_id": "invalid-related-skill-overreach",
+          "schema_version": "resume-core.result.v1",
+          "status": "rejected",
+          "validation_state": "rejected"
+        }
+      },
+      {
+        "operation": {
+          "after": "Staff Software Engineer",
+          "before": "Senior Software Developer",
+          "linked_fact_ids": [],
+          "linked_requirement_ids": [],
+          "op": "rewrite",
+          "operation_id": "invalid-title-inflation",
+          "path": "/experience/0/title",
+          "provenance": [
+            {
+              "source": "operation_fixture",
+              "source_id": "invalid-title-inflation",
+              "text": "Job A title cannot rewrite actual employment history."
+            }
+          ],
+          "reason": "Job A title cannot rewrite actual employment history.",
+          "schema_version": "resume-change-operation.v1",
+          "status": "proposed"
+        },
+        "operation_fixture": {
+          "after": "Staff Software Engineer",
+          "before": "Senior Software Developer",
+          "expected_reason": "title_inflation",
+          "expected_status": "rejected",
+          "fixture_id": "invalid-title-inflation",
+          "notes": "Job A title cannot rewrite actual employment history.",
+          "schema_version": "operation-fixture.v1",
+          "target_path": "/experience/0/title"
+        },
+        "validation_result": {
+          "errors": [
+            {
+              "code": "unsupported_guarded_claim",
+              "details": {
+                "claims": [
+                  "staff_title"
+                ]
+              },
+              "field_path": "after",
+              "message": "Guarded claims require exact supplied verified fact DTO support.",
+              "severity": "error"
+            },
+            {
+              "code": "missing_linked_fact",
+              "field_path": "linked_fact_ids",
+              "message": "Guarded changes must link supporting fact IDs.",
+              "severity": "error"
+            },
+            {
+              "code": "missing_linked_requirement",
+              "field_path": "linked_requirement_ids",
+              "message": "Guarded changes must link the requirement IDs they resolve.",
+              "severity": "error"
+            },
+            {
+              "code": "title_inflation",
+              "field_path": "after",
+              "message": "Employment title changes require exact user-verified title fact support.",
+              "severity": "error"
+            }
+          ],
+          "grounding": {
+            "guarded_claims": [
+              "staff_title"
+            ],
+            "supported": false,
+            "supporting_fact_ids": [],
+            "supporting_requirement_ids": []
+          },
+          "operation_id": "invalid-title-inflation",
+          "schema_version": "resume-core.result.v1",
+          "status": "rejected",
+          "validation_state": "rejected"
+        }
+      },
+      {
+        "operation": {
+          "after": "Managed 30 engineers across multiple delivery teams.",
+          "before": "Led a small team of three developers.",
+          "linked_fact_ids": [],
+          "linked_requirement_ids": [],
+          "op": "rewrite",
+          "operation_id": "invalid-unsupported-management",
+          "path": "/experience/0/bullets/1",
+          "provenance": [
+            {
+              "source": "operation_fixture",
+              "source_id": "invalid-unsupported-management",
+              "text": "Small-team leadership is supported; management of 30 engineers is not."
+            }
+          ],
+          "reason": "Small-team leadership is supported; management of 30 engineers is not.",
+          "schema_version": "resume-change-operation.v1",
+          "status": "proposed"
+        },
+        "operation_fixture": {
+          "after": "Managed 30 engineers across multiple delivery teams.",
+          "before": "Led a small team of three developers.",
+          "expected_reason": "unsupported_management_scope",
+          "expected_status": "rejected",
+          "fixture_id": "invalid-unsupported-management",
+          "notes": "Small-team leadership is supported; management of 30 engineers is not.",
+          "schema_version": "operation-fixture.v1",
+          "target_path": "/experience/0/bullets/1"
+        },
+        "validation_result": {
+          "errors": [
+            {
+              "code": "before_mismatch",
+              "field_path": "before",
+              "message": "Operation before value does not match current content.",
+              "severity": "error"
+            },
+            {
+              "code": "unsupported_guarded_claim",
+              "details": {
+                "claims": [
+                  "unsupported_management"
+                ]
+              },
+              "field_path": "after",
+              "message": "Guarded claims require exact supplied verified fact DTO support.",
+              "severity": "error"
+            },
+            {
+              "code": "missing_linked_fact",
+              "field_path": "linked_fact_ids",
+              "message": "Guarded changes must link supporting fact IDs.",
+              "severity": "error"
+            },
+            {
+              "code": "missing_linked_requirement",
+              "field_path": "linked_requirement_ids",
+              "message": "Guarded changes must link the requirement IDs they resolve.",
+              "severity": "error"
+            }
+          ],
+          "grounding": {
+            "guarded_claims": [
+              "unsupported_management"
+            ],
+            "supported": false,
+            "supporting_fact_ids": [],
+            "supporting_requirement_ids": []
+          },
+          "operation_id": "invalid-unsupported-management",
+          "schema_version": "resume-core.result.v1",
+          "status": "rejected",
+          "validation_state": "rejected"
+        }
+      },
+      {
+        "operation": {
+          "after": "Architected enterprise React platforms serving 20 million users globally.",
+          "before": "Built React applications.",
+          "linked_fact_ids": [],
+          "linked_requirement_ids": [],
+          "op": "rewrite",
+          "operation_id": "invalid-unsupported-scale",
+          "path": "/experience/0/bullets/0",
+          "provenance": [
+            {
+              "source": "operation_fixture",
+              "source_id": "invalid-unsupported-scale",
+              "text": "Resume fixture has no evidence for enterprise/global scale or 20 million users."
+            }
+          ],
+          "reason": "Resume fixture has no evidence for enterprise/global scale or 20 million users.",
+          "schema_version": "resume-change-operation.v1",
+          "status": "proposed"
+        },
+        "operation_fixture": {
+          "after": "Architected enterprise React platforms serving 20 million users globally.",
+          "before": "Built React applications.",
+          "expected_reason": "unsupported_scale",
+          "expected_status": "rejected",
+          "fixture_id": "invalid-unsupported-scale",
+          "notes": "Resume fixture has no evidence for enterprise/global scale or 20 million users.",
+          "schema_version": "operation-fixture.v1",
+          "target_path": "/experience/0/bullets/0"
+        },
+        "validation_result": {
+          "errors": [
+            {
+              "code": "before_mismatch",
+              "field_path": "before",
+              "message": "Operation before value does not match current content.",
+              "severity": "error"
+            },
+            {
+              "code": "unsupported_guarded_claim",
+              "details": {
+                "claims": [
+                  "unsupported_scale"
+                ]
+              },
+              "field_path": "after",
+              "message": "Guarded claims require exact supplied verified fact DTO support.",
+              "severity": "error"
+            },
+            {
+              "code": "missing_linked_fact",
+              "field_path": "linked_fact_ids",
+              "message": "Guarded changes must link supporting fact IDs.",
+              "severity": "error"
+            },
+            {
+              "code": "missing_linked_requirement",
+              "field_path": "linked_requirement_ids",
+              "message": "Guarded changes must link the requirement IDs they resolve.",
+              "severity": "error"
+            }
+          ],
+          "grounding": {
+            "guarded_claims": [
+              "unsupported_scale"
+            ],
+            "supported": false,
+            "supporting_fact_ids": [],
+            "supporting_requirement_ids": []
+          },
+          "operation_id": "invalid-unsupported-scale",
+          "schema_version": "resume-core.result.v1",
+          "status": "rejected",
+          "validation_state": "rejected"
+        }
+      },
+      {
+        "operation": {
+          "after": "AWS experience, ten years",
+          "before": null,
+          "linked_fact_ids": [],
+          "linked_requirement_ids": [],
+          "op": "insert",
+          "operation_id": "invalid-years-inflation",
+          "path": "/skills/-",
+          "provenance": [
+            {
+              "source": "operation_fixture",
+              "source_id": "invalid-years-inflation",
+              "text": "AWS answer fixture supports about six years, not ten."
+            }
+          ],
+          "reason": "AWS answer fixture supports about six years, not ten.",
+          "schema_version": "resume-change-operation.v1",
+          "status": "proposed"
+        },
+        "operation_fixture": {
+          "after": "AWS experience, ten years",
+          "before": "AWS experience, six years",
+          "expected_reason": "years_inflation",
+          "expected_status": "rejected",
+          "fixture_id": "invalid-years-inflation",
+          "notes": "AWS answer fixture supports about six years, not ten.",
+          "schema_version": "operation-fixture.v1",
+          "target_path": "/skills"
+        },
+        "validation_result": {
+          "errors": [
+            {
+              "code": "unsupported_guarded_claim",
+              "details": {
+                "claims": [
+                  "aws"
+                ]
+              },
+              "field_path": "after",
+              "message": "Guarded claims require exact supplied verified fact DTO support.",
+              "severity": "error"
+            },
+            {
+              "code": "unsupported_years_claim",
+              "field_path": "after",
+              "message": "Years-of-experience claims require matching verified fact support.",
+              "severity": "error"
+            },
+            {
+              "code": "missing_linked_fact",
+              "field_path": "linked_fact_ids",
+              "message": "Guarded changes must link supporting fact IDs.",
+              "severity": "error"
+            },
+            {
+              "code": "missing_linked_requirement",
+              "field_path": "linked_requirement_ids",
+              "message": "Guarded changes must link the requirement IDs they resolve.",
+              "severity": "error"
+            }
+          ],
+          "grounding": {
+            "guarded_claims": [
+              "aws"
+            ],
+            "supported": false,
+            "supporting_fact_ids": [],
+            "supporting_requirement_ids": []
+          },
+          "operation_id": "invalid-years-inflation",
+          "schema_version": "resume-core.result.v1",
+          "status": "rejected",
+          "validation_state": "rejected"
+        }
+      }
+    ],
+    "schema_version": "snapshot.rejected-operations.v1"
+  }
 }

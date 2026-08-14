@@ -32,6 +32,11 @@ FIXTURE_CONFIG = {
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", default=".", help="Repository root. Defaults to the current directory.")
+    parser.add_argument(
+        "--write",
+        action="store_true",
+        help="Write canonicalized data blocks into fixtures/expected envelopes.",
+    )
     args = parser.parse_args()
 
     root = Path(args.root).resolve()
@@ -46,8 +51,45 @@ def main() -> int:
         "snapshot_count": len(snapshots),
         "snapshots": snapshots,
     }
-    print(canonical_json(canonicalize(payload)))
+    if args.write:
+        _write_expected_snapshots(root, snapshots, canonicalize)
+        print(f"wrote {len(snapshots)} expected snapshot data blocks under fixtures/expected")
+    else:
+        print(canonical_json(canonicalize(payload)))
     return 0
+
+
+def _write_expected_snapshots(root: Path, snapshots: dict[str, Any], canonicalize: Any) -> None:
+    expected_dir = root / "fixtures" / "expected"
+    missing = sorted(snapshot_id for snapshot_id in snapshots if not (expected_dir / f"{snapshot_id}.json").exists())
+    if missing:
+        raise FileNotFoundError(f"Missing expected snapshot file(s): {', '.join(missing)}")
+
+    for snapshot_id in sorted(snapshots):
+        path = expected_dir / f"{snapshot_id}.json"
+        envelope = json.loads(path.read_text(encoding="utf-8"))
+        observations = envelope.get("expected_observations")
+        if observations is None:
+            raise ValueError(f"{path} is missing expected_observations")
+        if envelope.get("fixture_id") != snapshot_id:
+            raise ValueError(f"{path} fixture_id does not match {snapshot_id}")
+        if envelope.get("schema_version") != "expected-snapshot.v1":
+            raise ValueError(f"{path} schema_version must be expected-snapshot.v1")
+        if envelope.get("config_hash") != CONFIG_HASH:
+            raise ValueError(f"{path} config_hash must be {CONFIG_HASH}")
+        if envelope.get("reviewed") is not True:
+            raise ValueError(f"{path} reviewed must be true")
+
+        updated = {
+            "fixture_id": envelope["fixture_id"],
+            "schema_version": envelope["schema_version"],
+            "config_hash": envelope["config_hash"],
+            "reviewed": envelope["reviewed"],
+            "expected_observations": observations,
+            "comment": observations,
+            "data": canonicalize(snapshots[snapshot_id]),
+        }
+        path.write_text(json.dumps(updated, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def generate_snapshots(root: Path) -> dict[str, Any]:

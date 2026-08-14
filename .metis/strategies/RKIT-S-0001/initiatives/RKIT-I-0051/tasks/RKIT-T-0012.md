@@ -4,16 +4,15 @@ level: task
 title: "REQ-001b: Populate 13 expected snapshots with reviewed data"
 short_code: "RKIT-T-0012"
 created_at: 2026-08-14T03:14:05.466710+00:00
-updated_at: 2026-08-14T03:14:05.466710+00:00
+updated_at: 2026-08-14T17:09:07.778618+00:00
 parent: executable-release-gate-e2e
-blocked_by: ["RKIT-T-0011"]
+blocked_by: [RKIT-T-0011]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -30,6 +29,10 @@ initiative_id: RKIT-I-0051
 ## Objective
 
 Replace the prose-stub content of all 13 `fixtures/expected/*.json` snapshots with the real reviewed-baseline envelope — `{schema_version, config_hash, reviewed:true, comment:<former prose>, data:<canonicalized live output>}` — using the generator built in RKIT-T-0011. This turns the fixtures from placeholder observations into deterministic, regenerable golden data that the contract tests and PR gate can enforce, giving the executable release gate real ground truth to compare against.
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -102,4 +105,5 @@ Fixtures whose data reflects a known product defect are NOT weakened (none expec
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-14: Codex-driven population of all 13 envelopes with generator data (no data:null needed — run-manifest and audit-report producers are deterministic and Wave-1-traversable). `expected_observations` retained (protected fixtures_guardrails still requires it); `comment` mirrors it verbatim pending REQ-001d migration. Guarded `--write` mode added to the generator. No-drift proven; fixtures_guardrails + PR 198 + smoke green; envelope invariants script-checked.
+- Daniel REVIEWED AND APPROVED the baselines 2026-08-14, with two current-behavior quirks knowingly locked in until owning initiatives fix them: (1) job-b-initial-match resolves AWS/GraphQL with empty matched_fact_ids; (2) post-graphql-match resolves GraphQL from resume API evidence rather than fact_graphql (both shallow-scorer behavior, RKIT-I-0002/RKIT-I-0007 territory; update via regenerate + re-review). Committing; marking completed.

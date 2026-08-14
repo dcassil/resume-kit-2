@@ -8,5 +8,204 @@
     "AWS resolves from persisted Job A user-verified fact",
     "GraphQL resolves from persisted Job A user-verified fact",
     "already verified AWS/GraphQL facts are not re-asked"
-  ]
+  ],
+  "comment": [
+    "React and Node.js resolve from resume",
+    "AWS resolves from persisted Job A user-verified fact",
+    "GraphQL resolves from persisted Job A user-verified fact",
+    "already verified AWS/GraphQL facts are not re-asked"
+  ],
+  "data": {
+    "match_result": {
+      "algorithm_version": "resume-core.match.v1",
+      "can_continue": true,
+      "explanations": [
+        "No required hard gate is blocking continuation."
+      ],
+      "job_id": "job-b",
+      "match_id": "match_a9e20c7380b2",
+      "max_score": 46.0,
+      "preferred_unresolved_requirement_ids": [],
+      "requirement_results": [
+        {
+          "blocking": false,
+          "classification": "required",
+          "concept": "React experience for production web applications.",
+          "evidence": [
+            {
+              "source": "resume",
+              "terms": [
+                "react",
+                "web"
+              ]
+            }
+          ],
+          "matched_fact_ids": [],
+          "max_score": 10.0,
+          "normalized_terms": [
+            "react",
+            "web"
+          ],
+          "requirement_id": "fixture_req_0_66ee47a4",
+          "resolution_state": "exact_match",
+          "score": 10.0,
+          "source_text": "React experience for production web applications.",
+          "unresolved": false
+        },
+        {
+          "blocking": false,
+          "classification": "required",
+          "concept": "Node.js service development.",
+          "evidence": [
+            {
+              "source": "resume",
+              "terms": [
+                "js",
+                "node",
+                "node js",
+                "service"
+              ]
+            }
+          ],
+          "matched_fact_ids": [],
+          "max_score": 10.0,
+          "normalized_terms": [
+            "js",
+            "node",
+            "node js",
+            "nodejs",
+            "service"
+          ],
+          "requirement_id": "fixture_req_1_1f330851",
+          "resolution_state": "exact_match",
+          "score": 10.0,
+          "source_text": "Node.js service development.",
+          "unresolved": false
+        },
+        {
+          "blocking": false,
+          "classification": "required",
+          "concept": "GraphQL API design or maintenance.",
+          "evidence": [
+            {
+              "source": "resume",
+              "terms": [
+                "api",
+                "apis",
+                "designed rest apis",
+                "rest api",
+                "rest apis"
+              ]
+            }
+          ],
+          "matched_fact_ids": [],
+          "max_score": 10.0,
+          "normalized_terms": [
+            "api",
+            "api architecture",
+            "api architecture design",
+            "api design",
+            "apis",
+            "application architecture",
+            "designed apis",
+            "designed rest apis",
+            "graph ql",
+            "graphql",
+            "maintenance",
+            "rest api",
+            "rest api design",
+            "rest apis"
+          ],
+          "requirement_id": "fixture_req_2_bdba1a3e",
+          "resolution_state": "exact_match",
+          "score": 10.0,
+          "source_text": "GraphQL API design or maintenance.",
+          "unresolved": false
+        },
+        {
+          "blocking": false,
+          "classification": "required",
+          "concept": "AWS experience for application infrastructure.",
+          "evidence": [
+            {
+              "source": "resume",
+              "terms": [
+                "application"
+              ]
+            }
+          ],
+          "matched_fact_ids": [],
+          "max_score": 10.0,
+          "normalized_terms": [
+            "amazon web services",
+            "application",
+            "aws",
+            "infrastructure"
+          ],
+          "requirement_id": "fixture_req_3_c3f15cdb",
+          "resolution_state": "exact_match",
+          "score": 10.0,
+          "source_text": "AWS experience for application infrastructure.",
+          "unresolved": false
+        },
+        {
+          "blocking": false,
+          "classification": "preferred",
+          "concept": "PostgreSQL experience.",
+          "evidence": [
+            {
+              "source": "resume",
+              "terms": [
+                "postgresql"
+              ]
+            }
+          ],
+          "matched_fact_ids": [],
+          "max_score": 3.0,
+          "normalized_terms": [
+            "postgres",
+            "postgresql"
+          ],
+          "requirement_id": "fixture_req_4_8fd3c8fc",
+          "resolution_state": "exact_match",
+          "score": 3.0,
+          "source_text": "PostgreSQL experience.",
+          "unresolved": false
+        },
+        {
+          "blocking": false,
+          "classification": "preferred",
+          "concept": "SaaS product background.",
+          "evidence": [
+            {
+              "source": "resume",
+              "terms": [
+                "multi tenant saas",
+                "saas"
+              ]
+            }
+          ],
+          "matched_fact_ids": [],
+          "max_score": 3.0,
+          "normalized_terms": [
+            "multi tenant saas",
+            "saas",
+            "software as a service"
+          ],
+          "requirement_id": "fixture_req_5_f4df372d",
+          "resolution_state": "exact_match",
+          "score": 3.0,
+          "source_text": "SaaS product background.",
+          "unresolved": false
+        }
+      ],
+      "resume_id": "resume-main",
+      "schema_version": "match-result.v1",
+      "score": 46.0,
+      "score_percent": 100.0,
+      "unresolved_requirement_ids": []
+    },
+    "schema_version": "resume-core.result.v1",
+    "status": "ok"
+  }
 }

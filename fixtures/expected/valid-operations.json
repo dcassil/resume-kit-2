@@ -7,5 +7,1510 @@
     "operations include target path, before value, after value, facts used, requirements targeted, provenance, and status",
     "valid operations move proposed to validated to applied",
     "base resume remains unchanged"
-  ]
+  ],
+  "comment": [
+    "operations include target path, before value, after value, facts used, requirements targeted, provenance, and status",
+    "valid operations move proposed to validated to applied",
+    "base resume remains unchanged"
+  ],
+  "data": {
+    "application_results": [
+      {
+        "applied_operation": {
+          "after": "AWS",
+          "before": null,
+          "linked_fact_ids": [
+            "fact_aws"
+          ],
+          "linked_requirement_ids": [
+            "fixture_req_5_a1cdaa2a"
+          ],
+          "op": "insert",
+          "operation_id": "op_add_aws_skill",
+          "path": "/skills/-",
+          "provenance": [
+            {
+              "source": "fixture_generator",
+              "text": "answer-aws"
+            }
+          ],
+          "reason": "Add AWS only from the user-verified AWS answer fixture.",
+          "schema_version": "resume-change-operation.v1",
+          "status": "applied",
+          "validation_state": "validated"
+        },
+        "audit": {
+          "after": "AWS",
+          "applied": true,
+          "before": null,
+          "linked_fact_ids": [
+            "fact_aws"
+          ],
+          "linked_requirement_ids": [
+            "fixture_req_5_a1cdaa2a"
+          ],
+          "path": "/skills/-",
+          "status_transition": "validated->applied"
+        },
+        "operation_id": "op_add_aws_skill",
+        "schema_version": "resume-core.result.v1",
+        "status": "ok",
+        "working_resume": {
+          "basics": {
+            "headline": "Senior Software Developer",
+            "name": "Daniel Candidate"
+          },
+          "education": [
+            {
+              "id": "education_1",
+              "text": "B.S. Computer Science"
+            }
+          ],
+          "experience": [
+            {
+              "bullets": [
+                {
+                  "claim_id": "experience_1_bullet_1",
+                  "provenance": [
+                    {
+                      "claim_id": "experience_1_bullet_1",
+                      "source": "resume",
+                      "text": "Built React and TypeScript interfaces for multi-tenant SaaS workflows used by operations teams."
+                    }
+                  ],
+                  "value": "Built React and TypeScript interfaces for multi-tenant SaaS workflows used by operations teams.",
+                  "verification_state": "source_stated"
+                },
+                {
+                  "claim_id": "experience_1_bullet_2",
+                  "provenance": [
+                    {
+                      "claim_id": "experience_1_bullet_2",
+                      "source": "resume",
+                      "text": "Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting."
+                    }
+                  ],
+                  "value": "Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting.",
+                  "verification_state": "source_stated"
+                },
+                {
+                  "claim_id": "experience_1_bullet_3",
+                  "provenance": [
+                    {
+                      "claim_id": "experience_1_bullet_3",
+                      "source": "resume",
+                      "text": "Led a small team of three developers through delivery planning, code review, and release coordination."
+                    }
+                  ],
+                  "value": "Led a small team of three developers through delivery planning, code review, and release coordination.",
+                  "verification_state": "source_stated"
+                },
+                {
+                  "claim_id": "experience_1_bullet_4",
+                  "provenance": [
+                    {
+                      "claim_id": "experience_1_bullet_4",
+                      "source": "resume",
+                      "text": "Improved front-end reliability for responsive web apps across desktop and mobile browsers."
+                    }
+                  ],
+                  "value": "Improved front-end reliability for responsive web apps across desktop and mobile browsers.",
+                  "verification_state": "source_stated"
+                }
+              ],
+              "company": "Example SaaS Co.",
+              "end_date": "Present",
+              "id": "experience_1",
+              "start_date": "Jan 2018",
+              "title": "Senior Software Developer"
+            },
+            {
+              "bullets": [
+                {
+                  "claim_id": "experience_2_bullet_1",
+                  "provenance": [
+                    {
+                      "claim_id": "experience_2_bullet_1",
+                      "source": "resume",
+                      "text": "Built Node.js services backed by PostgreSQL for workflow automation and data-processing tools."
+                    }
+                  ],
+                  "value": "Built Node.js services backed by PostgreSQL for workflow automation and data-processing tools.",
+                  "verification_state": "source_stated"
+                },
+                {
+                  "claim_id": "experience_2_bullet_2",
+                  "provenance": [
+                    {
+                      "claim_id": "experience_2_bullet_2",
+                      "source": "resume",
+                      "text": "Integrated Azure services for deployment, monitoring, and application operations."
+                    }
+                  ],
+                  "value": "Integrated Azure services for deployment, monitoring, and application operations.",
+                  "verification_state": "source_stated"
+                },
+                {
+                  "claim_id": "experience_2_bullet_3",
+                  "provenance": [
+                    {
+                      "claim_id": "experience_2_bullet_3",
+                      "source": "resume",
+                      "text": "Partnered with product and support teams to simplify internal processes and reduce manual handoffs."
+                    }
+                  ],
+                  "value": "Partnered with product and support teams to simplify internal processes and reduce manual handoffs.",
+                  "verification_state": "source_stated"
+                }
+              ],
+              "company": "AutomationWorks",
+              "end_date": "Dec 2017",
+              "id": "experience_2",
+              "start_date": "2013",
+              "title": "Software Developer"
+            }
+          ],
+          "provenance": [
+            {
+              "claim_id": "summary_main",
+              "source": "resume",
+              "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+            }
+          ],
+          "resume_id": "resume-main",
+          "schema_version": "canonical-resume.v1",
+          "skills": [
+            {
+              "claim_id": "skill_react",
+              "provenance": [
+                {
+                  "claim_id": "skill_react",
+                  "source": "resume",
+                  "text": "React"
+                }
+              ],
+              "value": "React",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_typescript",
+              "provenance": [
+                {
+                  "claim_id": "skill_typescript",
+                  "source": "resume",
+                  "text": "TypeScript"
+                }
+              ],
+              "value": "TypeScript",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_node_js",
+              "provenance": [
+                {
+                  "claim_id": "skill_node_js",
+                  "source": "resume",
+                  "text": "Node.js"
+                }
+              ],
+              "value": "Node.js",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_postgresql",
+              "provenance": [
+                {
+                  "claim_id": "skill_postgresql",
+                  "source": "resume",
+                  "text": "PostgreSQL"
+                }
+              ],
+              "value": "PostgreSQL",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_azure",
+              "provenance": [
+                {
+                  "claim_id": "skill_azure",
+                  "source": "resume",
+                  "text": "Azure"
+                }
+              ],
+              "value": "Azure",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_rest_apis",
+              "provenance": [
+                {
+                  "claim_id": "skill_rest_apis",
+                  "source": "resume",
+                  "text": "REST APIs"
+                }
+              ],
+              "value": "REST APIs",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_saas",
+              "provenance": [
+                {
+                  "claim_id": "skill_saas",
+                  "source": "resume",
+                  "text": "SaaS"
+                }
+              ],
+              "value": "SaaS",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_workflow_automation",
+              "provenance": [
+                {
+                  "claim_id": "skill_workflow_automation",
+                  "source": "resume",
+                  "text": "workflow automation"
+                }
+              ],
+              "value": "workflow automation",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_responsive_web_apps",
+              "provenance": [
+                {
+                  "claim_id": "skill_responsive_web_apps",
+                  "source": "resume",
+                  "text": "responsive web apps"
+                }
+              ],
+              "value": "responsive web apps",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_team_leadership",
+              "provenance": [
+                {
+                  "claim_id": "skill_team_leadership",
+                  "source": "resume",
+                  "text": "team leadership"
+                }
+              ],
+              "value": "team leadership",
+              "verification_state": "source_stated"
+            },
+            "AWS"
+          ],
+          "source": {
+            "kind": "fixture",
+            "path": "fixtures/resumes/resume-main.txt"
+          },
+          "summary": {
+            "claim_id": "summary_main",
+            "provenance": [
+              {
+                "claim_id": "summary_main",
+                "source": "resume",
+                "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+              },
+              {
+                "claim_id": "summary_main",
+                "source": "resume",
+                "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+              }
+            ],
+            "value": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps.",
+            "verification_state": "source_stated"
+          },
+          "verification_state": "source_stated"
+        }
+      },
+      {
+        "applied_operation": {
+          "after": "GraphQL",
+          "before": null,
+          "linked_fact_ids": [
+            "fact_graphql"
+          ],
+          "linked_requirement_ids": [
+            "fixture_req_6_3ef16ea5"
+          ],
+          "op": "insert",
+          "operation_id": "op_add_graphql_skill",
+          "path": "/skills/-",
+          "provenance": [
+            {
+              "source": "fixture_generator",
+              "text": "answer-graphql"
+            }
+          ],
+          "reason": "Add GraphQL only from the user-verified GraphQL answer fixture.",
+          "schema_version": "resume-change-operation.v1",
+          "status": "applied",
+          "validation_state": "validated"
+        },
+        "audit": {
+          "after": "GraphQL",
+          "applied": true,
+          "before": null,
+          "linked_fact_ids": [
+            "fact_graphql"
+          ],
+          "linked_requirement_ids": [
+            "fixture_req_6_3ef16ea5"
+          ],
+          "path": "/skills/-",
+          "status_transition": "validated->applied"
+        },
+        "operation_id": "op_add_graphql_skill",
+        "schema_version": "resume-core.result.v1",
+        "status": "ok",
+        "working_resume": {
+          "basics": {
+            "headline": "Senior Software Developer",
+            "name": "Daniel Candidate"
+          },
+          "education": [
+            {
+              "id": "education_1",
+              "text": "B.S. Computer Science"
+            }
+          ],
+          "experience": [
+            {
+              "bullets": [
+                {
+                  "claim_id": "experience_1_bullet_1",
+                  "provenance": [
+                    {
+                      "claim_id": "experience_1_bullet_1",
+                      "source": "resume",
+                      "text": "Built React and TypeScript interfaces for multi-tenant SaaS workflows used by operations teams."
+                    }
+                  ],
+                  "value": "Built React and TypeScript interfaces for multi-tenant SaaS workflows used by operations teams.",
+                  "verification_state": "source_stated"
+                },
+                {
+                  "claim_id": "experience_1_bullet_2",
+                  "provenance": [
+                    {
+                      "claim_id": "experience_1_bullet_2",
+                      "source": "resume",
+                      "text": "Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting."
+                    }
+                  ],
+                  "value": "Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting.",
+                  "verification_state": "source_stated"
+                },
+                {
+                  "claim_id": "experience_1_bullet_3",
+                  "provenance": [
+                    {
+                      "claim_id": "experience_1_bullet_3",
+                      "source": "resume",
+                      "text": "Led a small team of three developers through delivery planning, code review, and release coordination."
+                    }
+                  ],
+                  "value": "Led a small team of three developers through delivery planning, code review, and release coordination.",
+                  "verification_state": "source_stated"
+                },
+                {
+                  "claim_id": "experience_1_bullet_4",
+                  "provenance": [
+                    {
+                      "claim_id": "experience_1_bullet_4",
+                      "source": "resume",
+                      "text": "Improved front-end reliability for responsive web apps across desktop and mobile browsers."
+                    }
+                  ],
+                  "value": "Improved front-end reliability for responsive web apps across desktop and mobile browsers.",
+                  "verification_state": "source_stated"
+                }
+              ],
+              "company": "Example SaaS Co.",
+              "end_date": "Present",
+              "id": "experience_1",
+              "start_date": "Jan 2018",
+              "title": "Senior Software Developer"
+            },
+            {
+              "bullets": [
+                {
+                  "claim_id": "experience_2_bullet_1",
+                  "provenance": [
+                    {
+                      "claim_id": "experience_2_bullet_1",
+                      "source": "resume",
+                      "text": "Built Node.js services backed by PostgreSQL for workflow automation and data-processing tools."
+                    }
+                  ],
+                  "value": "Built Node.js services backed by PostgreSQL for workflow automation and data-processing tools.",
+                  "verification_state": "source_stated"
+                },
+                {
+                  "claim_id": "experience_2_bullet_2",
+                  "provenance": [
+                    {
+                      "claim_id": "experience_2_bullet_2",
+                      "source": "resume",
+                      "text": "Integrated Azure services for deployment, monitoring, and application operations."
+                    }
+                  ],
+                  "value": "Integrated Azure services for deployment, monitoring, and application operations.",
+                  "verification_state": "source_stated"
+                },
+                {
+                  "claim_id": "experience_2_bullet_3",
+                  "provenance": [
+                    {
+                      "claim_id": "experience_2_bullet_3",
+                      "source": "resume",
+                      "text": "Partnered with product and support teams to simplify internal processes and reduce manual handoffs."
+                    }
+                  ],
+                  "value": "Partnered with product and support teams to simplify internal processes and reduce manual handoffs.",
+                  "verification_state": "source_stated"
+                }
+              ],
+              "company": "AutomationWorks",
+              "end_date": "Dec 2017",
+              "id": "experience_2",
+              "start_date": "2013",
+              "title": "Software Developer"
+            }
+          ],
+          "provenance": [
+            {
+              "claim_id": "summary_main",
+              "source": "resume",
+              "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+            }
+          ],
+          "resume_id": "resume-main",
+          "schema_version": "canonical-resume.v1",
+          "skills": [
+            {
+              "claim_id": "skill_react",
+              "provenance": [
+                {
+                  "claim_id": "skill_react",
+                  "source": "resume",
+                  "text": "React"
+                }
+              ],
+              "value": "React",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_typescript",
+              "provenance": [
+                {
+                  "claim_id": "skill_typescript",
+                  "source": "resume",
+                  "text": "TypeScript"
+                }
+              ],
+              "value": "TypeScript",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_node_js",
+              "provenance": [
+                {
+                  "claim_id": "skill_node_js",
+                  "source": "resume",
+                  "text": "Node.js"
+                }
+              ],
+              "value": "Node.js",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_postgresql",
+              "provenance": [
+                {
+                  "claim_id": "skill_postgresql",
+                  "source": "resume",
+                  "text": "PostgreSQL"
+                }
+              ],
+              "value": "PostgreSQL",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_azure",
+              "provenance": [
+                {
+                  "claim_id": "skill_azure",
+                  "source": "resume",
+                  "text": "Azure"
+                }
+              ],
+              "value": "Azure",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_rest_apis",
+              "provenance": [
+                {
+                  "claim_id": "skill_rest_apis",
+                  "source": "resume",
+                  "text": "REST APIs"
+                }
+              ],
+              "value": "REST APIs",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_saas",
+              "provenance": [
+                {
+                  "claim_id": "skill_saas",
+                  "source": "resume",
+                  "text": "SaaS"
+                }
+              ],
+              "value": "SaaS",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_workflow_automation",
+              "provenance": [
+                {
+                  "claim_id": "skill_workflow_automation",
+                  "source": "resume",
+                  "text": "workflow automation"
+                }
+              ],
+              "value": "workflow automation",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_responsive_web_apps",
+              "provenance": [
+                {
+                  "claim_id": "skill_responsive_web_apps",
+                  "source": "resume",
+                  "text": "responsive web apps"
+                }
+              ],
+              "value": "responsive web apps",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_team_leadership",
+              "provenance": [
+                {
+                  "claim_id": "skill_team_leadership",
+                  "source": "resume",
+                  "text": "team leadership"
+                }
+              ],
+              "value": "team leadership",
+              "verification_state": "source_stated"
+            },
+            "AWS",
+            "GraphQL"
+          ],
+          "source": {
+            "kind": "fixture",
+            "path": "fixtures/resumes/resume-main.txt"
+          },
+          "summary": {
+            "claim_id": "summary_main",
+            "provenance": [
+              {
+                "claim_id": "summary_main",
+                "source": "resume",
+                "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+              },
+              {
+                "claim_id": "summary_main",
+                "source": "resume",
+                "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+              }
+            ],
+            "value": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps.",
+            "verification_state": "source_stated"
+          },
+          "verification_state": "source_stated"
+        }
+      },
+      {
+        "applied_operation": {
+          "after": {
+            "claim_id": "experience_1_bullet_2",
+            "provenance": [
+              {
+                "claim_id": "experience_1_bullet_2",
+                "source": "resume",
+                "text": "Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting."
+              }
+            ],
+            "value": "Designed REST APIs and application architecture for distributed product systems.",
+            "verification_state": "source_stated"
+          },
+          "before": {
+            "claim_id": "experience_1_bullet_2",
+            "provenance": [
+              {
+                "claim_id": "experience_1_bullet_2",
+                "source": "resume",
+                "text": "Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting."
+              }
+            ],
+            "value": "Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting.",
+            "verification_state": "source_stated"
+          },
+          "linked_fact_ids": [
+            "fact_architecture"
+          ],
+          "linked_requirement_ids": [
+            "fixture_req_2_e55af3cd"
+          ],
+          "op": "rewrite",
+          "operation_id": "op_rewrite_api_architecture",
+          "path": "/experience/0/bullets/1",
+          "provenance": [
+            {
+              "source": "fixture_generator",
+              "text": "answer-architecture"
+            }
+          ],
+          "reason": "Clarify architecture wording from the user-verified architecture answer fixture.",
+          "schema_version": "resume-change-operation.v1",
+          "status": "applied",
+          "validation_state": "validated"
+        },
+        "audit": {
+          "after": {
+            "claim_id": "experience_1_bullet_2",
+            "provenance": [
+              {
+                "claim_id": "experience_1_bullet_2",
+                "source": "resume",
+                "text": "Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting."
+              }
+            ],
+            "value": "Designed REST APIs and application architecture for distributed product systems.",
+            "verification_state": "source_stated"
+          },
+          "applied": true,
+          "before": {
+            "claim_id": "experience_1_bullet_2",
+            "provenance": [
+              {
+                "claim_id": "experience_1_bullet_2",
+                "source": "resume",
+                "text": "Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting."
+              }
+            ],
+            "value": "Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting.",
+            "verification_state": "source_stated"
+          },
+          "linked_fact_ids": [
+            "fact_architecture"
+          ],
+          "linked_requirement_ids": [
+            "fixture_req_2_e55af3cd"
+          ],
+          "path": "/experience/0/bullets/1",
+          "status_transition": "validated->applied"
+        },
+        "operation_id": "op_rewrite_api_architecture",
+        "schema_version": "resume-core.result.v1",
+        "status": "ok",
+        "working_resume": {
+          "basics": {
+            "headline": "Senior Software Developer",
+            "name": "Daniel Candidate"
+          },
+          "education": [
+            {
+              "id": "education_1",
+              "text": "B.S. Computer Science"
+            }
+          ],
+          "experience": [
+            {
+              "bullets": [
+                {
+                  "claim_id": "experience_1_bullet_1",
+                  "provenance": [
+                    {
+                      "claim_id": "experience_1_bullet_1",
+                      "source": "resume",
+                      "text": "Built React and TypeScript interfaces for multi-tenant SaaS workflows used by operations teams."
+                    }
+                  ],
+                  "value": "Built React and TypeScript interfaces for multi-tenant SaaS workflows used by operations teams.",
+                  "verification_state": "source_stated"
+                },
+                {
+                  "claim_id": "experience_1_bullet_2",
+                  "provenance": [
+                    {
+                      "claim_id": "experience_1_bullet_2",
+                      "source": "resume",
+                      "text": "Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting."
+                    }
+                  ],
+                  "value": "Designed REST APIs and application architecture for distributed product systems.",
+                  "verification_state": "source_stated"
+                },
+                {
+                  "claim_id": "experience_1_bullet_3",
+                  "provenance": [
+                    {
+                      "claim_id": "experience_1_bullet_3",
+                      "source": "resume",
+                      "text": "Led a small team of three developers through delivery planning, code review, and release coordination."
+                    }
+                  ],
+                  "value": "Led a small team of three developers through delivery planning, code review, and release coordination.",
+                  "verification_state": "source_stated"
+                },
+                {
+                  "claim_id": "experience_1_bullet_4",
+                  "provenance": [
+                    {
+                      "claim_id": "experience_1_bullet_4",
+                      "source": "resume",
+                      "text": "Improved front-end reliability for responsive web apps across desktop and mobile browsers."
+                    }
+                  ],
+                  "value": "Improved front-end reliability for responsive web apps across desktop and mobile browsers.",
+                  "verification_state": "source_stated"
+                }
+              ],
+              "company": "Example SaaS Co.",
+              "end_date": "Present",
+              "id": "experience_1",
+              "start_date": "Jan 2018",
+              "title": "Senior Software Developer"
+            },
+            {
+              "bullets": [
+                {
+                  "claim_id": "experience_2_bullet_1",
+                  "provenance": [
+                    {
+                      "claim_id": "experience_2_bullet_1",
+                      "source": "resume",
+                      "text": "Built Node.js services backed by PostgreSQL for workflow automation and data-processing tools."
+                    }
+                  ],
+                  "value": "Built Node.js services backed by PostgreSQL for workflow automation and data-processing tools.",
+                  "verification_state": "source_stated"
+                },
+                {
+                  "claim_id": "experience_2_bullet_2",
+                  "provenance": [
+                    {
+                      "claim_id": "experience_2_bullet_2",
+                      "source": "resume",
+                      "text": "Integrated Azure services for deployment, monitoring, and application operations."
+                    }
+                  ],
+                  "value": "Integrated Azure services for deployment, monitoring, and application operations.",
+                  "verification_state": "source_stated"
+                },
+                {
+                  "claim_id": "experience_2_bullet_3",
+                  "provenance": [
+                    {
+                      "claim_id": "experience_2_bullet_3",
+                      "source": "resume",
+                      "text": "Partnered with product and support teams to simplify internal processes and reduce manual handoffs."
+                    }
+                  ],
+                  "value": "Partnered with product and support teams to simplify internal processes and reduce manual handoffs.",
+                  "verification_state": "source_stated"
+                }
+              ],
+              "company": "AutomationWorks",
+              "end_date": "Dec 2017",
+              "id": "experience_2",
+              "start_date": "2013",
+              "title": "Software Developer"
+            }
+          ],
+          "provenance": [
+            {
+              "claim_id": "summary_main",
+              "source": "resume",
+              "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+            }
+          ],
+          "resume_id": "resume-main",
+          "schema_version": "canonical-resume.v1",
+          "skills": [
+            {
+              "claim_id": "skill_react",
+              "provenance": [
+                {
+                  "claim_id": "skill_react",
+                  "source": "resume",
+                  "text": "React"
+                }
+              ],
+              "value": "React",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_typescript",
+              "provenance": [
+                {
+                  "claim_id": "skill_typescript",
+                  "source": "resume",
+                  "text": "TypeScript"
+                }
+              ],
+              "value": "TypeScript",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_node_js",
+              "provenance": [
+                {
+                  "claim_id": "skill_node_js",
+                  "source": "resume",
+                  "text": "Node.js"
+                }
+              ],
+              "value": "Node.js",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_postgresql",
+              "provenance": [
+                {
+                  "claim_id": "skill_postgresql",
+                  "source": "resume",
+                  "text": "PostgreSQL"
+                }
+              ],
+              "value": "PostgreSQL",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_azure",
+              "provenance": [
+                {
+                  "claim_id": "skill_azure",
+                  "source": "resume",
+                  "text": "Azure"
+                }
+              ],
+              "value": "Azure",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_rest_apis",
+              "provenance": [
+                {
+                  "claim_id": "skill_rest_apis",
+                  "source": "resume",
+                  "text": "REST APIs"
+                }
+              ],
+              "value": "REST APIs",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_saas",
+              "provenance": [
+                {
+                  "claim_id": "skill_saas",
+                  "source": "resume",
+                  "text": "SaaS"
+                }
+              ],
+              "value": "SaaS",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_workflow_automation",
+              "provenance": [
+                {
+                  "claim_id": "skill_workflow_automation",
+                  "source": "resume",
+                  "text": "workflow automation"
+                }
+              ],
+              "value": "workflow automation",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_responsive_web_apps",
+              "provenance": [
+                {
+                  "claim_id": "skill_responsive_web_apps",
+                  "source": "resume",
+                  "text": "responsive web apps"
+                }
+              ],
+              "value": "responsive web apps",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_team_leadership",
+              "provenance": [
+                {
+                  "claim_id": "skill_team_leadership",
+                  "source": "resume",
+                  "text": "team leadership"
+                }
+              ],
+              "value": "team leadership",
+              "verification_state": "source_stated"
+            },
+            "AWS",
+            "GraphQL"
+          ],
+          "source": {
+            "kind": "fixture",
+            "path": "fixtures/resumes/resume-main.txt"
+          },
+          "summary": {
+            "claim_id": "summary_main",
+            "provenance": [
+              {
+                "claim_id": "summary_main",
+                "source": "resume",
+                "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+              },
+              {
+                "claim_id": "summary_main",
+                "source": "resume",
+                "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+              }
+            ],
+            "value": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps.",
+            "verification_state": "source_stated"
+          },
+          "verification_state": "source_stated"
+        }
+      }
+    ],
+    "applied_operation_ids": [
+      "op_add_aws_skill",
+      "op_add_graphql_skill",
+      "op_rewrite_api_architecture"
+    ],
+    "operations": [
+      {
+        "operation": {
+          "after": "AWS",
+          "before": null,
+          "linked_fact_ids": [
+            "fact_aws"
+          ],
+          "linked_requirement_ids": [
+            "fixture_req_5_a1cdaa2a"
+          ],
+          "op": "insert",
+          "operation_id": "op_add_aws_skill",
+          "path": "/skills/-",
+          "provenance": [
+            {
+              "source": "fixture_generator",
+              "text": "answer-aws"
+            }
+          ],
+          "reason": "Add AWS only from the user-verified AWS answer fixture.",
+          "schema_version": "resume-change-operation.v1",
+          "status": "proposed"
+        },
+        "validation_result": {
+          "errors": [],
+          "grounding": {
+            "guarded_claims": [
+              "aws"
+            ],
+            "supported": true,
+            "supporting_fact_ids": [
+              "fact_aws"
+            ],
+            "supporting_requirement_ids": [
+              "fixture_req_5_a1cdaa2a"
+            ]
+          },
+          "operation_id": "op_add_aws_skill",
+          "schema_version": "resume-core.result.v1",
+          "status": "ok",
+          "validated_operation": {
+            "after": "AWS",
+            "before": null,
+            "linked_fact_ids": [
+              "fact_aws"
+            ],
+            "linked_requirement_ids": [
+              "fixture_req_5_a1cdaa2a"
+            ],
+            "op": "insert",
+            "operation_id": "op_add_aws_skill",
+            "path": "/skills/-",
+            "provenance": [
+              {
+                "source": "fixture_generator",
+                "text": "answer-aws"
+              }
+            ],
+            "reason": "Add AWS only from the user-verified AWS answer fixture.",
+            "schema_version": "resume-change-operation.v1",
+            "status": "validated",
+            "validation_state": "validated"
+          },
+          "validation_state": "validated"
+        }
+      },
+      {
+        "operation": {
+          "after": "GraphQL",
+          "before": null,
+          "linked_fact_ids": [
+            "fact_graphql"
+          ],
+          "linked_requirement_ids": [
+            "fixture_req_6_3ef16ea5"
+          ],
+          "op": "insert",
+          "operation_id": "op_add_graphql_skill",
+          "path": "/skills/-",
+          "provenance": [
+            {
+              "source": "fixture_generator",
+              "text": "answer-graphql"
+            }
+          ],
+          "reason": "Add GraphQL only from the user-verified GraphQL answer fixture.",
+          "schema_version": "resume-change-operation.v1",
+          "status": "proposed"
+        },
+        "validation_result": {
+          "errors": [],
+          "grounding": {
+            "guarded_claims": [
+              "graphql"
+            ],
+            "supported": true,
+            "supporting_fact_ids": [
+              "fact_graphql"
+            ],
+            "supporting_requirement_ids": [
+              "fixture_req_6_3ef16ea5"
+            ]
+          },
+          "operation_id": "op_add_graphql_skill",
+          "schema_version": "resume-core.result.v1",
+          "status": "ok",
+          "validated_operation": {
+            "after": "GraphQL",
+            "before": null,
+            "linked_fact_ids": [
+              "fact_graphql"
+            ],
+            "linked_requirement_ids": [
+              "fixture_req_6_3ef16ea5"
+            ],
+            "op": "insert",
+            "operation_id": "op_add_graphql_skill",
+            "path": "/skills/-",
+            "provenance": [
+              {
+                "source": "fixture_generator",
+                "text": "answer-graphql"
+              }
+            ],
+            "reason": "Add GraphQL only from the user-verified GraphQL answer fixture.",
+            "schema_version": "resume-change-operation.v1",
+            "status": "validated",
+            "validation_state": "validated"
+          },
+          "validation_state": "validated"
+        }
+      },
+      {
+        "operation": {
+          "after": {
+            "claim_id": "experience_1_bullet_2",
+            "provenance": [
+              {
+                "claim_id": "experience_1_bullet_2",
+                "source": "resume",
+                "text": "Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting."
+              }
+            ],
+            "value": "Designed REST APIs and application architecture for distributed product systems.",
+            "verification_state": "source_stated"
+          },
+          "before": {
+            "claim_id": "experience_1_bullet_2",
+            "provenance": [
+              {
+                "claim_id": "experience_1_bullet_2",
+                "source": "resume",
+                "text": "Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting."
+              }
+            ],
+            "value": "Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting.",
+            "verification_state": "source_stated"
+          },
+          "linked_fact_ids": [
+            "fact_architecture"
+          ],
+          "linked_requirement_ids": [
+            "fixture_req_2_e55af3cd"
+          ],
+          "op": "rewrite",
+          "operation_id": "op_rewrite_api_architecture",
+          "path": "/experience/0/bullets/1",
+          "provenance": [
+            {
+              "source": "fixture_generator",
+              "text": "answer-architecture"
+            }
+          ],
+          "reason": "Clarify architecture wording from the user-verified architecture answer fixture.",
+          "schema_version": "resume-change-operation.v1",
+          "status": "proposed"
+        },
+        "validation_result": {
+          "errors": [],
+          "grounding": {
+            "guarded_claims": [],
+            "supported": true,
+            "supporting_fact_ids": [],
+            "supporting_requirement_ids": [
+              "fixture_req_2_e55af3cd"
+            ]
+          },
+          "operation_id": "op_rewrite_api_architecture",
+          "schema_version": "resume-core.result.v1",
+          "status": "ok",
+          "validated_operation": {
+            "after": {
+              "claim_id": "experience_1_bullet_2",
+              "provenance": [
+                {
+                  "claim_id": "experience_1_bullet_2",
+                  "source": "resume",
+                  "text": "Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting."
+                }
+              ],
+              "value": "Designed REST APIs and application architecture for distributed product systems.",
+              "verification_state": "source_stated"
+            },
+            "before": {
+              "claim_id": "experience_1_bullet_2",
+              "provenance": [
+                {
+                  "claim_id": "experience_1_bullet_2",
+                  "source": "resume",
+                  "text": "Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting."
+                }
+              ],
+              "value": "Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting.",
+              "verification_state": "source_stated"
+            },
+            "linked_fact_ids": [
+              "fact_architecture"
+            ],
+            "linked_requirement_ids": [
+              "fixture_req_2_e55af3cd"
+            ],
+            "op": "rewrite",
+            "operation_id": "op_rewrite_api_architecture",
+            "path": "/experience/0/bullets/1",
+            "provenance": [
+              {
+                "source": "fixture_generator",
+                "text": "answer-architecture"
+              }
+            ],
+            "reason": "Clarify architecture wording from the user-verified architecture answer fixture.",
+            "schema_version": "resume-change-operation.v1",
+            "status": "validated",
+            "validation_state": "validated"
+          },
+          "validation_state": "validated"
+        }
+      }
+    ],
+    "schema_version": "snapshot.valid-operations.v1",
+    "working_resume": {
+      "basics": {
+        "headline": "Senior Software Developer",
+        "name": "Daniel Candidate"
+      },
+      "education": [
+        {
+          "id": "education_1",
+          "text": "B.S. Computer Science"
+        }
+      ],
+      "experience": [
+        {
+          "bullets": [
+            {
+              "claim_id": "experience_1_bullet_1",
+              "provenance": [
+                {
+                  "claim_id": "experience_1_bullet_1",
+                  "source": "resume",
+                  "text": "Built React and TypeScript interfaces for multi-tenant SaaS workflows used by operations teams."
+                }
+              ],
+              "value": "Built React and TypeScript interfaces for multi-tenant SaaS workflows used by operations teams.",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "experience_1_bullet_2",
+              "provenance": [
+                {
+                  "claim_id": "experience_1_bullet_2",
+                  "source": "resume",
+                  "text": "Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting."
+                }
+              ],
+              "value": "Designed REST APIs and application architecture for distributed product systems.",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "experience_1_bullet_3",
+              "provenance": [
+                {
+                  "claim_id": "experience_1_bullet_3",
+                  "source": "resume",
+                  "text": "Led a small team of three developers through delivery planning, code review, and release coordination."
+                }
+              ],
+              "value": "Led a small team of three developers through delivery planning, code review, and release coordination.",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "experience_1_bullet_4",
+              "provenance": [
+                {
+                  "claim_id": "experience_1_bullet_4",
+                  "source": "resume",
+                  "text": "Improved front-end reliability for responsive web apps across desktop and mobile browsers."
+                }
+              ],
+              "value": "Improved front-end reliability for responsive web apps across desktop and mobile browsers.",
+              "verification_state": "source_stated"
+            }
+          ],
+          "company": "Example SaaS Co.",
+          "end_date": "Present",
+          "id": "experience_1",
+          "start_date": "Jan 2018",
+          "title": "Senior Software Developer"
+        },
+        {
+          "bullets": [
+            {
+              "claim_id": "experience_2_bullet_1",
+              "provenance": [
+                {
+                  "claim_id": "experience_2_bullet_1",
+                  "source": "resume",
+                  "text": "Built Node.js services backed by PostgreSQL for workflow automation and data-processing tools."
+                }
+              ],
+              "value": "Built Node.js services backed by PostgreSQL for workflow automation and data-processing tools.",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "experience_2_bullet_2",
+              "provenance": [
+                {
+                  "claim_id": "experience_2_bullet_2",
+                  "source": "resume",
+                  "text": "Integrated Azure services for deployment, monitoring, and application operations."
+                }
+              ],
+              "value": "Integrated Azure services for deployment, monitoring, and application operations.",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "experience_2_bullet_3",
+              "provenance": [
+                {
+                  "claim_id": "experience_2_bullet_3",
+                  "source": "resume",
+                  "text": "Partnered with product and support teams to simplify internal processes and reduce manual handoffs."
+                }
+              ],
+              "value": "Partnered with product and support teams to simplify internal processes and reduce manual handoffs.",
+              "verification_state": "source_stated"
+            }
+          ],
+          "company": "AutomationWorks",
+          "end_date": "Dec 2017",
+          "id": "experience_2",
+          "start_date": "2013",
+          "title": "Software Developer"
+        }
+      ],
+      "provenance": [
+        {
+          "claim_id": "summary_main",
+          "source": "resume",
+          "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+        }
+      ],
+      "resume_id": "resume-main",
+      "schema_version": "canonical-resume.v1",
+      "skills": [
+        {
+          "claim_id": "skill_react",
+          "provenance": [
+            {
+              "claim_id": "skill_react",
+              "source": "resume",
+              "text": "React"
+            }
+          ],
+          "value": "React",
+          "verification_state": "source_stated"
+        },
+        {
+          "claim_id": "skill_typescript",
+          "provenance": [
+            {
+              "claim_id": "skill_typescript",
+              "source": "resume",
+              "text": "TypeScript"
+            }
+          ],
+          "value": "TypeScript",
+          "verification_state": "source_stated"
+        },
+        {
+          "claim_id": "skill_node_js",
+          "provenance": [
+            {
+              "claim_id": "skill_node_js",
+              "source": "resume",
+              "text": "Node.js"
+            }
+          ],
+          "value": "Node.js",
+          "verification_state": "source_stated"
+        },
+        {
+          "claim_id": "skill_postgresql",
+          "provenance": [
+            {
+              "claim_id": "skill_postgresql",
+              "source": "resume",
+              "text": "PostgreSQL"
+            }
+          ],
+          "value": "PostgreSQL",
+          "verification_state": "source_stated"
+        },
+        {
+          "claim_id": "skill_azure",
+          "provenance": [
+            {
+              "claim_id": "skill_azure",
+              "source": "resume",
+              "text": "Azure"
+            }
+          ],
+          "value": "Azure",
+          "verification_state": "source_stated"
+        },
+        {
+          "claim_id": "skill_rest_apis",
+          "provenance": [
+            {
+              "claim_id": "skill_rest_apis",
+              "source": "resume",
+              "text": "REST APIs"
+            }
+          ],
+          "value": "REST APIs",
+          "verification_state": "source_stated"
+        },
+        {
+          "claim_id": "skill_saas",
+          "provenance": [
+            {
+              "claim_id": "skill_saas",
+              "source": "resume",
+              "text": "SaaS"
+            }
+          ],
+          "value": "SaaS",
+          "verification_state": "source_stated"
+        },
+        {
+          "claim_id": "skill_workflow_automation",
+          "provenance": [
+            {
+              "claim_id": "skill_workflow_automation",
+              "source": "resume",
+              "text": "workflow automation"
+            }
+          ],
+          "value": "workflow automation",
+          "verification_state": "source_stated"
+        },
+        {
+          "claim_id": "skill_responsive_web_apps",
+          "provenance": [
+            {
+              "claim_id": "skill_responsive_web_apps",
+              "source": "resume",
+              "text": "responsive web apps"
+            }
+          ],
+          "value": "responsive web apps",
+          "verification_state": "source_stated"
+        },
+        {
+          "claim_id": "skill_team_leadership",
+          "provenance": [
+            {
+              "claim_id": "skill_team_leadership",
+              "source": "resume",
+              "text": "team leadership"
+            }
+          ],
+          "value": "team leadership",
+          "verification_state": "source_stated"
+        },
+        "AWS",
+        "GraphQL"
+      ],
+      "source": {
+        "kind": "fixture",
+        "path": "fixtures/resumes/resume-main.txt"
+      },
+      "summary": {
+        "claim_id": "summary_main",
+        "provenance": [
+          {
+            "claim_id": "summary_main",
+            "source": "resume",
+            "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+          },
+          {
+            "claim_id": "summary_main",
+            "source": "resume",
+            "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+          }
+        ],
+        "value": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps.",
+        "verification_state": "source_stated"
+      },
+      "verification_state": "source_stated"
+    }
+  }
 }
