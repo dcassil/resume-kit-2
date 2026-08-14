@@ -4,16 +4,15 @@ level: task
 title: "REQ-007a: Migration fixture content spec and previous-schema career.db fixture"
 short_code: "RKIT-T-0019"
 created_at: 2026-08-14T03:14:05.754884+00:00
-updated_at: 2026-08-14T03:14:05.754884+00:00
+updated_at: 2026-08-14T16:54:14.342552+00:00
 parent: executable-release-gate-e2e
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -30,6 +29,10 @@ initiative_id: RKIT-I-0051
 ## Objective
 
 Replace the README-only `fixtures/migrations/` placeholder with the migration-fixture content spec and the actual fixture data the migration checker will consume. This task authors both the documentation (in `fixtures/TEST_SPEC.md`) that maps the four migration cases to concrete inputs/outputs and the deterministic previous-schema `career.db` fixture (plus its expected post-migration state) that makes the "upgrade-from-previous" migration path a real, exercisable test rather than an empty directory.
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -83,4 +86,4 @@ No task dependencies — startable once the initiative is active (proposal depen
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-14: Codex-driven implementation reviewed + verified. Previous schema `career-store.v0` (migrations/facts/evidence only; no relationships/conflicts/job_matches) vs current `career-store.v1` (from store.py SCHEMA_VERSION) — genuinely older. Byte-stable seed generator (fixed timestamps, no autoincrement, canonical JSON, double-run hash identical: a7d86ce). `expected-post-migration.json` cross-checked against an actual fixed-clock CareerStore upgrade (EXPECTED_MATCH). TEST_SPEC.md maps all four checker cases. fixtures_guardrails green, PR 198 green, smoke green. All acceptance criteria met; committing and marking completed.

@@ -1,0 +1,138 @@
+{
+  "schema_version": "migration-fixture-expected.v1",
+  "fixture_id": "career-store-upgrade-from-v0-to-v1",
+  "reviewed": true,
+  "previous_schema_version": "career-store.v0",
+  "current_schema_version": "career-store.v1",
+  "migration_clock": "2026-01-01T00:00:00Z",
+  "source_fixture": "fixtures/migrations/previous-schema-career.db",
+  "expected_database": {
+    "tables": [
+      "conflicts",
+      "evidence",
+      "facts",
+      "job_matches",
+      "migrations",
+      "relationships"
+    ],
+    "migrations": [
+      {
+        "migration_id": "000_previous_schema_fixture",
+        "schema_version": "career-store.v0",
+        "applied_at": "2026-01-01T00:00:00Z"
+      },
+      {
+        "migration_id": "001_initial",
+        "schema_version": "career-store.v1",
+        "applied_at": "2026-01-01T00:00:00Z"
+      }
+    ],
+    "facts": [
+      {
+        "fact_id": "fact_api_architecture_10_years",
+        "type": "skill",
+        "text": "API and application architecture experience for more than ten years.",
+        "normalized_terms": [
+          "10 years",
+          "api architecture",
+          "application architecture"
+        ],
+        "verification_state": "imported",
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z",
+        "metadata": {
+          "fixture": "previous-schema",
+          "years": "10+"
+        }
+      },
+      {
+        "fact_id": "fact_aws_6_years",
+        "type": "skill",
+        "text": "AWS experience across EC2, S3, Lambda, RDS, and IAM for about six years.",
+        "normalized_terms": [
+          "amazon web services",
+          "aws",
+          "ec2",
+          "iam",
+          "lambda",
+          "rds",
+          "s3"
+        ],
+        "verification_state": "imported",
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z",
+        "metadata": {
+          "fixture": "previous-schema",
+          "years": 6
+        }
+      },
+      {
+        "fact_id": "fact_graphql_5_years",
+        "type": "skill",
+        "text": "Built and maintained GraphQL APIs in production for around five years.",
+        "normalized_terms": [
+          "graphql",
+          "graphql api",
+          "production"
+        ],
+        "verification_state": "source_stated",
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z",
+        "metadata": {
+          "fixture": "previous-schema",
+          "years": 5
+        }
+      }
+    ],
+    "evidence": [
+      {
+        "evidence_id": "evidence_api_architecture_answer",
+        "fact_id": "fact_api_architecture_10_years",
+        "source": "user_answer",
+        "source_id": "answer-architecture",
+        "text": "I've designed APIs and application architecture for more than ten years, but I haven't had Staff Engineer as my formal title.",
+        "source_span": {
+          "start": 0,
+          "end": 125
+        },
+        "observed_at": "2026-01-01T00:00:00Z",
+        "metadata": {
+          "fixture": "previous-schema"
+        }
+      },
+      {
+        "evidence_id": "evidence_aws_answer",
+        "fact_id": "fact_aws_6_years",
+        "source": "user_answer",
+        "source_id": "answer-aws",
+        "text": "Yes. I have about six years of AWS experience, mainly EC2, S3, Lambda, RDS, and IAM.",
+        "source_span": {
+          "start": 0,
+          "end": 84
+        },
+        "observed_at": "2026-01-01T00:00:00Z",
+        "metadata": {
+          "fixture": "previous-schema"
+        }
+      },
+      {
+        "evidence_id": "evidence_graphql_answer",
+        "fact_id": "fact_graphql_5_years",
+        "source": "user_answer",
+        "source_id": "answer-graphql",
+        "text": "Yes, around five years. I've built and maintained GraphQL APIs in production.",
+        "source_span": {
+          "start": 0,
+          "end": 77
+        },
+        "observed_at": "2026-01-01T00:00:00Z",
+        "metadata": {
+          "fixture": "previous-schema"
+        }
+      }
+    ],
+    "relationships": [],
+    "conflicts": [],
+    "job_matches": []
+  }
+}
