@@ -47,18 +47,20 @@ Tests should expect workflow artifacts around:
 
 ## State Machine Test Cases
 
-### Valid transitions
+### Grounded transition obligations
 
-- INIT can move to resume ingest only after config validates.
-- Resume ingest can move to base validation only after canonical output exists.
-- Base validation must pass before career fact extraction persists final source-stated facts.
-- Job ingest must pass normalization before matching.
-- Match must run before gap resolution.
-- Gap resolution must rerun match after new verified facts.
-- Tailoring must build a selection plan before agent rewrite proposals.
-- Changes must validate before application.
-- Final validation must run before render/export completion.
-- Render validation must run before complete.
+- INIT can move to resume ingest only after a config-validation DTO resolves in the run state.
+- Resume ingest can move to base validation only after the canonical resume artifact exists and its hash matches the EvidenceRef.
+- Base validation can move to career fact extraction only after a validation DTO resolves against the declared workflow schema.
+- Job ingest can move to normalization only after the ingested job artifact exists and its hash matches the EvidenceRef.
+- Normalization can move to matching only after a normalization DTO resolves against the declared workflow schema.
+- Match can move to gap resolution only after a match-result DTO resolves against the declared workflow schema.
+- Gap resolution must rerun match when persisted verified facts exist beyond the last match watermark.
+- After the rerun records a match watermark covering the verified facts, BUILD_SELECTION_PLAN must be reachable with grounded run-state evidence and the loop must terminate.
+- Tailoring can move to agent rewrite proposals only after a selection-plan DTO resolves against the declared workflow schema.
+- Changes can move to application only after change-validation DTO evidence resolves against the declared workflow schema.
+- Final match can move to grounding audit only after operations-applied evidence resolves from persisted run state.
+- Grounding audit, ATS/structure validation, render, render validation, and complete can advance only after their required DTO, artifact, or persisted run-state evidence resolves.
 
 ### Invalid transitions
 
