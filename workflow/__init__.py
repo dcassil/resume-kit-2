@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Any, Callable
 
@@ -53,6 +54,15 @@ class RunManifestValidationError(ValueError):
         super().__init__(f"Run manifest validation failed: {summary}")
 
 
+class UnknownRunError(FileNotFoundError):
+    """Raised when persisted state for a requested run id does not exist."""
+
+    def __init__(self, run_id: str, workspace: str | Path) -> None:
+        self.run_id = run_id
+        self.workspace = str(workspace)
+        super().__init__(f"Unknown workflow run_id {run_id!r} under workspace {self.workspace!r}.")
+
+
 def createRun(workspace: str | Path, config: JsonObject) -> JsonObject:
     workspace_path = Path(workspace)
     config_hash = _stable_hash(config)
@@ -66,6 +76,8 @@ def createRun(workspace: str | Path, config: JsonObject) -> JsonObject:
         "schema_versions": dict(versions["schema_versions"]),
         "package_versions": dict(versions["package_versions"]),
         "careerDbVersion": dict(versions["careerDbVersion"]),
+        "matching_algorithm_version": versions["matching_algorithm_version"],
+        "matching_config_version": versions["matching_config_version"],
         "stage_state": {},
         "recovery_markers": [],
         "operation_log_refs": [],
@@ -179,18 +191,22 @@ def advanceCheckpoint(run_state: JsonObject, target_checkpoint: str, evidence: J
 def recordCheckpointResult(run_state: JsonObject, checkpoint: str, result: JsonObject, clock: Callable[[], str] | None = None) -> JsonObject:
     working_state = _working_run_state(run_state)
     checkpoint_result = dict(result)
+    timestamp = _timestamp(clock)
+    operation_records = _operation_status_records(checkpoint_result)
+    question_records = _question_log_records(checkpoint_result)
     _extend_unique(working_state, "facts_verified", checkpoint_result.get("facts_verified", []))
     _extend_unique(working_state, "facts_added", checkpoint_result.get("facts_added", []))
     _extend_unique(working_state, "operations_applied", checkpoint_result.get("operations_applied", []))
     _extend_unique(working_state, "operations_rejected", checkpoint_result.get("operations_rejected", []))
-    _merge_operation_statuses(working_state, _operation_status_records(checkpoint_result))
+    _extend_requirement_unique(working_state, checkpoint_result.get("unresolved_requirements", []))
+    _merge_operation_statuses(working_state, operation_records)
     _extend_unique(working_state, "already_applied_operations", checkpoint_result.get("operations_applied", []))
-    _extend_unique(working_state, "already_asked_questions", checkpoint_result.get("question_answer_log_refs", []))
+    _extend_unique(working_state, "already_asked_questions", _question_recovery_refs(question_records))
     _extend_unique(working_state, "already_written_facts", checkpoint_result.get("facts_verified", []) + checkpoint_result.get("facts_added", []))
     if checkpoint == "MATCH_BASE":
         working_state["last_match_fact_watermark"] = _dedupe(working_state.get("facts_verified", []))
-    operation_refs = [f"operations/{item}.json" for item in checkpoint_result.get("operations_applied", [])]
-    question_refs = list(checkpoint_result.get("question_answer_log_refs", []))
+    operation_refs = _append_operation_log(working_state, checkpoint, operation_records, timestamp)
+    question_refs = _append_question_log(working_state, checkpoint, question_records, timestamp)
     checkpoint_ref = _write_checkpoint_result(working_state, checkpoint, checkpoint_result)
     artifact_refs = [checkpoint_ref] + _normalize_artifact_refs(working_state, checkpoint_result.get("artifact_refs", []), "artifact_refs")
     validation_refs = _normalize_artifact_refs(working_state, checkpoint_result.get("validation_refs", []), "validation_refs")
@@ -203,7 +219,7 @@ def recordCheckpointResult(run_state: JsonObject, checkpoint: str, result: JsonO
     _extend_ref_unique(working_state, "artifact_refs", artifact_refs)
     _persist_run(working_state)
     run_state.update(working_state)
-    event = _record_audit("recordCheckpointResult", checkpoint, clock)
+    event = _record_audit("recordCheckpointResult", checkpoint, timestamp)
     return {
         "status": "ok",
         "checkpoint": checkpoint,
@@ -217,14 +233,15 @@ def recordCheckpointResult(run_state: JsonObject, checkpoint: str, result: JsonO
 
 
 def buildRunManifest(run_state: JsonObject) -> JsonObject:
-    versions = collectVersions(workspace=run_state.get("workspace"), run_state=run_state)
+    working_state = _working_run_state(run_state)
+    versions = _manifest_versions(working_state, allow_not_recorded=False)
     schema_versions = versions["schema_versions"]
     manifest = {
-        "run_id": run_state.get("run_id", ""),
-        "base_resume_id": run_state.get("base_resume_id", ""),
-        "base_resume_hash": run_state.get("base_resume_hash", ""),
-        "job_id": run_state.get("job_id", ""),
-        "config_hash": run_state.get("config_hash", ""),
+        "run_id": working_state.get("run_id", ""),
+        "base_resume_id": working_state.get("base_resume_id", ""),
+        "base_resume_hash": working_state.get("base_resume_hash", ""),
+        "job_id": working_state.get("job_id", ""),
+        "config_hash": working_state.get("config_hash", ""),
         "canonical_resume_schema_version": schema_versions["canonical_resume"],
         "job_schema_version": schema_versions["job"],
         "career_db_schema_version": schema_versions["career_db"],
@@ -232,23 +249,39 @@ def buildRunManifest(run_state: JsonObject) -> JsonObject:
         "change_operation_schema_version": schema_versions["change_operation"],
         "matching_algorithm_version": versions["matching_algorithm_version"],
         "matching_config_version": versions["matching_config_version"],
-        "renderer_template_version": run_state.get("renderer_template_version", ""),
-        "agent_model_config": run_state.get("agent_model_config", {}),
-        "initial_score": run_state.get("initial_score", 0.0),
-        "final_score": run_state.get("final_score", 0.0),
-        "facts_added": list(run_state.get("facts_added", [])),
-        "facts_verified": list(run_state.get("facts_verified", [])),
-        "operations_applied": list(run_state.get("operations_applied", [])),
-        "operations_rejected": list(run_state.get("operations_rejected", [])),
-        "validation_status": run_state.get("validation_status", "unknown"),
-        "output_artifact_paths": list(run_state.get("output_artifact_paths", [])),
-        "question_answer_log_refs": list(run_state.get("question_answer_log_refs", [])),
-        "unresolved_requirements": [dict(requirement) for requirement in run_state.get("unresolved_requirements", [])],
+        "renderer_template_version": working_state.get("renderer_template_version", ""),
+        "agent_model_config": working_state.get("agent_model_config", {}),
+        "initial_score": working_state.get("initial_score", 0.0),
+        "final_score": working_state.get("final_score", 0.0),
+        "facts_added": list(working_state.get("facts_added", [])),
+        "facts_verified": list(working_state.get("facts_verified", [])),
+        "operations_applied": _manifest_operation_ids(working_state, "operations_applied", {"applied"}),
+        "operations_rejected": _manifest_operation_ids(working_state, "operations_rejected", {"rejected"}),
+        "validation_status": working_state.get("validation_status", "unknown"),
+        "output_artifact_paths": list(working_state.get("output_artifact_paths", [])),
+        "question_answer_log_refs": _manifest_question_answer_refs(working_state),
+        "unresolved_requirements": _manifest_unresolved_requirements(working_state),
         "schema_version": RUN_MANIFEST_SCHEMA["schema_version"],
         "package_versions": dict(versions["package_versions"]),
-        "recovery_markers": list(run_state.get("recovery_markers", [])),
-        "audit_refs": list(run_state.get("audit_refs", [])),
+        "recovery_markers": list(working_state.get("recovery_markers", [])),
+        "audit_refs": list(working_state.get("audit_refs", [])),
+        "metadata": {"field_sources": _manifest_field_sources()},
     }
+    _validate_run_manifest(manifest)
+    return manifest
+
+
+def reconstructRunManifest(run_id: str, workspace: str | Path = ".") -> JsonObject:
+    workspace_path = Path(workspace)
+    path = _run_path(workspace_path, run_id)
+    if not path.exists():
+        raise UnknownRunError(run_id, workspace_path)
+    loaded = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(loaded, dict):
+        raise RunManifestValidationError([_issue("invalid_run_state", "Persisted run state must be an object.", "")])
+    run_state = dict(loaded)
+    run_state.setdefault("workspace", str(workspace_path))
+    manifest = _reconstructed_manifest_from_state(run_state)
     _validate_run_manifest(manifest)
     return manifest
 
@@ -465,6 +498,266 @@ def _resolve_artifact_path(run_state: JsonObject, path_value: str) -> Path:
     return Path(str(workspace)) / path if workspace else path
 
 
+def _run_dir(run_state: JsonObject) -> Path:
+    workspace = run_state.get("workspace")
+    run_id = run_state.get("run_id")
+    if not workspace or not run_id:
+        raise ValueError("Workflow log recording requires a run_state with workspace and run_id.")
+    return Path(str(workspace)) / ".workflow" / "runs" / str(run_id)
+
+
+def _run_relative_log_ref(run_state: JsonObject, filename: str, line_number: int) -> str:
+    return f".workflow/runs/{run_state['run_id']}/{filename}#L{line_number}"
+
+
+def _append_operation_log(run_state: JsonObject, checkpoint: str, records: list[JsonObject], timestamp: str) -> list[str]:
+    return _append_jsonl_records(
+        run_state,
+        "operations.jsonl",
+        [
+            {
+                "run_id": str(run_state.get("run_id", "")),
+                "checkpoint": checkpoint,
+                "operation_id": str(record["operation_id"]),
+                "status": str(record.get("status", "")),
+                "timestamp": timestamp,
+                "record": dict(record),
+            }
+            for record in records
+        ],
+    )
+
+
+def _append_question_log(run_state: JsonObject, checkpoint: str, records: list[JsonObject], timestamp: str) -> list[str]:
+    return _append_jsonl_records(
+        run_state,
+        "questions.jsonl",
+        [
+            {
+                "run_id": str(run_state.get("run_id", "")),
+                "checkpoint": checkpoint,
+                "timestamp": timestamp,
+                **dict(record),
+            }
+            for record in records
+        ],
+    )
+
+
+def _append_jsonl_records(run_state: JsonObject, filename: str, records: list[JsonObject]) -> list[str]:
+    if not records:
+        return []
+    path = _run_dir(run_state) / filename
+    path.parent.mkdir(parents=True, exist_ok=True)
+    start_line = _jsonl_line_count(path) + 1
+    refs: list[str] = []
+    with path.open("a", encoding="utf-8") as handle:
+        for offset, record in enumerate(records):
+            handle.write(json.dumps(_jsonable(record), sort_keys=True, separators=(",", ":")) + "\n")
+            refs.append(_run_relative_log_ref(run_state, filename, start_line + offset))
+        handle.flush()
+        os.fsync(handle.fileno())
+    return refs
+
+
+def _jsonl_line_count(path: Path) -> int:
+    if not path.exists():
+        return 0
+    with path.open("r", encoding="utf-8") as handle:
+        return sum(1 for line in handle if line.strip())
+
+
+def _read_jsonl_records(path: Path) -> list[JsonObject]:
+    if not path.exists():
+        return []
+    records: list[JsonObject] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        value = json.loads(line)
+        if isinstance(value, dict):
+            records.append(value)
+    return records
+
+
+def _manifest_question_answer_refs(run_state: JsonObject) -> list[str]:
+    question_log = _log_path_if_recorded(run_state, "questions.jsonl")
+    if question_log is None:
+        return list(run_state.get("question_answer_log_refs", []))
+    line_count = _jsonl_line_count(question_log)
+    if line_count == 0:
+        return list(run_state.get("question_answer_log_refs", []))
+    return [_run_relative_log_ref(run_state, "questions.jsonl", line_number) for line_number in range(1, line_count + 1)]
+
+
+def _manifest_unresolved_requirements(run_state: JsonObject) -> list[JsonObject]:
+    unresolved: list[JsonObject] = []
+    _append_unresolved_requirements(unresolved, run_state.get("unresolved_requirements", []))
+    question_log = _log_path_if_recorded(run_state, "questions.jsonl")
+    if question_log is not None:
+        for record in _read_jsonl_records(question_log):
+            _append_unresolved_requirements(unresolved, record.get("unresolved_requirements", []))
+    return _dedupe_dicts(unresolved)
+
+
+def _manifest_operation_ids(run_state: JsonObject, state_key: str, statuses: set[str]) -> list[str]:
+    operation_ids = [str(value) for value in run_state.get(state_key, [])]
+    operation_log = _log_path_if_recorded(run_state, "operations.jsonl")
+    if operation_log is not None:
+        for record in _read_jsonl_records(operation_log):
+            if str(record.get("status", "")) in statuses and record.get("operation_id"):
+                operation_ids.append(str(record["operation_id"]))
+    return _dedupe(operation_ids)
+
+
+def _log_path_if_recorded(run_state: JsonObject, filename: str) -> Path | None:
+    try:
+        path = _run_dir(run_state) / filename
+    except ValueError:
+        return None
+    return path if path.exists() else None
+
+
+def _manifest_versions(run_state: JsonObject, *, allow_not_recorded: bool) -> JsonObject:
+    schema_versions = run_state.get("schema_versions")
+    package_versions = run_state.get("package_versions")
+    career_db_version = run_state.get("careerDbVersion")
+    recorded_matching_versions = bool(run_state.get("matching_algorithm_version")) and bool(run_state.get("matching_config_version"))
+    if isinstance(schema_versions, dict) and isinstance(package_versions, dict) and isinstance(career_db_version, dict) and (recorded_matching_versions or allow_not_recorded):
+        return {
+            "schema_versions": _schema_versions_from_recorded_state(schema_versions, allow_not_recorded),
+            "package_versions": {str(key): str(value) for key, value in package_versions.items()},
+            "careerDbVersion": dict(career_db_version),
+            "matching_algorithm_version": _recorded_string(run_state, "matching_algorithm_version", allow_not_recorded),
+            "matching_config_version": _recorded_string(run_state, "matching_config_version", allow_not_recorded),
+        }
+    if allow_not_recorded:
+        return {
+            "schema_versions": _schema_versions_from_recorded_state({}, True),
+            "package_versions": {},
+            "careerDbVersion": {"status": "unavailable", "reason": "career_db_not_configured"},
+            "matching_algorithm_version": "not recorded",
+            "matching_config_version": "not recorded",
+        }
+    return collectVersions(workspace=run_state.get("workspace"), run_state=run_state)
+
+
+def _schema_versions_from_recorded_state(schema_versions: JsonObject, allow_not_recorded: bool) -> JsonObject:
+    marker = "not recorded" if allow_not_recorded else ""
+    return {
+        "canonical_resume": str(schema_versions.get("canonical_resume", marker)),
+        "job": str(schema_versions.get("job", marker)),
+        "career_db": str(schema_versions.get("career_db", marker)),
+        "change_operation": str(schema_versions.get("change_operation", marker)),
+    }
+
+
+def _recorded_string(run_state: JsonObject, key: str, allow_not_recorded: bool) -> str:
+    value = run_state.get(key)
+    if isinstance(value, str) and value:
+        return value
+    return "not recorded" if allow_not_recorded else ""
+
+
+def _reconstructed_manifest_from_state(run_state: JsonObject) -> JsonObject:
+    versions = _manifest_versions(run_state, allow_not_recorded=True)
+    schema_versions = versions["schema_versions"]
+    not_recorded = _not_recorded_fields(run_state, versions)
+    metadata: JsonObject = {"field_sources": _manifest_field_sources()}
+    if not_recorded:
+        metadata["not_recorded_fields"] = not_recorded
+        metadata["not_recorded_marker"] = "not recorded"
+    manifest = {
+        "run_id": _recorded_string(run_state, "run_id", True),
+        "base_resume_id": _recorded_string(run_state, "base_resume_id", True),
+        "base_resume_hash": _recorded_string(run_state, "base_resume_hash", True),
+        "job_id": _recorded_string(run_state, "job_id", True),
+        "config_hash": _recorded_string(run_state, "config_hash", True),
+        "canonical_resume_schema_version": schema_versions["canonical_resume"],
+        "job_schema_version": schema_versions["job"],
+        "career_db_schema_version": schema_versions["career_db"],
+        "careerDbVersion": dict(versions["careerDbVersion"]),
+        "change_operation_schema_version": schema_versions["change_operation"],
+        "matching_algorithm_version": versions["matching_algorithm_version"],
+        "matching_config_version": versions["matching_config_version"],
+        "renderer_template_version": _recorded_string(run_state, "renderer_template_version", True),
+        "agent_model_config": dict(run_state.get("agent_model_config", {})) if isinstance(run_state.get("agent_model_config"), dict) else {},
+        "initial_score": _recorded_number(run_state.get("initial_score")),
+        "final_score": _recorded_number(run_state.get("final_score")),
+        "facts_added": list(run_state.get("facts_added", [])),
+        "facts_verified": list(run_state.get("facts_verified", [])),
+        "operations_applied": _manifest_operation_ids(run_state, "operations_applied", {"applied"}),
+        "operations_rejected": _manifest_operation_ids(run_state, "operations_rejected", {"rejected"}),
+        "validation_status": str(run_state.get("validation_status", "unknown")),
+        "output_artifact_paths": list(run_state.get("output_artifact_paths", [])),
+        "question_answer_log_refs": _manifest_question_answer_refs(run_state),
+        "unresolved_requirements": _manifest_unresolved_requirements(run_state),
+        "schema_version": RUN_MANIFEST_SCHEMA["schema_version"],
+        "package_versions": dict(versions["package_versions"]),
+        "recovery_markers": list(run_state.get("recovery_markers", [])),
+        "audit_refs": list(run_state.get("audit_refs", [])),
+        "metadata": metadata,
+    }
+    return manifest
+
+
+def _recorded_number(value: Any) -> float:
+    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else 0.0
+
+
+def _not_recorded_fields(run_state: JsonObject, versions: JsonObject) -> list[str]:
+    fields = [
+        "base_resume_id",
+        "base_resume_hash",
+        "job_id",
+        "config_hash",
+        "renderer_template_version",
+        "initial_score",
+        "final_score",
+    ]
+    missing = [field for field in fields if field not in run_state or run_state.get(field) in ("", None)]
+    for field, key in [
+        ("canonical_resume_schema_version", "canonical_resume"),
+        ("job_schema_version", "job"),
+        ("career_db_schema_version", "career_db"),
+        ("change_operation_schema_version", "change_operation"),
+    ]:
+        if versions["schema_versions"].get(key) == "not recorded":
+            missing.append(field)
+    for field in ["matching_algorithm_version", "matching_config_version"]:
+        if versions.get(field) == "not recorded":
+            missing.append(field)
+    return missing
+
+
+def _manifest_field_sources() -> JsonObject:
+    return {
+        "run_id": "persisted run state",
+        "base_resume_id": "persisted run state",
+        "base_resume_hash": "persisted run state",
+        "job_id": "persisted run state",
+        "config_hash": "persisted run state",
+        "schema_versions": "persisted run state",
+        "careerDbVersion": "persisted run state",
+        "matching_algorithm_version": "persisted run state",
+        "matching_config_version": "persisted run state",
+        "renderer_template_version": "persisted run state",
+        "agent_model_config": "persisted run state",
+        "initial_score": "persisted run state",
+        "final_score": "persisted run state",
+        "facts_added": "persisted run state",
+        "facts_verified": "persisted run state",
+        "operations_applied": "persisted run state plus operations.jsonl observations",
+        "operations_rejected": "persisted run state plus operations.jsonl observations",
+        "validation_status": "persisted run state",
+        "output_artifact_paths": "persisted run state",
+        "question_answer_log_refs": "questions.jsonl line refs when present, otherwise persisted run state",
+        "unresolved_requirements": "persisted run state plus explicit unresolved_requirements entries in questions.jsonl",
+        "recovery_markers": "persisted run state",
+        "audit_refs": "persisted run state",
+    }
+
+
 def _extend_ref_unique(target: JsonObject, key: str, values: list[JsonObject]) -> None:
     existing = [item for item in target.get(key, []) if isinstance(item, dict)]
     by_identity = {_stable_hash(item): dict(item) for item in existing}
@@ -473,12 +766,12 @@ def _extend_ref_unique(target: JsonObject, key: str, values: list[JsonObject]) -
     target[key] = list(by_identity.values())
 
 
-def _record_audit(operation: str, checkpoint: str, clock: Callable[[], str] | None) -> JsonObject:
+def _record_audit(operation: str, checkpoint: str, timestamp: str) -> JsonObject:
     return {
         "operation": operation,
         "checkpoint": checkpoint,
         "accepted": True,
-        "timestamp": _timestamp(clock),
+        "timestamp": timestamp,
     }
 
 
@@ -766,9 +1059,28 @@ def _operation_status_records(checkpoint_result: JsonObject) -> list[JsonObject]
     records: list[JsonObject] = []
     for key in ("operation_statuses", "operation_records", "validation_results"):
         records.extend(_operation_records_from_list(checkpoint_result.get(key)))
+    records.extend(_operation_records_from_ids(checkpoint_result.get("operations_proposed"), "proposed"))
+    records.extend(_operation_records_from_ids(checkpoint_result.get("operations_validated"), "validated"))
+    records.extend(_operation_records_from_ids(checkpoint_result.get("operations_applied"), "applied"))
+    records.extend(_operation_records_from_ids(checkpoint_result.get("operations_rejected"), "rejected"))
+    records.extend(_operation_records_from_list(checkpoint_result.get("proposed"), default_status="proposed"))
     records.extend(_operation_records_from_list(checkpoint_result.get("validated"), default_status="validated"))
     records.extend(_operation_records_from_list(checkpoint_result.get("applied"), default_status="applied"))
     records.extend(_operation_records_from_list(checkpoint_result.get("rejected"), default_status="rejected"))
+    return records
+
+
+def _operation_records_from_ids(value: Any, status: str) -> list[JsonObject]:
+    if not isinstance(value, list):
+        return []
+    records: list[JsonObject] = []
+    for item in value:
+        operation_id = str(item.get("operation_id", "")) if isinstance(item, dict) else str(item)
+        if operation_id:
+            record = dict(item) if isinstance(item, dict) else {"operation_id": operation_id}
+            record["operation_id"] = operation_id
+            record["status"] = str(record.get("status") or status)
+            records.append(record)
     return records
 
 
@@ -793,6 +1105,104 @@ def _operation_records_from_list(value: Any, default_status: str | None = None) 
             record["validation"] = dict(item)
         records.append(record)
     return records
+
+
+def _question_log_records(checkpoint_result: JsonObject) -> list[JsonObject]:
+    records: list[JsonObject] = []
+    for key in ("question_answer_records", "question_answer_log", "question_answers", "questions"):
+        records.extend(_question_records_from_list(checkpoint_result.get(key)))
+    for ref in checkpoint_result.get("question_answer_log_refs", []) or []:
+        if isinstance(ref, str) and ref:
+            records.append({"question_answer_ref": ref, "status": "recorded"})
+        elif isinstance(ref, dict):
+            records.extend(_question_records_from_list([ref]))
+    return records
+
+
+def _question_records_from_list(value: Any) -> list[JsonObject]:
+    if not isinstance(value, list):
+        return []
+    records: list[JsonObject] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        record: JsonObject = {}
+        for key in (
+            "question_id",
+            "question_ref",
+            "answer_ref",
+            "question_answer_ref",
+            "status",
+            "career_store_interaction_id",
+            "career_store_interaction_ref",
+        ):
+            if item.get(key) not in (None, ""):
+                record[key] = item[key]
+        fact_refs = item.get("fact_refs")
+        if isinstance(fact_refs, list):
+            record["fact_refs"] = [str(ref) for ref in fact_refs]
+        unresolved = _normalized_unresolved_requirements(item.get("unresolved_requirements", []))
+        if unresolved:
+            record["unresolved_requirements"] = unresolved
+        if record:
+            records.append(record)
+    return records
+
+
+def _question_recovery_refs(records: list[JsonObject]) -> list[str]:
+    refs: list[str] = []
+    for record in records:
+        for key in ("question_id", "question_answer_ref", "question_ref"):
+            value = record.get(key)
+            if isinstance(value, str) and value:
+                refs.append(value)
+                break
+    return refs
+
+
+def _extend_requirement_unique(run_state: JsonObject, requirements: Any) -> None:
+    existing = _normalized_unresolved_requirements(run_state.get("unresolved_requirements", []))
+    incoming = _normalized_unresolved_requirements(requirements)
+    run_state["unresolved_requirements"] = _dedupe_dicts(existing + incoming)
+
+
+def _append_unresolved_requirements(target: list[JsonObject], requirements: Any) -> None:
+    target.extend(_normalized_unresolved_requirements(requirements))
+
+
+def _normalized_unresolved_requirements(requirements: Any) -> list[JsonObject]:
+    if not isinstance(requirements, list):
+        return []
+    normalized: list[JsonObject] = []
+    for item in requirements:
+        if not isinstance(item, dict):
+            continue
+        requirement_id = item.get("requirement_id")
+        resolution_state = item.get("resolution_state")
+        if not isinstance(requirement_id, str) or not requirement_id:
+            continue
+        if not isinstance(resolution_state, str) or not resolution_state:
+            continue
+        normalized.append(
+            {
+                "requirement_id": requirement_id,
+                "resolution_state": resolution_state,
+                "reason": str(item.get("reason", "")),
+            }
+        )
+    return normalized
+
+
+def _dedupe_dicts(values: list[JsonObject]) -> list[JsonObject]:
+    result: list[JsonObject] = []
+    seen: set[str] = set()
+    for value in values:
+        identity = _stable_hash(value)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        result.append(dict(value))
+    return result
 
 
 def _looks_like_validation_result(value: JsonObject) -> bool:
@@ -870,11 +1280,13 @@ __all__ = [
     "Checkpoint",
     "RunManifest",
     "RunManifestValidationError",
+    "UnknownRunError",
     "createRun",
     "getNextCheckpoint",
     "advanceCheckpoint",
     "recordCheckpointResult",
     "buildRunManifest",
+    "reconstructRunManifest",
     "recoverRun",
     "assertCanComplete",
 ]

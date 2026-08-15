@@ -39,8 +39,8 @@ Tests should expect workflow artifacts around:
 - checkpoints
 - config hash
 - schema/package/template versions
-- operation log
-- question/answer log
+- operation log (`.workflow/runs/<run_id>/operations.jsonl`) exists on disk with at least one JSONL record when operation status transitions are recorded
+- question/answer log (`.workflow/runs/<run_id>/questions.jsonl`) exists on disk with at least one JSONL record when question/answer refs are recorded
 - validation results
 - render results
 - recovery markers

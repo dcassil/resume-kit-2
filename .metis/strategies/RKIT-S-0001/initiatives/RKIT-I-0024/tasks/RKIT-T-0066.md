@@ -4,14 +4,14 @@ level: task
 title: "Append-only operation and question/answer logs plus reconstructRunManifest"
 short_code: "RKIT-T-0066"
 created_at: 2026-08-15T03:39:09.886894+00:00
-updated_at: 2026-08-15T03:39:09.886894+00:00
+updated_at: 2026-08-15T03:47:17.025388+00:00
 parent: workflow-checkpoint-result
-blocked_by: ["RKIT-T-0065"]
+blocked_by: [RKIT-T-0065]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0024
 ## Objective
 
 Create the written log artifacts and reconstruction surface (RKIT-I-0024 Requirements 4-6 minus the CLI migration; Detailed Design "Operation and question/answer logs"/"Manifest reconstruction"): append-only `operations.jsonl` and `questions.jsonl` under the run directory; buildRunManifest populates question_answer_log_refs and unresolved_requirements from persisted logs; `reconstructRunManifest(run_id)` reads only persisted state and never invents values.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -60,4 +62,5 @@ Rationale: the audit-reconstruction spine; source-of-truth decisions per field a
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-15: Implemented append-only `operations.jsonl`/`questions.jsonl` writes with fsync, manifest log-derived refs/unresolved requirements, and `reconstructRunManifest(run_id, workspace=...)` from persisted state only. Added focused unit coverage for disk logs, no duplicated Q/A content, reconstruction equality, unknown run typed error, and pre-initiative `not recorded` markers. Focused workflow unit file passes locally.
+- 2026-08-15: Final validation passed: `python3 tools/run_gate.py --pr --root .`, `python3 tools/run_gate.py --smoke --root .`, and `python3 -m unittest discover -s tests/unit -v`. Workflow guardrail passed. Straight Jacket verification remains blocked by pre-existing protected `tools/*` checksum mismatches unrelated to this task.

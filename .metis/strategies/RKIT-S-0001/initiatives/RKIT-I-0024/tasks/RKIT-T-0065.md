@@ -4,14 +4,14 @@ level: task
 title: "Durable audit events and real checkpoint artifact refs; delete substring fabrication"
 short_code: "RKIT-T-0065"
 created_at: 2026-08-15T03:39:09.827790+00:00
-updated_at: 2026-08-15T03:40:22.141284+00:00
+updated_at: 2026-08-15T03:47:16.560052+00:00
 parent: workflow-checkpoint-result
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0024
 ## Objective
 
 Make the audit surface real (RKIT-I-0024 Requirements 1-3; Detailed Design "Audit-event persistence"/"Ref grounding"): every advanceCheckpoint decision — allowed AND blocked — appends a durable AuditEvent flushed at decision time; recordCheckpointResult writes the checkpoint payload to disk and returns only refs to files that exist with sha256 hashes; the substring 'validation'/'render' ref fabrication is deleted outright.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
