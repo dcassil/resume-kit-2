@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
+
+from resume_core import ResolutionState, VerificationState
 
 
 SCHEMA_VERSION = "career-store.v1"
@@ -145,6 +148,16 @@ def _stable_id(prefix: str, *parts: Any) -> str:
     return f"{prefix}_{digest}"
 
 
+def _row_value(row: sqlite3.Row | tuple[Any, ...], name: str, index: int) -> Any:
+    if isinstance(row, sqlite3.Row):
+        return row[name]
+    return row[index]
+
+
+_CANONICAL_VERIFICATION_STATES = tuple(state.value for state in VerificationState)
+_CANONICAL_RESOLUTION_STATES = tuple(state.value for state in ResolutionState)
+
+
 def _apply_section_6_fact_columns(conn: sqlite3.Connection) -> None:
     _add_column(conn, "facts", "canonical_name TEXT")
     _add_column(conn, "facts", "description TEXT")
@@ -181,11 +194,63 @@ def _apply_match_relationship_columns(conn: sqlite3.Connection) -> None:
     _add_column(conn, "relationships", "confidence REAL")
 
 
+def _apply_enum_value_remap(conn: sqlite3.Connection) -> None:
+    placeholders = ", ".join("?" for _ in _CANONICAL_VERIFICATION_STATES)
+    drifted_facts = conn.execute(
+        f"""
+        SELECT fact_id, verification_state, created_at, updated_at
+        FROM facts
+        WHERE verification_state NOT IN ({placeholders})
+        ORDER BY fact_id
+        """,
+        _CANONICAL_VERIFICATION_STATES,
+    ).fetchall()
+    for row in drifted_facts:
+        fact_id = str(_row_value(row, "fact_id", 0))
+        prior_state = str(_row_value(row, "verification_state", 1))
+        if prior_state != "conflicted":
+            continue
+        reason = "legacy conflicted verification state"
+        conflict_id = _stable_id("conflict", fact_id, reason)
+        created_at = str(_row_value(row, "updated_at", 3) or _row_value(row, "created_at", 2) or "1970-01-01T00:00:00Z")
+        metadata = {
+            "fact_id": fact_id,
+            "migration_id": "005_enum_value_remap",
+            "verification_state": prior_state,
+        }
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO conflicts (
+                conflict_id, fact_ids_json, reason, status, evidence_ids_json, metadata_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                conflict_id,
+                json.dumps([fact_id], sort_keys=True, separators=(",", ":")),
+                reason,
+                "open",
+                "[]",
+                json.dumps(metadata, sort_keys=True, separators=(",", ":")),
+                created_at,
+            ),
+        )
+    conn.execute(
+        f"UPDATE facts SET verification_state = 'unknown' WHERE verification_state NOT IN ({placeholders})",
+        _CANONICAL_VERIFICATION_STATES,
+    )
+    resolution_placeholders = ", ".join("?" for _ in _CANONICAL_RESOLUTION_STATES)
+    conn.execute(
+        f"UPDATE job_matches SET resolution_state = 'unknown' WHERE resolution_state NOT IN ({resolution_placeholders})",
+        _CANONICAL_RESOLUTION_STATES,
+    )
+
+
 MIGRATIONS: tuple[MigrationEntry, ...] = (
     MigrationEntry("001_initial", _apply_initial),
     MigrationEntry("002_section_6_fact_columns", _apply_section_6_fact_columns),
     MigrationEntry("003_jobs_table_backfill", _apply_jobs_table),
     MigrationEntry("004_match_relationship_columns", _apply_match_relationship_columns),
+    MigrationEntry("005_enum_value_remap", _apply_enum_value_remap),
 )
 
 SUPPORTED_SCHEMA_VERSION = len(MIGRATIONS)

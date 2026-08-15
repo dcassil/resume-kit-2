@@ -42,6 +42,11 @@
         "migration_id": "004_match_relationship_columns",
         "schema_version": "career-store.v1",
         "applied_at": "2026-01-01T00:00:00Z"
+      },
+      {
+        "migration_id": "005_enum_value_remap",
+        "schema_version": "career-store.v1",
+        "applied_at": "2026-01-01T00:00:00Z"
       }
     ],
     "facts": [

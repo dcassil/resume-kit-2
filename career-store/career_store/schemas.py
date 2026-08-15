@@ -16,6 +16,8 @@ class RelationshipType(str, Enum):
     ALIAS = "alias"
     EQUIVALENT = "equivalent"
     RELATED = "related"
+    PARENT = "parent"
+    CHILD = "child"
     CONTRADICTS = "contradicts"
 
 

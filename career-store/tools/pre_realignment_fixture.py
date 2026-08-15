@@ -15,6 +15,7 @@ EXPECTED_MIGRATIONS = [
     "002_section_6_fact_columns",
     "003_jobs_table_backfill",
     "004_match_relationship_columns",
+    "005_enum_value_remap",
 ]
 
 

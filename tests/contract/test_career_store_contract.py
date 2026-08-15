@@ -39,6 +39,7 @@ EXPECTED_MIGRATIONS = [
     "002_section_6_fact_columns",
     "003_jobs_table_backfill",
     "004_match_relationship_columns",
+    "005_enum_value_remap",
 ]
 
 
@@ -129,6 +130,21 @@ class CareerStoreSurfaceManifestTests(unittest.TestCase):
             },
         )
 
+    def test_effective_store_enum_sets_match_shared_dtos_where_named_same(self):
+        career_store = load_store_module(self)
+        resume_core = importlib.import_module("resume_core")
+        store_module = importlib.import_module("career_store.store")
+        verification_states = {state.value for state in resume_core.VerificationState}
+        resolution_states = {state.value for state in resume_core.ResolutionState}
+        relationship_types = {"alias", "related", "parent", "child", "equivalent", "contradicts"}
+
+        self.assertEqual({state.value for state in career_store.VerificationState}, verification_states)
+        self.assertEqual(store_module._VERIFICATION_STATES, verification_states)
+        self.assertEqual({state.value for state in career_store.ResolutionState}, resolution_states)
+        self.assertEqual(store_module._RESOLUTION_STATES, resolution_states)
+        self.assertEqual({state.value for state in career_store.RelationshipType}, relationship_types)
+        self.assertEqual(store_module._RELATIONSHIP_TYPES, relationship_types)
+
     def test_manifest_defines_safe_contracts_for_every_surface(self):
         surfaces = {surface["name"]: surface for surface in SURFACE["surfaces"]}
         self.assertEqual(set(surfaces), set(PUBLIC_FUNCTIONS))
@@ -160,7 +176,7 @@ class CareerStoreSchemaStateContractTests(unittest.TestCase):
             self.assertEqual(state.applied_migrations, EXPECTED_MIGRATIONS)
             self.assertEqual(state.pending_migrations, [])
             self.assertEqual(state.status, "ok")
-            self.assertEqual(state.metadata["user_version"], 4)
+            self.assertEqual(state.metadata["user_version"], 5)
             with sqlite3.connect(database_path) as conn:
                 rows = conn.execute("SELECT id, applied_at FROM schema_migrations ORDER BY id").fetchall()
                 self.assertEqual(rows, [(migration_id, "2026-01-01T00:00:00Z") for migration_id in EXPECTED_MIGRATIONS])
@@ -195,7 +211,7 @@ class CareerStoreSchemaStateContractTests(unittest.TestCase):
             with self.assertRaises(module.IncompatibleSchemaVersionError) as raised:
                 maybe_await(module.openCareerStore(str(database_path), clock=lambda: "2026-01-01T00:00:00Z"))
             self.assertEqual(raised.exception.found, 999)
-            self.assertEqual(raised.exception.supported, 4)
+            self.assertEqual(raised.exception.supported, 5)
 
 
 class CareerStorePersistenceContractTests(unittest.TestCase):
@@ -285,6 +301,61 @@ class CareerStorePersistenceContractTests(unittest.TestCase):
         self.assertIn(result.get("status"), {"created", "updated", "ok"})
         text = serialized(result)
         self.assertNotRegex(text, r"\bresume_patch|working_resume|base_resume|raw_sql|connection\b")
+
+    def test_write_paths_reject_removed_drifted_values_with_typed_errors(self):
+        rejected = maybe_await(
+            self.store.upsertFact(
+                {**SOURCE_FACT, "text": "Conflicted drift", "normalized_terms": ["conflicted"], "verification_state": "conflicted"},
+                SOURCE_EVIDENCE,
+                source="resume",
+                policy={},
+            )
+        )
+        self.assertEqual(rejected["status"], "error")
+        self.assertEqual(rejected["mutation_status"], "rejected")
+        self.assertEqual(rejected["errors"][0]["code"], "invalid_verification_state")
+        self.assertEqual(rejected["errors"][0]["field_path"], "verification_state")
+        self.assertNotIn("conflicted", rejected["errors"][0]["allowed_values"])
+
+        fact = maybe_await(self.store.upsertFact(SOURCE_FACT, SOURCE_EVIDENCE, source="resume", policy={}))
+        verify_rejected = maybe_await(self.store.verifyFact(fact["fact_id"], "explicitly_missing", confirmation=True, source="user_answer"))
+        self.assertEqual(verify_rejected["status"], "error")
+        self.assertEqual(verify_rejected["errors"][0]["code"], "invalid_verification_state")
+
+        match_rejected = maybe_await(self.store.recordJobMatch("job_a", "req_react", [fact["fact_id"]], "conflicted"))
+        self.assertEqual(match_rejected["status"], "error")
+        self.assertEqual(match_rejected["mutation_status"], "rejected")
+        self.assertEqual(match_rejected["errors"][0]["code"], "invalid_resolution_state")
+
+    def test_parent_child_relationship_types_are_accepted_by_effective_store(self):
+        parent = maybe_await(
+            self.store.upsertFact(
+                {**SOURCE_FACT, "text": "Frontend architecture", "normalized_terms": ["frontend architecture"]},
+                {"source": "resume", "text": "Frontend architecture"},
+                source="resume",
+                policy={},
+            )
+        )
+        child = maybe_await(
+            self.store.upsertFact(
+                {**SOURCE_FACT, "text": "React", "normalized_terms": ["react"]},
+                SOURCE_EVIDENCE,
+                source="resume",
+                policy={},
+            )
+        )
+        for relationship_type in ("parent", "child"):
+            with self.subTest(relationship_type=relationship_type):
+                result = maybe_await(
+                    self.store.addRelationship(
+                        parent["fact_id"],
+                        child["fact_id"],
+                        relationship_type,
+                        evidence_or_rationale={"text": relationship_type},
+                        policy={},
+                    )
+                )
+                self.assertIn(result["status"], {"created", "updated"})
 
 
 if __name__ == "__main__":

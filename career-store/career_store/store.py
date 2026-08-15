@@ -32,7 +32,7 @@ _VERIFICATION_STATES = {
     "inferred",
     "unknown",
 }
-_RELATIONSHIP_TYPES = {"alias", "equivalent", "related", "contradicts"}
+_RELATIONSHIP_TYPES = {"alias", "related", "parent", "child", "equivalent", "contradicts"}
 _RESOLUTION_STATES = {
     "exact_match",
     "alias_match",
@@ -245,17 +245,14 @@ class CareerStore:
         normalized = _normalized_terms(fact)
         fact_id = str(fact.get("fact_id") or _stable_id("fact", fact.get("type", "fact"), "|".join(normalized), fact.get("text", "")))
         requested_state = _state_value(fact.get("verification_state", "unknown"))
-        original_requested_state = requested_state
+        if requested_state not in _VERIFICATION_STATES:
+            return self._mutation_error("upsertFact", fact_id, "unknown", "invalid_verification_state", True)
         if requested_state == "user_verified" and not _has_explicit_confirmation(policy, evidence, source):
             requested_state = "unknown"
             confirmation_required = True
         else:
             confirmation_required = requested_state in {"inferred", "unknown"} and not policy.get("allow_inferred_final", True)
         conflicts = self._detect_conflicts({**fact, "fact_id": fact_id, "normalized_terms": normalized})
-        if original_requested_state == "conflicted":
-            conflicts.append(_legacy_state_conflict({**fact, "fact_id": fact_id}, original_requested_state))
-        if requested_state not in _VERIFICATION_STATES:
-            requested_state = "unknown"
         mutation_status = "created"
         with self._connect() as conn:
             existing = conn.execute(
@@ -574,7 +571,7 @@ class CareerStore:
     ) -> JsonObject:
         resolution_state = str(resolution_state)
         if resolution_state not in _RESOLUTION_STATES:
-            resolution_state = "unknown"
+            return self._job_match_error(job_id, requirement_id, "invalid_resolution_state")
         now = self._clock()
         clean_fact_ids = sorted(str(fact_id) for fact_id in fact_ids)
         job_match_id = _stable_id("job_match", job_id, requirement_id, "|".join(clean_fact_ids), resolution_state)
@@ -1054,6 +1051,9 @@ class CareerStore:
                 "verification_state": verification_state,
                 "conflicts": [],
                 "confirmation_required": confirmation_required,
+                "errors": [_validation_error(status, "verification_state", _VERIFICATION_STATES)]
+                if status == "invalid_verification_state"
+                else [{"code": status, "message": status.replace("_", " ")}],
                 "audit": self._audit(operation, mutated=False, reason=status),
             }
         )
@@ -1069,7 +1069,26 @@ class CareerStore:
                 "verification_state": "unknown",
                 "conflicts": [],
                 "confirmation_required": confirmation_required,
+                "errors": [_validation_error(reason, "relationship_type", _RELATIONSHIP_TYPES)]
+                if reason == "invalid_relationship_type"
+                else [{"code": reason, "message": reason.replace("_", " ")}],
                 "audit": self._audit("addRelationship", mutated=False, reason=reason),
+            }
+        )
+
+    def _job_match_error(self, job_id: str, requirement_id: str, reason: str) -> JsonObject:
+        return _clean_result(
+            {
+                "schema_version": SCHEMA_VERSION,
+                "status": "error",
+                "mutation_status": "rejected",
+                "job_match_id": None,
+                "job_id": str(job_id),
+                "requirement_id": str(requirement_id),
+                "fact_ids": [],
+                "resolution_state": "unknown",
+                "errors": [_validation_error(reason, "resolution_state", _RESOLUTION_STATES)],
+                "audit": self._audit("recordJobMatch", mutated=False, reason=reason),
             }
         )
 
@@ -1275,6 +1294,15 @@ def _legacy_state_conflict(fact: JsonObject, state: str) -> JsonObject:
             "fact_id": str(fact.get("fact_id", "")),
         },
     )
+
+
+def _validation_error(code: str, field_path: str, allowed_values: set[str]) -> JsonObject:
+    return {
+        "code": code,
+        "field_path": field_path,
+        "message": f"Invalid {field_path}.",
+        "allowed_values": sorted(allowed_values),
+    }
 
 
 def _has_explicit_confirmation(policy: JsonObject, evidence: JsonObject | None, source: str) -> bool:

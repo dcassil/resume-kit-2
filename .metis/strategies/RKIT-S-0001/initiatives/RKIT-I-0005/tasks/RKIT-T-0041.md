@@ -4,14 +4,14 @@ level: task
 title: "Enum restoration, persisted-value remap migration, surface/contract realignment"
 short_code: "RKIT-T-0041"
 created_at: 2026-08-14T23:56:07.483826+00:00
-updated_at: 2026-08-14T23:56:07.483826+00:00
+updated_at: 2026-08-15T00:16:37.690966+00:00
 parent: durable-career-store-package-and
-blocked_by: ["RKIT-T-0040"]
+blocked_by: [RKIT-T-0040]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0005
 ## Objective
 
 Restore the RKIT-A-0006 canonical enum vocabulary in career-store (store.py:16-35, store_surface.json:28-51) and remap persisted drifted values via a registry migration (RKIT-I-0005 Requirement 5): VerificationState = source_stated/user_verified/imported/inferred/unknown; ResolutionState regains `not_applicable` and drops `conflicted`; relationship types become alias/related/parent/child/equivalent plus `contradicts` (the A-0006-recorded extension).
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -61,4 +63,5 @@ Rationale: cross-package vocabulary alignment with data migration and conflict-p
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-14: Read task and Requirement 5. Protected `tools/career_store_guardrails.py` pins canonical verification/resolution sets, but relationship types are still drifted at line 49 (`alias/equivalent/related/contradicts`, missing `parent`/`child`), so full `store_surface.json` relationship realignment must be deferred to Daniel's protected approve/update-locks batch.
+- 2026-08-14: Implemented `005_enum_value_remap`, restored effective store relationship vocabulary to include `parent`/`child`, added typed write-path rejection for drifted verification/resolution values, and added row-by-row drifted fixture coverage including conflict preservation. Requested gates pass; full surface manifest relationship realignment remains deferred behind the protected guardrail pin.

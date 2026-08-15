@@ -13,6 +13,7 @@ for package_dir in ("resume-core", "career-store", "career-store/tools"):
         sys.path.insert(0, package_path)
 
 from career_store import openCareerStore  # noqa: E402
+from career_store.migrations import _stable_id  # noqa: E402
 from pre_realignment_fixture import (  # noqa: E402
     EXPECTED_MIGRATIONS,
     FIXED_TIME,
@@ -32,7 +33,7 @@ class CareerStoreRealignmentTests(unittest.TestCase):
 
             self.assertEqual(state.applied_migrations, EXPECTED_MIGRATIONS)
             self.assertEqual(state.pending_migrations, [])
-            self.assertEqual(state.metadata["user_version"], 4)
+            self.assertEqual(state.metadata["user_version"], 5)
             with sqlite3.connect(database_path) as conn:
                 conn.row_factory = sqlite3.Row
                 self.assertEqual(conn.execute("SELECT COUNT(*) FROM facts").fetchone()[0], 2)
@@ -61,6 +62,53 @@ class CareerStoreRealignmentTests(unittest.TestCase):
             openCareerStore(str(second_path), clock=lambda: FIXED_TIME)
 
             self.assertEqual(_canonical_sqlite_dump(first_path), _canonical_sqlite_dump(second_path))
+
+    def test_drifted_enum_values_migrate_row_by_row_and_preserve_conflicts(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "career.db"
+            build_drifted_enum_database(database_path)
+
+            store = openCareerStore(str(database_path), clock=lambda: FIXED_TIME)
+            state = store.getMigrationState()
+
+            self.assertEqual(state.applied_migrations, EXPECTED_MIGRATIONS)
+            with sqlite3.connect(database_path) as conn:
+                conn.row_factory = sqlite3.Row
+                facts = {
+                    row["fact_id"]: row["verification_state"]
+                    for row in conn.execute("SELECT fact_id, verification_state FROM facts ORDER BY fact_id").fetchall()
+                }
+                self.assertEqual(
+                    facts,
+                    {
+                        "fact_canonical": "source_stated",
+                        "fact_conflicted_existing": "unknown",
+                        "fact_conflicted_new": "unknown",
+                        "fact_explicitly_missing": "unknown",
+                        "fact_made_up": "unknown",
+                    },
+                )
+                job_matches = {
+                    row["job_match_id"]: row["resolution_state"]
+                    for row in conn.execute("SELECT job_match_id, resolution_state FROM job_matches ORDER BY job_match_id").fetchall()
+                }
+                self.assertEqual(job_matches, {"match_conflicted": "unknown", "match_not_applicable": "not_applicable"})
+                conflicts = {
+                    row["conflict_id"]: {
+                        "fact_ids": json.loads(row["fact_ids_json"]),
+                        "reason": row["reason"],
+                        "status": row["status"],
+                        "metadata": json.loads(row["metadata_json"]),
+                    }
+                    for row in conn.execute("SELECT * FROM conflicts ORDER BY conflict_id").fetchall()
+                }
+                existing_id = _legacy_conflict_id("fact_conflicted_existing")
+                created_id = _legacy_conflict_id("fact_conflicted_new")
+                self.assertEqual(conflicts[existing_id]["status"], "already_open")
+                self.assertEqual(conflicts[existing_id]["metadata"]["preserved"], True)
+                self.assertEqual(conflicts[created_id]["fact_ids"], ["fact_conflicted_new"])
+                self.assertEqual(conflicts[created_id]["reason"], "legacy conflicted verification state")
+                self.assertEqual(conflicts[created_id]["metadata"]["verification_state"], "conflicted")
 
 
 class CareerStoreJobsUnitTests(unittest.TestCase):
@@ -143,3 +191,97 @@ class CareerStoreJobsUnitTests(unittest.TestCase):
                         ("job_b", "req_graphql", [graphql["fact_id"]]),
                     ],
                 )
+
+
+def _legacy_conflict_id(fact_id: str) -> str:
+    return _stable_id("conflict", fact_id, "legacy conflicted verification state")
+
+
+def build_drifted_enum_database(database_path: Path) -> None:
+    from career_store.migrations import MIGRATIONS  # noqa: PLC0415
+
+    conn = sqlite3.connect(database_path)
+    try:
+        for index, migration in enumerate(MIGRATIONS[:4], start=1):
+            migration.apply(conn)
+            conn.execute(
+                "INSERT INTO schema_migrations (id, applied_at) VALUES (?, ?)",
+                (migration.id, FIXED_TIME),
+            )
+            conn.execute(
+                "INSERT INTO migrations (migration_id, schema_version, applied_at) VALUES (?, ?, ?)",
+                (migration.id, "career-store.v1", FIXED_TIME),
+            )
+            conn.execute(f"PRAGMA user_version = {index}")
+        for fact_id, state in (
+            ("fact_canonical", "source_stated"),
+            ("fact_conflicted_existing", "conflicted"),
+            ("fact_conflicted_new", "conflicted"),
+            ("fact_explicitly_missing", "explicitly_missing"),
+            ("fact_made_up", "made_up"),
+        ):
+            conn.execute(
+                """
+                INSERT INTO facts (
+                    fact_id, type, text, normalized_terms_json, verification_state, created_at, updated_at,
+                    metadata_json, canonical_name, description, years, confidence
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    fact_id,
+                    "skill",
+                    fact_id.replace("_", " "),
+                    json.dumps([fact_id], sort_keys=True, separators=(",", ":")),
+                    state,
+                    FIXED_TIME,
+                    FIXED_TIME,
+                    "{}",
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
+            )
+        conn.execute(
+            """
+            INSERT INTO conflicts (
+                conflict_id, fact_ids_json, reason, status, evidence_ids_json, metadata_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                _legacy_conflict_id("fact_conflicted_existing"),
+                json.dumps(["fact_conflicted_existing"], sort_keys=True, separators=(",", ":")),
+                "legacy conflicted verification state",
+                "already_open",
+                "[]",
+                json.dumps({"preserved": True}, sort_keys=True, separators=(",", ":")),
+                FIXED_TIME,
+            ),
+        )
+        for match_id, resolution_state in (
+            ("match_conflicted", "conflicted"),
+            ("match_not_applicable", "not_applicable"),
+        ):
+            conn.execute(
+                """
+                INSERT INTO job_matches (
+                    job_match_id, job_id, requirement_id, fact_ids_json, resolution_state, created_at, metadata_json,
+                    match_type, confidence, user_confirmed
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    match_id,
+                    "job_a",
+                    f"req_{match_id}",
+                    json.dumps(["fact_canonical"], sort_keys=True, separators=(",", ":")),
+                    resolution_state,
+                    FIXED_TIME,
+                    "{}",
+                    None,
+                    None,
+                    None,
+                ),
+            )
+        conn.commit()
+    finally:
+        conn.close()
