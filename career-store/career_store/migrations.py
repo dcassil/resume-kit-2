@@ -245,12 +245,30 @@ def _apply_enum_value_remap(conn: sqlite3.Connection) -> None:
     )
 
 
+def _apply_fact_merge_redirects(conn: sqlite3.Connection) -> None:
+    _add_column(conn, "facts", "merged_into_fact_id TEXT")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS fact_merges (
+            merge_id TEXT PRIMARY KEY,
+            survivor_fact_id TEXT NOT NULL,
+            merged_fact_id TEXT NOT NULL UNIQUE,
+            provenance_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(survivor_fact_id) REFERENCES facts(fact_id),
+            FOREIGN KEY(merged_fact_id) REFERENCES facts(fact_id)
+        )
+        """
+    )
+
+
 MIGRATIONS: tuple[MigrationEntry, ...] = (
     MigrationEntry("001_initial", _apply_initial),
     MigrationEntry("002_section_6_fact_columns", _apply_section_6_fact_columns),
     MigrationEntry("003_jobs_table_backfill", _apply_jobs_table),
     MigrationEntry("004_match_relationship_columns", _apply_match_relationship_columns),
     MigrationEntry("005_enum_value_remap", _apply_enum_value_remap),
+    MigrationEntry("006_fact_merge_redirects", _apply_fact_merge_redirects),
 )
 
 SUPPORTED_SCHEMA_VERSION = len(MIGRATIONS)

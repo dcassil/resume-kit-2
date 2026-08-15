@@ -33,7 +33,7 @@ class CareerStoreRealignmentTests(unittest.TestCase):
 
             self.assertEqual(state.applied_migrations, EXPECTED_MIGRATIONS)
             self.assertEqual(state.pending_migrations, [])
-            self.assertEqual(state.metadata["user_version"], 5)
+            self.assertEqual(state.metadata["user_version"], 6)
             with sqlite3.connect(database_path) as conn:
                 conn.row_factory = sqlite3.Row
                 self.assertEqual(conn.execute("SELECT COUNT(*) FROM facts").fetchone()[0], 2)
@@ -50,6 +50,9 @@ class CareerStoreRealignmentTests(unittest.TestCase):
                 self.assertTrue({"match_type", "confidence", "user_confirmed"} <= match_columns)
                 relationship_columns = {row["name"] for row in conn.execute("PRAGMA table_info(relationships)").fetchall()}
                 self.assertIn("confidence", relationship_columns)
+                fact_columns = {row["name"] for row in conn.execute("PRAGMA table_info(facts)").fetchall()}
+                self.assertIn("merged_into_fact_id", fact_columns)
+                self.assertEqual(conn.execute("SELECT COUNT(*) FROM fact_merges").fetchone()[0], 0)
 
     def test_jobs_backfill_is_deterministic_for_identical_inputs(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

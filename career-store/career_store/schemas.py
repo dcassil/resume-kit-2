@@ -41,6 +41,26 @@ class InvalidInterpretationProposalError(ValueError):
         return payload
 
 
+class MergeConflictError(ValueError):
+    """Typed validation error for invalid fact merge requests."""
+
+    def __init__(self, code: str, survivor_id: str, merged_id: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.survivor_id = survivor_id
+        self.merged_id = merged_id
+        self.message = message
+
+    def to_error(self) -> JsonObject:
+        return {
+            "type": self.__class__.__name__,
+            "code": self.code,
+            "survivorId": self.survivor_id,
+            "mergedId": self.merged_id,
+            "message": self.message,
+        }
+
+
 class RelationshipType(str, Enum):
     ALIAS = "alias"
     EQUIVALENT = "equivalent"
@@ -227,6 +247,7 @@ __all__ = [
     "INTERPRETATION_PROPOSAL_SCHEMA",
     "InterpretationProposal",
     "InvalidInterpretationProposalError",
+    "MergeConflictError",
     "MigrationState",
     "ProvenanceRef",
     "RelationshipType",

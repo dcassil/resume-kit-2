@@ -4,14 +4,14 @@ level: task
 title: "mergeFacts with alias/history retention and id redirects"
 short_code: "RKIT-T-0047"
 created_at: 2026-08-15T00:37:23.698688+00:00
-updated_at: 2026-08-15T00:37:23.698688+00:00
+updated_at: 2026-08-15T01:06:02.716209+00:00
 parent: evidence-backed-fact-and
-blocked_by: ["RKIT-T-0046"]
+blocked_by: [RKIT-T-0046]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0006
 ## Objective
 
 Implement fact merging per vision section 6 (RKIT-I-0006 Requirement 4, Detailed Design "Merge design"): `mergeFacts(survivorId, mergedId, provenance)` retains the losing fact's terms as aliases, preserves ALL evidence rows for both facts, records the merge in history, installs an id redirect so the merged-away id resolves to the survivor, and never escalates verification state outside the T-0045 engine.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -61,4 +63,4 @@ Rationale: destructive-operation semantics with retention invariants; irreversib
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-15: Implemented `mergeFacts` in career-store with alias retention, evidence/job-match repointing, deterministic `fact_merges` history, `facts.merged_into_fact_id` redirects, redirect-aware `getFact`/`searchFacts`, and `MergeConflictError`. Added focused unit tests for retention, redirected-id search, no verification promotion, typed conflicts, and transaction rollback after injected interruption. Requested PR/smoke/unit/migration validations pass; `store_surface.json` remains intentionally deferred/protected.

@@ -24,28 +24,44 @@ from .migrations import (
 from .schemas import InvalidInterpretationProposalError, MigrationState, TransactionResult
 from .store_support import (
     _add_if_not_none,
+    _after_merge_repoint,
     _authority_ref,
     _clean_result,
     _conflict_from_row,
     _conflict_object,
     _dedupe_conflicts,
+    _direct_resolution,
+    _expanded_terms,
     _from_json,
     _has_explicit_confirmation,
     _inference_ref,
+    _insert_merge_alias_relationship,
     _job_metadata,
+    _meaningful_overlap,
+    _merge_alias_terms,
+    _merge_conflict,
+    _merge_conflict_result,
+    _merge_provenance_payload,
+    _merged_metadata,
+    _metadata_terms,
     _normalize,
+    _normalized_terms,
     _optional_bool,
     _optional_float,
     _optional_int,
     _optional_text,
+    _required_years,
+    _repoint_job_matches,
+    _resolve_fact_id,
     _source_document_ref,
     _stable_id,
     _state_value,
+    _title_claim,
     _to_json,
     _upsert_user_proposal,
     _validation_error,
+    _year_claim,
 )
-from .terms import _AWS_SERVICE_TERMS, _STOP_TERMS, _TERM_ALIASES
 from .transactions import TransactionScope, transaction_result_payload
 from .verification import (
     DisallowedTransitionError,
@@ -111,18 +127,32 @@ class CareerStore:
     ) -> JsonObject:
         filters = filters or {}
         terms = _normalized_terms({"text": query, "normalized_terms": [query]})
-        rows = self._fact_rows()
         matches: list[JsonObject] = []
-        for row in rows:
-            fact = self._fact_from_row(row)
-            if filters.get("verification_state") and fact["verification_state"] != filters["verification_state"]:
-                continue
-            fact_terms = set(fact["normalized_terms"] + [_normalize(fact["text"])])
-            relationship_terms = set(self._relationship_terms(fact["fact_id"]))
-            if not terms or fact_terms.intersection(terms) or relationship_terms.intersection(terms):
-                if include_evidence:
-                    fact["evidence"] = self._evidence_for_fact(fact["fact_id"])
-                matches.append(fact)
+        with self._connect() as conn:
+            redirected_query_id = _resolve_fact_id(conn, query)
+            rows = self._fact_rows(conn=conn, active_only=True)
+            for row in rows:
+                fact = self._fact_from_row(row, conn=conn)
+                if filters.get("verification_state") and fact["verification_state"] != filters["verification_state"]:
+                    continue
+                fact_terms = set(
+                    fact["normalized_terms"]
+                    + [
+                        _normalize(fact["text"]),
+                        _normalize(fact.get("canonical_name", "")),
+                        _normalize(fact.get("description", "")),
+                    ]
+                )
+                relationship_terms = set(self._relationship_terms(fact["fact_id"], conn=conn))
+                if (
+                    not terms
+                    or redirected_query_id == fact["fact_id"]
+                    or fact_terms.intersection(terms)
+                    or relationship_terms.intersection(terms)
+                ):
+                    if include_evidence:
+                        fact["evidence"] = self._evidence_for_fact(fact["fact_id"], conn=conn)
+                    matches.append(fact)
         matches.sort(key=lambda item: (item["type"], item["text"].casefold(), item["fact_id"]))
         if limit is not None:
             matches = matches[: max(0, int(limit))]
@@ -137,31 +167,117 @@ class CareerStore:
         )
 
     def getFact(self, fact_id: str) -> JsonObject:
-        row = self._fact_row(fact_id)
-        if row is None:
+        with self._connect() as conn:
+            resolved_fact_id = _resolve_fact_id(conn, fact_id)
+            row = self._fact_row(resolved_fact_id, conn=conn) if resolved_fact_id else None
+            if row is None:
+                return _clean_result(
+                    {
+                        "schema_version": SCHEMA_VERSION,
+                        "status": "not_found",
+                        "fact": None,
+                        "evidence": [],
+                        "relationships": [],
+                        "conflicts": [],
+                        "audit": self._audit("getFact", mutated=False),
+                    }
+                )
+            fact = self._fact_from_row(row, conn=conn)
             return _clean_result(
                 {
                     "schema_version": SCHEMA_VERSION,
-                    "status": "not_found",
-                    "fact": None,
-                    "evidence": [],
-                    "relationships": [],
-                    "conflicts": [],
+                    "status": "ok",
+                    "fact": fact,
+                    "evidence": self._evidence_for_fact(fact["fact_id"], conn=conn),
+                    "relationships": self._relationships_for_fact(fact["fact_id"], conn=conn),
+                    "conflicts": self._conflicts_for_fact(fact["fact_id"], conn=conn),
                     "audit": self._audit("getFact", mutated=False),
                 }
             )
-        fact = self._fact_from_row(row)
-        return _clean_result(
-            {
-                "schema_version": SCHEMA_VERSION,
-                "status": "ok",
-                "fact": fact,
-                "evidence": self._evidence_for_fact(fact_id),
-                "relationships": self._relationships_for_fact(fact_id),
-                "conflicts": self._conflicts_for_fact(fact_id),
-                "audit": self._audit("getFact", mutated=False),
-            }
-        )
+
+    def mergeFacts(self, survivorId: str, mergedId: str, provenance: JsonObject | list[JsonObject] | None) -> JsonObject:
+        survivor_id = str(survivorId)
+        merged_id = str(mergedId)
+        now = self._clock()
+        merge_id = _stable_id("fact_merge", survivor_id, merged_id)
+        with self._transaction("mergeFacts", "updated") as txn:
+            conn = txn.connection
+            assert conn is not None
+            txn.touch("survivor_fact_id", survivor_id)
+            txn.touch("merged_fact_id", merged_id)
+            txn.touch("merge_id", merge_id)
+            error = _merge_conflict(conn, survivor_id, merged_id)
+            if error is not None:
+                txn.set_mutation_status("rejected")
+                result = _merge_conflict_result(
+                    error,
+                    SCHEMA_VERSION,
+                    self._audit("mergeFacts", mutated=False, reason=error.code),
+                )
+                result["transaction_result"] = None
+            else:
+                survivor_row = self._fact_row(survivor_id, conn=conn)
+                merged_row = self._fact_row(merged_id, conn=conn)
+                assert survivor_row is not None
+                assert merged_row is not None
+                alias_terms = _merge_alias_terms(survivor_row, merged_row)
+                survivor_metadata = _from_json(str(survivor_row["metadata_json"]), {})
+                metadata = _merged_metadata(
+                    survivor_metadata,
+                    {
+                        "merged_fact_ids": sorted(
+                            set([*survivor_metadata.get("merged_fact_ids", []), merged_id])
+                            if isinstance(survivor_metadata.get("merged_fact_ids"), list)
+                            else {merged_id}
+                        )
+                    },
+                )
+                canonical_name = survivor_row["canonical_name"] or merged_row["canonical_name"]
+                description = survivor_row["description"] or merged_row["description"]
+                conn.execute(
+                    """
+                    UPDATE facts
+                    SET normalized_terms_json = ?, metadata_json = ?, canonical_name = ?, description = ?, updated_at = ?
+                    WHERE fact_id = ?
+                    """,
+                    (_to_json(alias_terms), _to_json(metadata), canonical_name, description, now, survivor_id),
+                )
+                _insert_merge_alias_relationship(conn, survivor_id, merged_id, provenance, now)
+                conn.execute(
+                    "UPDATE evidence SET fact_id = ? WHERE fact_id = ?",
+                    (survivor_id, merged_id),
+                )
+                _repoint_job_matches(conn, survivor_id, merged_id)
+                _after_merge_repoint(provenance)
+                conn.execute(
+                    "UPDATE facts SET merged_into_fact_id = ?, updated_at = ? WHERE fact_id = ?",
+                    (survivor_id, now, merged_id),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO fact_merges (
+                        merge_id, survivor_fact_id, merged_fact_id, provenance_json, created_at
+                    ) VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (merge_id, survivor_id, merged_id, _to_json(_merge_provenance_payload(provenance)), now),
+                )
+                result = {
+                    "schema_version": SCHEMA_VERSION,
+                    "status": "updated",
+                    "mutation_status": "updated",
+                    "fact_id": survivor_id,
+                    "survivor_fact_id": survivor_id,
+                    "merged_fact_id": merged_id,
+                    "merge_id": merge_id,
+                    "verification_state": str(survivor_row["verification_state"]),
+                    "conflicts": self._conflicts_for_fact(survivor_id, conn=conn),
+                    "confirmation_required": False,
+                    "transaction_result": None,
+                    "audit": self._audit("mergeFacts", mutated=True),
+                }
+        transaction_result = txn.result
+        result["transaction_result"] = transaction_result_payload(transaction_result)
+        return _clean_result(result)
 
     def upsertFact(
         self,
@@ -830,11 +946,17 @@ class CareerStore:
         with self._connect() as local_conn:
             return self._fact_row(fact_id, conn=local_conn)
 
-    def _fact_rows(self, conn: sqlite3.Connection | None = None) -> list[sqlite3.Row]:
+    def _fact_rows(self, conn: sqlite3.Connection | None = None, active_only: bool = True) -> list[sqlite3.Row]:
         if conn is not None:
+            if active_only:
+                return list(
+                    conn.execute(
+                        "SELECT * FROM facts WHERE merged_into_fact_id IS NULL ORDER BY type, text, fact_id"
+                    ).fetchall()
+                )
             return list(conn.execute("SELECT * FROM facts ORDER BY type, text, fact_id").fetchall())
         with self._connect() as local_conn:
-            return self._fact_rows(conn=local_conn)
+            return self._fact_rows(conn=local_conn, active_only=active_only)
 
     def _fact_from_row(self, row: sqlite3.Row | None, conn: sqlite3.Connection | None = None) -> JsonObject:
         if row is None:
@@ -950,6 +1072,8 @@ class CareerStore:
             if other:
                 terms.extend(_expanded_terms(other["normalized_terms"]))
                 terms.append(_normalize(other["text"]))
+                terms.append(_normalize(other.get("canonical_name", "")))
+                terms.append(_normalize(other.get("description", "")))
         return sorted(set(term for term in terms if term))
 
     def _conflicts_for_fact(self, fact_id: str, conn: sqlite3.Connection | None = None) -> list[JsonObject]:
@@ -1152,6 +1276,8 @@ class CareerStore:
         if fact:
             terms.extend(fact.get("normalized_terms", []))
             terms.append(_normalize(fact.get("text", "")))
+            terms.append(_normalize(fact.get("canonical_name", "")))
+            terms.append(_normalize(fact.get("description", "")))
             metadata = fact.get("metadata", {})
             if isinstance(metadata, dict):
                 terms.extend(_metadata_terms(metadata))
@@ -1332,159 +1458,6 @@ def _default_clock() -> str:
     from datetime import datetime, timezone
 
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-def _normalized_terms(value: JsonObject) -> list[str]:
-    raw_terms = value.get("normalized_terms") or []
-    if isinstance(raw_terms, str):
-        raw_terms = [raw_terms]
-    terms = [_normalize(term) for term in raw_terms]
-    for key in ("concept", "source_text", "text", "type"):
-        if value.get(key):
-            terms.append(_normalize(value[key]))
-    return sorted(set(_expanded_terms(terms)))
-
-
-def _expanded_terms(values: list[Any] | set[Any] | tuple[Any, ...]) -> list[str]:
-    terms: set[str] = set()
-    for value in values:
-        normalized = _normalize(value)
-        if not normalized:
-            continue
-        terms.add(normalized)
-        pieces = normalized.split()
-        terms.update(piece for piece in pieces if len(piece) > 1)
-        for canonical, aliases in _TERM_ALIASES.items():
-            all_terms = {canonical, *aliases}
-            if normalized in all_terms or any(_term_in_text(alias, normalized) for alias in all_terms):
-                terms.add(canonical)
-                terms.update(aliases)
-    if "aws" in terms or "amazon web services" in terms:
-        terms.update(term for term in _AWS_SERVICE_TERMS if any(term in _normalize(value) for value in values))
-    return sorted(term for term in terms if term)
-
-
-def _metadata_terms(metadata: JsonObject) -> list[str]:
-    terms: list[str] = []
-    for key, value in metadata.items():
-        if isinstance(value, (str, int, float, bool)):
-            terms.append(_normalize(key))
-            terms.append(_normalize(value))
-        elif isinstance(value, list):
-            terms.append(_normalize(key))
-            terms.extend(_normalize(item) for item in value if isinstance(item, (str, int, float, bool)))
-        elif isinstance(value, dict):
-            terms.append(_normalize(key))
-            terms.extend(_metadata_terms(value))
-    return terms
-
-
-def _term_in_text(term: str, text: str) -> bool:
-    normalized = _normalize(term)
-    haystack = f" {_normalize(text)} "
-    return bool(normalized and f" {normalized} " in haystack)
-
-
-def _meaningful_overlap(requirement_terms: set[str], fact_terms: set[str]) -> set[str]:
-    overlap = requirement_terms.intersection(fact_terms)
-    return {term for term in overlap if term not in _STOP_TERMS}
-
-
-def _required_years(requirement: JsonObject) -> int | None:
-    raw_years = requirement.get("years")
-    if isinstance(raw_years, (int, float)) and 0 < int(raw_years) < 60:
-        return int(raw_years)
-    if isinstance(raw_years, str):
-        parsed = _year_claim(raw_years, {_normalize(raw_years)})
-        if parsed is not None:
-            return int(parsed)
-    parsed = _year_claim(
-        " ".join(str(requirement.get(key, "")) for key in ("concept", "source_text", "text")),
-        set(_normalized_terms(requirement)),
-    )
-    return int(parsed) if parsed is not None else None
-
-
-def _direct_resolution(fact: JsonObject, requirement_year: int | None, fact_terms: set[str]) -> tuple[str, JsonObject]:
-    if fact["verification_state"] == "conflicted":
-        return "possible_match", {"conflicts": [_legacy_state_conflict(fact, "conflicted")]}
-    if fact.get("resolution_state") == "explicitly_missing":
-        return "explicitly_missing", {}
-    fact_year_text = " ".join([str(fact.get("text", "")), *fact.get("normalized_terms", [])])
-    fact_year = _year_claim(fact_year_text, fact_terms)
-    metadata: JsonObject = {}
-    if requirement_year is not None:
-        metadata["required_years"] = requirement_year
-        if fact_year is not None:
-            fact_year_int = int(fact_year)
-            metadata["fact_years"] = fact_year_int
-            metadata["years_satisfied"] = fact_year_int >= requirement_year
-            if fact_year_int < requirement_year:
-                return "possible_match", metadata
-        else:
-            metadata["years_satisfied"] = False
-            return "possible_match", metadata
-    if fact["verification_state"] == "user_verified":
-        return "verified_fact_match", metadata
-    if fact["verification_state"] in {"unknown", "inferred"}:
-        return "possible_match", metadata
-    return "exact_match", metadata
-
-
-def _merged_metadata(existing: JsonObject, incoming: Any) -> JsonObject:
-    merged = dict(existing) if isinstance(existing, dict) else {}
-    if isinstance(incoming, dict):
-        merged.update(incoming)
-    return merged
-
-
-def _legacy_state_conflict(fact: JsonObject, state: str) -> JsonObject:
-    return _conflict_object(
-        [str(fact.get("fact_id", ""))],
-        f"legacy {state} verification state",
-        {
-            "verification_state": state,
-            "fact_id": str(fact.get("fact_id", "")),
-        },
-    )
-
-
-def _year_claim(text: str, terms: set[str]) -> str | None:
-    combined = " ".join([_normalize(text), *terms])
-    number_words = {
-        "one": "1",
-        "two": "2",
-        "three": "3",
-        "four": "4",
-        "five": "5",
-        "six": "6",
-        "seven": "7",
-        "eight": "8",
-        "nine": "9",
-        "ten": "10",
-    }
-    for word, number in number_words.items():
-        if f"{word} year" in combined or f"{word} years" in combined:
-            return number
-    for token in combined.split():
-        if token.isdigit() and 0 < int(token) < 60:
-            return token
-    return None
-
-
-def _title_claim(text: str, terms: set[str]) -> str | None:
-    combined = " ".join([_normalize(text), *terms])
-    titles = [
-        "staff engineer",
-        "principal engineer",
-        "senior engineer",
-        "engineering manager",
-        "software engineer",
-    ]
-    for title in titles:
-        if title in combined:
-            return title
-    return None
 
 
 __all__ = ["CareerStore", "IncompatibleSchemaVersionError", "MigrationFailedError", "openCareerStore"]

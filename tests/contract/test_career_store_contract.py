@@ -40,6 +40,7 @@ EXPECTED_MIGRATIONS = [
     "003_jobs_table_backfill",
     "004_match_relationship_columns",
     "005_enum_value_remap",
+    "006_fact_merge_redirects",
 ]
 
 
@@ -184,7 +185,7 @@ class CareerStoreSchemaStateContractTests(unittest.TestCase):
             self.assertEqual(state.applied_migrations, EXPECTED_MIGRATIONS)
             self.assertEqual(state.pending_migrations, [])
             self.assertEqual(state.status, "ok")
-            self.assertEqual(state.metadata["user_version"], 5)
+            self.assertEqual(state.metadata["user_version"], 6)
             with sqlite3.connect(database_path) as conn:
                 rows = conn.execute("SELECT id, applied_at FROM schema_migrations ORDER BY id").fetchall()
                 self.assertEqual(rows, [(migration_id, "2026-01-01T00:00:00Z") for migration_id in EXPECTED_MIGRATIONS])
@@ -219,7 +220,7 @@ class CareerStoreSchemaStateContractTests(unittest.TestCase):
             with self.assertRaises(module.IncompatibleSchemaVersionError) as raised:
                 maybe_await(module.openCareerStore(str(database_path), clock=lambda: "2026-01-01T00:00:00Z"))
             self.assertEqual(raised.exception.found, 999)
-            self.assertEqual(raised.exception.supported, 5)
+            self.assertEqual(raised.exception.supported, 6)
 
 
 class CareerStorePersistenceContractTests(unittest.TestCase):

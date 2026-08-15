@@ -10,6 +10,7 @@
     "tables": [
       "conflicts",
       "evidence",
+      "fact_merges",
       "facts",
       "job_matches",
       "jobs",
@@ -45,6 +46,11 @@
       },
       {
         "migration_id": "005_enum_value_remap",
+        "schema_version": "career-store.v1",
+        "applied_at": "2026-01-01T00:00:00Z"
+      },
+      {
+        "migration_id": "006_fact_merge_redirects",
         "schema_version": "career-store.v1",
         "applied_at": "2026-01-01T00:00:00Z"
       }

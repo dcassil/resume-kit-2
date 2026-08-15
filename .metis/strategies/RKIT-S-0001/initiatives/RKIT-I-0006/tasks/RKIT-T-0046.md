@@ -4,14 +4,14 @@ level: task
 title: "Rewire verify/confirm surface and import path through the engine; downgrade protection"
 short_code: "RKIT-T-0046"
 created_at: 2026-08-15T00:37:23.651390+00:00
-updated_at: 2026-08-15T00:56:49.022271+00:00
+updated_at: 2026-08-15T01:06:02.320201+00:00
 parent: evidence-backed-fact-and
 blocked_by: [RKIT-T-0045]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0006
 ## Objective
 
 Route every verification-state write through the T-0045 engine (RKIT-I-0006 Requirement 3's enforcement half): verifyFact, the upsert merge precedence path, and the import path all use the chokepoint; no inline state assignment remains; user_verified never downgrades except by explicit user-provenance correction and persists across store reopen and job sessions (TEST_SPEC:70-71).
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

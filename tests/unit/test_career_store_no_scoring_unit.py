@@ -25,6 +25,7 @@ ALLOWED_PUBLIC_METHODS = {
     "findConflicts",
     "getFact",
     "getMigrationState",
+    "mergeFacts",
     "recordJobMatch",
     "searchFacts",
     "upsertFact",

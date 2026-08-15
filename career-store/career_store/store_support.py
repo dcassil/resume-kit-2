@@ -7,7 +7,8 @@ import json
 import sqlite3
 from typing import Any
 
-from .schemas import InterpretationProposal
+from .schemas import InterpretationProposal, MergeConflictError
+from .terms import _AWS_SERVICE_TERMS, _STOP_TERMS, _TERM_ALIASES
 
 
 JsonObject = dict[str, Any]
@@ -211,3 +212,284 @@ def _clean_result(value: Any) -> Any:
     if isinstance(value, list):
         return [_clean_result(item) for item in value]
     return value
+
+
+def _normalized_terms(value: JsonObject) -> list[str]:
+    raw_terms = value.get("normalized_terms") or []
+    if isinstance(raw_terms, str):
+        raw_terms = [raw_terms]
+    terms = [_normalize(term) for term in raw_terms]
+    for key in ("concept", "source_text", "text", "type"):
+        if value.get(key):
+            terms.append(_normalize(value[key]))
+    return sorted(set(_expanded_terms(terms)))
+
+
+def _expanded_terms(values: list[Any] | set[Any] | tuple[Any, ...]) -> list[str]:
+    terms: set[str] = set()
+    for value in values:
+        normalized = _normalize(value)
+        if not normalized:
+            continue
+        terms.add(normalized)
+        pieces = normalized.split()
+        terms.update(piece for piece in pieces if len(piece) > 1)
+        for canonical, aliases in _TERM_ALIASES.items():
+            all_terms = {canonical, *aliases}
+            if normalized in all_terms or any(_term_in_text(alias, normalized) for alias in all_terms):
+                terms.add(canonical)
+                terms.update(aliases)
+    if "aws" in terms or "amazon web services" in terms:
+        terms.update(term for term in _AWS_SERVICE_TERMS if any(term in _normalize(value) for value in values))
+    return sorted(term for term in terms if term)
+
+
+def _metadata_terms(metadata: JsonObject) -> list[str]:
+    terms: list[str] = []
+    for key, value in metadata.items():
+        if isinstance(value, (str, int, float, bool)):
+            terms.append(_normalize(key))
+            terms.append(_normalize(value))
+        elif isinstance(value, list):
+            terms.append(_normalize(key))
+            terms.extend(_normalize(item) for item in value if isinstance(item, (str, int, float, bool)))
+        elif isinstance(value, dict):
+            terms.append(_normalize(key))
+            terms.extend(_metadata_terms(value))
+    return terms
+
+
+def _term_in_text(term: str, text: str) -> bool:
+    normalized = _normalize(term)
+    haystack = f" {_normalize(text)} "
+    return bool(normalized and f" {normalized} " in haystack)
+
+
+def _meaningful_overlap(requirement_terms: set[str], fact_terms: set[str]) -> set[str]:
+    overlap = requirement_terms.intersection(fact_terms)
+    return {term for term in overlap if term not in _STOP_TERMS}
+
+
+def _required_years(requirement: JsonObject) -> int | None:
+    raw_years = requirement.get("years")
+    if isinstance(raw_years, (int, float)) and 0 < int(raw_years) < 60:
+        return int(raw_years)
+    if isinstance(raw_years, str):
+        parsed = _year_claim(raw_years, {_normalize(raw_years)})
+        if parsed is not None:
+            return int(parsed)
+    parsed = _year_claim(
+        " ".join(str(requirement.get(key, "")) for key in ("concept", "source_text", "text")),
+        set(_normalized_terms(requirement)),
+    )
+    return int(parsed) if parsed is not None else None
+
+
+def _direct_resolution(fact: JsonObject, requirement_year: int | None, fact_terms: set[str]) -> tuple[str, JsonObject]:
+    if fact["verification_state"] == "conflicted":
+        return "possible_match", {"conflicts": [_legacy_state_conflict(fact, "conflicted")]}
+    if fact.get("resolution_state") == "explicitly_missing":
+        return "explicitly_missing", {}
+    fact_year_text = " ".join([str(fact.get("text", "")), *fact.get("normalized_terms", [])])
+    fact_year = _year_claim(fact_year_text, fact_terms)
+    metadata: JsonObject = {}
+    if requirement_year is not None:
+        metadata["required_years"] = requirement_year
+        if fact_year is not None:
+            fact_year_int = int(fact_year)
+            metadata["fact_years"] = fact_year_int
+            metadata["years_satisfied"] = fact_year_int >= requirement_year
+            if fact_year_int < requirement_year:
+                return "possible_match", metadata
+        else:
+            metadata["years_satisfied"] = False
+            return "possible_match", metadata
+    # Resolution only; verification transitions require explicit confirmation.
+    if fact["verification_state"] == "user_verified":
+        return "verified_fact_match", metadata
+    if fact["verification_state"] in {"unknown", "inferred"}:
+        return "possible_match", metadata
+    return "exact_match", metadata
+
+
+def _merged_metadata(existing: JsonObject, incoming: Any) -> JsonObject:
+    merged = dict(existing) if isinstance(existing, dict) else {}
+    if isinstance(incoming, dict):
+        merged.update(incoming)
+    return merged
+
+
+def _merge_alias_terms(survivor_row: sqlite3.Row, merged_row: sqlite3.Row) -> list[str]:
+    terms: list[str] = []
+    for row in (survivor_row, merged_row):
+        terms.extend(_from_json(str(row["normalized_terms_json"]), []))
+        terms.append(_normalize(row["text"]))
+        terms.append(_normalize(row["canonical_name"] or ""))
+        terms.append(_normalize(row["description"] or ""))
+    return sorted(set(term for term in _expanded_terms(terms) if term))
+
+
+def _merge_provenance_payload(provenance: JsonObject | list[JsonObject] | None) -> Any:
+    if isinstance(provenance, dict):
+        return {
+            key: value
+            for key, value in provenance.items()
+            if not key.startswith("_") and isinstance(value, (str, int, float, bool, list, dict, type(None)))
+        }
+    if isinstance(provenance, list):
+        cleaned = []
+        for item in provenance:
+            if isinstance(item, dict):
+                cleaned.append(_merge_provenance_payload(item))
+        return cleaned
+    return {}
+
+
+def _resolve_fact_id(conn: sqlite3.Connection, fact_id: str) -> str | None:
+    current = str(fact_id)
+    seen: set[str] = set()
+    while current not in seen:
+        seen.add(current)
+        row = conn.execute(
+            "SELECT fact_id, merged_into_fact_id FROM facts WHERE fact_id = ?",
+            (current,),
+        ).fetchone()
+        if row is None:
+            return None
+        redirected = row["merged_into_fact_id"]
+        if redirected is None or not str(redirected):
+            return str(row["fact_id"])
+        current = str(redirected)
+    return None
+
+
+def _merge_conflict(conn: sqlite3.Connection, survivor_id: str, merged_id: str) -> MergeConflictError | None:
+    if survivor_id == merged_id:
+        return MergeConflictError("self_merge", survivor_id, merged_id, "Cannot merge a fact into itself.")
+    survivor_row = conn.execute("SELECT fact_id, merged_into_fact_id FROM facts WHERE fact_id = ?", (survivor_id,)).fetchone()
+    merged_row = conn.execute("SELECT fact_id, merged_into_fact_id FROM facts WHERE fact_id = ?", (merged_id,)).fetchone()
+    if survivor_row is None or merged_row is None:
+        return MergeConflictError("unknown_fact_id", survivor_id, merged_id, "Both merge facts must exist.")
+    if survivor_row["merged_into_fact_id"] is not None or merged_row["merged_into_fact_id"] is not None:
+        return MergeConflictError("already_merged", survivor_id, merged_id, "Merge inputs must not already be redirected.")
+    return None
+
+
+def _merge_conflict_result(error: MergeConflictError, schema_version: str, audit: JsonObject) -> JsonObject:
+    return _clean_result(
+        {
+            "schema_version": schema_version,
+            "status": "error",
+            "mutation_status": "rejected",
+            "fact_id": error.survivor_id,
+            "survivor_fact_id": error.survivor_id,
+            "merged_fact_id": error.merged_id,
+            "verification_state": "unknown",
+            "conflicts": [],
+            "confirmation_required": False,
+            "errors": [error.to_error()],
+            "audit": audit,
+        }
+    )
+
+
+def _insert_merge_alias_relationship(
+    conn: sqlite3.Connection,
+    survivor_id: str,
+    merged_id: str,
+    provenance: JsonObject | list[JsonObject] | None,
+    now: str,
+) -> None:
+    evidence = {
+        "source": "mergeFacts",
+        "text": "Merged fact retained as an alias.",
+        "provenance": _merge_provenance_payload(provenance),
+    }
+    relationship_id = _stable_id("relationship", survivor_id, merged_id, "alias", _to_json(evidence))
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO relationships (
+            relationship_id, from_fact_id, to_fact_id, relationship_type, evidence_json, created_at,
+            metadata_json, confidence
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            relationship_id,
+            survivor_id,
+            merged_id,
+            "alias",
+            _to_json(evidence),
+            now,
+            _to_json({"source": "mergeFacts"}),
+            None,
+        ),
+    )
+
+
+def _repoint_job_matches(conn: sqlite3.Connection, survivor_id: str, merged_id: str) -> None:
+    rows = conn.execute("SELECT job_match_id, fact_ids_json FROM job_matches ORDER BY job_match_id").fetchall()
+    for row in rows:
+        fact_ids = [str(fact_id) for fact_id in _from_json(str(row["fact_ids_json"]), [])]
+        if merged_id not in fact_ids:
+            continue
+        repointed = sorted({survivor_id if fact_id == merged_id else fact_id for fact_id in fact_ids})
+        conn.execute(
+            "UPDATE job_matches SET fact_ids_json = ? WHERE job_match_id = ?",
+            (_to_json(repointed), row["job_match_id"]),
+        )
+
+
+def _after_merge_repoint(provenance: JsonObject | list[JsonObject] | None) -> None:
+    if isinstance(provenance, dict):
+        hook = provenance.get("_after_repoint")
+        if callable(hook):
+            hook("mergeFacts")
+
+
+def _legacy_state_conflict(fact: JsonObject, state: str) -> JsonObject:
+    return _conflict_object(
+        [str(fact.get("fact_id", ""))],
+        f"legacy {state} verification state",
+        {
+            "verification_state": state,
+            "fact_id": str(fact.get("fact_id", "")),
+        },
+    )
+
+
+def _year_claim(text: str, terms: set[str]) -> str | None:
+    combined = " ".join([_normalize(text), *terms])
+    number_words = {
+        "one": "1",
+        "two": "2",
+        "three": "3",
+        "four": "4",
+        "five": "5",
+        "six": "6",
+        "seven": "7",
+        "eight": "8",
+        "nine": "9",
+        "ten": "10",
+    }
+    for word, number in number_words.items():
+        if f"{word} year" in combined or f"{word} years" in combined:
+            return number
+    for token in combined.split():
+        if token.isdigit() and 0 < int(token) < 60:
+            return token
+    return None
+
+
+def _title_claim(text: str, terms: set[str]) -> str | None:
+    combined = " ".join([_normalize(text), *terms])
+    titles = [
+        "staff engineer",
+        "principal engineer",
+        "senior engineer",
+        "engineering manager",
+        "software engineer",
+    ]
+    for title in titles:
+        if title in combined:
+            return title
+    return None
