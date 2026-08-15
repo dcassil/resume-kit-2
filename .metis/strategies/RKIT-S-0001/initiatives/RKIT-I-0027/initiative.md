@@ -4,14 +4,14 @@ level: initiative
 title: "Workflow Tailoring, Validation, Render, and Completion Orchestration"
 short_code: "RKIT-I-0027"
 created_at: 2026-08-13T20:41:37.507312+00:00
-updated_at: 2026-08-15T04:30:48.850529+00:00
+updated_at: 2026-08-15T04:52:57.640447+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0026]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -92,6 +92,8 @@ Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
 - **Keep page-delta requiredReduction (the current DTO drift).** Rejected by decided RKIT-A-0006 item 7: the contract example implies a fine-grained quantity actionable by selection/rewrite; a page delta cannot direct a targeted reduction.
 
 ## Implementation Plan **[REQUIRED]**
+
+**COMPLETE 2026-08-15 (continuous mode).** Executed as RKIT-T-0071..0073: T-0071 grounded tail (stage evidence declarations BUILD_SELECTION_PLAN→COMPLETE; required_gates mapped to persisted artifact refs w/ hash re-verification — missing/tampered refs block per-gate by name; boolean completion tests rewritten to real artifacts); T-0072 render-overflow loop-back (measureLayout realigned to character-count requiredReduction per A-0006 item 7 w/ offending_sections; constraint artifact + loop-back to BUILD_SELECTION_PLAN; typed workflow.maxRenderOverflowIterations bound; honest blocked outcome; no truncation anywhere); T-0073 AST public-surface boundary test, TEST_SPEC overflow/completion cases, I-0040 driving-surface documented (see the review appended below/in T-0073), mutation probe. Gates at close: --pr 382 OK, --smoke OK, --future-contract 389 OK. COMPLETE is now meaningful: unreachable without real hash-verified artifacts across every gate.
 
 Decomposition guidance (tasks to be created at decompose phase, in dependency order):
 1. Stage evidence declarations for the tailoring tail (selection plan through completion).

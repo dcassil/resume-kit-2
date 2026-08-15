@@ -4,14 +4,14 @@ level: task
 title: "Public-surface boundary, TEST_SPEC overflow/completion cases, driving-surface review; I-0027 close-out"
 short_code: "RKIT-T-0073"
 created_at: 2026-08-15T04:29:40.693749+00:00
-updated_at: 2026-08-15T04:47:32.275510+00:00
+updated_at: 2026-08-15T04:52:41.046721+00:00
 parent: workflow-tailoring-validation
 blocked_by: [RKIT-T-0072]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0027
 ## Objective
 
 Close out RKIT-I-0027 (Requirements 4-5 + Testing Strategy): a boundary test enforces workflow imports only public surfaces of resume-core/resume-render; workflow/TEST_SPEC.md gains the overflow loop-back and grounded-completion cases; the stage-level checkpoint-driving surface is reviewed and documented for RKIT-I-0040's `resume run` wiring (interface shape only, no CLI code); three-gate close-out with mutation probe.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
