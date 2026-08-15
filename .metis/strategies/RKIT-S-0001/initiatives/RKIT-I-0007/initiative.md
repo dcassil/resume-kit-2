@@ -4,14 +4,14 @@ level: initiative
 title: "Relationship-Aware Matching and Cross-Job Reuse"
 short_code: "RKIT-I-0007"
 created_at: 2026-08-13T20:41:36.962447+00:00
-updated_at: 2026-08-15T01:25:04.949157+00:00
+updated_at: 2026-08-15T02:07:08.696125+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0006]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -94,6 +94,8 @@ Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
 - Fold scoring into career-store so it can decide resolution locally: rejected — scoring/resolution is Must-Not-Own (:37); emitting typed candidates and letting resume-core decide also keeps the honesty rule testable at the store boundary.
 
 ## Implementation Plan **[REQUIRED]**
+
+**COMPLETE 2026-08-15 (continuous mode).** Chunks executed as RKIT-T-0049..0053 (serial codex chain, committed on develop): T-0049 typed candidate generation (direct vs one-hop traversal, viaRelationships provenance, related-pollution FIXED with the outcome-asserted Azure contract test replacing the vacuous string-absence one; _TERM_ALIASES/_AWS_SERVICE_TERMS deleted, dictionary pairs honest non-matches); T-0050 confirmation substrate (migration 007, confirmRelationship as sole path to user_confirmed, single policy function enforcing allowUnverifiedAliasCreation:false — unconfirmed alias at most possible_match); T-0051 directional parent/child (child→parent related_match, parent→child possible_match, never exact/alias) + contradicts emitting conflict_signals for I-0008, never matching; T-0052 searchFacts composable concept/terms/alias/verification filters + minimum-necessary evidence + redirect exclusion; T-0053 gap-fill (cross-job match-metadata columns test) + TEST_SPEC outcome framing + mutation probe (term re-folding fails suite). Gates at close: --pr 352 OK, --smoke OK, --future-contract 359 OK, migration checks 4/4. Approval-batch additions: confirmRelationship surface entry; parent/child manifest vocabulary still deferred (guardrail pins drifted set); run_tests.py wiring now eight career-store unit modules.
 
 Dependency-ordered chunks for later decomposition (no Metis tasks yet):
 1. Rewrite `_fact_match_terms`/`_relationship_terms` into direct-vs-traversal candidate generation with typed provenance (fixes the pollution).

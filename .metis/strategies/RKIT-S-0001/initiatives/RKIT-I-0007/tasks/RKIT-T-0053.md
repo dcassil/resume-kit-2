@@ -4,14 +4,14 @@ level: task
 title: "Azure contract-test replacement, TEST_SPEC strengthening; I-0007 close-out"
 short_code: "RKIT-T-0053"
 created_at: 2026-08-15T01:23:28.483508+00:00
-updated_at: 2026-08-15T02:01:17.009386+00:00
+updated_at: 2026-08-15T02:06:54.621346+00:00
 parent: relationship-aware-matching-and
 blocked_by: [RKIT-T-0052]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0007
 ## Objective
 
 Close out RKIT-I-0007 (Requirement 7 + Testing Strategy): replace the vacuous Azure string-absence contract test with outcome assertions; consolidate confirmation/dictionary-removal/parent-child/searchFacts regressions; strengthen career-store/TEST_SPEC.md's relationship and match-type framing; run the three-gate close-out with a mutation probe.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
