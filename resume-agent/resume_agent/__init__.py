@@ -9,6 +9,15 @@ from typing import Any
 
 SCHEMA_VERSION = "resume-agent.proposal.v1"
 
+_TERM_SUPPORT_VARIANTS = {
+    "api architecture": ("api architecture", "api design", "rest api design", "rest apis"),
+    "responsive design": ("responsive design", "responsive web applications", "responsive web apps"),
+    "technical leadership": ("technical leadership", "team leadership", "led a small team", "code review", "delivery planning"),
+    "leadership": ("leadership", "team leadership", "led a small team", "code review", "delivery planning"),
+    "node.js": ("node", "node js", "nodejs"),
+    "postgresql": ("postgres", "postgresql"),
+}
+
 __all__ = [
     "extractResumeSemantics",
     "extractJobSemantics",
@@ -42,6 +51,15 @@ def _clean_text(value: Any) -> str:
     if not isinstance(value, str):
         return ""
     return re.sub(r"\s+", " ", value).strip()
+
+
+def _match_text(value: Any) -> str:
+    return " ".join("".join(char if char.isalnum() else " " for char in str(value).casefold()).split())
+
+
+def _term_in_text(term: str, text: str) -> bool:
+    needle = _match_text(term)
+    return bool(needle and f" {needle} " in f" {_match_text(text)} ")
 
 
 def _stable_id(prefix: str, text: str) -> str:
@@ -723,6 +741,7 @@ def proposeRewrite(context: dict[str, Any]) -> dict[str, Any]:
         and _clean_text(fact.get("text"))
         and not _is_blocked(_clean_text(fact.get("text")), blocked_text)
     ]
+    usable_terms = [term for term in usable_terms if _term_supported_by_facts(term, usable_facts)]
 
     fact_ids = [str(fact["fact_id"]) for fact in usable_facts]
     requirement_ids = [
@@ -785,6 +804,25 @@ def proposeRewrite(context: dict[str, Any]) -> dict[str, Any]:
     result.update({"operations": [operation]})
     result["proposals"] = [operation]
     return result
+
+
+def _term_supported_by_facts(term: str, facts: list[dict[str, Any]]) -> bool:
+    variants = _TERM_SUPPORT_VARIANTS.get(term.casefold(), (term,))
+    return any(_fact_supports_term(fact, variants) for fact in facts)
+
+
+def _fact_supports_term(fact: dict[str, Any], variants: tuple[str, ...]) -> bool:
+    segments = [_clean_text(fact.get("text"))]
+    terms = fact.get("normalized_terms")
+    if isinstance(terms, list):
+        segments.extend(_clean_text(term) for term in terms if isinstance(term, str))
+    evidence = fact.get("evidence")
+    if isinstance(evidence, list):
+        for item in evidence:
+            if isinstance(item, dict):
+                segments.append(_clean_text(item.get("text")))
+    text = " ".join(segment for segment in segments if segment)
+    return any(_term_in_text(variant, text) for variant in variants)
 
 
 def _contains_years(text: str) -> bool:

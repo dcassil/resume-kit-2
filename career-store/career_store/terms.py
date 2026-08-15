@@ -26,44 +26,4 @@ _STOP_TERMS = {
     "with",
     "years",
 }
-_TERM_ALIASES: dict[str, set[str]] = {
-    "api": {"apis", "rest api", "rest apis", "backend api", "service api"},
-    "api architecture": {
-        "api design",
-        "apis architecture",
-        "application architecture",
-        "architecture",
-        "system design",
-        "technical design",
-    },
-    "application architecture": {"api architecture", "architecture", "software architecture", "system architecture", "system design"},
-    "architecture": {"api architecture", "application architecture", "software architecture", "system architecture", "system design"},
-    "aws": {"amazon web services"},
-    "amazon web services": {"aws"},
-    "ec2": {"aws ec2"},
-    "graphql": {"graph ql", "graphql api", "graphql apis", "gql"},
-    "gql": {"graphql"},
-    "leadership": {"lead", "led", "mentor", "mentored", "mentoring", "technical leadership", "team leadership"},
-    "node": {"node js", "nodejs"},
-    "node js": {"node", "nodejs"},
-    "nodejs": {"node", "node js"},
-    "postgres": {"postgresql", "postgre sql"},
-    "postgresql": {"postgres", "postgre sql"},
-    "responsive design": {
-        "mobile friendly",
-        "responsive ui",
-        "responsive web app",
-        "responsive web apps",
-        "responsive web application",
-        "responsive web applications",
-    },
-    "responsive web apps": {"responsive design"},
-    "saas": {"software as a service", "multi tenant", "multitenant"},
-    "software as a service": {"saas"},
-    "software engineering": {"software development", "application development", "engineering"},
-    "system design": {"architecture", "application architecture", "technical design"},
-}
-_AWS_SERVICE_TERMS = {"ec2", "s3", "lambda", "rds", "iam"}
-
-
-__all__ = ["_AWS_SERVICE_TERMS", "_STOP_TERMS", "_TERM_ALIASES"]
+__all__ = ["_STOP_TERMS"]

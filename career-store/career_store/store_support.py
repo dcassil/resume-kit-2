@@ -8,7 +8,7 @@ import sqlite3
 from typing import Any
 
 from .schemas import InterpretationProposal, MergeConflictError
-from .terms import _AWS_SERVICE_TERMS, _STOP_TERMS, _TERM_ALIASES
+from .terms import _STOP_TERMS
 
 
 JsonObject = dict[str, Any]
@@ -234,13 +234,6 @@ def _expanded_terms(values: list[Any] | set[Any] | tuple[Any, ...]) -> list[str]
         terms.add(normalized)
         pieces = normalized.split()
         terms.update(piece for piece in pieces if len(piece) > 1)
-        for canonical, aliases in _TERM_ALIASES.items():
-            all_terms = {canonical, *aliases}
-            if normalized in all_terms or any(_term_in_text(alias, normalized) for alias in all_terms):
-                terms.add(canonical)
-                terms.update(aliases)
-    if "aws" in terms or "amazon web services" in terms:
-        terms.update(term for term in _AWS_SERVICE_TERMS if any(term in _normalize(value) for value in values))
     return sorted(term for term in terms if term)
 
 
@@ -310,6 +303,30 @@ def _direct_resolution(fact: JsonObject, requirement_year: int | None, fact_term
     if fact["verification_state"] in {"unknown", "inferred"}:
         return "possible_match", metadata
     return "exact_match", metadata
+
+
+def _relationship_candidate(
+    resolution: str,
+    overlap: set[str],
+    relationship: JsonObject,
+    metadata: JsonObject,
+    conflicts: list[JsonObject],
+) -> JsonObject:
+    return {
+        "resolution_state": resolution,
+        "match_type": resolution,
+        "match_terms": sorted(overlap),
+        "relationship_id": relationship["relationship_id"],
+        "via_relationships": [
+            {
+                "relationshipId": relationship["relationship_id"],
+                "type": relationship["relationship_type"],
+                "confirmationStatus": relationship.get("confirmation_status", "unconfirmed"),
+            }
+        ],
+        "metadata": metadata,
+        "conflicts": conflicts,
+    }
 
 
 def _merged_metadata(existing: JsonObject, incoming: Any) -> JsonObject:

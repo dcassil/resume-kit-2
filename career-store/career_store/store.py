@@ -53,6 +53,7 @@ from .store_support import (
     _required_years,
     _repoint_job_matches,
     _resolve_fact_id,
+    _relationship_candidate,
     _source_document_ref,
     _stable_id,
     _state_value,
@@ -723,25 +724,35 @@ class CareerStore:
                     supporting["evidence"] = self._evidence_for_fact(supporting["fact_id"])
                 supporting_facts.append(
                     {
+                        "factId": supporting["fact_id"],
                         "fact_id": supporting["fact_id"],
                         "fact": supporting,
+                        "matchType": candidate["match_type"],
                         "resolution_state": candidate["resolution_state"],
                         "match_type": candidate["resolution_state"],
+                        "terms": candidate["match_terms"],
                         "match_terms": candidate["match_terms"],
                         "relationship_id": candidate.get("relationship_id"),
+                        "viaRelationships": candidate.get("via_relationships", []),
+                        "via_relationships": candidate.get("via_relationships", []),
                         "metadata": candidate.get("metadata", {}),
                     }
                 )
             item = {
                 "requirement_id": requirement_id,
                 "job_id": job_id,
+                "factId": fact["fact_id"],
                 "fact_id": fact["fact_id"],
                 "fact_ids": [candidate["fact"]["fact_id"] for candidate in candidates],
                 "fact": fact,
                 "supporting_facts": supporting_facts,
+                "matchType": best["match_type"],
                 "resolution_state": best["resolution_state"],
                 "match_type": best["resolution_state"],
+                "terms": best["match_terms"],
                 "match_terms": best["match_terms"],
+                "viaRelationships": best.get("via_relationships", []),
+                "via_relationships": best.get("via_relationships", []),
                 "metadata": {
                     "concept": requirement.get("concept", requirement.get("text", "")),
                     "source_text": requirement.get("source_text", requirement.get("text", "")),
@@ -753,7 +764,7 @@ class CareerStore:
             for candidate in candidates:
                 conflicts.extend(candidate.get("conflicts", []))
                 conflicts.extend(self._conflicts_for_fact(candidate["fact"]["fact_id"]))
-            if best["resolution_state"] in {"unknown", "possible_match", "explicitly_missing"}:
+            if best["resolution_state"] in {"unknown", "possible_match", "related_match", "explicitly_missing"}:
                 unresolved.append(
                     {
                         "requirement_id": requirement_id,
@@ -1061,6 +1072,8 @@ class CareerStore:
                 "metadata": _from_json(str(row["metadata_json"]), {}),
             }
             _add_if_not_none(relationship, "confidence", row["confidence"])
+            if "confirmation_status" in row.keys():
+                relationship["confirmation_status"] = str(row["confirmation_status"] or "unconfirmed")
             relationships.append(relationship)
         return relationships
 
@@ -1238,7 +1251,9 @@ class CareerStore:
                         {
                             "fact": fact,
                             "resolution_state": resolution,
+                            "match_type": resolution,
                             "match_terms": sorted(overlap),
+                            "via_relationships": [],
                             "metadata": metadata,
                             "conflicts": conflicts,
                         },
@@ -1270,8 +1285,8 @@ class CareerStore:
                 break
         return selected
 
-    def _fact_match_terms(self, fact_id: str) -> set[str]:
-        fact = self._fact_from_row(self._fact_row(fact_id))
+    def _fact_match_terms(self, fact_id: str, conn: sqlite3.Connection | None = None) -> set[str]:
+        fact = self._fact_from_row(self._fact_row(fact_id, conn=conn), conn=conn)
         terms: list[str] = []
         if fact:
             terms.extend(fact.get("normalized_terms", []))
@@ -1281,13 +1296,12 @@ class CareerStore:
             metadata = fact.get("metadata", {})
             if isinstance(metadata, dict):
                 terms.extend(_metadata_terms(metadata))
-        for evidence in self._evidence_for_fact(fact_id):
+        for evidence in self._evidence_for_fact(fact_id, conn=conn):
             terms.append(_normalize(evidence.get("text", "")))
             terms.extend(_normalized_terms(evidence))
             metadata = evidence.get("metadata", {})
             if isinstance(metadata, dict):
                 terms.extend(_metadata_terms(metadata))
-        terms.extend(self._relationship_terms(fact_id))
         return set(_expanded_terms(terms))
 
     def _relationship_match(
@@ -1297,10 +1311,10 @@ class CareerStore:
         requirement_year: int | None,
         policy: JsonObject,
     ) -> JsonObject | None:
+        relationship_matches: list[tuple[int, int, str, str, JsonObject]] = []
         for relationship in self._relationships_for_fact(fact_id):
             other_id = relationship["to_fact_id"] if relationship["from_fact_id"] == fact_id else relationship["from_fact_id"]
-            other = self._fact_from_row(self._fact_row(other_id))
-            other_terms = set(_expanded_terms(other.get("normalized_terms", []) + [_normalize(other.get("text", ""))]))
+            other_terms = self._fact_match_terms(other_id)
             overlap = _meaningful_overlap(requirement_terms, other_terms)
             if not overlap:
                 continue
@@ -1309,26 +1323,30 @@ class CareerStore:
             fact_terms = self._fact_match_terms(fact_id)
             _, metadata = _direct_resolution(fact, requirement_year, fact_terms)
             conflicts = list(metadata.pop("conflicts", []))
+            def append_candidate(resolution: str) -> None:
+                relationship_matches.append(
+                    (
+                        _RESOLUTION_RANK[resolution],
+                        len(overlap),
+                        str(relationship["relationship_id"]),
+                        other_id,
+                        _relationship_candidate(resolution, overlap, relationship, metadata, conflicts),
+                    )
+                )
             if relationship_type in {"alias", "equivalent"}:
                 resolution = "possible_match" if metadata.get("years_satisfied") is False else "alias_match"
-                return {
-                    "resolution_state": resolution,
-                    "match_terms": sorted(overlap),
-                    "relationship_id": relationship["relationship_id"],
-                    "metadata": metadata,
-                    "conflicts": conflicts,
-                }
+                append_candidate(resolution)
+                continue
             if relationship_type == "related":
-                resolution = "related_match" if policy.get("allow_related_as_equivalent") else "possible_match"
+                resolution = "related_match"
                 if metadata.get("years_satisfied") is False:
                     resolution = "possible_match"
-                return {
-                    "resolution_state": resolution,
-                    "match_terms": sorted(overlap),
-                    "relationship_id": relationship["relationship_id"],
-                    "metadata": metadata,
-                    "conflicts": conflicts,
-                }
+                append_candidate(resolution)
+                continue
+            if relationship_type in {"parent", "child"}:
+                resolution = "possible_match" if metadata.get("years_satisfied") is False else "related_match"
+                append_candidate(resolution)
+                continue
             if relationship_type == "contradicts":
                 conflict = _conflict_object(
                     sorted([fact_id, other_id]),
@@ -1339,14 +1357,11 @@ class CareerStore:
                     },
                 )
                 conflicts.append(conflict)
-                return {
-                    "resolution_state": "possible_match",
-                    "match_terms": sorted(overlap),
-                    "relationship_id": relationship["relationship_id"],
-                    "metadata": metadata,
-                    "conflicts": conflicts,
-                }
-        return None
+                append_candidate("possible_match")
+        if not relationship_matches:
+            return None
+        relationship_matches.sort(key=lambda item: (-item[0], -item[1], item[2], item[3]))
+        return relationship_matches[0][4]
 
     def _mutation_error(
         self,

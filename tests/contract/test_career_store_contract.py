@@ -283,9 +283,80 @@ class CareerStorePersistenceContractTests(unittest.TestCase):
                 policy={"allow_related_as_equivalent": False},
             )
         )
-        text = serialized(matches)
-        self.assertIn("req_aws", text)
-        self.assertNotIn("equivalent_match", text)
+        self.assertEqual(matches["matches"][0]["requirement_id"], "req_aws")
+        self.assertEqual(matches["matches"][0]["fact_id"], azure["fact_id"])
+        self.assertEqual(matches["matches"][0]["matchType"], "related_match")
+        self.assertEqual(matches["matches"][0]["resolution_state"], "related_match")
+        self.assertEqual(matches["matches"][0]["viaRelationships"][0]["type"], "related")
+        self.assertEqual(matches["matches"][0]["viaRelationships"][0]["confirmationStatus"], "unconfirmed")
+        self.assertEqual(matches["unresolved"][0]["requirement_id"], "req_aws")
+        self.assertEqual(matches["unresolved"][0]["resolution_state"], "related_match")
+        states = {
+            candidate["matchType"]
+            for match in matches["matches"]
+            for candidate in match["supporting_facts"]
+        } | {match["matchType"] for match in matches["matches"]}
+        self.assertNotIn("exact_match", states)
+        self.assertNotIn("alias_match", states)
+
+    def test_compiled_dictionary_pairs_do_not_match_without_stored_relationships(self):
+        cases = [
+            ("System design", ["system design"], "API architecture", ["api architecture"]),
+            ("Amazon Web Services", ["amazon web services"], "AWS", ["aws"]),
+            ("GQL", ["gql"], "GraphQL", ["graphql"]),
+            ("NodeJS", ["nodejs"], "Node", ["node"]),
+            ("PostgreSQL", ["postgresql"], "Postgres", ["postgres"]),
+        ]
+        for fact_text, fact_terms, requirement_concept, requirement_terms in cases:
+            with self.subTest(fact_text=fact_text, requirement_concept=requirement_concept):
+                store = open_isolated_store(self)
+                maybe_await(
+                    store.upsertFact(
+                        {**SOURCE_FACT, "text": fact_text, "normalized_terms": fact_terms},
+                        {"source": "resume", "text": fact_text},
+                        source="resume",
+                        policy={},
+                    )
+                )
+                matches = maybe_await(
+                    store.findCandidateMatches(
+                        [
+                            {
+                                "requirement_id": "req_dictionary_regression",
+                                "concept": requirement_concept,
+                                "normalized_terms": requirement_terms,
+                            }
+                        ],
+                        policy={},
+                    )
+                )
+
+                self.assertEqual(matches["matches"], [])
+                self.assertEqual(matches["unresolved"][0]["requirement_id"], "req_dictionary_regression")
+                self.assertEqual(matches["unresolved"][0]["resolution_state"], "unknown")
+
+    def test_user_verified_direct_terms_emit_verified_candidate_without_relationship_path(self):
+        fact = maybe_await(
+            self.store.upsertFact(
+                {**SOURCE_FACT, "text": "React", "normalized_terms": ["react"], "verification_state": "user_verified"},
+                {"source": "user_answer", "text": "React"},
+                source="user_answer",
+                policy={"explicit_confirmation": True},
+            )
+        )
+
+        matches = maybe_await(
+            self.store.findCandidateMatches(
+                [{"requirement_id": "req_react", "concept": "React", "normalized_terms": ["react"]}],
+                policy={},
+            )
+        )
+
+        candidate = matches["matches"][0]["supporting_facts"][0]
+        self.assertEqual(candidate["factId"], fact["fact_id"])
+        self.assertEqual(candidate["matchType"], "verified_fact_match")
+        self.assertEqual(candidate["viaRelationships"], [])
+        self.assertEqual(candidate["terms"], ["react"])
 
     def test_conflicting_claims_are_returned_without_overwriting_history(self):
         six = maybe_await(
