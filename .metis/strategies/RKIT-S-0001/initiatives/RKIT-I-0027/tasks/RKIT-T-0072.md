@@ -4,14 +4,14 @@ level: task
 title: "Render-overflow loop-back with character-count requiredReduction and bounded honest blocking"
 short_code: "RKIT-T-0072"
 created_at: 2026-08-15T04:29:40.636408+00:00
-updated_at: 2026-08-15T04:38:15.481520+00:00
+updated_at: 2026-08-15T04:47:31.886287+00:00
 parent: workflow-tailoring-validation
 blocked_by: [RKIT-T-0071]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0027
 ## Objective
 
 Implement the render-overflow loop-back that exists nowhere in the repo (RKIT-I-0027 Requirements 1-2, Detailed Design "Overflow loop"): a render checkpoint result carrying overflow constraints from resume-render measureLayout routes the machine back to the selection-plan checkpoint with `requiredReduction` as a CHARACTER COUNT (RKIT-A-0006 item 7 — not a page delta); iterations are bounded via the section 13 config vocabulary; bound exhaustion yields an honest blocked outcome; renderer truncation is forbidden.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

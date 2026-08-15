@@ -62,6 +62,10 @@ Tests should expect workflow artifacts around:
 - Changes can move to application only after change-validation DTO evidence resolves against the declared workflow schema.
 - Final match can move to grounding audit only after operations-applied evidence resolves from persisted run state.
 - Grounding audit, ATS/structure validation, render, render validation, and complete can advance only after their required DTO, artifact, or persisted run-state evidence resolves.
+- A render checkpoint result from `measureLayout` with `status: overflow` and positive character-count `requiredReduction` must record a render-overflow constraint artifact; `getNextCheckpoint` must route back to BUILD_SELECTION_PLAN with both `selection_plan` and `render_overflow_constraints` required, and advancing through BUILD_SELECTION_PLAN must consume that exact constraint ref.
+- Render overflow that exceeds `workflow.maxRenderOverflowIterations` must block at RENDER with persisted `render_overflow_bound_exhausted` reasons and must not reach COMPLETE silently.
+- COMPLETE can advance only when each grounded completion gate has a resolving artifact ref with a matching hash: final match report, grounding audit, ATS/structure report, render validation report, and audit ref.
+- COMPLETE must remain blocked for each grounded completion gate when that gate's ref is missing or when the referenced artifact hash does not match the current file bytes.
 
 ### Invalid transitions
 

@@ -75,6 +75,8 @@ Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
 
 **Interruption surface.** Every stage boundary persists state before returning, so RKIT-I-0025 (which deliberately follows this initiative) can compute recovery reruns for the proposed-operations, partially-applied-operations, and render-overflow interruption points.
 
+**Driving surface review (2026-08-15).** RKIT-I-0040 can drive `resume run` through workflow without duplicating orchestration logic by using this exact call sequence: createRun -> loop of getNextCheckpoint (including resolution_loop + blocking_reasons and render_overflow) -> produce grounded evidence via package calls -> advanceCheckpoint -> recordCheckpointResult (+ overflow loop-back handling) -> assertCanComplete -> buildRunManifest. The CLI should invoke resume-core/resume-render/career-store public package calls to produce the evidence refs, but workflow remains the owner of checkpoint order, loop routing, bound exhaustion, and completion gates. Gap left for I-0040: wire the command to reload persisted run state between iterations and map each checkpoint's required_inputs to concrete package calls and artifact writes.
+
 ## Testing Strategy **[CONDITIONAL: Separate Testing Initiative]**
 
 - Contract test: an overflow render result routes the machine back to the selection-plan checkpoint carrying a character-count requiredReduction (regression for the currently unimplemented CONTRACT_SURFACE_ALIGNMENT.md:283 rule).

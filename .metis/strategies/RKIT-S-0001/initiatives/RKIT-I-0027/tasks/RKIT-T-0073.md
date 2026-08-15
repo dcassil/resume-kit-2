@@ -4,14 +4,14 @@ level: task
 title: "Public-surface boundary, TEST_SPEC overflow/completion cases, driving-surface review; I-0027 close-out"
 short_code: "RKIT-T-0073"
 created_at: 2026-08-15T04:29:40.693749+00:00
-updated_at: 2026-08-15T04:29:40.693749+00:00
+updated_at: 2026-08-15T04:47:32.275510+00:00
 parent: workflow-tailoring-validation
-blocked_by: ["RKIT-T-0072"]
+blocked_by: [RKIT-T-0072]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0027
 ## Objective
 
 Close out RKIT-I-0027 (Requirements 4-5 + Testing Strategy): a boundary test enforces workflow imports only public surfaces of resume-core/resume-render; workflow/TEST_SPEC.md gains the overflow loop-back and grounded-completion cases; the stage-level checkpoint-driving surface is reviewed and documented for RKIT-I-0040's `resume run` wiring (interface shape only, no CLI code); three-gate close-out with mutation probe.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -60,4 +62,8 @@ Rationale: consolidation + interface documentation on decided shapes.
 
 ## Status Updates
 
-*To be added during implementation*
+2026-08-15:
+- Guardrail-compat baseline checked before TEST_SPEC edit: `python3 tools/workflow_guardrails.py --root .` passed.
+- Boundary-test design: added an unprotected AST import inspection over `workflow/*.py` that rejects `resume_core`/`resume_render` submodule imports, wildcard imports, dynamic submodule imports, and root imports of names not listed in each package root `__all__`.
+- TEST_SPEC state-machine strengthening: added render-overflow loop-back, bound-exhaustion blocking, and grounded COMPLETE cases requiring per-gate artifact ref presence plus hash match.
+- Driving-surface review for RKIT-I-0040: createRun -> loop of getNextCheckpoint (including resolution_loop + blocking_reasons and render_overflow) -> produce grounded evidence via package calls -> advanceCheckpoint -> recordCheckpointResult (+ overflow loop-back handling) -> assertCanComplete -> buildRunManifest. No workflow orchestration logic needs CLI-side duplication; I-0040 still needs to map required_inputs to package calls/artifact writes and reload persisted run state between iterations.
