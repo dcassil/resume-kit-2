@@ -14,7 +14,7 @@ from career_store import openCareerStore
 from resume_agent import extractJobSemantics, extractResumeSemantics, generateClarificationQuestion, interpretUserAnswer, proposeRewrite
 from resume_core import applyChange, normalizeJobModel, normalizeResume, rankResumeContent, sanitizeText, scoreMatch, validateChange, validateFinalResume, validateGrounding, validateResume
 from resume_render import renderDocx, renderMarkdown, validateRenderedOutput
-from workflow import CHECKPOINT_ORDER, buildRunManifest, createRun
+from workflow import CHECKPOINT_ORDER, UnknownRunError, createRun, reconstructRunManifest, recordCheckpointResult
 
 
 JsonObject = dict[str, Any]
@@ -174,6 +174,7 @@ def _match(workspace: Path) -> JsonObject:
     match_result["requirements"] = requirements
     match_result["unresolved"] = match_result.get("unresolved_requirement_ids", [])
     _write_json(paths["reports_dir"] / "match.json", match_result)
+    _record_latest_run_snapshot(workspace, "MATCH_BASE", {"match_result": match_result})
     return {"status": "ok", "exit_code": 0, "match_result": match_result}
 
 
@@ -205,6 +206,14 @@ def _resolve(workspace: Path, answer: str) -> JsonObject:
             for requirement_id in context["selected_requirement_ids"]:
                 store.recordJobMatch(_current_job_id(workspace), requirement_id, [stored["fact_id"]], "verified_fact_match")
     match_result = _match(workspace)["match_result"]
+    _record_latest_run_snapshot(
+        workspace,
+        "RESOLVE_GAPS",
+        {
+            "facts_verified": [fact["fact_id"] for fact in stored_facts if fact.get("verification_state") == "user_verified"],
+            "question_answer_log_refs": [f"career-store/facts/{fact['fact_id']}" for fact in stored_facts if fact.get("fact_id")],
+        },
+    )
     return {
         "status": "ok",
         "exit_code": 0,
@@ -262,6 +271,16 @@ def _tailor(workspace: Path) -> JsonObject:
     _write_json(paths["resume_working"], updated_working)
     _write_json(paths["operations_dir"] / "selection.json", selection)
     _write_json(paths["operations_dir"] / "tailor.json", {"proposal": proposal, "operations": operations, "validated": validated, "applied": applied, "rejected": rejected})
+    _record_latest_run_snapshot(
+        workspace,
+        "APPLY_CHANGES",
+        {
+            "operations_proposed": operations,
+            "operations_validated": validated,
+            "operations_applied": applied,
+            "operations_rejected": rejected,
+        },
+    )
     if paths["resume_base"].read_text(encoding="utf-8") != base_before:
         return _error("policy_error", "base artifact changed outside ingest")
     return {
@@ -291,6 +310,7 @@ def _validate(workspace: Path) -> JsonObject:
         "inferred_fact_policy": "no unverified inferred final claim",
     }
     _write_json(paths["reports_dir"] / "validations.json", validations)
+    _record_latest_run_snapshot(workspace, "ATS_STRUCTURE_VALIDATION", {"validation_status": "passed", "validations": validations})
     return {"status": "ok", "exit_code": 0, "validations": validations}
 
 
@@ -344,6 +364,7 @@ def _export(workspace: Path, fmt: str) -> JsonObject:
         "warnings": selected.get("warnings", []),
     }
     _write_json(paths["reports_dir"] / "export.json", result)
+    _record_latest_run_snapshot(workspace, "RENDER", {"output_artifact_paths": result["artifacts"]})
     return result
 
 
@@ -373,43 +394,126 @@ def _inspect_requirement(workspace: Path, requirement_id: str) -> JsonObject:
 
 
 def _audit_report(workspace: Path) -> JsonObject:
-    config = _config(workspace)
-    paths = _paths(workspace)
-    resume = _read_json(paths["resume_base"], {})
-    match = _read_json(_paths(workspace)["reports_dir"] / "match.json", {})
-    operations = _read_json(_paths(workspace)["operations_dir"] / "tailor.json", {})
-    validations = _read_json(_paths(workspace)["reports_dir"] / "validations.json", {})
-    export = _read_json(_paths(workspace)["reports_dir"] / "export.json", {})
-    job = _read_json(paths["job_current"], {})
-    run_state = createRun(workspace=workspace, config=config)
-    manifest = buildRunManifest(
-        {
-            **run_state,
-            "base_resume_id": resume.get("resume_id", ""),
-            "base_resume_hash": resume.get("base_hash", ""),
-            "job_id": job.get("job_id", ""),
-            "renderer_template_version": config.get("schema_versions", {}).get("renderer_template", ""),
-            "initial_score": match.get("score", 0.0),
-            "final_score": match.get("score", 0.0),
-            "facts_added": [fact.get("fact_id") for fact in _all_facts(workspace) if fact.get("fact_id")],
-            "operations_applied": [item.get("operation_id") for item in operations.get("validated", [])],
-            "operations_rejected": [item.get("operation_id") for item in operations.get("rejected", [])],
-            "validation_status": "passed" if validations else "unknown",
-            "output_artifact_paths": _output_artifact_paths(_paths(workspace)) if export else [],
-        }
-    )
+    selected = _latest_persisted_run_for_current_config(workspace)
+    if selected is None:
+        return _error("not_found", "no persisted workflow runs found for the current workspace config_hash")
+    try:
+        manifest = reconstructRunManifest(selected["run_id"], workspace=workspace)
+    except UnknownRunError as exc:
+        return _error("not_found", _safe_message(exc))
     return {
         "status": "ok",
         "exit_code": 0,
         "run_identity": manifest["run_id"],
         "config_hash": manifest["config_hash"],
         "schema": manifest["schema_version"],
+        "versions": {
+            "canonical_resume": manifest["canonical_resume_schema_version"],
+            "job": manifest["job_schema_version"],
+            "career_db": manifest["career_db_schema_version"],
+            "change_operation": manifest["change_operation_schema_version"],
+            "matching_algorithm": manifest["matching_algorithm_version"],
+            "matching_config": manifest["matching_config_version"],
+            "renderer_template": manifest["renderer_template_version"],
+            "packages": manifest["package_versions"],
+        },
         "scores": {"initial": manifest["initial_score"], "final": manifest["final_score"]},
-        "facts": manifest["facts_added"],
+        "questions": manifest["question_answer_log_refs"],
+        "facts": {"added": manifest["facts_added"], "verified": manifest["facts_verified"]},
         "operations": {"applied": manifest["operations_applied"], "rejected": manifest["operations_rejected"]},
-        "validations": validations,
+        "validations": {"status": manifest["validation_status"]},
         "outputs": manifest["output_artifact_paths"],
+        "manifest": manifest,
+        "run_selection": {
+            "rule": "latest persisted run for the current workspace config_hash; latest means the highest numeric run_id sequence suffix",
+            "config_hash": selected["config_hash"],
+            "run_id": selected["run_id"],
+        },
     }
+
+
+def _record_latest_run_snapshot(workspace: Path, checkpoint: str, checkpoint_result: JsonObject) -> None:
+    selected = _latest_persisted_run_for_current_config(workspace)
+    if selected is None:
+        return
+    run_state = _read_json(_workflow_run_file(workspace, selected["run_id"]), {})
+    if not isinstance(run_state, dict):
+        return
+    run_state.update(_manifest_snapshot(workspace, run_state))
+    recordCheckpointResult(run_state, checkpoint, checkpoint_result)
+
+
+def _manifest_snapshot(workspace: Path, current_run_state: JsonObject) -> JsonObject:
+    paths = _paths(workspace)
+    config = _config(workspace)
+    resume = _read_json(paths["resume_base"], {})
+    job = _read_json(paths["job_current"], {})
+    match = _read_json(paths["reports_dir"] / "match.json", {})
+    operations = _read_json(paths["operations_dir"] / "tailor.json", {})
+    validations = _read_json(paths["reports_dir"] / "validations.json", {})
+    export = _read_json(paths["reports_dir"] / "export.json", {})
+    fact_ids = [fact.get("fact_id") for fact in _all_facts(workspace) if fact.get("fact_id")]
+    snapshot: JsonObject = {
+        "base_resume_id": resume.get("resume_id") or current_run_state.get("base_resume_id", ""),
+        "base_resume_hash": resume.get("base_hash") or current_run_state.get("base_resume_hash", ""),
+        "job_id": job.get("job_id") or current_run_state.get("job_id", ""),
+        "renderer_template_version": config.get("schema_versions", {}).get("renderer_template") or current_run_state.get("renderer_template_version", ""),
+        "facts_added": fact_ids or list(current_run_state.get("facts_added", [])),
+        "facts_verified": fact_ids or list(current_run_state.get("facts_verified", [])),
+        "operations_applied": _operation_ids(operations.get("applied", [])) or list(current_run_state.get("operations_applied", [])),
+        "operations_rejected": _operation_ids(operations.get("rejected", [])) or list(current_run_state.get("operations_rejected", [])),
+        "validation_status": "passed" if validations else current_run_state.get("validation_status", "unknown"),
+        "output_artifact_paths": _output_artifact_paths(paths) if export else list(current_run_state.get("output_artifact_paths", [])),
+    }
+    if isinstance(match.get("score"), (int, float)) and not isinstance(match.get("score"), bool):
+        score = float(match["score"])
+        snapshot["initial_score"] = current_run_state.get("initial_score", score)
+        snapshot["final_score"] = score
+    return snapshot
+
+
+def _operation_ids(items: Any) -> list[str]:
+    if not isinstance(items, list):
+        return []
+    return [str(item.get("operation_id")) for item in items if isinstance(item, dict) and item.get("operation_id")]
+
+
+def _latest_persisted_run_for_current_config(workspace: Path) -> JsonObject | None:
+    config_hash = _workflow_stable_hash(_config(workspace))
+    index = _read_json(workspace / ".workflow" / "runs" / "index.json", {})
+    if not isinstance(index, dict):
+        return None
+    run_ids = [str(run_id) for run_id in index.get(config_hash, []) if isinstance(run_id, str)]
+    persisted = [run_id for run_id in run_ids if _workflow_run_file(workspace, run_id).is_file()]
+    if not persisted:
+        return None
+    latest = max(persisted, key=_run_sequence_key)
+    return {"config_hash": config_hash, "run_id": latest}
+
+
+def _run_sequence_key(run_id: str) -> tuple[int, str]:
+    match = re.search(r"_(\d+)$", run_id)
+    sequence = int(match.group(1)) if match else -1
+    return (sequence, run_id)
+
+
+def _workflow_run_file(workspace: Path, run_id: str) -> Path:
+    return workspace / ".workflow" / "runs" / f"{run_id}.json"
+
+
+def _workflow_stable_hash(value: Any) -> str:
+    payload = json.dumps(_jsonable(value), sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _jsonable(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {str(key): _jsonable(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_jsonable(item) for item in value]
+    if isinstance(value, tuple):
+        return [_jsonable(item) for item in value]
+    return value
 
 
 def _paths(workspace: Path) -> dict[str, Path]:

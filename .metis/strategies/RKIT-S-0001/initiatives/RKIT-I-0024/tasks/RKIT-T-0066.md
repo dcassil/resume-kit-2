@@ -4,14 +4,14 @@ level: task
 title: "Append-only operation and question/answer logs plus reconstructRunManifest"
 short_code: "RKIT-T-0066"
 created_at: 2026-08-15T03:39:09.886894+00:00
-updated_at: 2026-08-15T03:47:17.025388+00:00
+updated_at: 2026-08-15T03:55:48.214365+00:00
 parent: workflow-checkpoint-result
 blocked_by: [RKIT-T-0065]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0024
 ## Objective
 
 Create the written log artifacts and reconstruction surface (RKIT-I-0024 Requirements 4-6 minus the CLI migration; Detailed Design "Operation and question/answer logs"/"Manifest reconstruction"): append-only `operations.jsonl` and `questions.jsonl` under the run directory; buildRunManifest populates question_answer_log_refs and unresolved_requirements from persisted logs; `reconstructRunManifest(run_id)` reads only persisted state and never invents values.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
