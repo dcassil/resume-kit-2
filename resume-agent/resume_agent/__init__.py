@@ -654,6 +654,7 @@ def interpretUserAnswer(answer: str, context: dict[str, Any]) -> dict[str, Any]:
 
     result.update(
         {
+            "outcome": _answer_outcome(text),
             "proposals": facts + resolutions + negatives,
             "requirement_resolution_proposals": resolutions,
             "fact_proposals": facts,
@@ -663,6 +664,16 @@ def interpretUserAnswer(answer: str, context: dict[str, Any]) -> dict[str, Any]:
         }
     )
     return result
+
+
+def _answer_outcome(text: str) -> str:
+    affirmative = _contains(text, r"\b(yes|i have|i've|i used|built|designed|maintained|worked)\b")
+    denied = _contains(text, r"\b(incorrect|no|not|never|haven't|have not|did nothing|did not|don't|do not)\b")
+    if affirmative:
+        return "affirmed"
+    if denied:
+        return "denied"
+    return "unclear"
 
 
 def proposeRewrite(context: dict[str, Any]) -> dict[str, Any]:

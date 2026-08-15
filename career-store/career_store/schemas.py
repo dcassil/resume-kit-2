@@ -10,6 +10,35 @@ from resume_core import Error, Result, ResolutionState, VerificationState
 
 
 JsonObject = dict[str, Any]
+INTERPRETATION_PROPOSAL_OUTCOMES = {"affirmed", "denied", "unclear"}
+
+
+class InvalidInterpretationProposalError(ValueError):
+    """Typed validation error for malformed store interpretation proposals."""
+
+    def __init__(
+        self,
+        code: str,
+        field_path: str,
+        message: str,
+        allowed_values: list[str] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.field_path = field_path
+        self.message = message
+        self.allowed_values = allowed_values
+
+    def to_error(self) -> JsonObject:
+        payload: JsonObject = {
+            "type": self.__class__.__name__,
+            "code": self.code,
+            "field_path": self.field_path,
+            "message": self.message,
+        }
+        if self.allowed_values is not None:
+            payload["allowed_values"] = self.allowed_values
+        return payload
 
 
 class RelationshipType(str, Enum):
@@ -30,6 +59,18 @@ class Evidence:
     source_span: JsonObject | None = None
     observed_at: str | None = None
     metadata: JsonObject = field(default_factory=dict)
+
+
+ProvenanceRef = JsonObject
+
+
+@dataclass(frozen=True)
+class InterpretationProposal:
+    factId: str
+    outcome: str
+    provenance: list[ProvenanceRef]
+    questionId: str | None = None
+    confirmedValue: Any | None = None
 
 
 @dataclass(frozen=True)
@@ -154,11 +195,25 @@ FACT_RELATIONSHIP_SCHEMA: JsonObject = {
     },
 }
 
+INTERPRETATION_PROPOSAL_SCHEMA: JsonObject = {
+    "schema_version": "interpretation-proposal.v1",
+    "type": "object",
+    "required": ["factId", "outcome", "provenance"],
+    "properties": {
+        "factId": {"type": "string"},
+        "questionId": {"type": ["string", "null"]},
+        "outcome": {"enum": sorted(INTERPRETATION_PROPOSAL_OUTCOMES)},
+        "confirmedValue": {},
+        "provenance": {"type": "array", "items": {"type": "object"}},
+    },
+}
+
 SCHEMAS: dict[str, JsonObject] = {
     "Fact": FACT_SCHEMA,
     "CareerFact": FACT_SCHEMA,
     "Evidence": EVIDENCE_SCHEMA,
     "FactRelationship": FACT_RELATIONSHIP_SCHEMA,
+    "InterpretationProposal": INTERPRETATION_PROPOSAL_SCHEMA,
 }
 
 
@@ -168,7 +223,12 @@ __all__ = [
     "Evidence",
     "Fact",
     "FactRelationship",
+    "INTERPRETATION_PROPOSAL_OUTCOMES",
+    "INTERPRETATION_PROPOSAL_SCHEMA",
+    "InterpretationProposal",
+    "InvalidInterpretationProposalError",
     "MigrationState",
+    "ProvenanceRef",
     "RelationshipType",
     "ResolutionState",
     "Result",

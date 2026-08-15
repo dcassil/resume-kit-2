@@ -112,8 +112,12 @@ class FakeCareerStore:
     def verify_fact(self, **kwargs):
         self.calls.append(("verify_fact", kwargs))
         confirmation = kwargs.get("confirmation")
-        if kwargs["verification_state"] == "user_verified" and not confirmation:
-            raise ValueError("explicit confirmation required")
+        if kwargs["verification_state"] == "user_verified" and (
+            not isinstance(confirmation, dict)
+            or confirmation.get("outcome") != "affirmed"
+            or not confirmation.get("provenance")
+        ):
+            raise ValueError("affirmed interpretation proposal required")
         return {
             "mutation_status": "updated",
             "fact_id": kwargs["fact_id"],
@@ -320,7 +324,11 @@ class CareerMcpAdapterContractTests(unittest.TestCase):
             {
                 "fact_id": "fact_aws",
                 "verification_state": "user_verified",
-                "confirmation": {"kind": "explicit_user_answer", "text": "Yes, about six years of AWS experience."},
+                "confirmation": {
+                    "factId": "fact_aws",
+                    "outcome": "affirmed",
+                    "provenance": [{"source": "user_answer", "text": "Yes, about six years of AWS experience."}],
+                },
             },
         )
         self.assertEqual(verified["verification_state"], "user_verified")

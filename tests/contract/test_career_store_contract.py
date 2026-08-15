@@ -79,6 +79,14 @@ def serialized(result: dict) -> str:
     return json.dumps(result, sort_keys=True).lower()
 
 
+def interpretation_proposal(fact_id: str, text: str = "Yes, confirmed.") -> dict:
+    return {
+        "factId": fact_id,
+        "outcome": "affirmed",
+        "provenance": [{"source": "user_answer", "text": text}],
+    }
+
+
 class CareerStoreSurfaceManifestTests(unittest.TestCase):
     def test_manifest_declares_exact_public_functions_and_types(self):
         self.assertEqual(
@@ -318,7 +326,14 @@ class CareerStorePersistenceContractTests(unittest.TestCase):
         self.assertNotIn("conflicted", rejected["errors"][0]["allowed_values"])
 
         fact = maybe_await(self.store.upsertFact(SOURCE_FACT, SOURCE_EVIDENCE, source="resume", policy={}))
-        verify_rejected = maybe_await(self.store.verifyFact(fact["fact_id"], "explicitly_missing", confirmation=True, source="user_answer"))
+        verify_rejected = maybe_await(
+            self.store.verifyFact(
+                fact["fact_id"],
+                "explicitly_missing",
+                confirmation=interpretation_proposal(fact["fact_id"]),
+                source="user_answer",
+            )
+        )
         self.assertEqual(verify_rejected["status"], "error")
         self.assertEqual(verify_rejected["errors"][0]["code"], "invalid_verification_state")
 

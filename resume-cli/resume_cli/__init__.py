@@ -190,18 +190,20 @@ def _resolve(workspace: Path, answer: str) -> JsonObject:
             proposal,
             {"source": "user_answer", "text": answer, "metadata": {"selected_requirement_ids": context["selected_requirement_ids"]}},
             source="user_answer",
-            policy={"explicit_confirmation": _explicit_confirmation(answer)},
+            policy={},
         )
+        interpretation_proposal = _interpretation_proposal(stored["fact_id"], interpretation, context, answer)
         verified = store.verifyFact(
             stored["fact_id"],
             "user_verified",
-            confirmation={"explicit": _explicit_confirmation(answer), "text": answer},
+            confirmation=interpretation_proposal,
             source="user_answer",
         )
         stored_fact = {"fact_id": stored["fact_id"], "verification_state": verified["verification_state"], "text": proposal["text"]}
         stored_facts.append(stored_fact)
-        for requirement_id in context["selected_requirement_ids"]:
-            store.recordJobMatch(_current_job_id(workspace), requirement_id, [stored["fact_id"]], "verified_fact_match")
+        if verified["verification_state"] == "user_verified":
+            for requirement_id in context["selected_requirement_ids"]:
+                store.recordJobMatch(_current_job_id(workspace), requirement_id, [stored["fact_id"]], "verified_fact_match")
     match_result = _match(workspace)["match_result"]
     return {
         "status": "ok",
@@ -870,16 +872,32 @@ def _fact_proposals(interpretation: JsonObject, context: JsonObject) -> list[Jso
                 "type": str(proposal.get("category") or proposal.get("type") or "experience"),
                 "text": text,
                 "normalized_terms": normalized_terms,
-                "verification_state": "user_verified",
+                "verification_state": "inferred",
                 "metadata": {"agent_proposal": proposal, "selected_requirement_ids": context.get("selected_requirement_ids", [])},
             }
         )
     return proposals
 
 
-def _explicit_confirmation(answer: str) -> bool:
-    lowered = answer.lower()
-    return bool(re.search(r"\b(yes|i have|i've|i used|built|designed|maintained|worked)\b", lowered))
+def _interpretation_proposal(fact_id: str, interpretation: JsonObject, context: JsonObject, answer: str) -> JsonObject:
+    evidence = interpretation.get("evidence_proposals", [])
+    source_id = None
+    if evidence and isinstance(evidence[0], dict):
+        source_id = evidence[0].get("evidence_id")
+    return {
+        "factId": fact_id,
+        "questionId": ",".join(str(item) for item in context.get("selected_requirement_ids", [])) or None,
+        "outcome": str(interpretation.get("outcome") or "unclear"),
+        "confirmedValue": {"answer": answer},
+        "provenance": [
+            {
+                "source": "user_answer",
+                "source_id": source_id,
+                "text": answer,
+                "metadata": {"selected_requirement_ids": context.get("selected_requirement_ids", [])},
+            }
+        ],
+    }
 
 
 def _current_job_id(workspace: Path) -> str:

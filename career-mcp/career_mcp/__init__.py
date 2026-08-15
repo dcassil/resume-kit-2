@@ -127,7 +127,9 @@ class CareerMcpAdapter:
             value = await _maybe_await(self._store.verify_fact(**arguments))
         else:
             confirmation = arguments["confirmation"]
-            source = str(confirmation.get("source", confirmation.get("kind", "mcp_tool")))
+            provenance = confirmation.get("provenance", []) if isinstance(confirmation, dict) else []
+            first_provenance = provenance[0] if provenance and isinstance(provenance[0], dict) else {}
+            source = str(first_provenance.get("source", first_provenance.get("kind", "mcp_tool")))
             value = await _maybe_await(
                 self._store.verifyFact(arguments["fact_id"], arguments["verification_state"], confirmation, source=source)
             )

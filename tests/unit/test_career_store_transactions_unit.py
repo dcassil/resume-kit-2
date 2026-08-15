@@ -17,6 +17,14 @@ from career_store import openCareerStore  # noqa: E402
 FIXED_TIME = "2026-01-01T00:00:00Z"
 
 
+def interpretation_proposal(fact_id: str, text: str = "I built React apps") -> dict:
+    return {
+        "factId": fact_id,
+        "outcome": "affirmed",
+        "provenance": [{"source": "user_answer", "text": text}],
+    }
+
+
 class CareerStoreTransactionUnitTests(unittest.TestCase):
     def test_upsert_rollback_after_conflict_detection_leaves_no_partial_rows_and_reports_transaction(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -82,7 +90,7 @@ class CareerStoreTransactionUnitTests(unittest.TestCase):
             verified = store.verifyFact(
                 react["fact_id"],
                 "user_verified",
-                confirmation={"source": "user_answer", "text": "I built React apps", "confirmed": True},
+                confirmation=interpretation_proposal(react["fact_id"]),
                 source="user_answer",
             )
             relationship = store.addRelationship(

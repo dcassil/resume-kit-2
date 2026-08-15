@@ -4,14 +4,14 @@ level: initiative
 title: "Evidence-Backed Fact and Verification Lifecycle"
 short_code: "RKIT-I-0006"
 created_at: 2026-08-13T20:41:36.939547+00:00
-updated_at: 2026-08-15T00:37:18.562186+00:00
+updated_at: 2026-08-15T00:39:01.937906+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0005]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/decompose"
+  - "#phase/active"
 
 
 exit_criteria_met: false

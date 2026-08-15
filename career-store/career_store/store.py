@@ -10,6 +10,12 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable
 
+from .confirmations import (
+    USER_CONFIRMATION_SOURCES,
+    proposal_evidence,
+    proposal_has_user_provenance,
+    validate_interpretation_proposal,
+)
 from .migrations import (
     MIGRATIONS,
     SCHEMA_VERSION,
@@ -22,7 +28,7 @@ from .migrations import (
     set_user_version,
     user_version,
 )
-from .schemas import MigrationState, TransactionResult
+from .schemas import InvalidInterpretationProposalError, MigrationState, TransactionResult
 from .terms import _AWS_SERVICE_TERMS, _STOP_TERMS, _TERM_ALIASES
 from .transactions import TransactionScope, transaction_result_payload
 
@@ -58,33 +64,6 @@ _FORBIDDEN_RESULT_KEYS = {
     "resume_patch",
     "working_resume",
     "base_resume",
-}
-_USER_CONFIRMATION_SOURCES = {"user_answer", "user_confirmation", "manual_confirmation"}
-_AFFIRMATIVE_CONFIRMATION_MARKERS = {
-    "yes",
-    "confirmed",
-    "correct",
-    "that is correct",
-    "i have",
-    "ive",
-    "i ve",
-    "i built",
-    "i designed",
-    "i maintained",
-    "i led",
-    "my experience",
-}
-_NEGATION_MARKERS = {
-    " no ",
-    " not ",
-    " never ",
-    " havent ",
-    " haven t ",
-    " have not ",
-    " did not ",
-    " dont ",
-    " don t ",
-    " without ",
 }
 _RESOLUTION_RANK = {
     "not_applicable": 0,
@@ -280,39 +259,61 @@ class CareerStore:
         self,
         fact_id: str,
         verification_state: str,
-        confirmation: JsonObject | str | bool | None,
+        confirmation: JsonObject | None,
         source: str,
     ) -> JsonObject:
         requested_state = _state_value(verification_state)
         if requested_state not in _VERIFICATION_STATES:
             return self._mutation_error("verifyFact", fact_id, "unknown", "invalid_verification_state", True)
         now = self._clock()
-        evidence = _confirmation_evidence(confirmation, requested_state, source)
         mutation_status = "updated"
         with self._transaction("verifyFact", mutation_status) as txn:
             conn = txn.connection
             assert conn is not None
             txn.touch("fact_id", fact_id)
             row = self._fact_row(fact_id, conn=conn)
-            if row is None:
+            current_state = str(row["verification_state"]) if row is not None else "unknown"
+            try:
+                proposal = validate_interpretation_proposal(confirmation, expected_fact_id=fact_id, fact_exists=row is not None)
+            except InvalidInterpretationProposalError as exc:
                 txn.set_mutation_status("rejected")
-                result = self._mutation_error("verifyFact", fact_id, "unknown", "not_found", True)
+                result = self._interpretation_proposal_error(fact_id, current_state, exc, source)
                 result["transaction_result"] = None
             else:
-                current_state = str(row["verification_state"])
-                if requested_state == "user_verified" and not _confirmation_allows_user_verified(confirmation, source):
-                    txn.set_mutation_status("rejected")
+                if proposal.outcome != "affirmed":
+                    txn.set_mutation_status("evidence_only")
+                    for evidence in proposal_evidence(proposal, requested_state, source):
+                        evidence_id = self._insert_evidence(conn, fact_id, evidence, source, now)
+                        txn.touch("evidence_id", evidence_id)
                     result = _clean_result(
                         {
                             "schema_version": SCHEMA_VERSION,
-                            "status": "rejected",
-                            "mutation_status": "rejected",
+                            "status": "unchanged",
+                            "mutation_status": "evidence_only",
+                            "fact_id": fact_id,
+                            "verification_state": current_state,
+                            "conflicts": self._conflicts_for_fact(fact_id, conn=conn),
+                            "confirmation_required": requested_state == "user_verified",
+                            "transaction_result": None,
+                            "audit": self._audit("verifyFact", mutated=True, source=source, outcome=proposal.outcome),
+                        }
+                    )
+                elif requested_state == "user_verified" and not proposal_has_user_provenance(proposal):
+                    txn.set_mutation_status("evidence_only")
+                    for evidence in proposal_evidence(proposal, requested_state, source):
+                        evidence_id = self._insert_evidence(conn, fact_id, evidence, source, now)
+                        txn.touch("evidence_id", evidence_id)
+                    result = _clean_result(
+                        {
+                            "schema_version": SCHEMA_VERSION,
+                            "status": "unchanged",
+                            "mutation_status": "evidence_only",
                             "fact_id": fact_id,
                             "verification_state": current_state,
                             "conflicts": self._conflicts_for_fact(fact_id, conn=conn),
                             "confirmation_required": True,
                             "transaction_result": None,
-                            "audit": self._audit("verifyFact", mutated=False, source=source),
+                            "audit": self._audit("verifyFact", mutated=True, source=source, outcome=proposal.outcome),
                         }
                     )
                 else:
@@ -320,8 +321,9 @@ class CareerStore:
                         "UPDATE facts SET verification_state = ?, updated_at = ? WHERE fact_id = ?",
                         (requested_state, now, fact_id),
                     )
-                    evidence_id = self._insert_evidence(conn, fact_id, evidence, source, now)
-                    txn.touch("evidence_id", evidence_id)
+                    for evidence in proposal_evidence(proposal, requested_state, source):
+                        evidence_id = self._insert_evidence(conn, fact_id, evidence, source, now)
+                        txn.touch("evidence_id", evidence_id)
                     result = {
                         "schema_version": SCHEMA_VERSION,
                         "status": "updated",
@@ -331,7 +333,7 @@ class CareerStore:
                         "conflicts": self._conflicts_for_fact(fact_id, conn=conn),
                         "confirmation_required": False,
                         "transaction_result": None,
-                        "audit": self._audit("verifyFact", mutated=True, source=source),
+                        "audit": self._audit("verifyFact", mutated=True, source=source, outcome=proposal.outcome),
                     }
         transaction_result = txn.result
         result["transaction_result"] = transaction_result_payload(transaction_result)
@@ -988,9 +990,8 @@ class CareerStore:
             if isinstance(metadata, dict):
                 terms.extend(_metadata_terms(metadata))
         for evidence in self._evidence_for_fact(fact_id):
-            if not _contains_negation(evidence.get("text", "")):
-                terms.append(_normalize(evidence.get("text", "")))
-                terms.extend(_normalized_terms(evidence))
+            terms.append(_normalize(evidence.get("text", "")))
+            terms.extend(_normalized_terms(evidence))
             metadata = evidence.get("metadata", {})
             if isinstance(metadata, dict):
                 terms.extend(_metadata_terms(metadata))
@@ -1076,6 +1077,27 @@ class CareerStore:
                 if status == "invalid_verification_state"
                 else [{"code": status, "message": status.replace("_", " ")}],
                 "audit": self._audit(operation, mutated=False, reason=status),
+            }
+        )
+
+    def _interpretation_proposal_error(
+        self,
+        fact_id: str,
+        verification_state: str,
+        error: InvalidInterpretationProposalError,
+        source: str,
+    ) -> JsonObject:
+        return _clean_result(
+            {
+                "schema_version": SCHEMA_VERSION,
+                "status": "error",
+                "mutation_status": "rejected",
+                "fact_id": fact_id,
+                "verification_state": verification_state,
+                "conflicts": [],
+                "confirmation_required": True,
+                "errors": [error.to_error()],
+                "audit": self._audit("verifyFact", mutated=False, source=source, reason=error.code),
             }
         )
 
@@ -1331,88 +1353,15 @@ def _has_explicit_confirmation(policy: JsonObject, evidence: JsonObject | None, 
         return True
     if policy.get("confirmation") is True or policy.get("confirmed") is True:
         return True
-    if source in {"user_confirmation", "manual_confirmation"}:
+    if source in USER_CONFIRMATION_SOURCES - {"user_answer"}:
         return True
     if evidence:
-        if evidence.get("source") in {"user_confirmation", "manual_confirmation"}:
+        if evidence.get("source") in USER_CONFIRMATION_SOURCES - {"user_answer"}:
             return True
         metadata = evidence.get("metadata", {})
         if isinstance(metadata, dict) and (metadata.get("explicit") is True or metadata.get("confirmed") is True):
             return True
-        if source in _USER_CONFIRMATION_SOURCES and _text_is_explicit_confirmation(evidence.get("text", "")):
-            return True
     return False
-
-
-def _confirmation_is_explicit(confirmation: JsonObject | str | bool | None) -> bool:
-    if confirmation is True:
-        return True
-    if isinstance(confirmation, str):
-        return _text_is_explicit_confirmation(confirmation)
-    if isinstance(confirmation, dict):
-        if confirmation.get("explicit") is True or confirmation.get("confirmed") is True:
-            return True
-        return _text_is_explicit_confirmation(confirmation.get("text") or confirmation.get("answer") or "")
-    return False
-
-
-def _confirmation_allows_user_verified(confirmation: JsonObject | str | bool | None, source: str) -> bool:
-    if not _confirmation_is_explicit(confirmation):
-        return False
-    if source in _USER_CONFIRMATION_SOURCES:
-        return True
-    if isinstance(confirmation, dict):
-        confirmation_source = str(confirmation.get("source", confirmation.get("kind", "")))
-        return confirmation_source in _USER_CONFIRMATION_SOURCES
-    return False
-
-
-def _text_is_explicit_confirmation(value: Any) -> bool:
-    normalized = f" {_normalize(value)} "
-    if not normalized.strip():
-        return False
-    if _contains_negation(value):
-        return False
-    return any(marker in normalized for marker in _AFFIRMATIVE_CONFIRMATION_MARKERS)
-
-
-def _contains_negation(value: Any) -> bool:
-    normalized = f" {_normalize(value)} "
-    return any(marker in normalized for marker in _NEGATION_MARKERS)
-
-
-def _confirmation_text(confirmation: JsonObject | str | bool | None, verification_state: str) -> str:
-    if isinstance(confirmation, dict):
-        return str(confirmation.get("text") or confirmation.get("answer") or f"confirmed {verification_state}")
-    if isinstance(confirmation, str):
-        return confirmation
-    return f"confirmed {verification_state}"
-
-
-def _confirmation_evidence(confirmation: JsonObject | str | bool | None, verification_state: str, source: str) -> JsonObject:
-    metadata: JsonObject = {
-        "verification_state": verification_state,
-        "confirmation_source": source,
-    }
-    evidence: JsonObject = {
-        "source": source,
-        "text": _confirmation_text(confirmation, verification_state),
-        "metadata": metadata,
-    }
-    if isinstance(confirmation, dict):
-        if confirmation.get("source_id") is not None:
-            evidence["source_id"] = confirmation.get("source_id")
-        if confirmation.get("source_span") is not None:
-            evidence["source_span"] = confirmation.get("source_span")
-        if confirmation.get("observed_at") is not None:
-            evidence["observed_at"] = confirmation.get("observed_at")
-        supplied_metadata = confirmation.get("metadata", {})
-        metadata["confirmation"] = {key: value for key, value in confirmation.items() if key != "metadata"}
-        if isinstance(supplied_metadata, dict):
-            metadata.update(supplied_metadata)
-    elif isinstance(confirmation, bool):
-        metadata["confirmation"] = confirmation
-    return evidence
 
 
 def _year_claim(text: str, terms: set[str]) -> str | None:
