@@ -4,14 +4,14 @@ level: task
 title: "Enum restoration, persisted-value remap migration, surface/contract realignment"
 short_code: "RKIT-T-0041"
 created_at: 2026-08-14T23:56:07.483826+00:00
-updated_at: 2026-08-15T00:16:37.690966+00:00
+updated_at: 2026-08-15T00:23:56.108881+00:00
 parent: durable-career-store-package-and
 blocked_by: [RKIT-T-0040]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0005
 ## Objective
 
 Restore the RKIT-A-0006 canonical enum vocabulary in career-store (store.py:16-35, store_surface.json:28-51) and remap persisted drifted values via a registry migration (RKIT-I-0005 Requirement 5): VerificationState = source_stated/user_verified/imported/inferred/unknown; ResolutionState regains `not_applicable` and drops `conflicted`; relationship types become alias/related/parent/child/equivalent plus `contradicts` (the A-0006-recorded extension).
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

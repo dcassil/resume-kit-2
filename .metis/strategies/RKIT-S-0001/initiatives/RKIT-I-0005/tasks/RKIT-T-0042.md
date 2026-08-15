@@ -4,14 +4,14 @@ level: task
 title: "Transaction substrate: atomic detect+write, TransactionResult, interruption recovery"
 short_code: "RKIT-T-0042"
 created_at: 2026-08-14T23:56:07.530441+00:00
-updated_at: 2026-08-14T23:56:07.530441+00:00
+updated_at: 2026-08-15T00:23:56.607023+00:00
 parent: durable-career-store-package-and
-blocked_by: ["RKIT-T-0041"]
+blocked_by: [RKIT-T-0041]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0005
 ## Objective
 
 Build the store-owned transaction substrate (RKIT-I-0005 Requirement 6, moved forward from RKIT-I-0008 by deliberate re-sequencing): a context-managed single-connection transaction helper; `upsertFact` conflict detection and fact/evidence writes execute atomically in ONE transaction (fixing the separate-connections defect at store.py:245-247); the never-used `TransactionResult` DTO (schemas.py:81-88) is constructed and returned; interruption mid-operation leaves no partial rows.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -61,3 +63,7 @@ Rationale: concurrency/atomicity semantics with data-integrity stakes; I-0006's 
 ## Status Updates
 
 *To be added during implementation*
+
+- 2026-08-14: Started implementation. Confirmed `upsertFact` still detects conflicts before opening its write connection; sibling read-then-write mutation paths identified for transaction helper coverage: `verifyFact`, `addEvidence`, `addRelationship`, and `recordJobMatch`.
+- 2026-08-14: Implemented private `BEGIN IMMEDIATE` transaction scope with `TransactionResult` capture. Moved `upsertFact`, `verifyFact`, `addEvidence`, `addRelationship`, and `recordJobMatch` read+write work onto transaction-owned connections; added focused unit coverage for rollback, result embedding, and evidence append-only deterministic IDs.
+- 2026-08-14: Validation passed after splitting private helpers to keep `store.py` under the architecture line cap: PR gate 350 tests OK, smoke OK, unit discovery 131 tests OK, migration checks OK. Protected files and `career-store/store_surface.json` were not edited.

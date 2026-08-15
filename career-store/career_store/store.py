@@ -22,7 +22,9 @@ from .migrations import (
     set_user_version,
     user_version,
 )
-from .schemas import MigrationState
+from .schemas import MigrationState, TransactionResult
+from .terms import _AWS_SERVICE_TERMS, _STOP_TERMS, _TERM_ALIASES
+from .transactions import TransactionScope, transaction_result_payload
 
 _VERIFICATION_STATES = {
     # Confirmation policy keeps inferred/unknown distinct from user_verified.
@@ -84,70 +86,6 @@ _NEGATION_MARKERS = {
     " don t ",
     " without ",
 }
-_STOP_TERMS = {
-    "and",
-    "app",
-    "application",
-    "apps",
-    "applications",
-    "built",
-    "design",
-    "designed",
-    "developer",
-    "development",
-    "engineer",
-    "engineering",
-    "experience",
-    "for",
-    "in",
-    "maintained",
-    "of",
-    "required",
-    "skill",
-    "skills",
-    "software",
-    "the",
-    "with",
-    "years",
-}
-_TERM_ALIASES: dict[str, set[str]] = {
-    "api": {"apis", "rest api", "rest apis", "backend api", "service api"},
-    "api architecture": {
-        "api design",
-        "apis architecture",
-        "application architecture",
-        "architecture",
-        "system design",
-        "technical design",
-    },
-    "application architecture": {"api architecture", "architecture", "software architecture", "system architecture", "system design"},
-    "architecture": {"api architecture", "application architecture", "software architecture", "system architecture", "system design"},
-    "aws": {"amazon web services"},
-    "amazon web services": {"aws"},
-    "ec2": {"aws ec2"},
-    "graphql": {"graph ql", "graphql api", "graphql apis", "gql"},
-    "gql": {"graphql"},
-    "leadership": {"lead", "led", "mentor", "mentored", "mentoring", "technical leadership", "team leadership"},
-    "node": {"node js", "nodejs"},
-    "node js": {"node", "nodejs"},
-    "nodejs": {"node", "node js"},
-    "postgres": {"postgresql", "postgre sql"},
-    "postgresql": {"postgres", "postgre sql"},
-    "responsive design": {
-        "mobile friendly",
-        "responsive ui",
-        "responsive web app",
-        "responsive web apps",
-        "responsive web application",
-        "responsive web applications",
-    },
-    "responsive web apps": {"responsive design"},
-    "saas": {"software as a service", "multi tenant", "multitenant"},
-    "software as a service": {"saas"},
-    "software engineering": {"software development", "application development", "engineering"},
-    "system design": {"architecture", "application architecture", "technical design"},
-}
-_AWS_SERVICE_TERMS = {"ec2", "s3", "lambda", "rds", "iam"}
 _RESOLUTION_RANK = {
     "not_applicable": 0,
     "unknown": 1,
@@ -169,6 +107,7 @@ class CareerStore:
     def __init__(self, database_path: str, clock: Callable[[], str] | None = None) -> None:
         self._database_path = str(database_path)
         self._clock = clock or _default_clock
+        self._last_transaction_result: TransactionResult | None = None
         Path(self._database_path).parent.mkdir(parents=True, exist_ok=True)
         self._initialize()
 
@@ -252,9 +191,15 @@ class CareerStore:
             confirmation_required = True
         else:
             confirmation_required = requested_state in {"inferred", "unknown"} and not policy.get("allow_inferred_final", True)
-        conflicts = self._detect_conflicts({**fact, "fact_id": fact_id, "normalized_terms": normalized})
         mutation_status = "created"
-        with self._connect() as conn:
+        evidence_id: str | None = None
+        with self._transaction("upsertFact", mutation_status) as txn:
+            conn = txn.connection
+            assert conn is not None
+            txn.touch("fact_id", fact_id)
+            conflicts = self._detect_conflicts({**fact, "fact_id": fact_id, "normalized_terms": normalized}, conn=conn)
+            txn.touch("conflict_ids", ",".join(conflict["conflict_id"] for conflict in conflicts))
+            self._after_conflict_detection("upsertFact", policy)
             existing = conn.execute(
                 "SELECT fact_id, verification_state, created_at, metadata_json FROM facts WHERE fact_id = ?",
                 (fact_id,),
@@ -284,6 +229,7 @@ class CareerStore:
                 )
             else:
                 mutation_status = "updated"
+                txn.set_mutation_status(mutation_status)
                 current_state = str(existing["verification_state"])
                 next_state = self._merged_verification_state(current_state, requested_state, policy, evidence, source)
                 if next_state == current_state and requested_state == "user_verified" and current_state in {"inferred", "unknown"}:
@@ -311,10 +257,11 @@ class CareerStore:
                 )
                 requested_state = next_state
             if evidence:
-                self._insert_evidence(conn, fact_id, evidence, source, now)
+                evidence_id = self._insert_evidence(conn, fact_id, evidence, source, now)
+                txn.touch("evidence_id", evidence_id)
             for conflict in conflicts:
                 self._insert_conflict(conn, conflict, now)
-            conn.commit()
+        transaction_result = txn.result
         return _clean_result(
             {
                 "schema_version": SCHEMA_VERSION,
@@ -324,6 +271,7 @@ class CareerStore:
                 "verification_state": requested_state,
                 "conflicts": conflicts,
                 "confirmation_required": bool(confirmation_required),
+                "transaction_result": transaction_result_payload(transaction_result),
                 "audit": self._audit("upsertFact", mutated=True),
             }
         )
@@ -338,67 +286,87 @@ class CareerStore:
         requested_state = _state_value(verification_state)
         if requested_state not in _VERIFICATION_STATES:
             return self._mutation_error("verifyFact", fact_id, "unknown", "invalid_verification_state", True)
-        row = self._fact_row(fact_id)
-        if row is None:
-            return self._mutation_error("verifyFact", fact_id, "unknown", "not_found", True)
-        current_state = str(row["verification_state"])
-        if requested_state == "user_verified" and not _confirmation_allows_user_verified(confirmation, source):
-            return _clean_result(
-                {
-                    "schema_version": SCHEMA_VERSION,
-                    "status": "rejected",
-                    "mutation_status": "rejected",
-                    "fact_id": fact_id,
-                    "verification_state": current_state,
-                    "conflicts": self._conflicts_for_fact(fact_id),
-                    "confirmation_required": True,
-                    "audit": self._audit("verifyFact", mutated=False, source=source),
-                }
-            )
         now = self._clock()
         evidence = _confirmation_evidence(confirmation, requested_state, source)
-        with self._connect() as conn:
-            conn.execute(
-                "UPDATE facts SET verification_state = ?, updated_at = ? WHERE fact_id = ?",
-                (requested_state, now, fact_id),
-            )
-            self._insert_evidence(conn, fact_id, evidence, source, now)
-            conn.commit()
-        return _clean_result(
-            {
-                "schema_version": SCHEMA_VERSION,
-                "status": "updated",
-                "mutation_status": "updated",
-                "fact_id": fact_id,
-                "verification_state": requested_state,
-                "conflicts": self._conflicts_for_fact(fact_id),
-                "confirmation_required": False,
-                "audit": self._audit("verifyFact", mutated=True, source=source),
-            }
-        )
+        mutation_status = "updated"
+        with self._transaction("verifyFact", mutation_status) as txn:
+            conn = txn.connection
+            assert conn is not None
+            txn.touch("fact_id", fact_id)
+            row = self._fact_row(fact_id, conn=conn)
+            if row is None:
+                txn.set_mutation_status("rejected")
+                result = self._mutation_error("verifyFact", fact_id, "unknown", "not_found", True)
+                result["transaction_result"] = None
+            else:
+                current_state = str(row["verification_state"])
+                if requested_state == "user_verified" and not _confirmation_allows_user_verified(confirmation, source):
+                    txn.set_mutation_status("rejected")
+                    result = _clean_result(
+                        {
+                            "schema_version": SCHEMA_VERSION,
+                            "status": "rejected",
+                            "mutation_status": "rejected",
+                            "fact_id": fact_id,
+                            "verification_state": current_state,
+                            "conflicts": self._conflicts_for_fact(fact_id, conn=conn),
+                            "confirmation_required": True,
+                            "transaction_result": None,
+                            "audit": self._audit("verifyFact", mutated=False, source=source),
+                        }
+                    )
+                else:
+                    conn.execute(
+                        "UPDATE facts SET verification_state = ?, updated_at = ? WHERE fact_id = ?",
+                        (requested_state, now, fact_id),
+                    )
+                    evidence_id = self._insert_evidence(conn, fact_id, evidence, source, now)
+                    txn.touch("evidence_id", evidence_id)
+                    result = {
+                        "schema_version": SCHEMA_VERSION,
+                        "status": "updated",
+                        "mutation_status": "updated",
+                        "fact_id": fact_id,
+                        "verification_state": requested_state,
+                        "conflicts": self._conflicts_for_fact(fact_id, conn=conn),
+                        "confirmation_required": False,
+                        "transaction_result": None,
+                        "audit": self._audit("verifyFact", mutated=True, source=source),
+                    }
+        transaction_result = txn.result
+        result["transaction_result"] = transaction_result_payload(transaction_result)
+        return _clean_result(result)
 
     def addEvidence(self, fact_id: str, evidence: JsonObject, source: str) -> JsonObject:
-        row = self._fact_row(fact_id)
-        if row is None:
-            return self._mutation_error("addEvidence", fact_id, "unknown", "not_found", False)
         now = self._clock()
-        with self._connect() as conn:
-            evidence_id = self._insert_evidence(conn, fact_id, evidence, source, now)
-            conn.execute("UPDATE facts SET updated_at = ? WHERE fact_id = ?", (now, fact_id))
-            conn.commit()
-        return _clean_result(
-            {
-                "schema_version": SCHEMA_VERSION,
-                "status": "created",
-                "mutation_status": "created",
-                "fact_id": fact_id,
-                "evidence_id": evidence_id,
-                "verification_state": str(row["verification_state"]),
-                "conflicts": self._conflicts_for_fact(fact_id),
-                "confirmation_required": False,
-                "audit": self._audit("addEvidence", mutated=True, source=source),
-            }
-        )
+        with self._transaction("addEvidence", "created") as txn:
+            conn = txn.connection
+            assert conn is not None
+            txn.touch("fact_id", fact_id)
+            row = self._fact_row(fact_id, conn=conn)
+            if row is None:
+                txn.set_mutation_status("rejected")
+                result = self._mutation_error("addEvidence", fact_id, "unknown", "not_found", False)
+                result["transaction_result"] = None
+            else:
+                evidence_id = self._insert_evidence(conn, fact_id, evidence, source, now)
+                txn.touch("evidence_id", evidence_id)
+                conn.execute("UPDATE facts SET updated_at = ? WHERE fact_id = ?", (now, fact_id))
+                result = {
+                    "schema_version": SCHEMA_VERSION,
+                    "status": "created",
+                    "mutation_status": "created",
+                    "fact_id": fact_id,
+                    "evidence_id": evidence_id,
+                    "verification_state": str(row["verification_state"]),
+                    "conflicts": self._conflicts_for_fact(fact_id, conn=conn),
+                    "confirmation_required": False,
+                    "transaction_result": None,
+                    "audit": self._audit("addEvidence", mutated=True, source=source),
+                }
+        transaction_result = txn.result
+        result["transaction_result"] = transaction_result_payload(transaction_result)
+        return _clean_result(result)
 
     def addRelationship(
         self,
@@ -412,65 +380,81 @@ class CareerStore:
         relationship_type = str(relationship_type)
         if relationship_type not in _RELATIONSHIP_TYPES:
             return self._relationship_error(from_fact_id, "invalid_relationship_type", True)
-        if self._fact_row(from_fact_id) is None or self._fact_row(to_fact_id) is None:
-            return self._relationship_error(from_fact_id, "not_found", True)
         now = self._clock()
         relationship_id = _stable_id("relationship", from_fact_id, to_fact_id, relationship_type, _to_json(evidence_or_rationale or {}))
-        with self._connect() as conn:
-            existing = conn.execute(
-                "SELECT relationship_id FROM relationships WHERE relationship_id = ?",
-                (relationship_id,),
-            ).fetchone()
-            mutation_status = "updated" if existing else "created"
-            conn.execute(
-                """
-                INSERT INTO relationships (
-                    relationship_id, from_fact_id, to_fact_id, relationship_type, evidence_json, created_at, metadata_json, confidence
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(relationship_id) DO UPDATE SET
-                    evidence_json = excluded.evidence_json,
-                    metadata_json = excluded.metadata_json,
-                    confidence = excluded.confidence
-                """,
-                (
-                    relationship_id,
-                    from_fact_id,
-                    to_fact_id,
-                    relationship_type,
-                    _to_json(evidence_or_rationale or {}),
-                    now,
-                    _to_json({"policy": policy}),
-                    _optional_float((evidence_or_rationale or {}).get("confidence")),
-                ),
-            )
-            if relationship_type == "contradicts":
-                self._insert_conflict(
-                    conn,
-                    {
-                        "conflict_id": _stable_id("conflict", from_fact_id, to_fact_id, relationship_type),
-                        "fact_ids": sorted([from_fact_id, to_fact_id]),
-                        "reason": str((evidence_or_rationale or {}).get("text", "relationship contradiction")),
-                        "status": "open",
-                        "evidence_ids": [],
-                        "metadata": {"relationship_id": relationship_id},
-                    },
-                    now,
+        mutation_status = "created"
+        with self._transaction("addRelationship", mutation_status) as txn:
+            conn = txn.connection
+            assert conn is not None
+            txn.touch("fact_id", from_fact_id)
+            txn.touch("related_fact_id", to_fact_id)
+            txn.touch("relationship_id", relationship_id)
+            from_row = self._fact_row(from_fact_id, conn=conn)
+            to_row = self._fact_row(to_fact_id, conn=conn)
+            if from_row is None or to_row is None:
+                txn.set_mutation_status("rejected")
+                result = self._relationship_error(from_fact_id, "not_found", True)
+                result["transaction_result"] = None
+            else:
+                existing = conn.execute(
+                    "SELECT relationship_id FROM relationships WHERE relationship_id = ?",
+                    (relationship_id,),
+                ).fetchone()
+                mutation_status = "updated" if existing else "created"
+                txn.set_mutation_status(mutation_status)
+                conn.execute(
+                    """
+                    INSERT INTO relationships (
+                        relationship_id, from_fact_id, to_fact_id, relationship_type, evidence_json, created_at, metadata_json, confidence
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(relationship_id) DO UPDATE SET
+                        evidence_json = excluded.evidence_json,
+                        metadata_json = excluded.metadata_json,
+                        confidence = excluded.confidence
+                    """,
+                    (
+                        relationship_id,
+                        from_fact_id,
+                        to_fact_id,
+                        relationship_type,
+                        _to_json(evidence_or_rationale or {}),
+                        now,
+                        _to_json({"policy": policy}),
+                        _optional_float((evidence_or_rationale or {}).get("confidence")),
+                    ),
                 )
-            conn.commit()
-        from_fact = self._fact_from_row(self._fact_row(from_fact_id))
-        return _clean_result(
-            {
-                "schema_version": SCHEMA_VERSION,
-                "status": mutation_status,
-                "mutation_status": mutation_status,
-                "fact_id": from_fact_id,
-                "relationship_id": relationship_id,
-                "verification_state": from_fact["verification_state"],
-                "conflicts": self._conflicts_for_fact(from_fact_id),
-                "confirmation_required": relationship_type in {"alias", "equivalent"} and policy.get("requires_confirmation_for_equivalence", False),
-                "audit": self._audit("addRelationship", mutated=True),
-            }
-        )
+                if relationship_type == "contradicts":
+                    conflict_id = _stable_id("conflict", from_fact_id, to_fact_id, relationship_type)
+                    txn.touch("conflict_id", conflict_id)
+                    self._insert_conflict(
+                        conn,
+                        {
+                            "conflict_id": conflict_id,
+                            "fact_ids": sorted([from_fact_id, to_fact_id]),
+                            "reason": str((evidence_or_rationale or {}).get("text", "relationship contradiction")),
+                            "status": "open",
+                            "evidence_ids": [],
+                            "metadata": {"relationship_id": relationship_id},
+                        },
+                        now,
+                    )
+                from_fact = self._fact_from_row(from_row, conn=conn)
+                result = {
+                    "schema_version": SCHEMA_VERSION,
+                    "status": mutation_status,
+                    "mutation_status": mutation_status,
+                    "fact_id": from_fact_id,
+                    "relationship_id": relationship_id,
+                    "verification_state": from_fact["verification_state"],
+                    "conflicts": self._conflicts_for_fact(from_fact_id, conn=conn),
+                    "confirmation_required": relationship_type in {"alias", "equivalent"}
+                    and policy.get("requires_confirmation_for_equivalence", False),
+                    "transaction_result": None,
+                    "audit": self._audit("addRelationship", mutated=True),
+                }
+        transaction_result = txn.result
+        result["transaction_result"] = transaction_result_payload(transaction_result)
+        return _clean_result(result)
 
     def findCandidateMatches(
         self,
@@ -585,7 +569,12 @@ class CareerStore:
         }
         job_identity_id = _stable_id("job", job_id)
         job_metadata = _job_metadata(metadata or {})
-        with self._connect() as conn:
+        with self._transaction("recordJobMatch", "created") as txn:
+            conn = txn.connection
+            assert conn is not None
+            txn.touch("job_id", job_identity_id)
+            txn.touch("source_job_id", job_id)
+            txn.touch("job_match_id", job_match_id)
             conn.execute(
                 """
                 INSERT INTO jobs (job_id, source_job_id, created_at, updated_at, metadata_json)
@@ -598,6 +587,7 @@ class CareerStore:
             )
             existing = conn.execute("SELECT job_match_id FROM job_matches WHERE job_match_id = ?", (job_match_id,)).fetchone()
             mutation_status = "updated" if existing else "created"
+            txn.set_mutation_status(mutation_status)
             conn.execute(
                 """
                 INSERT INTO job_matches (
@@ -625,7 +615,7 @@ class CareerStore:
                     user_confirmed,
                 ),
             )
-            conn.commit()
+        transaction_result = txn.result
         result = {
             "schema_version": SCHEMA_VERSION,
             "status": mutation_status,
@@ -636,6 +626,7 @@ class CareerStore:
             "fact_ids": clean_fact_ids,
             "resolution_state": resolution_state,
             "match_type": match_type,
+            "transaction_result": transaction_result_payload(transaction_result),
             "audit": self._audit("recordJobMatch", mutated=True),
         }
         _add_if_not_none(result, "confidence", confidence)
@@ -691,6 +682,23 @@ class CareerStore:
         finally:
             conn.close()
 
+    @contextmanager
+    def _transaction(self, operation: str, mutation_status: str = "unknown") -> Iterator[TransactionScope]:
+        with TransactionScope(
+            self._database_path,
+            SCHEMA_VERSION,
+            self._clock,
+            operation,
+            mutation_status,
+            lambda result: setattr(self, "_last_transaction_result", result),
+        ) as txn:
+            yield txn
+
+    def _after_conflict_detection(self, operation: str, policy: JsonObject) -> None:
+        hook = policy.get("_after_conflict_detection")
+        if callable(hook):
+            hook(operation)
+
     def _audit(self, operation: str, mutated: bool, **extra: Any) -> JsonObject:
         audit = {
             "operation": operation,
@@ -701,18 +709,22 @@ class CareerStore:
         audit.update(extra)
         return audit
 
-    def _fact_row(self, fact_id: str) -> sqlite3.Row | None:
-        with self._connect() as conn:
+    def _fact_row(self, fact_id: str, conn: sqlite3.Connection | None = None) -> sqlite3.Row | None:
+        if conn is not None:
             return conn.execute("SELECT * FROM facts WHERE fact_id = ?", (fact_id,)).fetchone()
+        with self._connect() as local_conn:
+            return self._fact_row(fact_id, conn=local_conn)
 
-    def _fact_rows(self) -> list[sqlite3.Row]:
-        with self._connect() as conn:
+    def _fact_rows(self, conn: sqlite3.Connection | None = None) -> list[sqlite3.Row]:
+        if conn is not None:
             return list(conn.execute("SELECT * FROM facts ORDER BY type, text, fact_id").fetchall())
+        with self._connect() as local_conn:
+            return self._fact_rows(conn=local_conn)
 
-    def _fact_from_row(self, row: sqlite3.Row | None) -> JsonObject:
+    def _fact_from_row(self, row: sqlite3.Row | None, conn: sqlite3.Connection | None = None) -> JsonObject:
         if row is None:
             return {}
-        evidence_ids = [item["evidence_id"] for item in self._evidence_for_fact(str(row["fact_id"]))]
+        evidence_ids = [item["evidence_id"] for item in self._evidence_for_fact(str(row["fact_id"]), conn=conn)]
         fact = {
             "fact_id": str(row["fact_id"]),
             "type": str(row["type"]),
@@ -765,12 +777,15 @@ class CareerStore:
         )
         return evidence_id
 
-    def _evidence_for_fact(self, fact_id: str) -> list[JsonObject]:
-        with self._connect() as conn:
+    def _evidence_for_fact(self, fact_id: str, conn: sqlite3.Connection | None = None) -> list[JsonObject]:
+        if conn is not None:
             rows = conn.execute(
                 "SELECT * FROM evidence WHERE fact_id = ? ORDER BY created_at, evidence_id",
                 (fact_id,),
             ).fetchall()
+        else:
+            with self._connect() as local_conn:
+                return self._evidence_for_fact(fact_id, conn=local_conn)
         return [
             {
                 "evidence_id": str(row["evidence_id"]),
@@ -784,8 +799,8 @@ class CareerStore:
             for row in rows
         ]
 
-    def _relationships_for_fact(self, fact_id: str) -> list[JsonObject]:
-        with self._connect() as conn:
+    def _relationships_for_fact(self, fact_id: str, conn: sqlite3.Connection | None = None) -> list[JsonObject]:
+        if conn is not None:
             rows = conn.execute(
                 """
                 SELECT * FROM relationships
@@ -794,6 +809,9 @@ class CareerStore:
                 """,
                 (fact_id, fact_id),
             ).fetchall()
+        else:
+            with self._connect() as local_conn:
+                return self._relationships_for_fact(fact_id, conn=local_conn)
         relationships = []
         for row in rows:
             relationship = {
@@ -809,19 +827,22 @@ class CareerStore:
             relationships.append(relationship)
         return relationships
 
-    def _relationship_terms(self, fact_id: str) -> list[str]:
+    def _relationship_terms(self, fact_id: str, conn: sqlite3.Connection | None = None) -> list[str]:
         terms: list[str] = []
-        for relationship in self._relationships_for_fact(fact_id):
+        for relationship in self._relationships_for_fact(fact_id, conn=conn):
             other_id = relationship["to_fact_id"] if relationship["from_fact_id"] == fact_id else relationship["from_fact_id"]
-            other = self._fact_from_row(self._fact_row(other_id))
+            other = self._fact_from_row(self._fact_row(other_id, conn=conn), conn=conn)
             if other:
                 terms.extend(_expanded_terms(other["normalized_terms"]))
                 terms.append(_normalize(other["text"]))
         return sorted(set(term for term in terms if term))
 
-    def _conflicts_for_fact(self, fact_id: str) -> list[JsonObject]:
-        with self._connect() as conn:
+    def _conflicts_for_fact(self, fact_id: str, conn: sqlite3.Connection | None = None) -> list[JsonObject]:
+        if conn is not None:
             rows = conn.execute("SELECT * FROM conflicts ORDER BY conflict_id").fetchall()
+        else:
+            with self._connect() as local_conn:
+                return self._conflicts_for_fact(fact_id, conn=local_conn)
         conflicts = []
         for row in rows:
             fact_ids = _from_json(str(row["fact_ids_json"]), [])
@@ -829,14 +850,14 @@ class CareerStore:
                 conflicts.append(_conflict_from_row(row))
         return conflicts
 
-    def _detect_conflicts(self, claim: JsonObject) -> list[JsonObject]:
+    def _detect_conflicts(self, claim: JsonObject, conn: sqlite3.Connection | None = None) -> list[JsonObject]:
         claim_terms = set(_normalized_terms(claim))
         claim_text = str(claim.get("text", ""))
         claim_year = _year_claim(claim_text, claim_terms)
         claim_title = _title_claim(claim_text, claim_terms)
         conflicts: list[JsonObject] = []
-        for row in self._fact_rows():
-            fact = self._fact_from_row(row)
+        for row in self._fact_rows(conn=conn):
+            fact = self._fact_from_row(row, conn=conn)
             if claim.get("fact_id") and fact["fact_id"] == claim.get("fact_id"):
                 related = set(fact["normalized_terms"]).intersection(claim_terms)
             else:
