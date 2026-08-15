@@ -6,6 +6,7 @@ import asyncio
 import importlib
 import inspect
 import json
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -84,6 +85,10 @@ class CareerStoreSurfaceManifestTests(unittest.TestCase):
                 "findCandidateMatches",
                 "recordJobMatch",
                 "findConflicts",
+                # "getMigrationState" joins this tuple when the protected
+                # career_store_guardrails allowlist realignment (RKIT-A-0001 /
+                # RKIT-A-0006, queued for the approve/update-locks batch) lands
+                # together with the store_surface.json declaration.
             ),
         )
         self.assertEqual(
@@ -125,8 +130,65 @@ class CareerStoreSurfaceManifestTests(unittest.TestCase):
                 self.assertIn("input_contract", surface)
                 self.assertIn("output_contract", surface)
                 required_fields = set(surface["output_contract"]["required_fields"])
-                self.assertTrue({"schema_version", "status", "audit"} <= required_fields)
+                if name == "getMigrationState":
+                    self.assertEqual(
+                        required_fields,
+                        {"schema_version", "database_path", "applied_migrations", "pending_migrations", "status", "metadata"},
+                    )
+                else:
+                    self.assertTrue({"schema_version", "status", "audit"} <= required_fields)
                 self.assertIn("must_not_include", surface["output_contract"])
+
+
+class CareerStoreSchemaStateContractTests(unittest.TestCase):
+    def test_fresh_database_state_returns_all_applied_none_pending(self):
+        module = load_store_module(self)
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "career.db"
+            store = maybe_await(module.openCareerStore(str(database_path), clock=lambda: "2026-01-01T00:00:00Z"))
+            state = maybe_await(store.getMigrationState())
+            self.assertIsInstance(state, module.MigrationState)
+            self.assertEqual(state.schema_version, "career-store.v1")
+            self.assertEqual(state.database_path, str(database_path))
+            self.assertEqual(state.applied_migrations, ["001_initial"])
+            self.assertEqual(state.pending_migrations, [])
+            self.assertEqual(state.status, "ok")
+            self.assertEqual(state.metadata["user_version"], 1)
+            with sqlite3.connect(database_path) as conn:
+                rows = conn.execute("SELECT id, applied_at FROM schema_migrations ORDER BY id").fetchall()
+                self.assertEqual(rows, [("001_initial", "2026-01-01T00:00:00Z")])
+
+    def test_reopen_is_idempotent(self):
+        module = load_store_module(self)
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "career.db"
+            first = maybe_await(module.openCareerStore(str(database_path), clock=lambda: "2026-01-01T00:00:00Z"))
+            first_state = maybe_await(first.getMigrationState())
+            with sqlite3.connect(database_path) as conn:
+                before_schema_rows = conn.execute("SELECT id, applied_at FROM schema_migrations ORDER BY id").fetchall()
+                before_legacy_rows = conn.execute("SELECT migration_id, schema_version, applied_at FROM migrations ORDER BY migration_id").fetchall()
+                before_version = conn.execute("PRAGMA user_version").fetchone()[0]
+            second = maybe_await(module.openCareerStore(str(database_path), clock=lambda: "2026-02-02T00:00:00Z"))
+            second_state = maybe_await(second.getMigrationState())
+            with sqlite3.connect(database_path) as conn:
+                after_schema_rows = conn.execute("SELECT id, applied_at FROM schema_migrations ORDER BY id").fetchall()
+                after_legacy_rows = conn.execute("SELECT migration_id, schema_version, applied_at FROM migrations ORDER BY migration_id").fetchall()
+                after_version = conn.execute("PRAGMA user_version").fetchone()[0]
+            self.assertEqual(second_state, first_state)
+            self.assertEqual(after_schema_rows, before_schema_rows)
+            self.assertEqual(after_legacy_rows, before_legacy_rows)
+            self.assertEqual(after_version, before_version)
+
+    def test_unsupported_schema_version_fails_open_with_typed_error(self):
+        module = load_store_module(self)
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "career.db"
+            with sqlite3.connect(database_path) as conn:
+                conn.execute("PRAGMA user_version = 999")
+            with self.assertRaises(module.IncompatibleSchemaVersionError) as raised:
+                maybe_await(module.openCareerStore(str(database_path), clock=lambda: "2026-01-01T00:00:00Z"))
+            self.assertEqual(raised.exception.found, 999)
+            self.assertEqual(raised.exception.supported, 1)
 
 
 class CareerStorePersistenceContractTests(unittest.TestCase):

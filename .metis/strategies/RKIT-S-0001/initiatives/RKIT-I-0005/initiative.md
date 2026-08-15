@@ -4,14 +4,14 @@ level: initiative
 title: "Durable Career-Store Package and Migration Foundation"
 short_code: "RKIT-I-0005"
 created_at: 2026-08-13T20:41:36.917160+00:00
-updated_at: 2026-08-14T23:56:02.446975+00:00
+updated_at: 2026-08-14T23:58:02.178254+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: []
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/decompose"
+  - "#phase/active"
 
 
 exit_criteria_met: false

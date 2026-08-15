@@ -13,7 +13,8 @@
       "facts",
       "job_matches",
       "migrations",
-      "relationships"
+      "relationships",
+      "schema_migrations"
     ],
     "migrations": [
       {

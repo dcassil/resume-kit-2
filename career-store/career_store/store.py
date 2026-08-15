@@ -10,9 +10,20 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable
 
+from .migrations import (
+    MIGRATIONS,
+    SCHEMA_VERSION,
+    SUPPORTED_SCHEMA_VERSION,
+    IncompatibleSchemaVersionError,
+    MigrationFailedError,
+    migration_state,
+    pending_migrations,
+    _record_migration,
+    set_user_version,
+    user_version,
+)
+from .schemas import MigrationState
 
-SCHEMA_VERSION = "career-store.v1"
-_MIGRATION_ID = "001_initial"
 _VERIFICATION_STATES = {
     # Confirmation policy keeps inferred/unknown distinct from user_verified.
     "source_stated",
@@ -604,93 +615,29 @@ class CareerStore:
             }
         )
 
+    def getMigrationState(self) -> MigrationState:
+        with self._connect() as conn:
+            conn.execute("PRAGMA foreign_keys = ON")
+            return MigrationState(**migration_state(self._database_path, conn))
+
     def _initialize(self) -> None:
         with self._connect() as conn:
             conn.execute("PRAGMA foreign_keys = ON")
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS migrations (
-                    migration_id TEXT PRIMARY KEY,
-                    schema_version TEXT NOT NULL,
-                    applied_at TEXT NOT NULL
-                )
-                """
-            )
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS facts (
-                    fact_id TEXT PRIMARY KEY,
-                    type TEXT NOT NULL,
-                    text TEXT NOT NULL,
-                    normalized_terms_json TEXT NOT NULL,
-                    verification_state TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    metadata_json TEXT NOT NULL
-                )
-                """
-            )
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS evidence (
-                    evidence_id TEXT PRIMARY KEY,
-                    fact_id TEXT NOT NULL,
-                    source TEXT NOT NULL,
-                    source_id TEXT,
-                    text TEXT NOT NULL,
-                    source_span_json TEXT,
-                    observed_at TEXT,
-                    metadata_json TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    FOREIGN KEY(fact_id) REFERENCES facts(fact_id)
-                )
-                """
-            )
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS relationships (
-                    relationship_id TEXT PRIMARY KEY,
-                    from_fact_id TEXT NOT NULL,
-                    to_fact_id TEXT NOT NULL,
-                    relationship_type TEXT NOT NULL,
-                    evidence_json TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    metadata_json TEXT NOT NULL,
-                    FOREIGN KEY(from_fact_id) REFERENCES facts(fact_id),
-                    FOREIGN KEY(to_fact_id) REFERENCES facts(fact_id)
-                )
-                """
-            )
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS conflicts (
-                    conflict_id TEXT PRIMARY KEY,
-                    fact_ids_json TEXT NOT NULL,
-                    reason TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    evidence_ids_json TEXT NOT NULL,
-                    metadata_json TEXT NOT NULL,
-                    created_at TEXT NOT NULL
-                )
-                """
-            )
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS job_matches (
-                    job_match_id TEXT PRIMARY KEY,
-                    job_id TEXT NOT NULL,
-                    requirement_id TEXT NOT NULL,
-                    fact_ids_json TEXT NOT NULL,
-                    resolution_state TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    metadata_json TEXT NOT NULL
-                )
-                """
-            )
-            conn.execute(
-                "INSERT OR IGNORE INTO migrations (migration_id, schema_version, applied_at) VALUES (?, ?, ?)",
-                (_MIGRATION_ID, SCHEMA_VERSION, self._clock()),
-            )
+            found_version = user_version(conn)
+            if found_version > SUPPORTED_SCHEMA_VERSION:
+                raise IncompatibleSchemaVersionError(found=found_version, supported=SUPPORTED_SCHEMA_VERSION)
+            for migration in pending_migrations(conn):
+                migration_version = MIGRATIONS.index(migration) + 1
+                try:
+                    migration.apply(conn)
+                    _record_migration(conn, migration.id, self._clock())
+                    set_user_version(conn, migration_version)
+                except Exception as exc:
+                    if isinstance(exc, MigrationFailedError):
+                        raise
+                    raise MigrationFailedError(migration.id, exc) from exc
+            if not pending_migrations(conn) and user_version(conn) < SUPPORTED_SCHEMA_VERSION:
+                set_user_version(conn, SUPPORTED_SCHEMA_VERSION)
             conn.commit()
 
     @contextmanager
@@ -1392,4 +1339,4 @@ def _clean_result(value: Any) -> Any:
     return value
 
 
-__all__ = ["CareerStore", "openCareerStore"]
+__all__ = ["CareerStore", "IncompatibleSchemaVersionError", "MigrationFailedError", "openCareerStore"]

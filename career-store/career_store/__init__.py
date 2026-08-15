@@ -18,7 +18,7 @@ from .schemas import (
     TransactionResult,
     VerificationState,
 )
-from .store import CareerStore, openCareerStore
+from .store import CareerStore, IncompatibleSchemaVersionError, MigrationFailedError, openCareerStore
 
 __all__ = [
     "EVIDENCE_SCHEMA",
@@ -32,7 +32,9 @@ __all__ = [
     "Fact",
     "FactRelationship",
     "JobAssociation",
+    "IncompatibleSchemaVersionError",
     "MigrationState",
+    "MigrationFailedError",
     "RelationshipType",
     "ResolutionState",
     "Result",
