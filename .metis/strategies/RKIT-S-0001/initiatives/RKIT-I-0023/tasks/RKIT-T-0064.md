@@ -4,14 +4,14 @@ level: task
 title: "Contract-test rewrite, TEST_SPEC grounding obligations, skip-guardrail finding; I-0023 close-out"
 short_code: "RKIT-T-0064"
 created_at: 2026-08-15T03:11:05.482223+00:00
-updated_at: 2026-08-15T03:30:29.250916+00:00
+updated_at: 2026-08-15T03:38:16.087551+00:00
 parent: workflow-deterministic-checkpoint
 blocked_by: [RKIT-T-0063]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0023
 ## Objective
 
 Close out RKIT-I-0023 (Requirement 5 + Testing Strategy): finish the strengthen-only contract-test rewrite, rephrase workflow/TEST_SPEC.md:50-61 state-machine cases as grounding obligations and add the :57 loop-termination case, produce the structural skip-guardrail replacement finding for the protected tools/workflow_guardrails.py keyword blocklist, and run the three-gate close-out with a mutation probe.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

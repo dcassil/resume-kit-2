@@ -4,14 +4,14 @@ level: initiative
 title: "Workflow Deterministic Checkpoint State Machine and Policy Gates"
 short_code: "RKIT-I-0023"
 created_at: 2026-08-13T20:41:37.382760+00:00
-updated_at: 2026-08-15T03:12:29.746945+00:00
+updated_at: 2026-08-15T03:38:34.157368+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0022]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -92,6 +92,8 @@ advanceCheckpoint verifies every required ref, then persists the verified refs i
 - **Terminate the loop by clearing facts_verified after each match rerun.** Rejected: facts_verified is cumulative audit data consumed by the manifest; destroying it to fix control flow trades an audit defect for a loop fix. A watermark preserves both.
 
 ## Implementation Plan **[REQUIRED]**
+
+**COMPLETE 2026-08-15 (continuous mode).** Executed as RKIT-T-0061..0064: T-0061 grounded EvidenceRef model (artifact sha256 / dto schema-validated / run_state persisted-key refs declared per checkpoint; verified before advance and persisted; bare booleans typed-rejected; legacy boolean maps ungrounded; computed named blocking_reasons; smoke drives the grounded path — protected run_smoke.py +50/-0 strengthen-only, in the approval batch); T-0062 last_match_fact_watermark (fact-id sets; loop-back only on facts beyond watermark; cumulative facts_verified preserved; deadlock regression proves BUILD_SELECTION_PLAN→COMPLETE reachable); T-0063 hallucination_rejection gate (assertCanComplete reads persisted operation lifecycle records; flagged non-rejected blocks by name); T-0064 TEST_SPEC grounding obligations + structural skip-invariant unit test + verbatim guardrail replacement patch authored for the batch + mutation probe. Gates at close: --pr 368 OK, --smoke OK, --future-contract 375 OK. Approval-batch additions: run_smoke.py grounded-path strengthening, workflow_guardrails.py structural patch (authored in T-0064's report), test_workflow_grounded_transition_invariant for run_tests.py.
 
 Decomposition guidance (tasks to be created at decompose phase, in dependency order):
 1. EvidenceRef types plus verification in advanceCheckpoint, with typed rejection of bare booleans.
