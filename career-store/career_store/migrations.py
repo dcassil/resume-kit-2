@@ -262,6 +262,20 @@ def _apply_fact_merge_redirects(conn: sqlite3.Connection) -> None:
     )
 
 
+def _apply_relationship_confirmation_columns(conn: sqlite3.Connection) -> None:
+    _add_column(conn, "relationships", "confirmation_status TEXT NOT NULL DEFAULT 'unconfirmed'")
+    _add_column(conn, "relationships", "confirmed_by_provenance TEXT")
+    _add_column(conn, "relationships", "confirmed_at TEXT")
+    conn.execute(
+        """
+        UPDATE relationships
+        SET confirmation_status = 'unconfirmed'
+        WHERE confirmation_status IS NULL
+           OR confirmation_status NOT IN ('unconfirmed', 'user_confirmed')
+        """
+    )
+
+
 MIGRATIONS: tuple[MigrationEntry, ...] = (
     MigrationEntry("001_initial", _apply_initial),
     MigrationEntry("002_section_6_fact_columns", _apply_section_6_fact_columns),
@@ -269,6 +283,7 @@ MIGRATIONS: tuple[MigrationEntry, ...] = (
     MigrationEntry("004_match_relationship_columns", _apply_match_relationship_columns),
     MigrationEntry("005_enum_value_remap", _apply_enum_value_remap),
     MigrationEntry("006_fact_merge_redirects", _apply_fact_merge_redirects),
+    MigrationEntry("007_relationship_confirmation_columns", _apply_relationship_confirmation_columns),
 )
 
 SUPPORTED_SCHEMA_VERSION = len(MIGRATIONS)

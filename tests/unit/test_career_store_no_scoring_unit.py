@@ -21,6 +21,7 @@ SCORING_NAMES = {"score", "match_score", "official_score", "score_percent", "max
 ALLOWED_PUBLIC_METHODS = {
     "addEvidence",
     "addRelationship",
+    "confirmRelationship",
     "findCandidateMatches",
     "findConflicts",
     "getFact",

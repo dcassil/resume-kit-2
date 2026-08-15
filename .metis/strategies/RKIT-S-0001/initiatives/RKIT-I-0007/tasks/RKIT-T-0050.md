@@ -4,14 +4,14 @@ level: task
 title: "Relationship confirmation substrate, confirmRelationship, single match-policy function"
 short_code: "RKIT-T-0050"
 created_at: 2026-08-15T01:23:28.334360+00:00
-updated_at: 2026-08-15T01:23:28.334360+00:00
+updated_at: 2026-08-15T01:35:37.823382+00:00
 parent: relationship-aware-matching-and
-blocked_by: ["RKIT-T-0049"]
+blocked_by: [RKIT-T-0049]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0007
 ## Objective
 
 Give relationships stored confirmation status and enforce it in one place (RKIT-I-0007 Requirement 3): `fact_relationships`/`relationships` gains confirmation_status (unconfirmed/user_confirmed), confirmed_by_provenance, confirmed_at via the migration registry; addRelationship records agent rows as unconfirmed; new `confirmRelationship` (user provenance, idempotent) is the only path to user_confirmed; a single policy function maps (relationship type, confirmation status, config) → permitted matchType enforcing allowUnverifiedAliasCreation:false and allow_related_as_equivalent.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -62,3 +64,6 @@ Rationale: the enforcement substrate the vision guardrail (allowUnverifiedAliasC
 ## Status Updates
 
 *To be added during implementation*
+
+- 2026-08-15: Implemented additive migration 007, structural relationship confirmation validation, confirmRelationship transaction path, stored confirmation status on relationship DTOs, and a single relationship match-policy helper. Added focused unit tests for unconfirmed/confirmed alias matching in both directions plus typed errors/idempotency. Initial focused command passing: `PYTHONPATH=career-store:resume-core python3 -m unittest tests.unit.test_career_store_relationship_confirmation_unit -v`.
+- 2026-08-15: Validation complete: `python3 tools/run_gate.py --pr --root .`, `python3 tools/run_gate.py --smoke --root .`, `python3 -m unittest discover -s tests/unit -v`, and `python3 tools/run_migration_checks.py --root .` all pass. Straight Jacket verification still reports pre-existing checksum mismatches in protected `tools/pre-commit-resume-cli-guardrails.sh`, `tools/run_tests.py`, and `tools/TEST_SPEC.md`; this task did not edit those files.

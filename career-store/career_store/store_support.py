@@ -7,11 +7,19 @@ import json
 import sqlite3
 from typing import Any
 
-from .schemas import InterpretationProposal, MergeConflictError
+from .confirmations import validate_user_confirmation_provenance
+from .schemas import InterpretationProposal, InvalidRelationshipConfirmationError, MergeConflictError
+from .transactions import transaction_result_payload
 from .terms import _STOP_TERMS
 
 
 JsonObject = dict[str, Any]
+RELATIONSHIP_CONFIRMATION_UNCONFIRMED = "unconfirmed"
+RELATIONSHIP_CONFIRMATION_USER_CONFIRMED = "user_confirmed"
+RELATIONSHIP_CONFIRMATION_STATUSES = {
+    RELATIONSHIP_CONFIRMATION_UNCONFIRMED,
+    RELATIONSHIP_CONFIRMATION_USER_CONFIRMED,
+}
 
 _FORBIDDEN_RESULT_KEYS = {
     "raw_sql",
@@ -305,6 +313,30 @@ def _direct_resolution(fact: JsonObject, requirement_year: int | None, fact_term
     return "exact_match", metadata
 
 
+def _relationship_policy_match_type(relationship_type: str, confirmation_status: str, config: JsonObject) -> str:
+    clean_type = str(relationship_type)
+    clean_status = (
+        str(confirmation_status)
+        if str(confirmation_status) in RELATIONSHIP_CONFIRMATION_STATUSES
+        else RELATIONSHIP_CONFIRMATION_UNCONFIRMED
+    )
+    allow_unverified_alias = bool(
+        config.get("allowUnverifiedAliasCreation", config.get("allow_unverified_alias_creation", False))
+    )
+    allow_related_as_equivalent = bool(config.get("allow_related_as_equivalent", False))
+    if clean_type in {"alias", "equivalent"}:
+        if clean_status == RELATIONSHIP_CONFIRMATION_USER_CONFIRMED or allow_unverified_alias:
+            return "alias_match"
+        return "possible_match"
+    if clean_type == "related":
+        return "alias_match" if allow_related_as_equivalent else "related_match"
+    if clean_type in {"parent", "child"}:
+        return "related_match"
+    if clean_type == "contradicts":
+        return "possible_match"
+    return "possible_match"
+
+
 def _relationship_candidate(
     resolution: str,
     overlap: set[str],
@@ -321,12 +353,98 @@ def _relationship_candidate(
             {
                 "relationshipId": relationship["relationship_id"],
                 "type": relationship["relationship_type"],
-                "confirmationStatus": relationship.get("confirmation_status", "unconfirmed"),
+                "confirmationStatus": relationship["confirmation_status"],
             }
         ],
         "metadata": metadata,
         "conflicts": conflicts,
     }
+
+
+def _confirm_relationship(store: Any, schema_version: str, relationshipId: str, provenance: list[JsonObject]) -> JsonObject:
+    relationship_id = str(relationshipId)
+    now = store._clock()
+    with store._transaction("confirmRelationship", "updated") as txn:
+        conn = txn.connection
+        assert conn is not None
+        txn.touch("relationship_id", relationship_id)
+        row = conn.execute("SELECT * FROM relationships WHERE relationship_id = ?", (relationship_id,)).fetchone()
+        if row is None:
+            txn.set_mutation_status("rejected")
+            result = _relationship_confirmation_error(
+                store,
+                schema_version,
+                relationship_id,
+                InvalidRelationshipConfirmationError(
+                    "unknown_relationship_id",
+                    "relationshipId",
+                    "Relationship ID does not reference an existing relationship.",
+                ),
+            )
+            result["transaction_result"] = None
+        else:
+            try:
+                clean_provenance = validate_user_confirmation_provenance(provenance)
+            except InvalidRelationshipConfirmationError as exc:
+                txn.set_mutation_status("rejected")
+                result = _relationship_confirmation_error(store, schema_version, relationship_id, exc)
+                result["transaction_result"] = None
+            else:
+                if str(row["confirmation_status"] or RELATIONSHIP_CONFIRMATION_UNCONFIRMED) == RELATIONSHIP_CONFIRMATION_USER_CONFIRMED:
+                    txn.set_mutation_status("unchanged")
+                    result = {
+                        "schema_version": schema_version,
+                        "status": "unchanged",
+                        "mutation_status": "unchanged",
+                        "relationship_id": relationship_id,
+                        "confirmation_status": RELATIONSHIP_CONFIRMATION_USER_CONFIRMED,
+                        "confirmed_by_provenance": _from_json(row["confirmed_by_provenance"], []),
+                        "confirmed_at": row["confirmed_at"],
+                        "transaction_result": None,
+                        "audit": store._audit("confirmRelationship", mutated=True),
+                    }
+                else:
+                    conn.execute(
+                        """
+                        UPDATE relationships
+                        SET confirmation_status = ?, confirmed_by_provenance = ?, confirmed_at = ?
+                        WHERE relationship_id = ?
+                        """,
+                        (RELATIONSHIP_CONFIRMATION_USER_CONFIRMED, _to_json(clean_provenance), now, relationship_id),
+                    )
+                    result = {
+                        "schema_version": schema_version,
+                        "status": "updated",
+                        "mutation_status": "updated",
+                        "relationship_id": relationship_id,
+                        "confirmation_status": RELATIONSHIP_CONFIRMATION_USER_CONFIRMED,
+                        "confirmed_by_provenance": clean_provenance,
+                        "confirmed_at": now,
+                        "transaction_result": None,
+                        "audit": store._audit("confirmRelationship", mutated=True),
+                    }
+    transaction_result = txn.result
+    result["transaction_result"] = transaction_result_payload(transaction_result)
+    return _clean_result(result)
+
+
+def _relationship_confirmation_error(
+    store: Any,
+    schema_version: str,
+    relationship_id: str,
+    error: InvalidRelationshipConfirmationError,
+) -> JsonObject:
+    return _clean_result(
+        {
+            "schema_version": schema_version,
+            "status": "error",
+            "mutation_status": "rejected",
+            "relationship_id": relationship_id,
+            "confirmation_status": RELATIONSHIP_CONFIRMATION_UNCONFIRMED,
+            "errors": [error.to_error()],
+            "audit": store._audit("confirmRelationship", mutated=False, reason=error.code),
+        }
+    )
 
 
 def _merged_metadata(existing: JsonObject, incoming: Any) -> JsonObject:
@@ -427,8 +545,8 @@ def _insert_merge_alias_relationship(
         """
         INSERT OR IGNORE INTO relationships (
             relationship_id, from_fact_id, to_fact_id, relationship_type, evidence_json, created_at,
-            metadata_json, confidence
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            metadata_json, confidence, confirmation_status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             relationship_id,
@@ -439,6 +557,7 @@ def _insert_merge_alias_relationship(
             now,
             _to_json({"source": "mergeFacts"}),
             None,
+            RELATIONSHIP_CONFIRMATION_UNCONFIRMED,
         ),
     )
 

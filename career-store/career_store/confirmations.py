@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from .schemas import INTERPRETATION_PROPOSAL_OUTCOMES, InterpretationProposal, InvalidInterpretationProposalError
+from .schemas import (
+    INTERPRETATION_PROPOSAL_OUTCOMES,
+    InterpretationProposal,
+    InvalidInterpretationProposalError,
+    InvalidRelationshipConfirmationError,
+)
 
 
 JsonObject = dict[str, Any]
@@ -91,6 +96,45 @@ def proposal_has_user_provenance(proposal: InterpretationProposal) -> bool:
         if source in USER_CONFIRMATION_SOURCES:
             return True
     return False
+
+
+def validate_user_confirmation_provenance(value: Any, field_path: str = "provenance") -> list[JsonObject]:
+    if not isinstance(value, list) or not value:
+        raise InvalidRelationshipConfirmationError(
+            "missing_user_provenance",
+            field_path,
+            "Relationship confirmation provenance must be a non-empty ProvenanceRef array.",
+        )
+    clean_provenance: list[JsonObject] = []
+    has_user_source = False
+    for index, entry in enumerate(value):
+        if not isinstance(entry, dict):
+            raise InvalidRelationshipConfirmationError(
+                "malformed_provenance",
+                f"{field_path}/{index}",
+                "Each ProvenanceRef must be an object.",
+            )
+        source = entry.get("source", entry.get("kind"))
+        text = entry.get("text")
+        if not isinstance(source, str) or not source.strip() or not isinstance(text, str) or not text.strip():
+            raise InvalidRelationshipConfirmationError(
+                "malformed_provenance",
+                f"{field_path}/{index}",
+                "Each ProvenanceRef requires non-empty source and text fields.",
+            )
+        clean_entry = dict(entry)
+        clean_entry["source"] = source
+        clean_provenance.append(clean_entry)
+        if source in USER_CONFIRMATION_SOURCES:
+            has_user_source = True
+    if not has_user_source:
+        raise InvalidRelationshipConfirmationError(
+            "missing_user_confirmation_source",
+            field_path,
+            "Relationship confirmation provenance must include a structural user confirmation source.",
+            sorted(USER_CONFIRMATION_SOURCES),
+        )
+    return clean_provenance
 
 
 def proposal_evidence(proposal: InterpretationProposal, verification_state: str, source: str) -> list[JsonObject]:

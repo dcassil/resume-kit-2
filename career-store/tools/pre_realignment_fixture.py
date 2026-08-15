@@ -17,6 +17,7 @@ EXPECTED_MIGRATIONS = [
     "004_match_relationship_columns",
     "005_enum_value_remap",
     "006_fact_merge_redirects",
+    "007_relationship_confirmation_columns",
 ]
 
 

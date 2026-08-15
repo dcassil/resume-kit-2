@@ -41,6 +41,34 @@ class InvalidInterpretationProposalError(ValueError):
         return payload
 
 
+class InvalidRelationshipConfirmationError(ValueError):
+    """Typed validation error for malformed relationship confirmations."""
+
+    def __init__(
+        self,
+        code: str,
+        field_path: str,
+        message: str,
+        allowed_values: list[str] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.field_path = field_path
+        self.message = message
+        self.allowed_values = allowed_values
+
+    def to_error(self) -> JsonObject:
+        payload: JsonObject = {
+            "type": self.__class__.__name__,
+            "code": self.code,
+            "field_path": self.field_path,
+            "message": self.message,
+        }
+        if self.allowed_values is not None:
+            payload["allowed_values"] = self.allowed_values
+        return payload
+
+
 class MergeConflictError(ValueError):
     """Typed validation error for invalid fact merge requests."""
 
@@ -120,6 +148,9 @@ class FactRelationship:
     to_fact_id: str
     relationship_type: RelationshipType | str
     evidence_or_rationale: JsonObject = field(default_factory=dict)
+    confirmation_status: str = "unconfirmed"
+    confirmed_by_provenance: list[ProvenanceRef] = field(default_factory=list)
+    confirmed_at: str | None = None
     confidence: float | None = None
     created_at: str | None = None
     metadata: JsonObject = field(default_factory=dict)
@@ -211,6 +242,9 @@ FACT_RELATIONSHIP_SCHEMA: JsonObject = {
         "to_fact_id": {"type": "string"},
         "relationship_type": {"enum": [state.value for state in RelationshipType]},
         "evidence_or_rationale": {"type": "object"},
+        "confirmation_status": {"enum": ["unconfirmed", "user_confirmed"]},
+        "confirmed_by_provenance": {"type": "array", "items": {"type": "object"}},
+        "confirmed_at": {"type": ["string", "null"]},
         "confidence": {"type": ["number", "null"]},
     },
 }
@@ -247,6 +281,7 @@ __all__ = [
     "INTERPRETATION_PROPOSAL_SCHEMA",
     "InterpretationProposal",
     "InvalidInterpretationProposalError",
+    "InvalidRelationshipConfirmationError",
     "MergeConflictError",
     "MigrationState",
     "ProvenanceRef",

@@ -4,14 +4,14 @@ level: task
 title: "Typed candidate generation: direct vs traversal, dictionary deletion, pollution fix"
 short_code: "RKIT-T-0049"
 created_at: 2026-08-15T01:23:28.279934+00:00
-updated_at: 2026-08-15T01:25:05.405828+00:00
+updated_at: 2026-08-15T01:35:37.674003+00:00
 parent: relationship-aware-matching-and
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0007
 ## Objective
 
 Fix the CRITICAL related-term pollution and the compiled-in alias dictionary (RKIT-I-0007 Requirements 1-2): `_fact_match_terms`/`_relationship_terms` no longer fold relationship-linked terms into a fact's direct term set; matching produces typed candidates (direct terms → exact; relationship traversal → candidates labeled by the relationship path); the compiled alias/service dictionaries are deleted and alias lookup is stored-relationship traversal only.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

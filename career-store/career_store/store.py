@@ -27,6 +27,7 @@ from .store_support import (
     _after_merge_repoint,
     _authority_ref,
     _clean_result,
+    _confirm_relationship,
     _conflict_from_row,
     _conflict_object,
     _dedupe_conflicts,
@@ -54,6 +55,7 @@ from .store_support import (
     _repoint_job_matches,
     _resolve_fact_id,
     _relationship_candidate,
+    _relationship_policy_match_type,
     _source_document_ref,
     _stable_id,
     _state_value,
@@ -637,8 +639,9 @@ class CareerStore:
                 conn.execute(
                     """
                     INSERT INTO relationships (
-                        relationship_id, from_fact_id, to_fact_id, relationship_type, evidence_json, created_at, metadata_json, confidence
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        relationship_id, from_fact_id, to_fact_id, relationship_type, evidence_json, created_at,
+                        metadata_json, confidence, confirmation_status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(relationship_id) DO UPDATE SET
                         evidence_json = excluded.evidence_json,
                         metadata_json = excluded.metadata_json,
@@ -653,8 +656,14 @@ class CareerStore:
                         now,
                         _to_json({"policy": policy}),
                         _optional_float((evidence_or_rationale or {}).get("confidence")),
+                        "unconfirmed",
                     ),
                 )
+                status_row = conn.execute(
+                    "SELECT confirmation_status FROM relationships WHERE relationship_id = ?",
+                    (relationship_id,),
+                ).fetchone()
+                confirmation_status = str(status_row["confirmation_status"] or "unconfirmed") if status_row else "unconfirmed"
                 if relationship_type == "contradicts":
                     conflict_id = _stable_id("conflict", from_fact_id, to_fact_id, relationship_type)
                     txn.touch("conflict_id", conflict_id)
@@ -677,16 +686,20 @@ class CareerStore:
                     "mutation_status": mutation_status,
                     "fact_id": from_fact_id,
                     "relationship_id": relationship_id,
+                    "confirmation_status": confirmation_status,
                     "verification_state": from_fact["verification_state"],
                     "conflicts": self._conflicts_for_fact(from_fact_id, conn=conn),
                     "confirmation_required": relationship_type in {"alias", "equivalent"}
-                    and policy.get("requires_confirmation_for_equivalence", False),
+                    and confirmation_status != "user_confirmed",
                     "transaction_result": None,
                     "audit": self._audit("addRelationship", mutated=True),
                 }
         transaction_result = txn.result
         result["transaction_result"] = transaction_result_payload(transaction_result)
         return _clean_result(result)
+
+    def confirmRelationship(self, relationshipId: str, provenance: list[JsonObject]) -> JsonObject:
+        return _confirm_relationship(self, SCHEMA_VERSION, relationshipId, provenance)
 
     def findCandidateMatches(
         self,
@@ -1069,11 +1082,12 @@ class CareerStore:
                 "relationship_type": str(row["relationship_type"]),
                 "evidence_or_rationale": _from_json(str(row["evidence_json"]), {}),
                 "created_at": str(row["created_at"]),
+                "confirmation_status": str(row["confirmation_status"] or "unconfirmed"),
+                "confirmed_by_provenance": _from_json(row["confirmed_by_provenance"], []),
+                "confirmed_at": row["confirmed_at"],
                 "metadata": _from_json(str(row["metadata_json"]), {}),
             }
             _add_if_not_none(relationship, "confidence", row["confidence"])
-            if "confirmation_status" in row.keys():
-                relationship["confirmation_status"] = str(row["confirmation_status"] or "unconfirmed")
             relationships.append(relationship)
         return relationships
 
@@ -1324,6 +1338,8 @@ class CareerStore:
             _, metadata = _direct_resolution(fact, requirement_year, fact_terms)
             conflicts = list(metadata.pop("conflicts", []))
             def append_candidate(resolution: str) -> None:
+                if metadata.get("years_satisfied") is False:
+                    resolution = "possible_match"
                 relationship_matches.append(
                     (
                         _RESOLUTION_RANK[resolution],
@@ -1333,20 +1349,6 @@ class CareerStore:
                         _relationship_candidate(resolution, overlap, relationship, metadata, conflicts),
                     )
                 )
-            if relationship_type in {"alias", "equivalent"}:
-                resolution = "possible_match" if metadata.get("years_satisfied") is False else "alias_match"
-                append_candidate(resolution)
-                continue
-            if relationship_type == "related":
-                resolution = "related_match"
-                if metadata.get("years_satisfied") is False:
-                    resolution = "possible_match"
-                append_candidate(resolution)
-                continue
-            if relationship_type in {"parent", "child"}:
-                resolution = "possible_match" if metadata.get("years_satisfied") is False else "related_match"
-                append_candidate(resolution)
-                continue
             if relationship_type == "contradicts":
                 conflict = _conflict_object(
                     sorted([fact_id, other_id]),
@@ -1357,7 +1359,13 @@ class CareerStore:
                     },
                 )
                 conflicts.append(conflict)
-                append_candidate("possible_match")
+            append_candidate(
+                _relationship_policy_match_type(
+                    relationship_type,
+                    relationship["confirmation_status"],
+                    policy,
+                )
+            )
         if not relationship_matches:
             return None
         relationship_matches.sort(key=lambda item: (-item[0], -item[1], item[2], item[3]))
