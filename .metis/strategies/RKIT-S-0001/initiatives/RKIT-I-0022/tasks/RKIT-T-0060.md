@@ -4,14 +4,14 @@ level: task
 title: "Manifest audit-field additions and TEST_SPEC field-list strengthening; I-0022 close-out"
 short_code: "RKIT-T-0060"
 created_at: 2026-08-15T02:48:33.833144+00:00
-updated_at: 2026-08-15T03:03:20.128538+00:00
+updated_at: 2026-08-15T03:10:15.041595+00:00
 parent: workflow-artifact-schemas-and-run
 blocked_by: [RKIT-T-0059]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0022
 ## Objective
 
 Close out RKIT-I-0022 (Requirement 6 + Testing Strategy): RunManifest and RUN_MANIFEST_SCHEMA gain `question_answer_log_refs` and `unresolved_requirements` so the full Audit Gate reconstruction list (CONTRACT_SURFACE_ALIGNMENT.md:353-366) is representable; workflow/TEST_SPEC.md's manifest field list (:83-101) is strengthened to that set; three-gate close-out with mutation probe.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
