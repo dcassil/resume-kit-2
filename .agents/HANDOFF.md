@@ -1,4 +1,12 @@
-# Handoff — 2026-08-15 (I-0004 + I-0005 + I-0006 COMPLETE, continuous codex mode)
+# Handoff — 2026-08-15 (I-0004..I-0008 COMPLETE — career-store tier DONE, continuous codex mode)
+
+## -1. Later-evening update (supersedes §0 state line)
+
+develop PUSHED through `312a458`, **v0.8.0**. Since §0 below: **RKIT-I-0007** (v0.7.0: typed candidate generation fixing the Azure→AWS related-pollution defect w/ outcome-asserted contract test, _TERM_ALIASES deleted, relationship confirmation substrate + confirmRelationship + single policy chokepoint enforcing allowUnverifiedAliasCreation:false, directional parent/child + contradicts conflict_signals, searchFacts filters + evidence minimization) and **RKIT-I-0008** (v0.8.0: interactions substrate w/ no-write-path boundary per A-0001, conflict lifecycle w/ engine-routed adjudicateConflict, _YEARS_RE years + structured title heuristics killing the React-18 false conflict, dead self-conflict branch removed, _clean_result appeasement deleted). Career-store migrations now 001-009. Gates at head: --pr 352, --future-contract 359, smoke, migration checks 4/4 — all green.
+
+**APPROVAL BATCH (grown; single approve/update-locks before PR to main):** run_tests.py wiring for ELEVEN career-store unit modules (jobs, transactions, no_scoring, interpretation_proposals, verification_transitions, merge_facts, relationship_confirmation, search_facts, interactions, conflict_lifecycle, conflict_heuristics); career_store_guardrails ALLOWED_SURFACES += getMigrationState/mergeFacts/confirmRelationship/recordInteraction/listInteractions/adjudicateConflict + relationship set += parent/child; store_surface.json (same functions + confirmation slot → InterpretationProposal + parent/child vocabulary + contract-test tuple restores); pre-existing TEST_SPEC.md/run_tests.py drift + Daniel's hook edit.
+
+**Next:** RKIT-I-0022 (workflow contract tier root; owns the run-ID collision defect) in flight or next; then the workflow chain 0023→0027. Also newly unblocked: I-0011 (career-mcp semantics). Same loop.
 
 Read this first. Supersedes everything below (kept for defect table, ADR summaries, loop recipe details).
 
