@@ -374,14 +374,21 @@ def _inspect_requirement(workspace: Path, requirement_id: str) -> JsonObject:
 
 def _audit_report(workspace: Path) -> JsonObject:
     config = _config(workspace)
+    paths = _paths(workspace)
+    resume = _read_json(paths["resume_base"], {})
     match = _read_json(_paths(workspace)["reports_dir"] / "match.json", {})
     operations = _read_json(_paths(workspace)["operations_dir"] / "tailor.json", {})
     validations = _read_json(_paths(workspace)["reports_dir"] / "validations.json", {})
     export = _read_json(_paths(workspace)["reports_dir"] / "export.json", {})
+    job = _read_json(paths["job_current"], {})
     run_state = createRun(workspace=workspace, config=config)
     manifest = buildRunManifest(
         {
             **run_state,
+            "base_resume_id": resume.get("resume_id", ""),
+            "base_resume_hash": resume.get("base_hash", ""),
+            "job_id": job.get("job_id", ""),
+            "renderer_template_version": config.get("schema_versions", {}).get("renderer_template", ""),
             "initial_score": match.get("score", 0.0),
             "final_score": match.get("score", 0.0),
             "facts_added": [fact.get("fact_id") for fact in _all_facts(workspace) if fact.get("fact_id")],

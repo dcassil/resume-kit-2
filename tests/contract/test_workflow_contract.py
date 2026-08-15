@@ -117,6 +117,18 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
     def create_run(self):
         return maybe_await(self.workflow.createRun(workspace=self.workspace, config=self.config))
 
+    def valid_manifest_run_state(self):
+        run_state = self.create_run()
+        run_state.update(
+            {
+                "base_resume_id": "base_1",
+                "base_resume_hash": "hash_base",
+                "job_id": "job_1",
+                "renderer_template_version": "ats-clean@1",
+            }
+        )
+        return run_state
+
     def test_create_run_records_versions_config_hash_stage_and_recovery_metadata(self):
         run_state = self.create_run()
         for field in ["run_id", "current_checkpoint", "config_hash", "schema_versions", "package_versions", "stage_state", "recovery_markers"]:
@@ -294,15 +306,7 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         import resume_core
         from workflow.versions import CAREER_DB_VERSION_UNAVAILABLE
 
-        run_state = self.create_run()
-        run_state.update(
-            {
-                "base_resume_id": "base_1",
-                "base_resume_hash": "hash_base",
-                "job_id": "job_1",
-                "renderer_template_version": "ats-clean@1",
-            }
-        )
+        run_state = self.valid_manifest_run_state()
         manifest = maybe_await(self.workflow.buildRunManifest(run_state))
         installed_version = importlib_metadata.version("resume-kit")
         self.assertFalse(contains_value(manifest, "0.0.0"))
@@ -327,20 +331,63 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         )
         self.assertEqual(manifest["careerDbVersion"], CAREER_DB_VERSION_UNAVAILABLE)
 
+    def test_run_manifest_validation_rejects_each_empty_identity_field(self):
+        for field_name in ["base_resume_id", "base_resume_hash", "job_id", "renderer_template_version"]:
+            with self.subTest(field_name=field_name):
+                run_state = self.valid_manifest_run_state()
+                run_state[field_name] = ""
+                with self.assertRaises(self.workflow.RunManifestValidationError) as raised:
+                    maybe_await(self.workflow.buildRunManifest(run_state))
+                self.assertTrue(
+                    any(
+                        error.get("code") == "min_length" and error.get("field_path") == field_name
+                        for error in raised.exception.errors
+                    ),
+                    raised.exception.errors,
+                )
+
+    def test_run_manifest_validation_rejects_placeholder_version_values(self):
+        direct_run_state = self.valid_manifest_run_state()
+        direct_run_state["renderer_template_version"] = "0.0.0"
+        with self.assertRaises(self.workflow.RunManifestValidationError) as direct_error:
+            maybe_await(self.workflow.buildRunManifest(direct_run_state))
+        self.assertTrue(
+            any(error.get("code") == "forbidden_value" and error.get("field_path") == "renderer_template_version" for error in direct_error.exception.errors),
+            direct_error.exception.errors,
+        )
+
+        original_collect_versions = self.workflow.collectVersions
+        cases = {
+            "canonical_resume_schema_version": lambda versions: versions["schema_versions"].update({"canonical_resume": "0.0.0"}),
+            "matching_algorithm_version": lambda versions: versions.update({"matching_algorithm_version": "0.0.0"}),
+            "package_versions/workflow": lambda versions: versions["package_versions"].update({"workflow": "0.0.0"}),
+        }
+        for field_path, mutate_versions in cases.items():
+            with self.subTest(field_path=field_path):
+                def placeholder_versions(**kwargs):
+                    versions = original_collect_versions(**kwargs)
+                    versions["schema_versions"] = dict(versions["schema_versions"])
+                    versions["package_versions"] = dict(versions["package_versions"])
+                    mutate_versions(versions)
+                    return versions
+
+                with mock.patch.object(self.workflow, "collectVersions", side_effect=placeholder_versions):
+                    with self.assertRaises(self.workflow.RunManifestValidationError) as raised:
+                        maybe_await(self.workflow.buildRunManifest(self.valid_manifest_run_state()))
+                self.assertTrue(
+                    any(
+                        error.get("code") == "forbidden_value" and error.get("field_path") == field_path
+                        for error in raised.exception.errors
+                    ),
+                    raised.exception.errors,
+                )
+
     def test_run_manifest_career_db_version_equals_store_state(self):
         import career_store
 
         career_db = self.workspace / "data" / "career.db"
         store = career_store.openCareerStore(str(career_db), clock=lambda: "2026-01-01T00:00:00Z")
-        run_state = self.create_run()
-        run_state.update(
-            {
-                "base_resume_id": "base_1",
-                "base_resume_hash": "hash_base",
-                "job_id": "job_1",
-                "renderer_template_version": "ats-clean@1",
-            }
-        )
+        run_state = self.valid_manifest_run_state()
         manifest = maybe_await(self.workflow.buildRunManifest(run_state))
         self.assertEqual(manifest["careerDbVersion"], asdict(store.getMigrationState()))
 

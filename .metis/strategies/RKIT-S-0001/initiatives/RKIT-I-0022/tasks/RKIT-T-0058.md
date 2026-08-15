@@ -4,14 +4,14 @@ level: task
 title: "collectVersions with real package/schema/matching sources and careerDbVersion via getMigrationState"
 short_code: "RKIT-T-0058"
 created_at: 2026-08-15T02:48:33.727838+00:00
-updated_at: 2026-08-15T02:49:50.256691+00:00
+updated_at: 2026-08-15T02:58:23.023969+00:00
 parent: workflow-artifact-schemas-and-run
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0022
 ## Objective
 
 Kill the fake versions (RKIT-I-0022 Requirements 2-4, Detailed Design "Version recording"): a `collectVersions()` helper resolves every manifest version from its real source — installed package metadata, schema-module constants, resume-core's public surface for matching versions, and career-store `getMigrationState()` for careerDbVersion. No literal fallbacks; unresolvable sources raise typed errors, never '0.0.0'.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

@@ -36,6 +36,20 @@ _ADVANCE_REQUIREMENTS: dict[str, tuple[str, ...]] = {
 }
 
 
+class RunManifestValidationError(ValueError):
+    """Raised when an assembled run manifest violates the manifest schema."""
+
+    def __init__(self, errors: list[JsonObject]) -> None:
+        self.errors = errors
+        summary = "; ".join(
+            f"{error.get('field_path', '<root>')}: {error.get('message', error.get('code', 'invalid'))}"
+            for error in errors[:3]
+        )
+        if len(errors) > 3:
+            summary = f"{summary}; ... {len(errors) - 3} more"
+        super().__init__(f"Run manifest validation failed: {summary}")
+
+
 def createRun(workspace: str | Path, config: JsonObject) -> JsonObject:
     workspace_path = Path(workspace)
     config_hash = _stable_hash(config)
@@ -188,6 +202,7 @@ def buildRunManifest(run_state: JsonObject) -> JsonObject:
         "recovery_markers": list(run_state.get("recovery_markers", [])),
         "audit_refs": list(run_state.get("audit_refs", [])),
     }
+    _validate_run_manifest(manifest)
     return manifest
 
 
@@ -278,6 +293,92 @@ def _stable_hash(value: Any) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def _validate_run_manifest(manifest: JsonObject) -> None:
+    errors = _schema_errors(manifest, RUN_MANIFEST_SCHEMA, "")
+    if errors:
+        raise RunManifestValidationError(errors)
+
+
+def _schema_errors(value: Any, schema: JsonObject, field_path: str) -> list[JsonObject]:
+    errors: list[JsonObject] = []
+
+    one_of = schema.get("oneOf")
+    if isinstance(one_of, list):
+        if any(not _schema_errors(value, subschema, field_path) for subschema in one_of if isinstance(subschema, dict)):
+            return []
+        return [_issue("one_of", "Value must match exactly one allowed schema.", field_path)]
+
+    forbidden = schema.get("not")
+    if isinstance(forbidden, dict) and not _schema_errors(value, forbidden, field_path):
+        errors.append(_issue("forbidden_value", "Value must not use a placeholder value.", field_path, {"value": value}))
+
+    enum_values = schema.get("enum")
+    if isinstance(enum_values, list) and value not in enum_values:
+        errors.append(_issue("invalid_enum", "Value is not one of the allowed values.", field_path, {"allowed": enum_values}))
+
+    expected_type = schema.get("type")
+    if isinstance(expected_type, str) and not _matches_type(value, expected_type):
+        errors.append(_issue("invalid_type", f"Expected {expected_type}.", field_path, {"actual": type(value).__name__}))
+        return errors
+
+    min_length = schema.get("minLength")
+    if isinstance(min_length, int) and isinstance(value, str) and len(value) < min_length:
+        errors.append(_issue("min_length", f"Expected at least {min_length} character(s).", field_path))
+
+    if expected_type == "object" and isinstance(value, dict):
+        for field_name in schema.get("required", []):
+            if isinstance(field_name, str) and field_name not in value:
+                errors.append(_issue("missing_field", f"RunManifest requires {field_name}.", _join_path(field_path, field_name)))
+        properties = schema.get("properties", {})
+        if isinstance(properties, dict):
+            for field_name, field_schema in properties.items():
+                if field_name in value and isinstance(field_schema, dict):
+                    errors.extend(_schema_errors(value[field_name], field_schema, _join_path(field_path, field_name)))
+        additional_schema = schema.get("additionalProperties")
+        if isinstance(additional_schema, dict):
+            known = set(properties) if isinstance(properties, dict) else set()
+            for field_name, item in value.items():
+                if field_name not in known:
+                    errors.extend(_schema_errors(item, additional_schema, _join_path(field_path, str(field_name))))
+
+    if expected_type == "array" and isinstance(value, list):
+        item_schema = schema.get("items")
+        if isinstance(item_schema, dict):
+            for index, item in enumerate(value):
+                errors.extend(_schema_errors(item, item_schema, _join_path(field_path, str(index))))
+
+    return errors
+
+
+def _matches_type(value: Any, expected_type: str) -> bool:
+    if expected_type == "object":
+        return isinstance(value, dict)
+    if expected_type == "array":
+        return isinstance(value, list)
+    if expected_type == "string":
+        return isinstance(value, str)
+    if expected_type == "number":
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if expected_type == "boolean":
+        return isinstance(value, bool)
+    if expected_type == "null":
+        return value is None
+    return True
+
+
+def _issue(code: str, message: str, field_path: str, details: JsonObject | None = None) -> JsonObject:
+    issue: JsonObject = {"code": code, "message": message, "severity": "error"}
+    if field_path:
+        issue["field_path"] = field_path
+    if details:
+        issue["details"] = details
+    return issue
+
+
+def _join_path(parent: str, child: str) -> str:
+    return f"{parent}/{child}" if parent else child
+
+
 def _jsonable(value: Any) -> Any:
     if isinstance(value, Path):
         return str(value)
@@ -329,6 +430,7 @@ __all__ = [
     "SCHEMAS",
     "Checkpoint",
     "RunManifest",
+    "RunManifestValidationError",
     "createRun",
     "getNextCheckpoint",
     "advanceCheckpoint",

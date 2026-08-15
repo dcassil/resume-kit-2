@@ -4,14 +4,14 @@ level: task
 title: "Manifest schema validation in buildRunManifest with minLength identity constraints"
 short_code: "RKIT-T-0059"
 created_at: 2026-08-15T02:48:33.781066+00:00
-updated_at: 2026-08-15T02:48:33.781066+00:00
+updated_at: 2026-08-15T02:58:23.440843+00:00
 parent: workflow-artifact-schemas-and-run
-blocked_by: ["RKIT-T-0058"]
+blocked_by: [RKIT-T-0058]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0022
 ## Objective
 
 Make buildRunManifest self-gating (RKIT-I-0022 Requirement 5, Detailed Design "Manifest validation"): validate the assembled manifest against RUN_MANIFEST_SCHEMA before returning; identity fields (base_resume_id, base_resume_hash, job_id, renderer_template_version) gain minLength constraints so today's silent empty-string defaults become typed validation failures.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -59,4 +61,4 @@ Rationale: focused validation work on an established pattern; judgment is in pro
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-15: Implemented builder-side manifest validation in `workflow.buildRunManifest` with a local stdlib schema walker and typed `RunManifestValidationError`; added `minLength: 1` identity constraints plus `0.0.0` placeholder rejection for version fields in `RUN_MANIFEST_SCHEMA`. Fixed `resume-cli audit` manifest inputs to pass persisted resume id/hash, job id, and configured renderer template version. Added contract tests for empty identity fields, placeholder versions, and schema minLength assertions. Required gates passed: PR gate, smoke gate, and `python3 -m unittest discover -s tests/unit -v`. Straight Jacket verify remains blocked by pre-existing protected checksum mismatches in `tools/pre-commit-resume-cli-guardrails.sh`, `tools/run_tests.py`, and `tools/TEST_SPEC.md`.

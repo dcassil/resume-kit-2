@@ -141,6 +141,12 @@ class SharedDtoSchemaContractTests(unittest.TestCase):
             },
         )
 
+    def test_run_manifest_schema_requires_non_empty_identity_fields(self):
+        properties = workflow.RUN_MANIFEST_SCHEMA["properties"]
+        for field_name in ["base_resume_id", "base_resume_hash", "job_id", "renderer_template_version"]:
+            with self.subTest(field_name=field_name):
+                self.assertEqual(properties[field_name]["minLength"], 1)
+
     def test_dtos_serialize_to_plain_json_shapes(self):
         requirement = resume_core.JobRequirement(
             requirement_id="req_react",

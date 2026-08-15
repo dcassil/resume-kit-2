@@ -11,6 +11,8 @@ JsonObject = dict[str, Any]
 
 RUN_MANIFEST_SCHEMA_VERSION = "run-manifest.v1"
 CAREER_DB_VERSION_UNAVAILABLE_STATUS = "unavailable"
+NON_EMPTY_STRING: JsonObject = {"type": "string", "minLength": 1}
+VERSION_STRING: JsonObject = {"type": "string", "minLength": 1, "not": {"enum": ["0.0.0"]}}
 
 
 class Checkpoint(str, Enum):
@@ -94,20 +96,20 @@ RUN_MANIFEST_SCHEMA: JsonObject = {
     ],
     "properties": {
         "run_id": {"type": "string"},
-        "base_resume_id": {"type": "string"},
-        "base_resume_hash": {"type": "string"},
-        "job_id": {"type": "string"},
+        "base_resume_id": NON_EMPTY_STRING,
+        "base_resume_hash": NON_EMPTY_STRING,
+        "job_id": NON_EMPTY_STRING,
         "config_hash": {"type": "string"},
-        "canonical_resume_schema_version": {"type": "string"},
-        "job_schema_version": {"type": "string"},
-        "career_db_schema_version": {"type": "string"},
+        "canonical_resume_schema_version": VERSION_STRING,
+        "job_schema_version": VERSION_STRING,
+        "career_db_schema_version": VERSION_STRING,
         "careerDbVersion": {
             "oneOf": [
                 {
                     "type": "object",
                     "required": ["schema_version", "database_path", "applied_migrations", "pending_migrations", "status", "metadata"],
                     "properties": {
-                        "schema_version": {"type": "string"},
+                        "schema_version": VERSION_STRING,
                         "database_path": {"type": "string"},
                         "applied_migrations": {"type": "array", "items": {"type": "string"}},
                         "pending_migrations": {"type": "array", "items": {"type": "string"}},
@@ -125,10 +127,10 @@ RUN_MANIFEST_SCHEMA: JsonObject = {
                 },
             ]
         },
-        "change_operation_schema_version": {"type": "string"},
-        "matching_algorithm_version": {"type": "string"},
-        "matching_config_version": {"type": "string"},
-        "renderer_template_version": {"type": "string"},
+        "change_operation_schema_version": VERSION_STRING,
+        "matching_algorithm_version": VERSION_STRING,
+        "matching_config_version": VERSION_STRING,
+        "renderer_template_version": VERSION_STRING,
         "agent_model_config": {"type": "object"},
         "initial_score": {"type": "number"},
         "final_score": {"type": "number"},
@@ -138,6 +140,10 @@ RUN_MANIFEST_SCHEMA: JsonObject = {
         "operations_rejected": {"type": "array", "items": {"type": "string"}},
         "validation_status": {"type": "string"},
         "output_artifact_paths": {"type": "array", "items": {"type": "string"}},
+        "schema_version": VERSION_STRING,
+        "package_versions": {"type": "object", "additionalProperties": VERSION_STRING},
+        "recovery_markers": {"type": "array", "items": {"type": "object"}},
+        "audit_refs": {"type": "array", "items": {"type": "string"}},
     },
 }
 
