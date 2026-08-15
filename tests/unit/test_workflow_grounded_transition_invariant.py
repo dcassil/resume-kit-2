@@ -53,25 +53,30 @@ class WorkflowGroundedTransitionInvariantTests(unittest.TestCase):
         accepted_transitions = [
             event
             for event in run_state.get("audit_events", [])
-            if event.get("operation") == "advanceCheckpoint" and event.get("accepted") is True
+            if event.get("decision") == "advanced"
         ]
         self.assertTrue(accepted_transitions)
-        self.assertEqual(accepted_transitions[-1]["current_checkpoint"], run_state["current_checkpoint"])
+        self.assertEqual(accepted_transitions[-1]["checkpoint"], run_state["current_checkpoint"])
 
         verified_by_checkpoint = run_state.get("verified_evidence", {})
         stage_state = run_state.get("stage_state", {})
-        previous_checkpoint = "INIT"
+        latest_event_by_checkpoint = {}
         for event in accepted_transitions:
-            checkpoint = event["current_checkpoint"]
-            self.assertEqual(event["previous_checkpoint"], previous_checkpoint)
-            evidence = verified_by_checkpoint.get(checkpoint)
-            self.assertIsInstance(evidence, dict, checkpoint)
-            self.assertTrue(evidence, checkpoint)
-            self.assertEqual(stage_state.get(checkpoint), evidence)
-            for evidence_ref in evidence.values():
+            checkpoint = event["checkpoint"]
+            self.assertEqual(event["run_id"], run_state["run_id"])
+            self.assertEqual(event["blocking_reasons"], [])
+            self.assertIn("event_id", event)
+            self.assertIn("timestamp", event)
+            self.assertIsInstance(event["evidence_refs"], dict, checkpoint)
+            self.assertTrue(event["evidence_refs"], checkpoint)
+            for evidence_ref in event["evidence_refs"].values():
                 self.assertIsInstance(evidence_ref, dict)
                 self.assertIn(evidence_ref.get("kind"), {"artifact", "dto", "run_state"})
-            previous_checkpoint = checkpoint
+            latest_event_by_checkpoint[checkpoint] = event
+        for checkpoint, event in latest_event_by_checkpoint.items():
+            evidence = verified_by_checkpoint.get(checkpoint)
+            self.assertEqual(event["evidence_refs"], evidence)
+            self.assertEqual(stage_state.get(checkpoint), evidence)
 
     def test_reached_checkpoints_have_recorded_grounded_transitions(self):
         self.advance("INGEST_RESUME", {"config_validated": self.dto_ref("WorkflowStatusEvidence")})

@@ -4,14 +4,14 @@ level: task
 title: "Durable audit events and real checkpoint artifact refs; delete substring fabrication"
 short_code: "RKIT-T-0065"
 created_at: 2026-08-15T03:39:09.827790+00:00
-updated_at: 2026-08-15T03:39:09.827790+00:00
+updated_at: 2026-08-15T03:40:22.141284+00:00
 parent: workflow-checkpoint-result
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0024
 ## Objective
 
 Make the audit surface real (RKIT-I-0024 Requirements 1-3; Detailed Design "Audit-event persistence"/"Ref grounding"): every advanceCheckpoint decision — allowed AND blocked — appends a durable AuditEvent flushed at decision time; recordCheckpointResult writes the checkpoint payload to disk and returns only refs to files that exist with sha256 hashes; the substring 'validation'/'render' ref fabrication is deleted outright.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -59,4 +61,9 @@ Rationale: durable audit semantics + deletion of fabricated refs; the persisted 
 
 ## Status Updates
 
-*To be added during implementation*
+- Implemented workflow durable advance audit events with event_id/run_id/checkpoint/decision/blocking_reasons/evidence_refs/timestamp, sequence-based event IDs, and injectable clocks.
+- Implemented checkpoint payload writes under `.workflow/runs/<run_id>/checkpoints/<checkpoint>.json`; returned checkpoint/artifact/validation/render refs are verified artifact EvidenceRefs with sha256.
+- Deleted validation/render substring fabrication by replacing it with explicit typed refs only.
+- Added focused unit regressions; focused workflow tests and workflow contract suite are green.
+- Straight Jacket verify had pre-existing protected-file checksum mismatches before this work (`tools/run_smoke.py`, `tools/run_tests.py`, `tools/TEST_SPEC.md`, `tools/pre-commit-resume-cli-guardrails.sh`), so final gate status may be affected.
+- Final validation: `python3 tools/run_gate.py --pr --root .` passed (368 tests); `python3 tools/run_gate.py --smoke --root .` passed; `python3 -m unittest discover -s tests/unit -v` passed (194 tests). No protected tool files were edited by this task.

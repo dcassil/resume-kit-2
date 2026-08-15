@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .schemas import RUN_MANIFEST_SCHEMA, SCHEMAS, Checkpoint, RunManifest
 from .versions import collectVersions
@@ -104,9 +104,10 @@ def getNextCheckpoint(run_state: JsonObject) -> JsonObject:
     }
 
 
-def advanceCheckpoint(run_state: JsonObject, target_checkpoint: str, evidence: JsonObject) -> JsonObject:
-    current = str(run_state.get("current_checkpoint", "INIT"))
-    expected = getNextCheckpoint(run_state)["next_checkpoint"]
+def advanceCheckpoint(run_state: JsonObject, target_checkpoint: str, evidence: JsonObject, clock: Callable[[], str] | None = None) -> JsonObject:
+    working_state = _working_run_state(run_state)
+    current = str(working_state.get("current_checkpoint", "INIT"))
+    expected = getNextCheckpoint(working_state)["next_checkpoint"]
     blocking_reasons: list[str] = []
     evidence_errors: list[JsonObject] = []
     verified_evidence: JsonObject = {}
@@ -114,76 +115,99 @@ def advanceCheckpoint(run_state: JsonObject, target_checkpoint: str, evidence: J
         blocking_reasons.append(f"expected {expected} after {current}")
     for requirement in _ADVANCE_REQUIREMENTS.get(target_checkpoint, ()):
         required_name = str(requirement["name"])
-        result = _verify_evidence_ref(run_state, requirement, evidence.get(required_name))
+        result = _verify_evidence_ref(working_state, requirement, evidence.get(required_name))
         if result.get("status") != "ok":
             blocking_reasons.append(required_name)
             evidence_errors.append(result)
         else:
             verified_evidence[required_name] = result["evidence_ref"]
     if target_checkpoint == "COMPLETE":
-        complete = assertCanComplete(_completion_gate_state(run_state, verified_evidence))
+        complete = assertCanComplete(_completion_gate_state(working_state, verified_evidence))
         if not complete["can_complete"]:
             blocking_reasons.extend(complete["failed_gates"])
     if blocking_reasons:
+        blocking_reasons = sorted(set(blocking_reasons))
+        event = _append_advance_audit_event(
+            working_state,
+            checkpoint=target_checkpoint,
+            decision="blocked",
+            blocking_reasons=blocking_reasons,
+            evidence_refs=verified_evidence,
+            clock=clock,
+        )
+        run_state.update(working_state)
         return {
             "status": "blocked",
             "previous_checkpoint": current,
             "current_checkpoint": current,
             "transition_evidence": dict(evidence),
-            "audit_event": _audit("advanceCheckpoint", current, target_checkpoint, False),
-            "blocking_reasons": sorted(set(blocking_reasons)),
+            "audit_event": event,
+            "blocking_reasons": blocking_reasons,
             "evidence_errors": evidence_errors,
         }
     verified_by_checkpoint = {
-        **run_state.get("verified_evidence", {}),
+        **working_state.get("verified_evidence", {}),
         target_checkpoint: verified_evidence,
     }
     updated = {
-        **run_state,
+        **working_state,
         "current_checkpoint": target_checkpoint,
-        "stage_state": {**run_state.get("stage_state", {}), target_checkpoint: dict(verified_evidence)},
+        "stage_state": {**working_state.get("stage_state", {}), target_checkpoint: dict(verified_evidence)},
         "verified_evidence": verified_by_checkpoint,
     }
-    updated.setdefault("audit_events", []).append(_audit("advanceCheckpoint", current, target_checkpoint, True))
+    event = _append_advance_audit_event(
+        updated,
+        checkpoint=target_checkpoint,
+        decision="advanced",
+        blocking_reasons=[],
+        evidence_refs=verified_evidence,
+        clock=clock,
+    )
     _persist_run(updated)
+    run_state.update(updated)
     return {
         "status": "ok",
         "previous_checkpoint": current,
         "current_checkpoint": target_checkpoint,
         "transition_evidence": dict(evidence),
         "verified_evidence": dict(verified_evidence),
-        "audit_event": updated["audit_events"][-1],
+        "audit_event": event,
         "blocking_reasons": [],
     }
 
 
-def recordCheckpointResult(run_state: JsonObject, checkpoint: str, result: JsonObject) -> JsonObject:
+def recordCheckpointResult(run_state: JsonObject, checkpoint: str, result: JsonObject, clock: Callable[[], str] | None = None) -> JsonObject:
+    working_state = _working_run_state(run_state)
     checkpoint_result = dict(result)
-    _extend_unique(run_state, "facts_verified", checkpoint_result.get("facts_verified", []))
-    _extend_unique(run_state, "facts_added", checkpoint_result.get("facts_added", []))
-    _extend_unique(run_state, "operations_applied", checkpoint_result.get("operations_applied", []))
-    _extend_unique(run_state, "operations_rejected", checkpoint_result.get("operations_rejected", []))
-    _merge_operation_statuses(run_state, _operation_status_records(checkpoint_result))
-    _extend_unique(run_state, "already_applied_operations", checkpoint_result.get("operations_applied", []))
-    _extend_unique(run_state, "already_asked_questions", checkpoint_result.get("question_answer_log_refs", []))
-    _extend_unique(run_state, "already_written_facts", checkpoint_result.get("facts_verified", []) + checkpoint_result.get("facts_added", []))
+    _extend_unique(working_state, "facts_verified", checkpoint_result.get("facts_verified", []))
+    _extend_unique(working_state, "facts_added", checkpoint_result.get("facts_added", []))
+    _extend_unique(working_state, "operations_applied", checkpoint_result.get("operations_applied", []))
+    _extend_unique(working_state, "operations_rejected", checkpoint_result.get("operations_rejected", []))
+    _merge_operation_statuses(working_state, _operation_status_records(checkpoint_result))
+    _extend_unique(working_state, "already_applied_operations", checkpoint_result.get("operations_applied", []))
+    _extend_unique(working_state, "already_asked_questions", checkpoint_result.get("question_answer_log_refs", []))
+    _extend_unique(working_state, "already_written_facts", checkpoint_result.get("facts_verified", []) + checkpoint_result.get("facts_added", []))
     if checkpoint == "MATCH_BASE":
-        run_state["last_match_fact_watermark"] = _dedupe(run_state.get("facts_verified", []))
+        working_state["last_match_fact_watermark"] = _dedupe(working_state.get("facts_verified", []))
     operation_refs = [f"operations/{item}.json" for item in checkpoint_result.get("operations_applied", [])]
     question_refs = list(checkpoint_result.get("question_answer_log_refs", []))
-    validation_refs = [f"validations/{checkpoint}.json"] if "validation" in json.dumps(checkpoint_result, sort_keys=True).casefold() else []
-    render_refs = [f"render/{checkpoint}.json"] if "render" in json.dumps(checkpoint_result, sort_keys=True).casefold() else []
-    _extend_unique(run_state, "operation_log_refs", operation_refs)
-    _extend_unique(run_state, "question_answer_log_refs", question_refs)
-    _extend_unique(run_state, "validation_refs", validation_refs)
-    _extend_unique(run_state, "render_refs", render_refs)
-    event = _audit("recordCheckpointResult", checkpoint, checkpoint, True)
-    run_state.setdefault("audit_events", []).append(event)
-    _persist_run(run_state)
+    checkpoint_ref = _write_checkpoint_result(working_state, checkpoint, checkpoint_result)
+    artifact_refs = [checkpoint_ref] + _normalize_artifact_refs(working_state, checkpoint_result.get("artifact_refs", []), "artifact_refs")
+    validation_refs = _normalize_artifact_refs(working_state, checkpoint_result.get("validation_refs", []), "validation_refs")
+    render_refs = _normalize_artifact_refs(working_state, checkpoint_result.get("render_refs", []), "render_refs")
+    _extend_unique(working_state, "operation_log_refs", operation_refs)
+    _extend_unique(working_state, "question_answer_log_refs", question_refs)
+    _extend_ref_unique(working_state, "validation_refs", validation_refs)
+    _extend_ref_unique(working_state, "render_refs", render_refs)
+    _extend_ref_unique(working_state, "checkpoint_result_refs", [checkpoint_ref])
+    _extend_ref_unique(working_state, "artifact_refs", artifact_refs)
+    _persist_run(working_state)
+    run_state.update(working_state)
+    event = _record_audit("recordCheckpointResult", checkpoint, clock)
     return {
         "status": "ok",
         "checkpoint": checkpoint,
-        "artifact_refs": [f"workflow/{checkpoint}.json"],
+        "artifact_refs": artifact_refs,
         "operation_log_refs": operation_refs,
         "question_answer_log_refs": question_refs,
         "validation_refs": validation_refs,
@@ -311,6 +335,161 @@ def _persist_run(run_state: JsonObject) -> None:
     path = _run_path(Path(workspace), str(run_state["run_id"]))
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(_jsonable(run_state), sort_keys=True, indent=2), encoding="utf-8")
+
+
+def _working_run_state(run_state: JsonObject) -> JsonObject:
+    persisted = _load_persisted_run_state(run_state)
+    if not isinstance(persisted, dict):
+        return dict(run_state)
+    merged = {**persisted, **run_state}
+    merged["audit_events"] = _merge_dict_records(persisted.get("audit_events", []), run_state.get("audit_events", []), "event_id")
+    merged["verified_evidence"] = _merge_dict_values(persisted.get("verified_evidence", {}), run_state.get("verified_evidence", {}))
+    merged["stage_state"] = _merge_dict_values(persisted.get("stage_state", {}), run_state.get("stage_state", {}))
+    return merged
+
+
+def _merge_dict_values(first: Any, second: Any) -> JsonObject:
+    merged: JsonObject = {}
+    if isinstance(first, dict):
+        merged.update(first)
+    if isinstance(second, dict):
+        merged.update(second)
+    return merged
+
+
+def _merge_dict_records(first: Any, second: Any, identity_key: str) -> list[JsonObject]:
+    records: list[JsonObject] = []
+    seen: set[str] = set()
+    for value in list(first or []) + list(second or []):
+        if not isinstance(value, dict):
+            continue
+        identity = str(value.get(identity_key) or _stable_hash(value))
+        if identity in seen:
+            continue
+        seen.add(identity)
+        records.append(dict(value))
+    return records
+
+
+def _append_advance_audit_event(
+    run_state: JsonObject,
+    *,
+    checkpoint: str,
+    decision: str,
+    blocking_reasons: list[str],
+    evidence_refs: JsonObject,
+    clock: Callable[[], str] | None,
+) -> JsonObject:
+    event = {
+        "event_id": _next_audit_event_id(run_state),
+        "run_id": str(run_state.get("run_id", "")),
+        "checkpoint": checkpoint,
+        "decision": decision,
+        "blocking_reasons": list(blocking_reasons),
+        "evidence_refs": dict(evidence_refs),
+        "timestamp": _timestamp(clock),
+    }
+    run_state.setdefault("audit_events", []).append(event)
+    _persist_run(run_state)
+    return event
+
+
+def _next_audit_event_id(run_state: JsonObject) -> str:
+    run_id = str(run_state.get("run_id", "run"))
+    sequence = 1
+    for event in run_state.get("audit_events", []):
+        if not isinstance(event, dict):
+            continue
+        event_id = str(event.get("event_id", ""))
+        prefix = f"{run_id}_audit_"
+        if not event_id.startswith(prefix):
+            sequence += 1
+            continue
+        try:
+            sequence = max(sequence, int(event_id.removeprefix(prefix)) + 1)
+        except ValueError:
+            sequence += 1
+    return f"{run_id}_audit_{sequence:04d}"
+
+
+def _write_checkpoint_result(run_state: JsonObject, checkpoint: str, checkpoint_result: JsonObject) -> JsonObject:
+    workspace = run_state.get("workspace")
+    run_id = run_state.get("run_id")
+    if not workspace or not run_id:
+        raise ValueError("Checkpoint result recording requires a run_state with workspace and run_id.")
+    workspace_path = Path(str(workspace))
+    checkpoint_path = workspace_path / ".workflow" / "runs" / str(run_id) / "checkpoints" / f"{checkpoint}.json"
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    checkpoint_path.write_text(json.dumps(_jsonable(checkpoint_result), sort_keys=True, indent=2), encoding="utf-8")
+    return {
+        "kind": "artifact",
+        "path": str(checkpoint_path.relative_to(workspace_path)),
+        "sha256": _file_sha256(checkpoint_path),
+    }
+
+
+def _normalize_artifact_refs(run_state: JsonObject, value: Any, field_name: str) -> list[JsonObject]:
+    if value in (None, ""):
+        return []
+    if isinstance(value, dict):
+        refs = [value]
+    elif isinstance(value, list):
+        refs = value
+    else:
+        raise ValueError(f"{field_name} must contain typed artifact refs.")
+    normalized: list[JsonObject] = []
+    for ref in refs:
+        if not isinstance(ref, dict) or ref.get("kind") != "artifact":
+            raise ValueError(f"{field_name} entries must be artifact EvidenceRef objects.")
+        path_value = ref.get("path")
+        sha256_value = ref.get("sha256")
+        if not isinstance(path_value, str) or not path_value:
+            raise ValueError(f"{field_name} entries require a non-empty path.")
+        if not isinstance(sha256_value, str) or not sha256_value:
+            raise ValueError(f"{field_name} entries require a sha256.")
+        path = _resolve_artifact_path(run_state, path_value)
+        if not path.exists() or not path.is_file():
+            raise ValueError(f"{field_name} artifact does not exist: {path}")
+        actual_sha256 = _file_sha256(path)
+        if actual_sha256 != sha256_value:
+            raise ValueError(f"{field_name} artifact sha256 mismatch for {path}.")
+        normalized.append(dict(ref))
+    return normalized
+
+
+def _resolve_artifact_path(run_state: JsonObject, path_value: str) -> Path:
+    path = Path(path_value)
+    if path.is_absolute():
+        return path
+    workspace = run_state.get("workspace")
+    return Path(str(workspace)) / path if workspace else path
+
+
+def _extend_ref_unique(target: JsonObject, key: str, values: list[JsonObject]) -> None:
+    existing = [item for item in target.get(key, []) if isinstance(item, dict)]
+    by_identity = {_stable_hash(item): dict(item) for item in existing}
+    for value in values:
+        by_identity.setdefault(_stable_hash(value), dict(value))
+    target[key] = list(by_identity.values())
+
+
+def _record_audit(operation: str, checkpoint: str, clock: Callable[[], str] | None) -> JsonObject:
+    return {
+        "operation": operation,
+        "checkpoint": checkpoint,
+        "accepted": True,
+        "timestamp": _timestamp(clock),
+    }
+
+
+def _timestamp(clock: Callable[[], str] | None) -> str:
+    return str(clock() if clock is not None else _utc_now())
+
+
+def _utc_now() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def _stable_hash(value: Any) -> str:
