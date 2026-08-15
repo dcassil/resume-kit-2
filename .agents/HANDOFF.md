@@ -1,6 +1,14 @@
 # Handoff — 2026-08-15 (I-0004..I-0008 COMPLETE — career-store tier DONE, continuous codex mode)
 
-## -1. Later-evening update (supersedes §0 state line)
+## -2. Overnight update (supersedes §-1 state line)
+
+develop PUSHED through `00602df`, **v0.11.0**. Since §-1: **RKIT-I-0022** (v0.9.0: collectVersions killing every '0.0.0' placeholder — importlib.metadata + module-owned schema constants + public resume_core.matchingVersions() + careerDbVersion from getMigrationState; buildRunManifest self-validation w/ minLength identity + placeholder rejection; question_answer_log_refs + unresolved_requirements schema fields; run-identity chunk was already done 08-13); **RKIT-I-0023** (v0.10.0: grounded EvidenceRef model — artifact sha256/dto schema/run_state refs verified before every advance, bare booleans typed-rejected, computed named blocking_reasons; last_match_fact_watermark ending the RESOLVE_GAPS deadlock; hallucination_rejection completion gate; structural skip-invariant unit test + verbatim guardrail replacement patch authored in T-0064's report); **RKIT-I-0024** (v0.11.0: durable AuditEvents at decision time, real sha256-matched checkpoint refs w/ substring fabrication deleted, append-only operations/questions JSONL logs, reconstructRunManifest from persisted state only, resume audit migrated off audit-time createRun). Gates at head: --pr 368, --future-contract 375, smoke — green.
+
+**APPROVAL BATCH additions since §-1:** tools/run_smoke.py (+50/-0 grounded-path strengthening from T-0061); workflow_guardrails.py structural skip patch (verbatim in T-0064 report) + manifest-field-set + surface pins (blocks workflow_surface.json declarations for reconstructRunManifest and the new manifest fields); run_tests.py modules: test_workflow_grounded_transition_invariant, test_workflow_durable_audit_and_refs_unit, test_resume_cli_audit_reconstruction_unit (joining the eleven career-store modules).
+
+**Next:** RKIT-I-0026 (resolution loop orchestration — unblocked by I-0023) then I-0027→I-0025; I-0011 (career-mcp semantics) also unblocked. Same loop.
+
+## -1. Later-evening update (superseded by §-2 above)
 
 develop PUSHED through `312a458`, **v0.8.0**. Since §0 below: **RKIT-I-0007** (v0.7.0: typed candidate generation fixing the Azure→AWS related-pollution defect w/ outcome-asserted contract test, _TERM_ALIASES deleted, relationship confirmation substrate + confirmRelationship + single policy chokepoint enforcing allowUnverifiedAliasCreation:false, directional parent/child + contradicts conflict_signals, searchFacts filters + evidence minimization) and **RKIT-I-0008** (v0.8.0: interactions substrate w/ no-write-path boundary per A-0001, conflict lifecycle w/ engine-routed adjudicateConflict, _YEARS_RE years + structured title heuristics killing the React-18 false conflict, dead self-conflict branch removed, _clean_result appeasement deleted). Career-store migrations now 001-009. Gates at head: --pr 352, --future-contract 359, smoke, migration checks 4/4 — all green.
 
