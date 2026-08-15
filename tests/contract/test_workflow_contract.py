@@ -142,11 +142,21 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         )
         return run_state
 
-    def test_create_run_records_versions_config_hash_stage_and_recovery_metadata(self):
+    def test_create_run_records_versions_config_hash_stage_recovery_metadata_and_match_watermark(self):
         run_state = self.create_run()
-        for field in ["run_id", "current_checkpoint", "config_hash", "schema_versions", "package_versions", "stage_state", "recovery_markers"]:
+        for field in [
+            "run_id",
+            "current_checkpoint",
+            "config_hash",
+            "schema_versions",
+            "package_versions",
+            "stage_state",
+            "recovery_markers",
+            "last_match_fact_watermark",
+        ]:
             self.assertIn(field, run_state)
         self.assertEqual(run_state["current_checkpoint"], "INIT")
+        self.assertEqual(run_state["last_match_fact_watermark"], [])
 
     def test_collect_versions_uses_installed_metadata_schema_constants_and_core_matching_surface(self):
         import career_store
@@ -303,7 +313,7 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
                 self.assertIn("blocking_reasons", result)
                 self.assertTrue(result["blocking_reasons"])
 
-    def test_gap_resolution_reruns_match_after_new_verified_facts(self):
+    def test_deadlock_regression_verified_fact_reruns_match_then_reaches_complete_gate(self):
         run_state = self.create_run()
         run_state["current_checkpoint"] = "RESOLVE_GAPS"
         result = maybe_await(
@@ -314,8 +324,66 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
             )
         )
         self.assertEqual(result["status"], "ok")
-        decision = maybe_await(self.workflow.getNextCheckpoint({**run_state, "facts_verified": ["fact_aws"]}))
+        decision = maybe_await(self.workflow.getNextCheckpoint(run_state))
         self.assertEqual(decision["next_checkpoint"], "MATCH_BASE")
+
+        def advance(target, evidence):
+            advanced = maybe_await(self.workflow.advanceCheckpoint(run_state, target, evidence))
+            self.assertEqual(advanced["status"], "ok", advanced.get("blocking_reasons"))
+            run_state["current_checkpoint"] = target
+            run_state.setdefault("verified_evidence", {})[target] = advanced.get("verified_evidence", {})
+            return advanced
+
+        advance("MATCH_BASE", {"job_normalized": self.dto_ref("WorkflowStatusEvidence")})
+        match_record = maybe_await(self.workflow.recordCheckpointResult(run_state, "MATCH_BASE", {"match_result": {"score": 7.4}}))
+        self.assertEqual(match_record["status"], "ok")
+        self.assertEqual(run_state["last_match_fact_watermark"], ["fact_aws"])
+
+        advance("RESOLVE_GAPS", {"match_result": self.dto_ref("MatchResultEvidence", {"status": "ok", "match_result": {"score": 7.4}})})
+        decision = maybe_await(self.workflow.getNextCheckpoint(run_state))
+        self.assertEqual(decision["next_checkpoint"], "BUILD_SELECTION_PLAN")
+        self.assertIn("gaps_resolved", decision["blocking_reasons"])
+
+        advance("BUILD_SELECTION_PLAN", {"gaps_resolved": {"kind": "run_state", "key": "facts_verified"}})
+        advance("PROPOSE_TAILORING_CHANGES", {"selection_plan": self.dto_ref("SelectionPlanEvidence", {"status": "ok", "selection_plan": {}})})
+        advance("VALIDATE_CHANGES", {"proposed_operations": self.dto_ref("ProposedOperationsEvidence", {"status": "ok", "operations": []})})
+        advance("APPLY_CHANGES", {"change_validation": self.dto_ref("ChangeValidationEvidence", {"status": "ok", "validation": {}})})
+        apply_record = maybe_await(self.workflow.recordCheckpointResult(run_state, "APPLY_CHANGES", {"operations_applied": ["op_1"]}))
+        self.assertEqual(apply_record["status"], "ok")
+        advance("FINAL_MATCH", {"operations_applied": {"kind": "run_state", "key": "operations_applied"}})
+        advance("GROUNDING_AUDIT", {"final_match": self.dto_ref("FinalMatchEvidence", {"status": "passed", "final_match": {}})})
+        advance("ATS_STRUCTURE_VALIDATION", {"grounding_audit": self.dto_ref("WorkflowStatusEvidence")})
+        advance("RENDER", {"ats_structure_validation": self.dto_ref("WorkflowStatusEvidence")})
+        advance("RENDER_VALIDATION", {"render_result": self.artifact_ref("render/resume.md", {"status": "rendered"})})
+
+        complete_decision = maybe_await(self.workflow.getNextCheckpoint(run_state))
+        self.assertEqual(complete_decision["next_checkpoint"], "COMPLETE")
+        self.assertIn("render_validation", complete_decision["blocking_reasons"])
+        self.assertIn("audit_manifest_ref", complete_decision["blocking_reasons"])
+
+    def test_match_fact_watermark_persists_to_recovery_and_legacy_runs_default_to_zero(self):
+        run_state = self.create_run()
+        run_state["current_checkpoint"] = "MATCH_BASE"
+        run_state["facts_verified"] = ["fact_react", "fact_aws"]
+        result = maybe_await(self.workflow.recordCheckpointResult(run_state, "MATCH_BASE", {"match_result": {"score": 7.4}}))
+        self.assertEqual(result["status"], "ok")
+
+        persisted = json.loads((self.workspace / ".workflow" / "runs" / f"{run_state['run_id']}.json").read_text(encoding="utf-8"))
+        self.assertEqual(persisted["last_match_fact_watermark"], ["fact_react", "fact_aws"])
+        recovery = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=run_state["run_id"]))
+        self.assertEqual(recovery["last_match_fact_watermark"], ["fact_react", "fact_aws"])
+
+        legacy_run = self.create_run()
+        legacy_run.update({"current_checkpoint": "RESOLVE_GAPS", "facts_verified": ["fact_legacy"]})
+        legacy_path = self.workspace / ".workflow" / "runs" / f"{legacy_run['run_id']}.json"
+        legacy_persisted = dict(legacy_run)
+        legacy_persisted.pop("last_match_fact_watermark", None)
+        legacy_path.write_text(json.dumps(legacy_persisted, sort_keys=True, indent=2), encoding="utf-8")
+
+        legacy_recovery = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=legacy_run["run_id"]))
+        self.assertEqual(legacy_recovery["last_match_fact_watermark"], [])
+        legacy_decision = maybe_await(self.workflow.getNextCheckpoint(legacy_persisted))
+        self.assertEqual(legacy_decision["next_checkpoint"], "MATCH_BASE")
 
     def test_completion_gate_requires_final_validation_render_validation_and_audit(self):
         run_state = self.create_run()

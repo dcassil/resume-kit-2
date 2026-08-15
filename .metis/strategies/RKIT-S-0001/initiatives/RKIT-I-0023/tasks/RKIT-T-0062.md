@@ -4,14 +4,14 @@ level: task
 title: "Match watermark and terminating RESOLVE_GAPS loop-back with deadlock regression"
 short_code: "RKIT-T-0062"
 created_at: 2026-08-15T03:11:05.376990+00:00
-updated_at: 2026-08-15T03:11:05.376990+00:00
+updated_at: 2026-08-15T03:21:04.349343+00:00
 parent: workflow-deterministic-checkpoint
-blocked_by: ["RKIT-T-0061"]
+blocked_by: [RKIT-T-0061]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0023
 ## Objective
 
 Fix the verified non-terminating RESOLVE_GAPS→MATCH_BASE loop (RKIT-I-0023 Requirement 3, Detailed Design "Loop-termination substrate"): run state gains `last_match_fact_watermark` snapshotting facts_verified at each completed MATCH_BASE; loop-back fires only when facts exist beyond the watermark; BUILD_SELECTION_PLAN through COMPLETE become reachable after gap resolution.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -59,4 +61,14 @@ Rationale: focused control-flow fix with the design decided; judgment is in wate
 
 ## Status Updates
 
-*To be added during implementation*
+2026-08-15:
+- Implemented `last_match_fact_watermark` as a persisted list of fact IDs compared with set semantics.
+- Updated RESOLVE_GAPS loop-back to fire only when `facts_verified - last_match_fact_watermark` is non-empty; `facts_verified` remains cumulative audit data.
+- `recordCheckpointResult(..., "MATCH_BASE", ...)` snapshots the current verified-fact set into the watermark.
+- `recoverRun` returns the persisted watermark; missing legacy field defaults to an empty watermark, so legacy runs may loop once more.
+- Added regression coverage for the verified deadlock path and watermark persistence/legacy behavior.
+- Validation run:
+  - `python3 tools/run_gate.py --pr --root .` passed, 365 tests.
+  - `python3 tools/run_gate.py --smoke --root .` passed.
+  - `python3 -m unittest discover -s tests/unit -v` passed, 189 tests.
+  - `straight-jacket verify --json` still reports pre-existing protected checksum mismatches in `tools/pre-commit-resume-cli-guardrails.sh`, `tools/run_smoke.py`, `tools/run_tests.py`, and `tools/TEST_SPEC.md`; none were edited for this task.

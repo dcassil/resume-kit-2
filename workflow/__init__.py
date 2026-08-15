@@ -77,6 +77,7 @@ def createRun(workspace: str | Path, config: JsonObject) -> JsonObject:
         "already_applied_operations": [],
         "already_asked_questions": [],
         "already_written_facts": [],
+        "last_match_fact_watermark": [],
     }
     _persist_run(run_state)
     _index_run(workspace_path, config_hash, run_id)
@@ -85,7 +86,7 @@ def createRun(workspace: str | Path, config: JsonObject) -> JsonObject:
 
 def getNextCheckpoint(run_state: JsonObject) -> JsonObject:
     current = str(run_state.get("current_checkpoint", "INIT"))
-    if current == "RESOLVE_GAPS" and run_state.get("facts_verified"):
+    if current == "RESOLVE_GAPS" and _facts_beyond_match_watermark(run_state):
         next_checkpoint = "MATCH_BASE"
     elif current in CHECKPOINT_ORDER:
         index = CHECKPOINT_ORDER.index(current)
@@ -164,6 +165,8 @@ def recordCheckpointResult(run_state: JsonObject, checkpoint: str, result: JsonO
     _extend_unique(run_state, "already_applied_operations", checkpoint_result.get("operations_applied", []))
     _extend_unique(run_state, "already_asked_questions", checkpoint_result.get("question_answer_log_refs", []))
     _extend_unique(run_state, "already_written_facts", checkpoint_result.get("facts_verified", []) + checkpoint_result.get("facts_added", []))
+    if checkpoint == "MATCH_BASE":
+        run_state["last_match_fact_watermark"] = _dedupe(run_state.get("facts_verified", []))
     operation_refs = [f"operations/{item}.json" for item in checkpoint_result.get("operations_applied", [])]
     question_refs = list(checkpoint_result.get("question_answer_log_refs", []))
     validation_refs = [f"validations/{checkpoint}.json"] if "validation" in json.dumps(checkpoint_result, sort_keys=True).casefold() else []
@@ -236,6 +239,7 @@ def recoverRun(workspace: str | Path, run_id: str) -> JsonObject:
         "already_applied_operations": _dedupe(run_state.get("already_applied_operations", run_state.get("operations_applied", []))),
         "already_asked_questions": _dedupe(run_state.get("already_asked_questions", [])),
         "already_written_facts": _dedupe(run_state.get("already_written_facts", run_state.get("facts_verified", []))),
+        "last_match_fact_watermark": _dedupe(run_state.get("last_match_fact_watermark", [])),
         "required_reruns": required_reruns,
         "transactional_integrity": "valid",
     }
@@ -564,6 +568,16 @@ def _file_sha256(path: Path) -> str:
 
 def _extend_unique(target: JsonObject, key: str, values: list[str]) -> None:
     target[key] = _dedupe(list(target.get(key, [])) + list(values or []))
+
+
+def _facts_beyond_match_watermark(run_state: JsonObject) -> bool:
+    return bool(_fact_id_set(run_state.get("facts_verified", [])) - _fact_id_set(run_state.get("last_match_fact_watermark", [])))
+
+
+def _fact_id_set(values: Any) -> set[str]:
+    if not isinstance(values, list):
+        return set()
+    return {str(value) for value in values}
 
 
 def _dedupe(values: list[str]) -> list[str]:
