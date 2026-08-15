@@ -4,14 +4,14 @@ level: initiative
 title: "Conflict, Audit, Recovery, and Optional Preference History"
 short_code: "RKIT-I-0008"
 created_at: 2026-08-13T20:41:36.985858+00:00
-updated_at: 2026-08-15T02:09:16.255829+00:00
+updated_at: 2026-08-15T02:46:51.999283+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0006]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -93,6 +93,8 @@ Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
 - Defer the interactions substrate until a preference-learning consumer exists: rejected by RKIT-A-0001 — retrofitting append-only history costs a migration, and the Persistence Gate needs its concrete enforcement point now.
 
 ## Implementation Plan **[REQUIRED]**
+
+**COMPLETE 2026-08-15 (continuous mode).** Executed as RKIT-T-0054..0057 (serial codex chain, committed on develop): T-0054 interactions substrate (migration 008 append-only table, six-type vocabulary, content-hash replay dedupe, behavioral + structural no-write-path boundary per RKIT-A-0001); T-0055 conflict lifecycle (migration 009, adjudicateConflict w/ structural provenance, idempotent/typed re-adjudication, answer_recorded trail via recordInteraction, verification changes only through the engine — agent-only adjudication cannot promote); T-0056 honest heuristics (_YEARS_RE explicit patterns — React-18 false conflict gone, twelve-years parses; structured (role,title) tuples replace the 5-title list; dead self-conflict branch removed + contract test rewritten); T-0057 _clean_result/_FORBIDDEN_RESULT_KEYS appeasement deleted (guardrail pins key absence, not the mechanism), idempotency/rollback proven on new tables, TEST_SPEC executable cases, mutation probe (interactions→verification wire fails boundary test). Gates at close: --pr 352 OK, --smoke OK, --future-contract 359 OK, migration checks 4/4. Career-store tier (I-0005..0008) is now COMPLETE. Approval batch: eleven career-store unit modules for run_tests.py + surface entries (getMigrationState, mergeFacts, confirmRelationship, recordInteraction/listInteractions, adjudicateConflict, confirmation slot, parent/child vocabulary) + guardrail allowlists.
 
 Dependency-ordered chunks for later decomposition (no Metis tasks yet):
 1. Interactions table migration + recordInteraction/listInteractions + vocabulary validation + the boundary test.

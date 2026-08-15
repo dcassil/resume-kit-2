@@ -4,14 +4,14 @@ level: task
 title: "Appeasement removal, idempotency hardening, TEST_SPEC pass; I-0008 close-out"
 short_code: "RKIT-T-0057"
 created_at: 2026-08-15T02:07:49.816212+00:00
-updated_at: 2026-08-15T02:38:30.583514+00:00
+updated_at: 2026-08-15T02:46:30.117102+00:00
 parent: conflict-audit-recovery-and
 blocked_by: [RKIT-T-0056]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0008
 ## Objective
 
 Close out RKIT-I-0008 (Requirements 7-8 + Testing Strategy): remove the `_clean_result`/`_FORBIDDEN_RESULT_KEYS` stripping of never-produced keys with real-output assertions replacing any dependent expectations; idempotency hardening across the new interaction/conflict tables; TEST_SPEC strengthening; three-gate close-out with mutation probe.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
