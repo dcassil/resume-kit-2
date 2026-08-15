@@ -138,6 +138,8 @@ class SharedDtoSchemaContractTests(unittest.TestCase):
                 "operations_rejected",
                 "validation_status",
                 "output_artifact_paths",
+                "question_answer_log_refs",
+                "unresolved_requirements",
             },
         )
 

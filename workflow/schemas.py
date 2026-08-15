@@ -60,6 +60,8 @@ class RunManifest:
     operations_rejected: list[str] = field(default_factory=list)
     validation_status: str = "unknown"
     output_artifact_paths: list[str] = field(default_factory=list)
+    question_answer_log_refs: list[str] = field(default_factory=list)
+    unresolved_requirements: list[JsonObject] = field(default_factory=list)
     schema_version: str = RUN_MANIFEST_SCHEMA_VERSION
     package_versions: dict[str, str] = field(default_factory=dict)
     recovery_markers: list[JsonObject] = field(default_factory=list)
@@ -93,6 +95,8 @@ RUN_MANIFEST_SCHEMA: JsonObject = {
         "operations_rejected",
         "validation_status",
         "output_artifact_paths",
+        "question_answer_log_refs",
+        "unresolved_requirements",
     ],
     "properties": {
         "run_id": {"type": "string"},
@@ -140,6 +144,19 @@ RUN_MANIFEST_SCHEMA: JsonObject = {
         "operations_rejected": {"type": "array", "items": {"type": "string"}},
         "validation_status": {"type": "string"},
         "output_artifact_paths": {"type": "array", "items": {"type": "string"}},
+        "question_answer_log_refs": {"type": "array", "items": {"type": "string"}},
+        "unresolved_requirements": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["requirement_id", "resolution_state", "reason"],
+                "properties": {
+                    "requirement_id": NON_EMPTY_STRING,
+                    "resolution_state": NON_EMPTY_STRING,
+                    "reason": {"type": "string"},
+                },
+            },
+        },
         "schema_version": VERSION_STRING,
         "package_versions": {"type": "object", "additionalProperties": VERSION_STRING},
         "recovery_markers": {"type": "array", "items": {"type": "object"}},

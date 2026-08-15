@@ -4,14 +4,14 @@ level: task
 title: "Manifest schema validation in buildRunManifest with minLength identity constraints"
 short_code: "RKIT-T-0059"
 created_at: 2026-08-15T02:48:33.781066+00:00
-updated_at: 2026-08-15T02:58:23.440843+00:00
+updated_at: 2026-08-15T03:03:19.788285+00:00
 parent: workflow-artifact-schemas-and-run
 blocked_by: [RKIT-T-0058]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0022
 ## Objective
 
 Make buildRunManifest self-gating (RKIT-I-0022 Requirement 5, Detailed Design "Manifest validation"): validate the assembled manifest against RUN_MANIFEST_SCHEMA before returning; identity fields (base_resume_id, base_resume_hash, job_id, renderer_template_version) gain minLength constraints so today's silent empty-string defaults become typed validation failures.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

@@ -292,6 +292,14 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
                 "facts_verified": ["fact_aws"],
                 "operations_applied": ["op_1"],
                 "operations_rejected": ["op_bad"],
+                "question_answer_log_refs": ["qa_aws"],
+                "unresolved_requirements": [
+                    {
+                        "requirement_id": "req_k8s",
+                        "resolution_state": "unknown",
+                        "reason": "Awaiting user confirmation.",
+                    }
+                ],
                 "validation_status": "passed",
                 "output_artifact_paths": ["output/resume.docx"],
             }
@@ -300,6 +308,38 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         self.assertTrue(MANIFEST_FIELDS <= set(manifest))
         self.assertEqual(manifest["facts_verified"], ["fact_aws"])
         self.assertEqual(manifest["operations_rejected"], ["op_bad"])
+        self.assertEqual(manifest["question_answer_log_refs"], ["qa_aws"])
+        self.assertEqual(
+            manifest["unresolved_requirements"],
+            [
+                {
+                    "requirement_id": "req_k8s",
+                    "resolution_state": "unknown",
+                    "reason": "Awaiting user confirmation.",
+                }
+            ],
+        )
+
+    def test_run_manifest_emits_explicit_empty_audit_field_defaults(self):
+        manifest = maybe_await(self.workflow.buildRunManifest(self.valid_manifest_run_state()))
+        self.assertEqual(manifest["question_answer_log_refs"], [])
+        self.assertEqual(manifest["unresolved_requirements"], [])
+
+    def test_run_manifest_schema_rejects_missing_audit_fields(self):
+        manifest = maybe_await(self.workflow.buildRunManifest(self.valid_manifest_run_state()))
+        for field_name in ["question_answer_log_refs", "unresolved_requirements"]:
+            with self.subTest(field_name=field_name):
+                invalid_manifest = dict(manifest)
+                invalid_manifest.pop(field_name)
+                with self.assertRaises(self.workflow.RunManifestValidationError) as raised:
+                    self.workflow._validate_run_manifest(invalid_manifest)
+                self.assertTrue(
+                    any(
+                        error.get("code") == "missing_field" and error.get("field_path") == field_name
+                        for error in raised.exception.errors
+                    ),
+                    raised.exception.errors,
+                )
 
     def test_run_manifest_versions_have_no_placeholders_and_match_real_sources(self):
         import career_store

@@ -82,22 +82,18 @@ Tests should expect workflow artifacts around:
 
 Record:
 
+- source resume identity,
 - run ID,
 - base resume ID/hash,
 - job ID,
 - config hash,
-- canonical resume schema version,
-- job schema version,
-- career DB schema version,
-- change-operation schema version,
-- matching algorithm/config version,
-- renderer template version,
-- model/config metadata for agent calls,
-- initial score,
-- final score,
+- schema/package/model/template versions,
+- initial and final scores,
+- unresolved requirements,
+- user question/answer log refs,
 - facts added/verified,
-- operations applied/rejected,
-- validation status,
+- proposed/rejected/applied operations,
+- validation outcomes,
 - output artifact paths.
 
 ## Determinism Test Cases
