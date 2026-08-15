@@ -313,7 +313,12 @@ def _direct_resolution(fact: JsonObject, requirement_year: int | None, fact_term
     return "exact_match", metadata
 
 
-def _relationship_policy_match_type(relationship_type: str, confirmation_status: str, config: JsonObject) -> str:
+def _relationship_policy_match_type(
+    relationship_type: str,
+    confirmation_status: str,
+    config: JsonObject,
+    relationship_direction: str | None = None,
+) -> str | None:
     clean_type = str(relationship_type)
     clean_status = (
         str(confirmation_status)
@@ -331,16 +336,28 @@ def _relationship_policy_match_type(relationship_type: str, confirmation_status:
     if clean_type == "related":
         return "alias_match" if allow_related_as_equivalent else "related_match"
     if clean_type in {"parent", "child"}:
-        return "related_match"
+        return "related_match" if relationship_direction == "child_to_parent" else "possible_match"
     if clean_type == "contradicts":
-        return "possible_match"
+        return None
     return "possible_match"
+
+
+def _relationship_direction(relationship: JsonObject, fact_id: str) -> str:
+    relationship_type = relationship["relationship_type"]
+    from_fact_id = relationship["from_fact_id"]
+    to_fact_id = relationship["to_fact_id"]
+    if relationship_type == "parent":
+        return "parent_to_child" if fact_id == from_fact_id else "child_to_parent"
+    if relationship_type == "child":
+        return "child_to_parent" if fact_id == from_fact_id else "parent_to_child"
+    return "from_to" if fact_id == from_fact_id else "to_from"
 
 
 def _relationship_candidate(
     resolution: str,
     overlap: set[str],
     relationship: JsonObject,
+    relationship_direction: str,
     metadata: JsonObject,
     conflicts: list[JsonObject],
 ) -> JsonObject:
@@ -354,11 +371,72 @@ def _relationship_candidate(
                 "relationshipId": relationship["relationship_id"],
                 "type": relationship["relationship_type"],
                 "confirmationStatus": relationship["confirmation_status"],
+                "fromFactId": relationship["from_fact_id"],
+                "toFactId": relationship["to_fact_id"],
+                "direction": relationship_direction,
             }
         ],
         "metadata": metadata,
         "conflicts": conflicts,
     }
+
+
+def _relationship_conflict_signals(
+    conn: sqlite3.Connection,
+    requirement_id: str,
+    requirement_terms: set[str],
+    fact_match_terms: Any,
+) -> list[JsonObject]:
+    if not requirement_terms:
+        return []
+    signals: list[JsonObject] = []
+    rows = conn.execute(
+        """
+        SELECT * FROM relationships
+        WHERE relationship_type = 'contradicts'
+        ORDER BY relationship_id, from_fact_id, to_fact_id
+        """
+    ).fetchall()
+    for row in rows:
+        relationship_id = str(row["relationship_id"])
+        from_fact_id = str(row["from_fact_id"])
+        to_fact_id = str(row["to_fact_id"])
+        from_overlap = _meaningful_overlap(requirement_terms, fact_match_terms(from_fact_id, conn=conn))
+        to_overlap = _meaningful_overlap(requirement_terms, fact_match_terms(to_fact_id, conn=conn))
+        if to_overlap:
+            signals.append(
+                {
+                    "type": "contradicts",
+                    "factId": from_fact_id,
+                    "relationshipId": relationship_id,
+                    "contradictedFactId": to_fact_id,
+                    "requirementId": requirement_id,
+                }
+            )
+        if from_overlap:
+            signals.append(
+                {
+                    "type": "contradicts",
+                    "factId": to_fact_id,
+                    "relationshipId": relationship_id,
+                    "contradictedFactId": from_fact_id,
+                    "requirementId": requirement_id,
+                }
+            )
+    return signals
+
+
+def _dedupe_conflict_signals(signals: list[JsonObject]) -> list[JsonObject]:
+    deduped = {
+        (
+            str(signal["requirementId"]),
+            str(signal["relationshipId"]),
+            str(signal["factId"]),
+            str(signal["contradictedFactId"]),
+        ): signal
+        for signal in signals
+    }
+    return [deduped[key] for key in sorted(deduped)]
 
 
 def _confirm_relationship(store: Any, schema_version: str, relationshipId: str, provenance: list[JsonObject]) -> JsonObject:

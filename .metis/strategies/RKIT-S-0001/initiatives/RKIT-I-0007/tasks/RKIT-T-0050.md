@@ -4,14 +4,14 @@ level: task
 title: "Relationship confirmation substrate, confirmRelationship, single match-policy function"
 short_code: "RKIT-T-0050"
 created_at: 2026-08-15T01:23:28.334360+00:00
-updated_at: 2026-08-15T01:35:37.823382+00:00
+updated_at: 2026-08-15T01:44:07.315513+00:00
 parent: relationship-aware-matching-and
 blocked_by: [RKIT-T-0049]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0007
 ## Objective
 
 Give relationships stored confirmation status and enforce it in one place (RKIT-I-0007 Requirement 3): `fact_relationships`/`relationships` gains confirmation_status (unconfirmed/user_confirmed), confirmed_by_provenance, confirmed_at via the migration registry; addRelationship records agent rows as unconfirmed; new `confirmRelationship` (user provenance, idempotent) is the only path to user_confirmed; a single policy function maps (relationship type, confirmation status, config) → permitted matchType enforcing allowUnverifiedAliasCreation:false and allow_related_as_equivalent.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

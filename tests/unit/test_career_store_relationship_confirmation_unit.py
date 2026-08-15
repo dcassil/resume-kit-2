@@ -64,9 +64,142 @@ class CareerStoreRelationshipConfirmationUnitTests(unittest.TestCase):
             _relationship_policy_match_type("related", "unconfirmed", {"allow_related_as_equivalent": True}),
             "alias_match",
         )
-        self.assertEqual(_relationship_policy_match_type("parent", "unconfirmed", {}), "related_match")
-        self.assertEqual(_relationship_policy_match_type("child", "unconfirmed", {}), "related_match")
-        self.assertEqual(_relationship_policy_match_type("contradicts", "unconfirmed", {}), "possible_match")
+        for relationship_type in ("parent", "child"):
+            self.assertEqual(
+                _relationship_policy_match_type(relationship_type, "unconfirmed", {}, "child_to_parent"),
+                "related_match",
+            )
+            self.assertEqual(
+                _relationship_policy_match_type(
+                    relationship_type,
+                    "unconfirmed",
+                    {"allow_related_as_equivalent": True},
+                    "child_to_parent",
+                ),
+                "related_match",
+            )
+            self.assertEqual(
+                _relationship_policy_match_type(relationship_type, "user_confirmed", {}, "parent_to_child"),
+                "possible_match",
+            )
+            self.assertEqual(
+                _relationship_policy_match_type(
+                    relationship_type,
+                    "user_confirmed",
+                    {
+                        "allow_related_as_equivalent": True,
+                        "allowUnverifiedAliasCreation": True,
+                    },
+                    "parent_to_child",
+                ),
+                "possible_match",
+            )
+        self.assertIsNone(_relationship_policy_match_type("contradicts", "unconfirmed", {}))
+
+    def test_parent_child_relationships_are_directional_and_never_exact_or_alias(self) -> None:
+        cases = [
+            ("parent", "parent_fact", "child_fact"),
+            ("child", "child_fact", "parent_fact"),
+        ]
+        for relationship_type, from_key, to_key in cases:
+            with self.subTest(relationship_type=relationship_type):
+                with tempfile.TemporaryDirectory() as directory:
+                    store = openCareerStore(str(Path(directory) / "career.db"), clock=lambda: FIXED_TIME)
+                    facts = {
+                        "parent_fact": _unknown_fact(store, "Frontend architecture", ["frontend architecture"]),
+                        "child_fact": _unknown_fact(store, "React", ["react"]),
+                    }
+                    relationship = store.addRelationship(
+                        facts[from_key]["fact_id"],
+                        facts[to_key]["fact_id"],
+                        relationship_type,
+                        evidence_or_rationale={"source": "agent_proposal", "text": "Taxonomy path."},
+                        policy={},
+                    )
+                    relationship_id = relationship["relationship_id"]
+
+                    parent_requirement = [
+                        {
+                            "requirement_id": "req_frontend_architecture",
+                            "concept": "Frontend architecture",
+                            "normalized_terms": ["frontend architecture"],
+                        }
+                    ]
+                    child_requirement = [
+                        {
+                            "requirement_id": "req_react",
+                            "concept": "React",
+                            "normalized_terms": ["react"],
+                        }
+                    ]
+
+                    child_to_parent = store.findCandidateMatches(
+                        parent_requirement,
+                        policy={"allow_related_as_equivalent": True},
+                    )
+                    child_candidates = _relationship_candidates(child_to_parent, relationship_id)
+                    self.assertTrue(child_candidates)
+                    self.assertEqual({candidate["matchType"] for candidate in child_candidates}, {"related_match"})
+                    self.assertEqual(child_candidates[0]["fact_id"], facts["child_fact"]["fact_id"])
+                    self.assertEqual(child_candidates[0]["viaRelationships"][0]["direction"], "child_to_parent")
+
+                    parent_to_child = store.findCandidateMatches(
+                        child_requirement,
+                        policy={
+                            "allow_related_as_equivalent": True,
+                            "allowUnverifiedAliasCreation": True,
+                        },
+                    )
+                    parent_candidates = _relationship_candidates(parent_to_child, relationship_id)
+                    self.assertTrue(parent_candidates)
+                    self.assertEqual({candidate["matchType"] for candidate in parent_candidates}, {"possible_match"})
+                    self.assertEqual(parent_candidates[0]["fact_id"], facts["parent_fact"]["fact_id"])
+                    self.assertEqual(parent_candidates[0]["viaRelationships"][0]["direction"], "parent_to_child")
+
+                    relationship_match_types = {
+                        candidate["matchType"]
+                        for result in (child_to_parent, parent_to_child)
+                        for candidate in _relationship_candidates(result, relationship_id)
+                    }
+                    self.assertNotIn("exact_match", relationship_match_types)
+                    self.assertNotIn("alias_match", relationship_match_types)
+
+    def test_contradicts_relationship_emits_conflict_signal_and_no_candidate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = openCareerStore(str(Path(directory) / "career.db"), clock=lambda: FIXED_TIME)
+            react = _unknown_fact(store, "React", ["react"])
+            angular = _unknown_fact(store, "Angular", ["angular"])
+            relationship = store.addRelationship(
+                react["fact_id"],
+                angular["fact_id"],
+                "contradicts",
+                evidence_or_rationale={"source": "agent_proposal", "text": "User cannot truthfully claim both."},
+                policy={},
+            )
+            relationship_id = relationship["relationship_id"]
+
+            result = store.findCandidateMatches(
+                [{"requirement_id": "req_angular", "concept": "Angular", "normalized_terms": ["angular"]}],
+                policy={
+                    "allow_related_as_equivalent": True,
+                    "allowUnverifiedAliasCreation": True,
+                },
+            )
+
+            self.assertEqual(
+                result["conflict_signals"],
+                [
+                    {
+                        "type": "contradicts",
+                        "factId": react["fact_id"],
+                        "relationshipId": relationship_id,
+                        "contradictedFactId": angular["fact_id"],
+                        "requirementId": "req_angular",
+                    }
+                ],
+            )
+            self.assertFalse(_relationship_candidates(result, relationship_id))
+            self.assertNotIn("contradicts", {via["type"] for match in result["matches"] for via in match["viaRelationships"]})
 
     def test_unconfirmed_then_confirmed_alias_policy_applies_in_both_relationship_directions(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

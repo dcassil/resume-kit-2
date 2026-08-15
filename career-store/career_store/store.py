@@ -30,6 +30,7 @@ from .store_support import (
     _confirm_relationship,
     _conflict_from_row,
     _conflict_object,
+    _dedupe_conflict_signals,
     _dedupe_conflicts,
     _direct_resolution,
     _expanded_terms,
@@ -55,6 +56,8 @@ from .store_support import (
     _repoint_job_matches,
     _resolve_fact_id,
     _relationship_candidate,
+    _relationship_conflict_signals,
+    _relationship_direction,
     _relationship_policy_match_type,
     _source_document_ref,
     _stable_id,
@@ -712,9 +715,15 @@ class CareerStore:
         matches: list[JsonObject] = []
         unresolved: list[JsonObject] = []
         conflicts: list[JsonObject] = []
+        conflict_signals: list[JsonObject] = []
         facts = [self._fact_from_row(row) for row in self._fact_rows()]
         for requirement in requirements:
             requirement_id = str(requirement.get("requirement_id", requirement.get("id", "")))
+            requirement_terms = set(_expanded_terms(_normalized_terms(requirement)))
+            with self._connect() as conn:
+                conflict_signals.extend(
+                    _relationship_conflict_signals(conn, requirement_id, requirement_terms, self._fact_match_terms)
+                )
             candidates = self._candidate_matches(requirement, facts, policy)
             if not candidates:
                 unresolved.append(
@@ -789,6 +798,7 @@ class CareerStore:
                 )
         matches.sort(key=lambda item: (item["requirement_id"], item["resolution_state"], item["fact_id"]))
         unresolved.sort(key=lambda item: item["requirement_id"])
+        conflict_signals = _dedupe_conflict_signals(conflict_signals)
         return _clean_result(
             {
                 "schema_version": SCHEMA_VERSION,
@@ -796,6 +806,11 @@ class CareerStore:
                 "matches": matches,
                 "unresolved": unresolved,
                 "conflicts": _dedupe_conflicts(conflicts),
+                # Result contract for RKIT-I-0008: contradicts relationships are
+                # not match candidates. They surface here as typed directional
+                # signals shaped as {type, factId, relationshipId,
+                # contradictedFactId, requirementId}.
+                "conflict_signals": conflict_signals,
                 "audit": self._audit("findCandidateMatches", mutated=False),
             }
         )
@@ -1333,6 +1348,7 @@ class CareerStore:
             if not overlap:
                 continue
             relationship_type = relationship["relationship_type"]
+            relationship_direction = _relationship_direction(relationship, fact_id)
             fact = self._fact_from_row(self._fact_row(fact_id))
             fact_terms = self._fact_match_terms(fact_id)
             _, metadata = _direct_resolution(fact, requirement_year, fact_terms)
@@ -1346,26 +1362,24 @@ class CareerStore:
                         len(overlap),
                         str(relationship["relationship_id"]),
                         other_id,
-                        _relationship_candidate(resolution, overlap, relationship, metadata, conflicts),
+                        _relationship_candidate(
+                            resolution,
+                            overlap,
+                            relationship,
+                            relationship_direction,
+                            metadata,
+                            conflicts,
+                        ),
                     )
                 )
-            if relationship_type == "contradicts":
-                conflict = _conflict_object(
-                    sorted([fact_id, other_id]),
-                    "contradicts_relationship",
-                    {
-                        "relationship_id": relationship["relationship_id"],
-                        "relationship_type": "contradicts",
-                    },
-                )
-                conflicts.append(conflict)
-            append_candidate(
-                _relationship_policy_match_type(
-                    relationship_type,
-                    relationship["confirmation_status"],
-                    policy,
-                )
+            resolution = _relationship_policy_match_type(
+                relationship_type,
+                relationship["confirmation_status"],
+                policy,
+                relationship_direction,
             )
+            if resolution is not None:
+                append_candidate(resolution)
         if not relationship_matches:
             return None
         relationship_matches.sort(key=lambda item: (-item[0], -item[1], item[2], item[3]))
