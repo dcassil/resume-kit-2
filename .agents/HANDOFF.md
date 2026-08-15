@@ -1,6 +1,17 @@
-# Handoff — 2026-08-14 EVENING (I-0051 W1 + I-0002 + I-0003 COMPLETE, continuous codex mode)
+# Handoff — 2026-08-15 (I-0004 + I-0005 + I-0006 COMPLETE, continuous codex mode)
 
-Read this first. Supersedes the two handoffs below (kept for the defect table, ADR summaries, depth caveats, straight-jacket details).
+Read this first. Supersedes everything below (kept for defect table, ADR summaries, loop recipe details).
+
+## 0. State right now (develop PUSHED through `2f4b5df`, v0.6.0)
+
+- **DONE + pushed since the previous handoff**: **RKIT-I-0004** (v0.4.0: change_operations.py lifecycle enforcement, grounding.py per-claim provenance walk, honesty.py general mechanism replacing _GUARDED_TERMS, guardrails_config.py + quality_warnings.py, adversarial suite; PR gate 307→344, future-contract 351); **RKIT-I-0005** (v0.5.0: career-store migration registry 001-004 + getMigrationState + typed version errors, section-6 schema w/ jobs table, enum restoration + 005 remap w/ conflict preservation, BEGIN IMMEDIATE transaction substrate w/ TransactionResult, matching.py deleted); **RKIT-I-0006** (v0.6.0: InterpretationProposal DTO replacing the substring confirmation heuristic — audit probes now typed-rejection regressions, verification.py 14-edge transition engine w/ structural authorities + transition evidence, all store writes engine-mediated w/ downgrade protection + cross-session persistence, mergeFacts w/ retention/redirects via migration 006, mutation-probed close-out). Every task independently driver-probed; all gates green at every commit (--pr 350, --smoke, --future-contract 357, migration checks 4/4 at head).
+- **DEFERRED PROTECTED BATCH for Daniel's single approve/update-locks commit** (classifier enforces his "come back to locked approvals later"; a comment in test_career_store_contract.py marks the tuple spot):
+  1. tools/run_tests.py — wire six career-store unit modules (test_career_store_{jobs,transactions,no_scoring,interpretation_proposals,verification_transitions,merge_facts}_unit); the I-0004 wiring landed earlier (gate 344→350 came from contract tests).
+  2. tools/career_store_guardrails.py — ALLOWED_SURFACES += getMigrationState, mergeFacts; relationship-type set += parent/child.
+  3. career-store/store_surface.json — getMigrationState + mergeFacts declarations, confirmation slot → InterpretationProposal, relationship vocabulary += parent/child; restore the contract-test tuple entries.
+  4. Pre-existing: tools/TEST_SPEC.md + tools/run_tests.py checksum drift from I-0004, and Daniel's own pre-commit hook edit.
+- **Next**: RKIT-I-0007 (relationship-aware matching — owns the Azure→AWS term-pollution defect) and RKIT-I-0008 (conflict/audit/recovery + interactions; _YEARS_RE salvage is parked in its initiative doc) are both unblocked. Same decompose→codex loop.
+- Loop + gotchas: see §4/§6 of the 2026-08-14 handoff below — all still accurate. One addition: when a protected guardrail pins a surface, DEFER the manifest edit (keep gates green) rather than ending red — the classifier blocks protected edits in this mode.
 
 ## 1. State right now (everything on develop, PUSHED through `60de793`)
 
