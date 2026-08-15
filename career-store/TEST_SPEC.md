@@ -74,6 +74,15 @@ Tests should expect durable storage around these data areas:
 - Reject silent `inferred -> user_verified` escalation.
 - Preserve user verification across separate job sessions.
 
+Executable case names:
+
+- Proposal validation: `tests.unit.test_career_store_interpretation_proposals_unit.CareerStoreInterpretationProposalUnitTests.test_invalid_proposal_shape_returns_typed_validation_errors`, `test_unknown_fact_id_is_typed_validation_error`, `test_audit_probe_raw_text_inputs_are_rejected_without_promotion`, and `test_audit_probe_non_affirmed_proposals_are_evidence_only`.
+- Marker-table removal/raw-text gating: `tests.unit.test_career_store_interpretation_proposals_unit.CareerStoreInterpretationProposalUnitTests.test_marker_tables_are_gone_and_raw_confirmation_text_never_drives_state`.
+- Transition matrix: `tests.unit.test_career_store_verification_transitions_unit.CareerStoreVerificationTransitionUnitTests.test_exported_transition_matrix_is_the_full_declared_edge_set` and `test_every_allowed_edge_requires_its_exact_authority_and_every_other_edge_is_disallowed`.
+- `source_stated` gating: `tests.unit.test_career_store_verification_transitions_unit.CareerStoreVerificationTransitionUnitTests.test_verify_fact_rejects_inferred_to_source_stated_without_source_document_authority` and `test_verify_fact_allows_inferred_to_source_stated_with_source_document_evidence`.
+- Downgrade protection: `tests.unit.test_career_store_verification_transitions_unit.CareerStoreVerificationTransitionUnitTests.test_verify_fact_protects_user_verified_from_downgrade_without_explicit_user_correction` and `test_verify_fact_allows_user_verified_downgrade_with_explicit_user_correction_evidence`.
+- Cross-session persistence: `tests.unit.test_career_store_verification_transitions_unit.CareerStoreVerificationTransitionUnitTests.test_user_verified_persists_across_reopen_and_distinct_job_sessions`.
+
 ### Relationships
 
 - Add alias or related relationships such as `responsive web apps` to `responsive design`.
@@ -127,6 +136,11 @@ Tests should expect durable storage around these data areas:
 - Resume after interruption following user verification.
 - Detect duplicate writes from retried operations.
 - Preserve DB validity after simulated process interruption.
+
+Executable merge-retention case names:
+
+- Merge retention: `tests.unit.test_career_store_merge_facts_unit.CareerStoreMergeFactsUnitTests.test_merge_facts_retains_aliases_evidence_history_redirect_and_job_matches`, `test_merge_facts_preserves_user_verified_survivor_when_merged_is_inferred`, and `test_merge_facts_does_not_promote_inferred_survivor_from_user_verified_merged_fact`.
+- Merge atomicity: `tests.unit.test_career_store_merge_facts_unit.CareerStoreMergeFactsUnitTests.test_merge_facts_rolls_back_after_repoint_interruption`.
 
 ## Boundary Tests
 

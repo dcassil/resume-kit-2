@@ -1,3 +1,4 @@
+import sqlite3
 import sys
 import tempfile
 import unittest
@@ -68,18 +69,22 @@ class CareerStoreInterpretationProposalUnitTests(unittest.TestCase):
     def test_audit_probe_raw_text_inputs_are_rejected_without_promotion(self) -> None:
         for answer in ("incorrect", "yesterday I did nothing"):
             with self.subTest(answer=answer):
+                before_evidence = self.store.getFact(self.fact["fact_id"])["evidence"]
                 result = self.store.verifyFact(self.fact["fact_id"], "user_verified", confirmation=answer, source="user_answer")
+                after_evidence = self.store.getFact(self.fact["fact_id"])["evidence"]
 
                 self.assertEqual(result["status"], "error")
                 self.assertEqual(result["mutation_status"], "rejected")
                 self.assertEqual(result["verification_state"], "inferred")
                 self.assertEqual(result["errors"][0]["type"], InvalidInterpretationProposalError.__name__)
                 self.assertEqual(result["errors"][0]["code"], "malformed_interpretation_proposal")
+                self.assertEqual(after_evidence, before_evidence)
 
     def test_audit_probe_non_affirmed_proposals_are_evidence_only(self) -> None:
         for answer in ("incorrect", "yesterday I did nothing"):
             for outcome in ("denied", "unclear"):
                 with self.subTest(answer=answer, outcome=outcome):
+                    before_count = len(self.store.getFact(self.fact["fact_id"])["evidence"])
                     result = self.store.verifyFact(
                         self.fact["fact_id"],
                         "user_verified",
@@ -89,6 +94,41 @@ class CareerStoreInterpretationProposalUnitTests(unittest.TestCase):
 
                     self.assertEqual(result["verification_state"], "inferred")
                     self.assertEqual(result["mutation_status"], "evidence_only")
+                    evidence = self.store.getFact(self.fact["fact_id"])["evidence"]
+                    self.assertEqual(len(evidence), before_count + 1)
+                    literal_rows = [
+                        row
+                        for row in evidence
+                        if row["text"] == answer and row["metadata"].get("interpretation_proposal", {}).get("outcome") == outcome
+                    ]
+                    self.assertEqual(len(literal_rows), 1)
+
+    def test_marker_tables_are_gone_and_raw_confirmation_text_never_drives_state(self) -> None:
+        with sqlite3.connect(Path(self.directory.name) / "career.db") as conn:
+            tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()}
+        self.assertTrue(
+            {
+                "confirmation_markers",
+                "confirmation_marker_tables",
+                "affirmation_markers",
+                "denial_markers",
+                "unclear_markers",
+                "answer_markers",
+                "verification_markers",
+            }.isdisjoint(tables)
+        )
+
+        for answer in ("yes", "confirmed", "incorrect", "yesterday I did nothing"):
+            with self.subTest(answer=answer):
+                before = self.store.getFact(self.fact["fact_id"])
+                result = self.store.verifyFact(self.fact["fact_id"], "user_verified", confirmation=answer, source="user_answer")
+                after = self.store.getFact(self.fact["fact_id"])
+
+                self.assertEqual(result["status"], "error")
+                self.assertEqual(result["mutation_status"], "rejected")
+                self.assertEqual(result["verification_state"], "inferred")
+                self.assertEqual(after["fact"]["verification_state"], before["fact"]["verification_state"])
+                self.assertEqual(after["evidence"], before["evidence"])
 
     def test_invalid_proposal_shape_returns_typed_validation_errors(self) -> None:
         cases = [

@@ -4,14 +4,14 @@ level: task
 title: "mergeFacts with alias/history retention and id redirects"
 short_code: "RKIT-T-0047"
 created_at: 2026-08-15T00:37:23.698688+00:00
-updated_at: 2026-08-15T01:06:02.716209+00:00
+updated_at: 2026-08-15T01:16:54.272792+00:00
 parent: evidence-backed-fact-and
 blocked_by: [RKIT-T-0046]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0006
 ## Objective
 
 Implement fact merging per vision section 6 (RKIT-I-0006 Requirement 4, Detailed Design "Merge design"): `mergeFacts(survivorId, mergedId, provenance)` retains the losing fact's terms as aliases, preserves ALL evidence rows for both facts, records the merge in history, installs an id redirect so the merged-away id resolves to the survivor, and never escalates verification state outside the T-0045 engine.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
