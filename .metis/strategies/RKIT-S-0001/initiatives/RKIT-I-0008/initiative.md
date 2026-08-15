@@ -4,20 +4,20 @@ level: initiative
 title: "Conflict, Audit, Recovery, and Optional Preference History"
 short_code: "RKIT-I-0008"
 created_at: 2026-08-13T20:41:36.985858+00:00
-updated_at: 2026-08-13T20:41:36.985858+00:00
+updated_at: 2026-08-15T02:07:42.017448+00:00
 parent: resume-kit-2-full-product-buildout
-blocked_by: ["RKIT-I-0006"]
+blocked_by: [RKIT-I-0006]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/discovery"
+  - "#phase/decompose"
 
 
 exit_criteria_met: false
 estimated_complexity: M
 strategy_id: RKIT-S-0001
-initiative_id: NULL
+initiative_id: conflict-audit-recovery-and
 ---
 
 # Conflict, Audit, Recovery, and Optional Preference History Initiative
