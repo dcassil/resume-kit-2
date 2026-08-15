@@ -4,14 +4,14 @@ level: task
 title: "Matrix/regression/cross-session test pass and TEST_SPEC strengthening; I-0006 close-out"
 short_code: "RKIT-T-0048"
 created_at: 2026-08-15T00:37:23.746193+00:00
-updated_at: 2026-08-15T01:16:54.637135+00:00
+updated_at: 2026-08-15T01:22:07.930939+00:00
 parent: evidence-backed-fact-and
 blocked_by: [RKIT-T-0047]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0006
 ## Objective
 
 Close out RKIT-I-0006's Testing Strategy: consolidated contract regressions on the audit's exact probes, the full transition-matrix suite, merge retention tests, cross-session user_verified persistence, career-store/TEST_SPEC.md strengthening (downgrade protection + source_stated gating cases), and the three-gate close-out.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

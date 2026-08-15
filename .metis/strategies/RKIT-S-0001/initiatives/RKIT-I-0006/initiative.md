@@ -4,14 +4,14 @@ level: initiative
 title: "Evidence-Backed Fact and Verification Lifecycle"
 short_code: "RKIT-I-0006"
 created_at: 2026-08-13T20:41:36.939547+00:00
-updated_at: 2026-08-15T00:39:01.937906+00:00
+updated_at: 2026-08-15T01:22:20.783959+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0005]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -88,6 +88,8 @@ Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
 - Implement merge as delete-and-recreate without retention: rejected — violates section 6's alias/history retention rule and destroys the cross-job evidence trail RKIT-I-0007 depends on.
 
 ## Implementation Plan **[REQUIRED]**
+
+**COMPLETE 2026-08-15 (continuous mode).** Chunks 1-5 executed as RKIT-T-0044..0048 (serial codex chain, committed on develop): T-0044 InterpretationProposal DTO + typed validation (confirmations.py), substring marker tables DELETED, audit probes ('incorrect', 'yesterday I did nothing') permanent typed-rejection regressions, producers (agent/CLI/mcp) migrated to structured proposals; T-0045 verification.py engine — exported 14-edge matrix, structural authorities, DisallowedTransitionError, append-only transition evidence, all 25 pairs tested, audited inferred→source_stated agent-only escalation closed; T-0046 every store verification write engine-mediated (upsert create/merge precedence, import path, downgrade protection, cross-session user_verified persistence, sweep clean); T-0047 mergeFacts w/ alias/evidence/job-match retention, merge history, id redirects (migration 006), no-escalation both directions, atomic rollback; T-0048 consolidated regressions + marker-gone sweep + TEST_SPEC executable-case names + mutation probe (marker reintroduction fails 6 tests). Gates at close: --pr 350 OK, --smoke OK, --future-contract 357 OK, migration checks 4/4. Approval-batch additions: store_surface.json confirmation-slot + mergeFacts + getMigrationState declarations, guardrail ALLOWED_SURFACES/relationship set, six career-store unit modules for run_tests.py.
 
 Dependency-ordered chunks for later decomposition (no Metis tasks yet):
 1. Interpretation proposal DTO + validation + removal of the substring markers and free-text confirmation parameter (surface realignment under the A-0006 authorization).
