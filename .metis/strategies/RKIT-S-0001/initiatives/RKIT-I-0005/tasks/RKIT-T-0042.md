@@ -4,14 +4,14 @@ level: task
 title: "Transaction substrate: atomic detect+write, TransactionResult, interruption recovery"
 short_code: "RKIT-T-0042"
 created_at: 2026-08-14T23:56:07.530441+00:00
-updated_at: 2026-08-15T00:23:56.607023+00:00
+updated_at: 2026-08-15T00:31:53.272518+00:00
 parent: durable-career-store-package-and
 blocked_by: [RKIT-T-0041]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0005
 ## Objective
 
 Build the store-owned transaction substrate (RKIT-I-0005 Requirement 6, moved forward from RKIT-I-0008 by deliberate re-sequencing): a context-managed single-connection transaction helper; `upsertFact` conflict detection and fact/evidence writes execute atomically in ONE transaction (fixing the separate-connections defect at store.py:245-247); the never-used `TransactionResult` DTO (schemas.py:81-88) is constructed and returned; interruption mid-operation leaves no partial rows.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

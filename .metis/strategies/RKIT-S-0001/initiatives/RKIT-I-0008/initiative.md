@@ -100,3 +100,16 @@ Dependency-ordered chunks for later decomposition (no Metis tasks yet):
 3. Years/title heuristic replacement + dead-branch removal + audit-probe regressions.
 4. `_clean_result` appeasement removal + real-output assertions (A-0006 authorization).
 5. Idempotency hardening across new tables + TEST_SPEC strengthening pass.
+
+### Salvaged from RKIT-I-0005 matching.py deletion
+
+The dead `career_store/matching.py` module was removed in RKIT-T-0043. Its `_YEARS_RE` pattern is preserved verbatim here for the explicit-years heuristic replacement in this initiative:
+
+```python
+_YEARS_RE = re.compile(
+    r"\b(?P<value>\d+|zero|one|two|three|four|five|six|seven|eight|nine|ten|"
+    r"eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|"
+    r"nineteen|twenty)\+?\s+years?\b",
+    re.IGNORECASE,
+)
+```

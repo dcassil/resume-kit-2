@@ -4,14 +4,14 @@ level: task
 title: "Delete dead matching.py, no-scoring guardrail, TEST_SPEC realignment pass"
 short_code: "RKIT-T-0043"
 created_at: 2026-08-14T23:56:07.575439+00:00
-updated_at: 2026-08-14T23:56:07.575439+00:00
+updated_at: 2026-08-15T00:31:53.507110+00:00
 parent: durable-career-store-package-and
-blocked_by: ["RKIT-T-0042"]
+blocked_by: [RKIT-T-0042]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0005
 ## Objective
 
 Close out RKIT-I-0005 (Requirements 7-8 + Testing Strategy): delete the dead parallel `career_store/matching.py` (unused, unexported, divergent semantics, Must-Not-Own scoring at matching.py:497-508) after salvaging its `_YEARS_RE` pattern for RKIT-I-0008; add the no-scoring-export guardrail test; realign career-store/TEST_SPEC.md's drifted 6-value verification set; run the full three-gate close-out.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

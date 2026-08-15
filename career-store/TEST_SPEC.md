@@ -40,8 +40,11 @@ Tests should expect durable storage around these data areas:
 - Create a fresh isolated SQLite database.
 - Apply migrations from empty state.
 - Assert schema version is recorded.
+- Record applied migration IDs and pending migration IDs through `getMigrationState()`.
 - Re-run migrations and assert idempotency.
 - Reject incompatible schema versions with a typed error.
+- Reject a database stamped above the supported schema version before applying additional migrations.
+- Preserve wave-era databases by migrating existing facts, relationships, evidence, conflicts, and job matches forward without data loss.
 - Record career DB schema version for run manifests.
 
 ### Fact persistence
@@ -78,6 +81,7 @@ Tests should expect durable storage around these data areas:
 - Keep `related` distinct from `alias/equivalent`.
 - Prevent Azure from becoming proof of AWS through a related relationship.
 - Retain relationship evidence or rationale.
+- Defer `parent` and `child` relationship vocabulary coverage until the protected career-store guardrail lock is updated with the A-0006 relationship realignment batch.
 
 ### Search and matching
 
@@ -98,6 +102,10 @@ Tests should expect durable storage around these data areas:
 ### Job associations
 
 - Record requirement-to-fact matches for a job.
+- Create a stable row in the `jobs` table for each source job ID seen by `recordJobMatch`.
+- Backfill deterministic `jobs` rows from pre-realignment `job_matches` data during migration.
+- Store job metadata separately from match metadata so job identity/history survives repeated match writes.
+- Add `match_type`, `confidence`, and `user_confirmed` values to `job_fact_matches`/`job_matches` rows without changing the requirement-to-fact association.
 - Preserve which facts were used for Job A versus Job B.
 - Reuse user-verified AWS and GraphQL facts learned during Job A when matching Job B.
 - Do not pollute base resume or job-specific working resume state.
@@ -111,7 +119,11 @@ Tests should expect durable storage around these data areas:
 
 ### Transactions and recovery
 
+- Execute conflict detection and fact/evidence writes inside one store-owned transaction.
 - Roll back partial fact/evidence writes on failure.
+- Return a `TransactionResult` for committed and rolled-back mutating operations.
+- Embed transaction result details in `upsertFact`, `verifyFact`, `addEvidence`, `addRelationship`, and `recordJobMatch` mutation responses.
+- Preserve evidence append-only behavior and deterministic IDs through the transaction path.
 - Resume after interruption following user verification.
 - Detect duplicate writes from retried operations.
 - Preserve DB validity after simulated process interruption.
