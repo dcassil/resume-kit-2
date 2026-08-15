@@ -381,6 +381,310 @@ def _relationship_candidate(
     }
 
 
+def _search_error(store: Any, schema_version: str, code: str, field_path: str) -> JsonObject:
+    return _clean_result(
+        {
+            "schema_version": schema_version,
+            "status": "error",
+            "mutation_status": "rejected",
+            "facts": [],
+            "errors": [
+                {
+                    "type": "InvalidSearchFilterError",
+                    "code": code,
+                    "field_path": field_path,
+                    "message": f"Invalid {field_path}.",
+                }
+            ],
+            "audit": store._audit("searchFacts", mutated=False, reason=code),
+        }
+    )
+
+
+def _search_filters(store: Any, schema_version: str, filters: JsonObject | None) -> JsonObject:
+    if filters is None:
+        filters = {}
+    if not isinstance(filters, dict):
+        return _search_error(store, schema_version, "invalid_filter_shape", "filters")
+
+    concept = filters.get("concept")
+    concept_terms: list[str] = []
+    if concept is not None:
+        if not isinstance(concept, str):
+            return _search_error(store, schema_version, "invalid_filter_shape", "filters.concept")
+        concept_terms = _expanded_terms([concept])
+
+    terms_result = _search_filter_terms(store, schema_version, filters.get("terms"), "filters.terms")
+    if isinstance(terms_result, dict):
+        return terms_result
+    terms = terms_result
+
+    alias_result = _search_filter_alias(store, schema_version, filters.get("alias"), terms)
+    if alias_result.get("status") == "error":
+        return alias_result
+
+    verification_state = filters.get("verification_state")
+    if verification_state is not None and not isinstance(verification_state, str):
+        return _search_error(store, schema_version, "invalid_filter_shape", "filters.verification_state")
+
+    fact_type = filters.get("type")
+    if fact_type is not None and not isinstance(fact_type, str):
+        return _search_error(store, schema_version, "invalid_filter_shape", "filters.type")
+
+    return {
+        "status": "ok",
+        "filters": {
+            "concept_terms": concept_terms,
+            "terms": terms,
+            "alias_enabled": bool(alias_result["enabled"]),
+            "alias_terms": alias_result["terms"],
+            "allowUnverifiedAliasCreation": bool(alias_result["allowUnverifiedAliasCreation"]),
+            "verification_state": verification_state,
+            "type": fact_type,
+        },
+    }
+
+
+def _search_filter_terms(store: Any, schema_version: str, value: Any, field_path: str) -> list[str] | JsonObject:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        raw_terms = [value]
+    elif isinstance(value, (list, tuple)):
+        if not all(isinstance(item, str) for item in value):
+            return _search_error(store, schema_version, "invalid_filter_shape", field_path)
+        raw_terms = list(value)
+    else:
+        return _search_error(store, schema_version, "invalid_filter_shape", field_path)
+    return _expanded_terms(raw_terms)
+
+
+def _search_filter_alias(store: Any, schema_version: str, value: Any, term_filters: list[str]) -> JsonObject:
+    if value is None or value is False:
+        return {"enabled": False, "terms": [], "allowUnverifiedAliasCreation": False}
+    if value is True:
+        return {"enabled": True, "terms": term_filters, "allowUnverifiedAliasCreation": False}
+    if isinstance(value, str) or isinstance(value, list | tuple):
+        terms_result = _search_filter_terms(store, schema_version, value, "filters.alias")
+        if isinstance(terms_result, dict):
+            return terms_result
+        return {"enabled": True, "terms": terms_result, "allowUnverifiedAliasCreation": False}
+    if isinstance(value, dict):
+        enabled = value.get("enabled", True)
+        if not isinstance(enabled, bool):
+            return _search_error(store, schema_version, "invalid_filter_shape", "filters.alias.enabled")
+        terms_result = _search_filter_terms(store, schema_version, value.get("terms", term_filters), "filters.alias.terms")
+        if isinstance(terms_result, dict):
+            return terms_result
+        allow_unverified = value.get("allowUnverifiedAliasCreation", value.get("allow_unverified_alias_creation", False))
+        if not isinstance(allow_unverified, bool):
+            return _search_error(store, schema_version, "invalid_filter_shape", "filters.alias.allowUnverifiedAliasCreation")
+        return {
+            "enabled": enabled,
+            "terms": terms_result if enabled else [],
+            "allowUnverifiedAliasCreation": allow_unverified,
+        }
+    return _search_error(store, schema_version, "invalid_filter_shape", "filters.alias")
+
+
+def _search_allowed_fact_ids(store: Any, conn: sqlite3.Connection, filters: JsonObject) -> set[str]:
+    allowed = {str(row["fact_id"]) for row in store._fact_rows(conn=conn, active_only=True)}
+    if filters["verification_state"] is not None:
+        allowed &= {
+            str(row["fact_id"])
+            for row in conn.execute(
+                """
+                SELECT fact_id FROM facts
+                WHERE merged_into_fact_id IS NULL
+                  AND verification_state = ?
+                """,
+                (filters["verification_state"],),
+            ).fetchall()
+        }
+    if filters["type"] is not None:
+        allowed &= {
+            str(row["fact_id"])
+            for row in conn.execute(
+                """
+                SELECT fact_id FROM facts
+                WHERE merged_into_fact_id IS NULL
+                  AND type = ?
+                """,
+                (filters["type"],),
+            ).fetchall()
+        }
+    if filters["terms"]:
+        term_ids = _search_fact_ids_for_terms(conn, filters["terms"])
+        if filters["alias_enabled"]:
+            term_ids |= _search_fact_ids_for_alias_terms(conn, filters)
+        allowed &= term_ids
+    if filters["concept_terms"]:
+        allowed &= _search_fact_ids_for_concept(conn, filters["concept_terms"])
+    if filters["alias_terms"] and not filters["terms"]:
+        allowed &= _search_fact_ids_for_alias_terms(conn, filters)
+    return allowed
+
+
+def _search_fact_ids_for_terms(conn: sqlite3.Connection, terms: list[str]) -> set[str]:
+    placeholders = ",".join("?" for _ in terms)
+    rows = conn.execute(
+        f"""
+        SELECT DISTINCT f.fact_id
+        FROM facts AS f, json_each(f.normalized_terms_json) AS term
+        WHERE f.merged_into_fact_id IS NULL
+          AND term.value IN ({placeholders})
+        """,
+        tuple(terms),
+    ).fetchall()
+    return {str(row["fact_id"]) for row in rows}
+
+
+def _search_fact_ids_for_concept(conn: sqlite3.Connection, terms: list[str]) -> set[str]:
+    matched: set[str] = set()
+    rows = conn.execute(
+        """
+        SELECT fact_id, text, canonical_name, description
+        FROM facts
+        WHERE merged_into_fact_id IS NULL
+        ORDER BY type, text, fact_id
+        """
+    ).fetchall()
+    for row in rows:
+        haystacks = [str(row["text"]), str(row["canonical_name"] or ""), str(row["description"] or "")]
+        if any(_term_in_text(term, haystack) for term in terms for haystack in haystacks):
+            matched.add(str(row["fact_id"]))
+    return matched
+
+
+def _search_fact_ids_for_alias_terms(conn: sqlite3.Connection, filters: JsonObject) -> set[str]:
+    terms = list(filters["alias_terms"])
+    if not terms:
+        return set()
+    placeholders = ",".join("?" for _ in terms)
+    policy = {"allowUnverifiedAliasCreation": filters["allowUnverifiedAliasCreation"]}
+    rows = conn.execute(
+        f"""
+        SELECT DISTINCT f.fact_id, r.relationship_type, r.confirmation_status
+        FROM facts AS f
+        JOIN relationships AS r
+          ON r.from_fact_id = f.fact_id OR r.to_fact_id = f.fact_id
+        JOIN facts AS other
+          ON other.fact_id = CASE
+               WHEN r.from_fact_id = f.fact_id THEN r.to_fact_id
+               ELSE r.from_fact_id
+             END
+        JOIN json_each(other.normalized_terms_json) AS term
+        WHERE f.merged_into_fact_id IS NULL
+          AND other.merged_into_fact_id IS NULL
+          AND r.relationship_type IN ('alias', 'equivalent')
+          AND term.value IN ({placeholders})
+        """,
+        tuple(terms),
+    ).fetchall()
+    return {
+        str(row["fact_id"])
+        for row in rows
+        if _relationship_policy_match_type(
+            str(row["relationship_type"]),
+            str(row["confirmation_status"] or "unconfirmed"),
+            policy,
+        )
+        == "alias_match"
+    }
+
+
+def _search_fact_match_terms(fact: JsonObject) -> set[str]:
+    return set(
+        _expanded_terms(
+            [
+                *fact.get("normalized_terms", []),
+                fact.get("text", ""),
+                fact.get("canonical_name", ""),
+                fact.get("description", ""),
+            ]
+        )
+    )
+
+
+def _search_fact_normalized_terms(fact: JsonObject) -> set[str]:
+    return set(_expanded_terms(fact.get("normalized_terms", [])))
+
+
+def _search_fact_concept_terms(fact: JsonObject) -> set[str]:
+    terms: set[str] = set()
+    for value in (fact.get("text", ""), fact.get("canonical_name", ""), fact.get("description", "")):
+        terms.update(_expanded_terms([value]))
+    return terms
+
+
+def _search_alias_terms(store: Any, fact_id: str, terms: set[str], filters: JsonObject, conn: sqlite3.Connection | None = None) -> set[str]:
+    if not terms:
+        return set()
+    policy = {"allowUnverifiedAliasCreation": filters["allowUnverifiedAliasCreation"]}
+    matched: set[str] = set()
+    for relationship in store._relationships_for_fact(fact_id, conn=conn):
+        if relationship["relationship_type"] not in {"alias", "equivalent"}:
+            continue
+        if (
+            _relationship_policy_match_type(
+                relationship["relationship_type"],
+                relationship["confirmation_status"],
+                policy,
+            )
+            != "alias_match"
+        ):
+            continue
+        other_id = relationship["to_fact_id"] if relationship["from_fact_id"] == fact_id else relationship["from_fact_id"]
+        other_row = store._fact_row(other_id, conn=conn)
+        if other_row is None or other_row["merged_into_fact_id"] is not None:
+            continue
+        other = store._fact_from_row(other_row, conn=conn)
+        if not other:
+            continue
+        matched.update(_search_fact_match_terms(other).intersection(terms))
+    return matched
+
+
+def _evidence_for_fact_matching_terms(
+    store: Any,
+    fact_id: str,
+    terms: set[str],
+    conn: sqlite3.Connection | None = None,
+) -> list[JsonObject]:
+    evidence = store._evidence_for_fact(fact_id, conn=conn)
+    if not terms:
+        return evidence
+    filtered: list[JsonObject] = []
+    for row in evidence:
+        row_terms = set(_expanded_terms(_normalized_terms(row)))
+        metadata = row.get("metadata", {})
+        if isinstance(metadata, dict):
+            row_terms.update(_expanded_terms(_metadata_terms(metadata)))
+        if row_terms.intersection(terms):
+            filtered.append(row)
+    return filtered
+
+
+def _store_fact_match_terms(store: Any, fact_id: str, conn: sqlite3.Connection | None = None) -> set[str]:
+    fact = store._fact_from_row(store._fact_row(fact_id, conn=conn), conn=conn)
+    terms: list[str] = []
+    if fact:
+        terms.extend(fact.get("normalized_terms", []))
+        terms.append(_normalize(fact.get("text", "")))
+        terms.append(_normalize(fact.get("canonical_name", "")))
+        terms.append(_normalize(fact.get("description", "")))
+        metadata = fact.get("metadata", {})
+        if isinstance(metadata, dict):
+            terms.extend(_metadata_terms(metadata))
+    for evidence in store._evidence_for_fact(fact_id, conn=conn):
+        terms.append(_normalize(evidence.get("text", "")))
+        terms.extend(_normalized_terms(evidence))
+        metadata = evidence.get("metadata", {})
+        if isinstance(metadata, dict):
+            terms.extend(_metadata_terms(metadata))
+    return set(_expanded_terms(terms))
+
+
 def _relationship_conflict_signals(
     conn: sqlite3.Connection,
     requirement_id: str,

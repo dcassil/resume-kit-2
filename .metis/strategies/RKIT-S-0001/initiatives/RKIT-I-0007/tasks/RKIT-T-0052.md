@@ -4,14 +4,14 @@ level: task
 title: "searchFacts concept/terms/alias filtering and evidence minimization"
 short_code: "RKIT-T-0052"
 created_at: 2026-08-15T01:23:28.435082+00:00
-updated_at: 2026-08-15T01:23:28.435082+00:00
+updated_at: 2026-08-15T01:49:53.512428+00:00
 parent: relationship-aware-matching-and
-blocked_by: ["RKIT-T-0051"]
+blocked_by: [RKIT-T-0051]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0007
 ## Objective
 
 Bring searchFacts up to TEST_SPEC:83-84 (RKIT-I-0007 Requirement 5): accept concept, normalized-terms, alias (via stored relationships), and verification_state filters; include_evidence returns the minimum-necessary evidence rows for the match rather than all rows.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -59,4 +61,5 @@ Rationale: well-specified query work on an established schema; the only judgment
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-15: Implemented private searchFacts filter normalization and SQL-backed candidate ID filtering for verification_state/type, normalized terms, concept text, and confirmed alias/equivalent expansion. Added minimum-necessary evidence loading keyed by matched search/filter terms. Focused search/merge/relationship unit tests pass.
+- 2026-08-15: Required verification completed: PR gate, smoke gate, full unit discovery, and migration checks all pass. Straight Jacket verification still reports pre-existing protected-file checksum mismatches in tools/pre-commit-resume-cli-guardrails.sh, tools/run_tests.py, and tools/TEST_SPEC.md.

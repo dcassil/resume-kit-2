@@ -45,7 +45,6 @@ from .store_support import (
     _merge_conflict_result,
     _merge_provenance_payload,
     _merged_metadata,
-    _metadata_terms,
     _normalize,
     _normalized_terms,
     _optional_bool,
@@ -66,6 +65,13 @@ from .store_support import (
     _to_json,
     _upsert_user_proposal,
     _validation_error,
+    _evidence_for_fact_matching_terms,
+    _search_alias_terms,
+    _search_allowed_fact_ids,
+    _search_fact_concept_terms, _search_fact_match_terms,
+    _search_fact_normalized_terms,
+    _search_filters,
+    _store_fact_match_terms,
     _year_claim,
 )
 from .transactions import TransactionScope, transaction_result_payload
@@ -131,33 +137,53 @@ class CareerStore:
         limit: int | None = None,
         include_evidence: bool = False,
     ) -> JsonObject:
-        filters = filters or {}
-        terms = _normalized_terms({"text": query, "normalized_terms": [query]})
+        normalized_filters = _search_filters(self, SCHEMA_VERSION, filters)
+        if normalized_filters.get("status") == "error":
+            return normalized_filters
+        filters = normalized_filters["filters"]
+        query_terms = set(_normalized_terms({"text": query, "normalized_terms": [query]}))
+        term_filters = set(filters["terms"])
+        concept_terms = set(filters["concept_terms"])
+        alias_terms = set(filters["alias_terms"])
         matches: list[JsonObject] = []
         with self._connect() as conn:
             redirected_query_id = _resolve_fact_id(conn, query)
-            rows = self._fact_rows(conn=conn, active_only=True)
+            allowed_fact_ids = _search_allowed_fact_ids(self, conn, filters)
+            rows = [row for row in self._fact_rows(conn=conn, active_only=True) if row["fact_id"] in allowed_fact_ids]
             for row in rows:
                 fact = self._fact_from_row(row, conn=conn)
-                if filters.get("verification_state") and fact["verification_state"] != filters["verification_state"]:
+                matched_terms: set[str] = set()
+                query_matched = not query_terms
+                if query_terms:
+                    query_match = _search_fact_match_terms(fact).intersection(query_terms)
+                    if query_match:
+                        matched_terms.update(query_match)
+                        query_matched = True
+                    elif redirected_query_id == fact["fact_id"]:
+                        matched_terms.update(query_terms)
+                        query_matched = True
+                    elif filters["alias_enabled"]:
+                        alias_match = _search_alias_terms(self, fact["fact_id"], query_terms, filters, conn=conn)
+                        if alias_match:
+                            matched_terms.update(alias_match)
+                            query_matched = True
+                if not query_matched:
                     continue
-                fact_terms = set(
-                    fact["normalized_terms"]
-                    + [
-                        _normalize(fact["text"]),
-                        _normalize(fact.get("canonical_name", "")),
-                        _normalize(fact.get("description", "")),
-                    ]
-                )
-                relationship_terms = set(self._relationship_terms(fact["fact_id"], conn=conn))
-                if (
-                    not terms
-                    or redirected_query_id == fact["fact_id"]
-                    or fact_terms.intersection(terms)
-                    or relationship_terms.intersection(terms)
-                ):
-                    if include_evidence:
-                        fact["evidence"] = self._evidence_for_fact(fact["fact_id"], conn=conn)
+                if term_filters:
+                    matched_terms.update(_search_fact_normalized_terms(fact).intersection(term_filters))
+                if concept_terms:
+                    matched_terms.update(_search_fact_concept_terms(fact).intersection(concept_terms))
+                if alias_terms:
+                    matched_terms.update(_search_alias_terms(self, fact["fact_id"], alias_terms, filters, conn=conn))
+                if include_evidence:
+                    evidence = (
+                        self._evidence_for_fact(fact["fact_id"], conn=conn)
+                        if not matched_terms
+                        else _evidence_for_fact_matching_terms(self, fact["fact_id"], matched_terms, conn=conn)
+                    )
+                    fact["evidence"] = evidence
+                    fact["evidence_ids"] = [item["evidence_id"] for item in evidence]
+                if query_matched:
                     matches.append(fact)
         matches.sort(key=lambda item: (item["type"], item["text"].casefold(), item["fact_id"]))
         if limit is not None:
@@ -722,7 +748,12 @@ class CareerStore:
             requirement_terms = set(_expanded_terms(_normalized_terms(requirement)))
             with self._connect() as conn:
                 conflict_signals.extend(
-                    _relationship_conflict_signals(conn, requirement_id, requirement_terms, self._fact_match_terms)
+                    _relationship_conflict_signals(
+                        conn,
+                        requirement_id,
+                        requirement_terms,
+                        lambda fact_id, conn=None: _store_fact_match_terms(self, fact_id, conn=conn),
+                    )
                 )
             candidates = self._candidate_matches(requirement, facts, policy)
             if not candidates:
@@ -1106,18 +1137,6 @@ class CareerStore:
             relationships.append(relationship)
         return relationships
 
-    def _relationship_terms(self, fact_id: str, conn: sqlite3.Connection | None = None) -> list[str]:
-        terms: list[str] = []
-        for relationship in self._relationships_for_fact(fact_id, conn=conn):
-            other_id = relationship["to_fact_id"] if relationship["from_fact_id"] == fact_id else relationship["from_fact_id"]
-            other = self._fact_from_row(self._fact_row(other_id, conn=conn), conn=conn)
-            if other:
-                terms.extend(_expanded_terms(other["normalized_terms"]))
-                terms.append(_normalize(other["text"]))
-                terms.append(_normalize(other.get("canonical_name", "")))
-                terms.append(_normalize(other.get("description", "")))
-        return sorted(set(term for term in terms if term))
-
     def _conflicts_for_fact(self, fact_id: str, conn: sqlite3.Connection | None = None) -> list[JsonObject]:
         if conn is not None:
             rows = conn.execute("SELECT * FROM conflicts ORDER BY conflict_id").fetchall()
@@ -1266,7 +1285,7 @@ class CareerStore:
         requirement_year = _required_years(requirement)
         ranked: list[tuple[int, int, str, str, JsonObject]] = []
         for fact in facts:
-            fact_terms = self._fact_match_terms(fact["fact_id"])
+            fact_terms = _store_fact_match_terms(self, fact["fact_id"])
             overlap = _meaningful_overlap(requirement_set, fact_terms)
             if overlap:
                 resolution, metadata = _direct_resolution(fact, requirement_year, fact_terms)
@@ -1314,25 +1333,6 @@ class CareerStore:
                 break
         return selected
 
-    def _fact_match_terms(self, fact_id: str, conn: sqlite3.Connection | None = None) -> set[str]:
-        fact = self._fact_from_row(self._fact_row(fact_id, conn=conn), conn=conn)
-        terms: list[str] = []
-        if fact:
-            terms.extend(fact.get("normalized_terms", []))
-            terms.append(_normalize(fact.get("text", "")))
-            terms.append(_normalize(fact.get("canonical_name", "")))
-            terms.append(_normalize(fact.get("description", "")))
-            metadata = fact.get("metadata", {})
-            if isinstance(metadata, dict):
-                terms.extend(_metadata_terms(metadata))
-        for evidence in self._evidence_for_fact(fact_id, conn=conn):
-            terms.append(_normalize(evidence.get("text", "")))
-            terms.extend(_normalized_terms(evidence))
-            metadata = evidence.get("metadata", {})
-            if isinstance(metadata, dict):
-                terms.extend(_metadata_terms(metadata))
-        return set(_expanded_terms(terms))
-
     def _relationship_match(
         self,
         fact_id: str,
@@ -1343,14 +1343,14 @@ class CareerStore:
         relationship_matches: list[tuple[int, int, str, str, JsonObject]] = []
         for relationship in self._relationships_for_fact(fact_id):
             other_id = relationship["to_fact_id"] if relationship["from_fact_id"] == fact_id else relationship["from_fact_id"]
-            other_terms = self._fact_match_terms(other_id)
+            other_terms = _store_fact_match_terms(self, other_id)
             overlap = _meaningful_overlap(requirement_terms, other_terms)
             if not overlap:
                 continue
             relationship_type = relationship["relationship_type"]
             relationship_direction = _relationship_direction(relationship, fact_id)
             fact = self._fact_from_row(self._fact_row(fact_id))
-            fact_terms = self._fact_match_terms(fact_id)
+            fact_terms = _store_fact_match_terms(self, fact_id)
             _, metadata = _direct_resolution(fact, requirement_year, fact_terms)
             conflicts = list(metadata.pop("conflicts", []))
             def append_candidate(resolution: str) -> None:
