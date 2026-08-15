@@ -4,14 +4,14 @@ level: task
 title: "Interpretation proposal DTO, validation, substring-marker removal"
 short_code: "RKIT-T-0044"
 created_at: 2026-08-15T00:37:23.551637+00:00
-updated_at: 2026-08-15T00:39:02.414175+00:00
+updated_at: 2026-08-15T00:48:40.475754+00:00
 parent: evidence-backed-fact-and
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0006
 ## Objective
 
 Replace career-store's substring confirmation heuristic with structured interpretation-proposal validation per vision section 12 (RKIT-I-0006 Requirements 1-2): the affirmative/negation marker tables (store.py:51-76, 1243-1254) are removed; the confirmation surface accepts only the InterpretationProposal DTO; the store never derives meaning from raw answer text, which is retained as evidence only.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

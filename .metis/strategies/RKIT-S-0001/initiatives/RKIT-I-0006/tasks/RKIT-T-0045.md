@@ -4,14 +4,14 @@ level: task
 title: "Verification transition engine: data-declared matrix, typed errors, transition evidence"
 short_code: "RKIT-T-0045"
 created_at: 2026-08-15T00:37:23.604045+00:00
-updated_at: 2026-08-15T00:37:23.604045+00:00
+updated_at: 2026-08-15T00:48:40.859740+00:00
 parent: evidence-backed-fact-and
-blocked_by: ["RKIT-T-0044"]
+blocked_by: [RKIT-T-0044]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0006
 ## Objective
 
 Build the single verification transition engine (RKIT-I-0006 Requirement 3, Detailed Design "Transition engine"): a data-declared matrix `{(from, to) → required authority}` over the canonical five-state set, evaluated in one chokepoint, with typed `DisallowedTransitionError(from, to, requiredAuthority)` and an append-only transition evidence row for every allowed transition.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -60,4 +62,4 @@ Rationale: the honesty chokepoint for all of career-store; matrix/authority desi
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-15: Added `career_store.verification` with exported matrix, authority constructors, `DisallowedTransitionError`, and transition evidence payload builder. Wired `verifyFact` through the engine for real state changes and added `TODO(RKIT-T-0046)` on the remaining upsert/import merge path. Focused tests passed: `test_career_store_verification_transitions_unit`, `test_career_store_interpretation_proposals_unit`, and `test_career_store_transactions_unit`. Required verification passed: `python3 tools/run_gate.py --pr --root .`, `python3 tools/run_gate.py --smoke --root .`, `python3 -m unittest discover -s tests/unit -v`, and `python3 tools/run_migration_checks.py --root .`.

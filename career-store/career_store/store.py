@@ -13,7 +13,6 @@ from typing import Any, Callable
 from .confirmations import (
     USER_CONFIRMATION_SOURCES,
     proposal_evidence,
-    proposal_has_user_provenance,
     validate_interpretation_proposal,
 )
 from .migrations import (
@@ -31,6 +30,12 @@ from .migrations import (
 from .schemas import InvalidInterpretationProposalError, MigrationState, TransactionResult
 from .terms import _AWS_SERVICE_TERMS, _STOP_TERMS, _TERM_ALIASES
 from .transactions import TransactionScope, transaction_result_payload
+from .verification import (
+    DisallowedTransitionError,
+    evaluate_verification_transition,
+    transition_evidence_row,
+    user_affirmed_proposal_authority,
+)
 
 _VERIFICATION_STATES = {
     # Confirmation policy keeps inferred/unknown distinct from user_verified.
@@ -298,7 +303,7 @@ class CareerStore:
                             "audit": self._audit("verifyFact", mutated=True, source=source, outcome=proposal.outcome),
                         }
                     )
-                elif requested_state == "user_verified" and not proposal_has_user_provenance(proposal):
+                elif requested_state == current_state:
                     txn.set_mutation_status("evidence_only")
                     for evidence in proposal_evidence(proposal, requested_state, source):
                         evidence_id = self._insert_evidence(conn, fact_id, evidence, source, now)
@@ -311,30 +316,55 @@ class CareerStore:
                             "fact_id": fact_id,
                             "verification_state": current_state,
                             "conflicts": self._conflicts_for_fact(fact_id, conn=conn),
-                            "confirmation_required": True,
+                            "confirmation_required": False,
                             "transaction_result": None,
                             "audit": self._audit("verifyFact", mutated=True, source=source, outcome=proposal.outcome),
                         }
                     )
                 else:
-                    conn.execute(
-                        "UPDATE facts SET verification_state = ?, updated_at = ? WHERE fact_id = ?",
-                        (requested_state, now, fact_id),
-                    )
-                    for evidence in proposal_evidence(proposal, requested_state, source):
-                        evidence_id = self._insert_evidence(conn, fact_id, evidence, source, now)
-                        txn.touch("evidence_id", evidence_id)
-                    result = {
-                        "schema_version": SCHEMA_VERSION,
-                        "status": "updated",
-                        "mutation_status": "updated",
-                        "fact_id": fact_id,
-                        "verification_state": requested_state,
-                        "conflicts": self._conflicts_for_fact(fact_id, conn=conn),
-                        "confirmation_required": False,
-                        "transaction_result": None,
-                        "audit": self._audit("verifyFact", mutated=True, source=source, outcome=proposal.outcome),
-                    }
+                    try:
+                        transition = evaluate_verification_transition(
+                            fact_id,
+                            current_state,
+                            requested_state,
+                            user_affirmed_proposal_authority(proposal),
+                            now,
+                        )
+                    except DisallowedTransitionError as exc:
+                        txn.set_mutation_status("rejected")
+                        result = self._disallowed_transition_error(fact_id, current_state, exc, source)
+                        result["transaction_result"] = None
+                    else:
+                        conn.execute(
+                            "UPDATE facts SET verification_state = ?, updated_at = ? WHERE fact_id = ?",
+                            (requested_state, now, fact_id),
+                        )
+                        transition_evidence = transition_evidence_row(transition)
+                        transition_evidence["evidence_id"] = _stable_id(
+                            "verification_transition",
+                            fact_id,
+                            current_state,
+                            requested_state,
+                            transition.authorityKind,
+                            _to_json(transition.provenanceRefs),
+                            now,
+                        )
+                        evidence_id = self._insert_evidence(conn, fact_id, transition_evidence, "verification_transition", now)
+                        txn.touch("verification_transition_evidence_id", evidence_id)
+                        for evidence in proposal_evidence(proposal, requested_state, source):
+                            evidence_id = self._insert_evidence(conn, fact_id, evidence, source, now)
+                            txn.touch("evidence_id", evidence_id)
+                        result = {
+                            "schema_version": SCHEMA_VERSION,
+                            "status": "updated",
+                            "mutation_status": "updated",
+                            "fact_id": fact_id,
+                            "verification_state": requested_state,
+                            "conflicts": self._conflicts_for_fact(fact_id, conn=conn),
+                            "confirmation_required": False,
+                            "transaction_result": None,
+                            "audit": self._audit("verifyFact", mutated=True, source=source, outcome=proposal.outcome),
+                        }
         transaction_result = txn.result
         result["transaction_result"] = transaction_result_payload(transaction_result)
         return _clean_result(result)
@@ -913,6 +943,7 @@ class CareerStore:
         evidence: JsonObject | None,
         source: str,
     ) -> str:
+        # TODO(RKIT-T-0046): route upsert/import/merge state changes through career_store.verification.
         if current_state == "user_verified":
             return current_state
         if requested_state == "user_verified" and not _has_explicit_confirmation(policy, evidence, source):
@@ -1098,6 +1129,27 @@ class CareerStore:
                 "confirmation_required": True,
                 "errors": [error.to_error()],
                 "audit": self._audit("verifyFact", mutated=False, source=source, reason=error.code),
+            }
+        )
+
+    def _disallowed_transition_error(
+        self,
+        fact_id: str,
+        verification_state: str,
+        error: DisallowedTransitionError,
+        source: str,
+    ) -> JsonObject:
+        return _clean_result(
+            {
+                "schema_version": SCHEMA_VERSION,
+                "status": "error",
+                "mutation_status": "rejected",
+                "fact_id": fact_id,
+                "verification_state": verification_state,
+                "conflicts": [],
+                "confirmation_required": error.requiredAuthority == "user_affirmed_proposal",
+                "errors": [error.to_error()],
+                "audit": self._audit("verifyFact", mutated=False, source=source, reason="disallowed_verification_transition"),
             }
         )
 
