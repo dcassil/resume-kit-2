@@ -4,14 +4,14 @@ level: initiative
 title: "Durable Career-Store Package and Migration Foundation"
 short_code: "RKIT-I-0005"
 created_at: 2026-08-13T20:41:36.917160+00:00
-updated_at: 2026-08-14T23:58:02.178254+00:00
+updated_at: 2026-08-15T00:36:45.034100+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: []
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -96,6 +96,8 @@ The passing 188-test gate reflects thin assertions, not compliance. Re-baselined
 - Reconcile and adopt matching.py instead of deleting it: rejected — its semantics diverge from store.py (related→alias_match, user_verified→exact_match) and it contains scoring the package must not own; two matching layers invite silent drift.
 
 ## Implementation Plan **[REQUIRED]**
+
+**COMPLETE 2026-08-15 (continuous mode).** Chunks 1-5 executed as RKIT-T-0039..0043 (serial codex chain, committed on develop): T-0039 migration registry/stamping/typed errors/getMigrationState (surface-manifest + guardrail-allowlist declaration DEFERRED to Daniel's approve/update-locks batch — classifier enforced his locked-approvals deferral); T-0040 section-6 migrations 002-004 (fact columns, jobs table w/ deterministic backfill, match/relationship columns; jobs spec hole closed); T-0041 enum restoration + 005_enum_value_remap (drifted→unknown w/ conflict-record preservation, typed write rejection, parent/child effective; store_surface relationship realignment DEFERRED — guardrail pins drifted set); T-0042 transaction substrate (BEGIN IMMEDIATE single-connection detect+write across all five mutations, TransactionResult embedded, zero-partial-rows rollback proven); T-0043 matching.py deleted (_YEARS_RE salvaged to I-0008 doc), no-scoring contract test, TEST_SPEC strengthened. Gates at close: --pr 350 OK, --smoke OK, --future-contract 357 OK, migration checks 4/4. Approval batch additions: career_store_guardrails ALLOWED_SURFACES + relationship set, store_surface.json (getMigrationState + parent/child), contract-test tuple, run_tests.py wiring for test_career_store_{jobs,transactions,no_scoring}_unit. I-0006/0007/0008 substrates are all real now.
 
 Dependency-ordered chunks for later decomposition (no Metis tasks yet):
 1. Migration registry + version stamping + typed errors + `getMigrationState()` (registry absorbs `001_initial`).
