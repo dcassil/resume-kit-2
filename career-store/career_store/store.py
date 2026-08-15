@@ -2,19 +2,13 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable
 
-from .confirmations import (
-    USER_CONFIRMATION_SOURCES,
-    proposal_evidence,
-    validate_interpretation_proposal,
-)
+from .confirmations import proposal_evidence, validate_interpretation_proposal
 from .migrations import (
     MIGRATIONS,
     SCHEMA_VERSION,
@@ -28,11 +22,38 @@ from .migrations import (
     user_version,
 )
 from .schemas import InvalidInterpretationProposalError, MigrationState, TransactionResult
+from .store_support import (
+    _add_if_not_none,
+    _authority_ref,
+    _clean_result,
+    _conflict_from_row,
+    _conflict_object,
+    _dedupe_conflicts,
+    _from_json,
+    _has_explicit_confirmation,
+    _inference_ref,
+    _job_metadata,
+    _normalize,
+    _optional_bool,
+    _optional_float,
+    _optional_int,
+    _optional_text,
+    _source_document_ref,
+    _stable_id,
+    _state_value,
+    _to_json,
+    _upsert_user_proposal,
+    _validation_error,
+)
 from .terms import _AWS_SERVICE_TERMS, _STOP_TERMS, _TERM_ALIASES
 from .transactions import TransactionScope, transaction_result_payload
 from .verification import (
     DisallowedTransitionError,
+    agent_inference_provenance_authority,
     evaluate_verification_transition,
+    explicit_user_correction_authority,
+    import_provenance_authority,
+    source_document_evidence_authority,
     transition_evidence_row,
     user_affirmed_proposal_authority,
 )
@@ -55,20 +76,6 @@ _RESOLUTION_STATES = {
     "unknown",
     "explicitly_missing",
     "not_applicable",
-}
-_FORBIDDEN_RESULT_KEYS = {
-    "raw_sql",
-    "connection",
-    "internal_rows",
-    "silent_user_verified_promotion",
-    "implicit_confirmation",
-    "destructive_delete",
-    "related_as_equivalent_without_policy",
-    "official_score",
-    "destructive_resolution",
-    "resume_patch",
-    "working_resume",
-    "base_resume",
 }
 _RESOLUTION_RANK = {
     "not_applicable": 0,
@@ -177,6 +184,7 @@ class CareerStore:
             confirmation_required = requested_state in {"inferred", "unknown"} and not policy.get("allow_inferred_final", True)
         mutation_status = "created"
         evidence_id: str | None = None
+        result: JsonObject | None = None
         with self._transaction("upsertFact", mutation_status) as txn:
             conn = txn.connection
             assert conn is not None
@@ -189,63 +197,79 @@ class CareerStore:
                 (fact_id,),
             ).fetchone()
             if existing is None:
-                conn.execute(
-                    """
-                    INSERT INTO facts (
-                        fact_id, type, text, normalized_terms_json, verification_state, created_at, updated_at,
-                        metadata_json, canonical_name, description, years, confidence
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        fact_id,
-                        str(fact.get("type", "fact")),
-                        str(fact.get("text", "")),
-                        _to_json(normalized),
-                        requested_state,
-                        now,
-                        now,
-                        _to_json(fact.get("metadata", {})),
-                        _optional_text(fact.get("canonical_name")),
-                        _optional_text(fact.get("description")),
-                        _optional_int(fact.get("years")),
-                        _optional_float(fact.get("confidence")),
-                    ),
-                )
+                transition = None
+                persisted_state = requested_state
+                if requested_state != "unknown":
+                    try:
+                        transition = self._evaluate_upsert_transition(
+                            fact_id,
+                            "unknown",
+                            requested_state,
+                            policy,
+                            evidence,
+                            source,
+                            now,
+                        )
+                    except DisallowedTransitionError as exc:
+                        if requested_state == "user_verified":
+                            persisted_state = "unknown"
+                            confirmation_required = True
+                        else:
+                            txn.set_mutation_status("rejected")
+                            result = self._disallowed_transition_error(fact_id, "unknown", exc, source, "upsertFact")
+                            result["transaction_result"] = None
+                if result is None:
+                    self._insert_fact_row(conn, fact_id, fact, normalized, persisted_state, now)
+                    if transition is not None:
+                        evidence_id = self._insert_transition_evidence(conn, transition, now)
+                        txn.touch("verification_transition_evidence_id", evidence_id)
+                    requested_state = persisted_state
             else:
                 mutation_status = "updated"
                 txn.set_mutation_status(mutation_status)
                 current_state = str(existing["verification_state"])
-                next_state = self._merged_verification_state(current_state, requested_state, policy, evidence, source)
+                next_state = current_state
+                transition = None
+                try:
+                    transition = self._evaluate_upsert_merge_transition(
+                        fact_id,
+                        current_state,
+                        requested_state,
+                        policy,
+                        evidence,
+                        source,
+                        now,
+                    )
+                except DisallowedTransitionError as exc:
+                    if requested_state == "user_verified" and current_state in {"inferred", "unknown"}:
+                        confirmation_required = True
+                    elif current_state == "user_verified":
+                        pass
+                    else:
+                        txn.set_mutation_status("rejected")
+                        result = self._disallowed_transition_error(fact_id, current_state, exc, source, "upsertFact")
+                        result["transaction_result"] = None
+                else:
+                    if transition is not None:
+                        next_state = transition.newState
                 if next_state == current_state and requested_state == "user_verified" and current_state in {"inferred", "unknown"}:
                     confirmation_required = True
-                conn.execute(
-                    """
-                    UPDATE facts
-                    SET type = ?, text = ?, normalized_terms_json = ?, verification_state = ?, updated_at = ?,
-                        metadata_json = ?, canonical_name = ?, description = ?, years = ?, confidence = ?
-                    WHERE fact_id = ?
-                    """,
-                    (
-                        str(fact.get("type", "fact")),
-                        str(fact.get("text", "")),
-                        _to_json(normalized),
-                        next_state,
-                        now,
-                        _to_json(_merged_metadata(_from_json(str(existing["metadata_json"]), {}), fact.get("metadata", {}))),
-                        _optional_text(fact.get("canonical_name")),
-                        _optional_text(fact.get("description")),
-                        _optional_int(fact.get("years")),
-                        _optional_float(fact.get("confidence")),
-                        fact_id,
-                    ),
-                )
-                requested_state = next_state
-            if evidence:
-                evidence_id = self._insert_evidence(conn, fact_id, evidence, source, now)
-                txn.touch("evidence_id", evidence_id)
-            for conflict in conflicts:
-                self._insert_conflict(conn, conflict, now)
+                if result is None:
+                    self._update_fact_row(conn, fact_id, fact, normalized, next_state, now, str(existing["metadata_json"]))
+                    if transition is not None:
+                        transition_evidence_id = self._insert_transition_evidence(conn, transition, now)
+                        txn.touch("verification_transition_evidence_id", transition_evidence_id)
+                    requested_state = next_state
+            if result is None:
+                if evidence:
+                    evidence_id = self._insert_evidence(conn, fact_id, evidence, source, now)
+                    txn.touch("evidence_id", evidence_id)
+                for conflict in conflicts:
+                    self._insert_conflict(conn, conflict, now)
         transaction_result = txn.result
+        if result is not None:
+            result["transaction_result"] = transaction_result_payload(transaction_result)
+            return _clean_result(result)
         return _clean_result(
             {
                 "schema_version": SCHEMA_VERSION,
@@ -258,6 +282,70 @@ class CareerStore:
                 "transaction_result": transaction_result_payload(transaction_result),
                 "audit": self._audit("upsertFact", mutated=True),
             }
+        )
+
+    def _insert_fact_row(
+        self,
+        conn: sqlite3.Connection,
+        fact_id: str,
+        fact: JsonObject,
+        normalized: list[str],
+        verification_state: str,
+        now: str,
+    ) -> None:
+        conn.execute(
+            """
+            INSERT INTO facts (
+                fact_id, type, text, normalized_terms_json, verification_state, created_at, updated_at,
+                metadata_json, canonical_name, description, years, confidence
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                fact_id,
+                str(fact.get("type", "fact")),
+                str(fact.get("text", "")),
+                _to_json(normalized),
+                verification_state,
+                now,
+                now,
+                _to_json(fact.get("metadata", {})),
+                _optional_text(fact.get("canonical_name")),
+                _optional_text(fact.get("description")),
+                _optional_int(fact.get("years")),
+                _optional_float(fact.get("confidence")),
+            ),
+        )
+
+    def _update_fact_row(
+        self,
+        conn: sqlite3.Connection,
+        fact_id: str,
+        fact: JsonObject,
+        normalized: list[str],
+        verification_state: str,
+        now: str,
+        existing_metadata_json: str,
+    ) -> None:
+        conn.execute(
+            """
+            UPDATE facts
+            SET type = ?, text = ?, normalized_terms_json = ?, verification_state = ?, updated_at = ?,
+                metadata_json = ?, canonical_name = ?, description = ?, years = ?, confidence = ?
+            WHERE fact_id = ?
+            """,
+            (
+                str(fact.get("type", "fact")),
+                str(fact.get("text", "")),
+                _to_json(normalized),
+                verification_state,
+                now,
+                _to_json(_merged_metadata(_from_json(existing_metadata_json, {}), fact.get("metadata", {}))),
+                _optional_text(fact.get("canonical_name")),
+                _optional_text(fact.get("description")),
+                _optional_int(fact.get("years")),
+                _optional_float(fact.get("confidence")),
+                fact_id,
+            ),
         )
 
     def verifyFact(
@@ -323,11 +411,16 @@ class CareerStore:
                     )
                 else:
                     try:
+                        authority = user_affirmed_proposal_authority(proposal)
+                        if current_state == "user_verified" and requested_state != current_state:
+                            authority = explicit_user_correction_authority(proposal)
+                        elif requested_state == "source_stated":
+                            authority = self._source_document_authority_from_refs(proposal.provenance)
                         transition = evaluate_verification_transition(
                             fact_id,
                             current_state,
                             requested_state,
-                            user_affirmed_proposal_authority(proposal),
+                            authority,
                             now,
                         )
                     except DisallowedTransitionError as exc:
@@ -339,17 +432,7 @@ class CareerStore:
                             "UPDATE facts SET verification_state = ?, updated_at = ? WHERE fact_id = ?",
                             (requested_state, now, fact_id),
                         )
-                        transition_evidence = transition_evidence_row(transition)
-                        transition_evidence["evidence_id"] = _stable_id(
-                            "verification_transition",
-                            fact_id,
-                            current_state,
-                            requested_state,
-                            transition.authorityKind,
-                            _to_json(transition.provenanceRefs),
-                            now,
-                        )
-                        evidence_id = self._insert_evidence(conn, fact_id, transition_evidence, "verification_transition", now)
+                        evidence_id = self._insert_transition_evidence(conn, transition, now)
                         txn.touch("verification_transition_evidence_id", evidence_id)
                         for evidence in proposal_evidence(proposal, requested_state, source):
                             evidence_id = self._insert_evidence(conn, fact_id, evidence, source, now)
@@ -935,19 +1018,18 @@ class CareerStore:
             ),
         )
 
-    def _merged_verification_state(
+    def _evaluate_upsert_merge_transition(
         self,
+        fact_id: str,
         current_state: str,
         requested_state: str,
         policy: JsonObject,
         evidence: JsonObject | None,
         source: str,
-    ) -> str:
-        # TODO(RKIT-T-0046): route upsert/import/merge state changes through career_store.verification.
-        if current_state == "user_verified":
-            return current_state
-        if requested_state == "user_verified" and not _has_explicit_confirmation(policy, evidence, source):
-            return current_state
+        now: str,
+    ):
+        if requested_state == current_state or current_state == "user_verified":
+            return None
         precedence = {
             "unknown": 0,
             "inferred": 1,
@@ -955,7 +1037,60 @@ class CareerStore:
             "source_stated": 3,
             "user_verified": 4,
         }
-        return requested_state if precedence.get(requested_state, 0) >= precedence.get(current_state, 0) else current_state
+        if precedence.get(requested_state, 0) < precedence.get(current_state, 0):
+            return None
+        return self._evaluate_upsert_transition(fact_id, current_state, requested_state, policy, evidence, source, now)
+
+    def _evaluate_upsert_transition(
+        self,
+        fact_id: str,
+        current_state: str,
+        requested_state: str,
+        policy: JsonObject,
+        evidence: JsonObject | None,
+        source: str,
+        now: str,
+    ):
+        authority = self._upsert_transition_authority(fact_id, requested_state, policy, evidence, source)
+        return evaluate_verification_transition(fact_id, current_state, requested_state, authority, now)
+
+    def _upsert_transition_authority(
+        self,
+        fact_id: str,
+        requested_state: str,
+        policy: JsonObject,
+        evidence: JsonObject | None,
+        source: str,
+    ):
+        if requested_state == "inferred":
+            return agent_inference_provenance_authority(_inference_ref(fact_id, evidence, source))
+        if requested_state == "source_stated":
+            return source_document_evidence_authority(_source_document_ref(fact_id, evidence, source, policy))
+        if requested_state == "imported":
+            return import_provenance_authority(_authority_ref(evidence, source, "Imported durable career fact."))
+        if requested_state == "user_verified":
+            return user_affirmed_proposal_authority(_upsert_user_proposal(fact_id, evidence, source))
+        return agent_inference_provenance_authority({"source": source, "text": "No verification transition authority."})
+
+    def _source_document_authority_from_refs(self, refs: list[JsonObject]):
+        for ref in refs:
+            authority = source_document_evidence_authority(ref)
+            if authority.authorityKind == "source_document_evidence":
+                return authority
+        return source_document_evidence_authority(refs[0] if refs else {})
+
+    def _insert_transition_evidence(self, conn: sqlite3.Connection, transition: Any, now: str) -> str:
+        transition_evidence = transition_evidence_row(transition)
+        transition_evidence["evidence_id"] = _stable_id(
+            "verification_transition",
+            transition.factId,
+            transition.priorState,
+            transition.newState,
+            transition.authorityKind,
+            _to_json(transition.provenanceRefs),
+            now,
+        )
+        return self._insert_evidence(conn, transition.factId, transition_evidence, "verification_transition", now)
 
     def _candidate_matches(self, requirement: JsonObject, facts: list[JsonObject], policy: JsonObject) -> list[JsonObject]:
         requirement_terms = _normalized_terms(requirement)
@@ -1138,6 +1273,7 @@ class CareerStore:
         verification_state: str,
         error: DisallowedTransitionError,
         source: str,
+        operation: str = "verifyFact",
     ) -> JsonObject:
         return _clean_result(
             {
@@ -1149,7 +1285,7 @@ class CareerStore:
                 "conflicts": [],
                 "confirmation_required": error.requiredAuthority == "user_affirmed_proposal",
                 "errors": [error.to_error()],
-                "audit": self._audit("verifyFact", mutated=False, source=source, reason="disallowed_verification_transition"),
+                "audit": self._audit(operation, mutated=False, source=source, reason="disallowed_verification_transition"),
             }
         )
 
@@ -1196,80 +1332,6 @@ def _default_clock() -> str:
     from datetime import datetime, timezone
 
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-def _stable_id(prefix: str, *parts: Any) -> str:
-    payload = "\x1f".join(str(part) for part in parts)
-    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:24]
-    return f"{prefix}_{digest}"
-
-
-def _to_json(value: Any) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"))
-
-
-def _from_json(value: str | None, fallback: Any) -> Any:
-    if value is None:
-        return fallback
-    try:
-        return json.loads(value)
-    except json.JSONDecodeError:
-        return fallback
-
-
-def _optional_text(value: Any) -> str | None:
-    if value is None:
-        return None
-    text = str(value)
-    return text if text else None
-
-
-def _optional_int(value: Any) -> int | None:
-    if value is None or value == "":
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _optional_float(value: Any) -> float | None:
-    if value is None or value == "":
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _optional_bool(value: Any) -> int | None:
-    if value is None or value == "":
-        return None
-    if isinstance(value, bool):
-        return 1 if value else 0
-    if isinstance(value, (int, float)):
-        return 1 if value else 0
-    normalized = _normalize(value)
-    if normalized in {"true", "yes", "confirmed", "user confirmed", "1"}:
-        return 1
-    if normalized in {"false", "no", "unconfirmed", "0"}:
-        return 0
-    return None
-
-
-def _add_if_not_none(target: JsonObject, key: str, value: Any) -> None:
-    if value is not None:
-        target[key] = value
-
-
-def _job_metadata(metadata: JsonObject) -> JsonObject:
-    job_keys = {"title", "job_title", "company", "employer", "url", "job_url", "source", "source_id"}
-    return {key: value for key, value in metadata.items() if key in job_keys}
-
-
-def _normalize(value: Any) -> str:
-    text = str(value).casefold().strip()
-    return " ".join("".join(char if char.isalnum() else " " for char in text).split())
 
 
 def _normalized_terms(value: JsonObject) -> list[str]:
@@ -1376,10 +1438,6 @@ def _merged_metadata(existing: JsonObject, incoming: Any) -> JsonObject:
     return merged
 
 
-def _state_value(value: Any) -> str:
-    return str(getattr(value, "value", value))
-
-
 def _legacy_state_conflict(fact: JsonObject, state: str) -> JsonObject:
     return _conflict_object(
         [str(fact.get("fact_id", ""))],
@@ -1389,31 +1447,6 @@ def _legacy_state_conflict(fact: JsonObject, state: str) -> JsonObject:
             "fact_id": str(fact.get("fact_id", "")),
         },
     )
-
-
-def _validation_error(code: str, field_path: str, allowed_values: set[str]) -> JsonObject:
-    return {
-        "code": code,
-        "field_path": field_path,
-        "message": f"Invalid {field_path}.",
-        "allowed_values": sorted(allowed_values),
-    }
-
-
-def _has_explicit_confirmation(policy: JsonObject, evidence: JsonObject | None, source: str) -> bool:
-    if policy.get("explicit_confirmation") is True:
-        return True
-    if policy.get("confirmation") is True or policy.get("confirmed") is True:
-        return True
-    if source in USER_CONFIRMATION_SOURCES - {"user_answer"}:
-        return True
-    if evidence:
-        if evidence.get("source") in USER_CONFIRMATION_SOURCES - {"user_answer"}:
-            return True
-        metadata = evidence.get("metadata", {})
-        if isinstance(metadata, dict) and (metadata.get("explicit") is True or metadata.get("confirmed") is True):
-            return True
-    return False
 
 
 def _year_claim(text: str, terms: set[str]) -> str | None:
@@ -1452,42 +1485,6 @@ def _title_claim(text: str, terms: set[str]) -> str | None:
         if title in combined:
             return title
     return None
-
-
-def _conflict_object(fact_ids: list[str], reason: str, metadata: JsonObject) -> JsonObject:
-    clean_fact_ids = sorted(set(fact_id for fact_id in fact_ids if fact_id))
-    return {
-        "conflict_id": _stable_id("conflict", "|".join(clean_fact_ids), reason),
-        "fact_ids": clean_fact_ids,
-        "reason": reason,
-        "status": "open",
-        "evidence_ids": [],
-        "metadata": metadata,
-    }
-
-
-def _conflict_from_row(row: sqlite3.Row) -> JsonObject:
-    return {
-        "conflict_id": str(row["conflict_id"]),
-        "fact_ids": _from_json(str(row["fact_ids_json"]), []),
-        "reason": str(row["reason"]),
-        "status": str(row["status"]),
-        "evidence_ids": _from_json(str(row["evidence_ids_json"]), []),
-        "metadata": _from_json(str(row["metadata_json"]), {}),
-    }
-
-
-def _dedupe_conflicts(conflicts: list[JsonObject]) -> list[JsonObject]:
-    deduped = {str(conflict["conflict_id"]): conflict for conflict in conflicts}
-    return [deduped[key] for key in sorted(deduped)]
-
-
-def _clean_result(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {key: _clean_result(item) for key, item in value.items() if key not in _FORBIDDEN_RESULT_KEYS}
-    if isinstance(value, list):
-        return [_clean_result(item) for item in value]
-    return value
 
 
 __all__ = ["CareerStore", "IncompatibleSchemaVersionError", "MigrationFailedError", "openCareerStore"]

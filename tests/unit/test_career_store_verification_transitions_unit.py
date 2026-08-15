@@ -222,6 +222,229 @@ class CareerStoreVerificationTransitionUnitTests(unittest.TestCase):
             self.assertEqual(result["errors"][0]["requiredAuthority"], AUTHORITY_SOURCE_DOCUMENT_EVIDENCE)
             self.assertEqual(store.getFact(fact["fact_id"])["fact"]["verification_state"], "inferred")
 
+    def test_verify_fact_allows_inferred_to_source_stated_with_source_document_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = openCareerStore(str(Path(directory) / "career.db"), clock=lambda: FIXED_TIME)
+            fact = store.upsertFact(
+                {"type": "skill", "text": "AWS", "normalized_terms": ["aws"], "verification_state": "inferred"},
+                {"source": "agent_proposal", "text": "possible AWS match"},
+                source="agent_proposal",
+                policy={"allow_inferred_final": False},
+            )
+
+            result = store.verifyFact(
+                fact["fact_id"],
+                "source_stated",
+                confirmation={
+                    "factId": fact["fact_id"],
+                    "outcome": "affirmed",
+                    "provenance": [{"source": "resume", "source_id": "resume_1", "text": "AWS production experience."}],
+                },
+                source="resume",
+            )
+
+            self.assertEqual(result["status"], "updated")
+            self.assertEqual(result["verification_state"], "source_stated")
+            transition_rows = [
+                row
+                for row in store.getFact(fact["fact_id"])["evidence"]
+                if row["metadata"].get("verification_transition", {}).get("authorityKind") == AUTHORITY_SOURCE_DOCUMENT_EVIDENCE
+            ]
+            self.assertEqual(len(transition_rows), 1)
+
+    def test_verify_fact_protects_user_verified_from_downgrade_without_explicit_user_correction(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = openCareerStore(str(Path(directory) / "career.db"), clock=lambda: FIXED_TIME)
+            fact = store.upsertFact(
+                {"type": "skill", "text": "React", "normalized_terms": ["react"], "verification_state": "inferred"},
+                {"source": "agent_proposal", "text": "possible React match"},
+                source="agent_proposal",
+                policy={"allow_inferred_final": False},
+            )
+            verified = store.verifyFact(
+                fact["fact_id"],
+                "user_verified",
+                confirmation={
+                    "factId": fact["fact_id"],
+                    "outcome": "affirmed",
+                    "provenance": [{"source": "user_answer", "text": "Yes, I built React apps."}],
+                },
+                source="user_answer",
+            )
+            self.assertEqual(verified["verification_state"], "user_verified")
+
+            rejected = store.verifyFact(
+                fact["fact_id"],
+                "unknown",
+                confirmation={
+                    "factId": fact["fact_id"],
+                    "outcome": "affirmed",
+                    "provenance": [{"source": "user_answer", "text": "Actually, remove this."}],
+                },
+                source="user_answer",
+            )
+            self.assertEqual(rejected["status"], "error")
+            self.assertEqual(rejected["errors"][0]["type"], DisallowedTransitionError.__name__)
+            self.assertEqual(rejected["errors"][0]["requiredAuthority"], AUTHORITY_EXPLICIT_USER_CORRECTION)
+            self.assertEqual(store.getFact(fact["fact_id"])["fact"]["verification_state"], "user_verified")
+
+    def test_verify_fact_allows_user_verified_downgrade_with_explicit_user_correction_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = openCareerStore(str(Path(directory) / "career.db"), clock=lambda: FIXED_TIME)
+            fact = store.upsertFact(
+                {"type": "skill", "text": "React", "normalized_terms": ["react"], "verification_state": "inferred"},
+                {"source": "agent_proposal", "text": "possible React match"},
+                source="agent_proposal",
+                policy={"allow_inferred_final": False},
+            )
+            store.verifyFact(
+                fact["fact_id"],
+                "user_verified",
+                confirmation={
+                    "factId": fact["fact_id"],
+                    "outcome": "affirmed",
+                    "provenance": [{"source": "user_answer", "text": "Yes, I built React apps."}],
+                },
+                source="user_answer",
+            )
+
+            downgraded = store.verifyFact(
+                fact["fact_id"],
+                "unknown",
+                confirmation={
+                    "factId": fact["fact_id"],
+                    "outcome": "affirmed",
+                    "confirmedValue": {"verification_state": "unknown", "reason": "user correction"},
+                    "provenance": [{"source": "user_answer", "text": "Correction: do not use this fact."}],
+                },
+                source="user_answer",
+            )
+
+            self.assertEqual(downgraded["status"], "updated")
+            self.assertEqual(downgraded["verification_state"], "unknown")
+            transition_rows = [
+                row
+                for row in store.getFact(fact["fact_id"])["evidence"]
+                if row["metadata"].get("verification_transition", {}).get("authorityKind") == AUTHORITY_EXPLICIT_USER_CORRECTION
+            ]
+            self.assertEqual(len(transition_rows), 1)
+            self.assertEqual(transition_rows[0]["metadata"]["verification_transition"]["priorState"], "user_verified")
+
+    def test_upsert_imported_requires_import_provenance_and_writes_transition_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = openCareerStore(str(Path(directory) / "career.db"), clock=lambda: FIXED_TIME)
+            imported = store.upsertFact(
+                {"type": "skill", "text": "Go", "normalized_terms": ["go"], "verification_state": "imported"},
+                {
+                    "source": "external_system",
+                    "text": "Imported from durable profile.",
+                    "metadata": {"import_id": "import_1", "external_id": "skill_go"},
+                },
+                source="external_system",
+                policy={},
+            )
+
+            self.assertEqual(imported["status"], "created")
+            self.assertEqual(imported["verification_state"], "imported")
+            transition_rows = [
+                row
+                for row in store.getFact(imported["fact_id"])["evidence"]
+                if row["metadata"].get("verification_transition", {}).get("authorityKind") == AUTHORITY_IMPORT_PROVENANCE
+            ]
+            self.assertEqual(len(transition_rows), 1)
+
+            rejected = store.upsertFact(
+                {"type": "skill", "text": "Rust", "normalized_terms": ["rust"], "verification_state": "imported"},
+                {"source": "agent_proposal", "text": "No import anchor."},
+                source="agent_proposal",
+                policy={},
+            )
+            self.assertEqual(rejected["status"], "error")
+            self.assertEqual(rejected["errors"][0]["requiredAuthority"], AUTHORITY_IMPORT_PROVENANCE)
+            self.assertEqual(store.searchFacts("Rust")["facts"], [])
+
+    def test_upsert_merge_uses_engine_for_promotions_and_never_overwrites_user_verified_with_lower_authority(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = openCareerStore(str(Path(directory) / "career.db"), clock=lambda: FIXED_TIME)
+            fact = store.upsertFact(
+                {
+                    "fact_id": "fact_react",
+                    "type": "skill",
+                    "text": "React",
+                    "normalized_terms": ["react"],
+                    "verification_state": "inferred",
+                },
+                {"source": "agent_proposal", "text": "possible React match"},
+                source="agent_proposal",
+                policy={"allow_inferred_final": False},
+            )
+
+            promoted = store.upsertFact(
+                {
+                    "fact_id": "fact_react",
+                    "type": "skill",
+                    "text": "React",
+                    "normalized_terms": ["react"],
+                    "verification_state": "source_stated",
+                },
+                {"source": "resume", "source_id": "resume_1", "text": "React"},
+                source="resume",
+                policy={},
+            )
+            self.assertEqual(promoted["verification_state"], "source_stated")
+
+            store.verifyFact(
+                fact["fact_id"],
+                "user_verified",
+                confirmation={
+                    "factId": fact["fact_id"],
+                    "outcome": "affirmed",
+                    "provenance": [{"source": "user_answer", "text": "Yes, React is correct."}],
+                },
+                source="user_answer",
+            )
+            protected = store.upsertFact(
+                {
+                    "fact_id": "fact_react",
+                    "type": "skill",
+                    "text": "React",
+                    "normalized_terms": ["react"],
+                    "verification_state": "source_stated",
+                },
+                {"source": "resume", "source_id": "resume_2", "text": "React"},
+                source="resume",
+                policy={},
+            )
+            self.assertEqual(protected["verification_state"], "user_verified")
+            self.assertEqual(store.getFact(fact["fact_id"])["fact"]["verification_state"], "user_verified")
+
+    def test_user_verified_persists_across_reopen_and_distinct_job_sessions(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "career.db"
+            store = openCareerStore(str(database_path), clock=lambda: FIXED_TIME)
+            fact = store.upsertFact(
+                {"type": "skill", "text": "GraphQL", "normalized_terms": ["graphql"], "verification_state": "inferred"},
+                {"source": "agent_proposal", "text": "possible GraphQL match"},
+                source="agent_proposal",
+                policy={"allow_inferred_final": False},
+            )
+            store.verifyFact(
+                fact["fact_id"],
+                "user_verified",
+                confirmation={
+                    "factId": fact["fact_id"],
+                    "outcome": "affirmed",
+                    "provenance": [{"source": "user_answer", "text": "Yes, I built GraphQL APIs."}],
+                },
+                source="user_answer",
+            )
+            store.recordJobMatch("job_a", "req_graphql", [fact["fact_id"]], "verified_fact_match")
+
+            reopened = openCareerStore(str(database_path), clock=lambda: FIXED_TIME)
+            self.assertEqual(reopened.getFact(fact["fact_id"])["fact"]["verification_state"], "user_verified")
+            reopened.recordJobMatch("job_b", "req_graphql", [fact["fact_id"]], "verified_fact_match")
+            self.assertEqual(reopened.getFact(fact["fact_id"])["fact"]["verification_state"], "user_verified")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -63,7 +63,8 @@ class CareerStoreTransactionUnitTests(unittest.TestCase):
 
             with sqlite3.connect(database_path) as conn:
                 self.assertEqual(conn.execute("SELECT COUNT(*) FROM facts").fetchone()[0], 1)
-                self.assertEqual(conn.execute("SELECT COUNT(*) FROM evidence").fetchone()[0], 1)
+                self.assertEqual(conn.execute("SELECT COUNT(*) FROM evidence").fetchone()[0], 2)
+                self.assertEqual(conn.execute("SELECT COUNT(*) FROM evidence WHERE source = ?", ("verification_transition",)).fetchone()[0], 1)
                 self.assertEqual(conn.execute("SELECT COUNT(*) FROM conflicts").fetchone()[0], 0)
                 self.assertEqual(conn.execute("SELECT COUNT(*) FROM facts WHERE text = ?", ("AWS, ten years",)).fetchone()[0], 0)
                 self.assertEqual(conn.execute("SELECT COUNT(*) FROM evidence WHERE text = ?", ("ten years of AWS",)).fetchone()[0], 0)
@@ -146,7 +147,8 @@ class CareerStoreTransactionUnitTests(unittest.TestCase):
 
             fetched = store.getFact(fact["fact_id"])
             evidence_ids = [item["evidence_id"] for item in fetched["evidence"]]
-            self.assertEqual(len(evidence_ids), 3)
+            self.assertEqual(len(evidence_ids), 4)
+            self.assertIn(fact["transaction_result"]["ids"]["verification_transition_evidence_id"], evidence_ids)
             self.assertIn(first["evidence_id"], evidence_ids)
             self.assertIn(second["evidence_id"], evidence_ids)
             self.assertEqual(second["evidence_id"], repeated["evidence_id"])
