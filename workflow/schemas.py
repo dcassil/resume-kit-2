@@ -9,6 +9,9 @@ from typing import Any
 
 JsonObject = dict[str, Any]
 
+RUN_MANIFEST_SCHEMA_VERSION = "run-manifest.v1"
+CAREER_DB_VERSION_UNAVAILABLE_STATUS = "unavailable"
+
 
 class Checkpoint(str, Enum):
     INIT = "INIT"
@@ -41,6 +44,7 @@ class RunManifest:
     canonical_resume_schema_version: str
     job_schema_version: str
     career_db_schema_version: str
+    careerDbVersion: JsonObject
     change_operation_schema_version: str
     matching_algorithm_version: str
     matching_config_version: str
@@ -54,7 +58,7 @@ class RunManifest:
     operations_rejected: list[str] = field(default_factory=list)
     validation_status: str = "unknown"
     output_artifact_paths: list[str] = field(default_factory=list)
-    schema_version: str = "run-manifest.v1"
+    schema_version: str = RUN_MANIFEST_SCHEMA_VERSION
     package_versions: dict[str, str] = field(default_factory=dict)
     recovery_markers: list[JsonObject] = field(default_factory=list)
     audit_refs: list[str] = field(default_factory=list)
@@ -62,7 +66,7 @@ class RunManifest:
 
 
 RUN_MANIFEST_SCHEMA: JsonObject = {
-    "schema_version": "run-manifest.v1",
+    "schema_version": RUN_MANIFEST_SCHEMA_VERSION,
     "type": "object",
     "required": [
         "run_id",
@@ -73,6 +77,7 @@ RUN_MANIFEST_SCHEMA: JsonObject = {
         "canonical_resume_schema_version",
         "job_schema_version",
         "career_db_schema_version",
+        "careerDbVersion",
         "change_operation_schema_version",
         "matching_algorithm_version",
         "matching_config_version",
@@ -96,6 +101,30 @@ RUN_MANIFEST_SCHEMA: JsonObject = {
         "canonical_resume_schema_version": {"type": "string"},
         "job_schema_version": {"type": "string"},
         "career_db_schema_version": {"type": "string"},
+        "careerDbVersion": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "required": ["schema_version", "database_path", "applied_migrations", "pending_migrations", "status", "metadata"],
+                    "properties": {
+                        "schema_version": {"type": "string"},
+                        "database_path": {"type": "string"},
+                        "applied_migrations": {"type": "array", "items": {"type": "string"}},
+                        "pending_migrations": {"type": "array", "items": {"type": "string"}},
+                        "status": {"type": "string"},
+                        "metadata": {"type": "object"},
+                    },
+                },
+                {
+                    "type": "object",
+                    "required": ["status", "reason"],
+                    "properties": {
+                        "status": {"enum": [CAREER_DB_VERSION_UNAVAILABLE_STATUS]},
+                        "reason": {"enum": ["career_db_not_configured"]},
+                    },
+                },
+            ]
+        },
         "change_operation_schema_version": {"type": "string"},
         "matching_algorithm_version": {"type": "string"},
         "matching_config_version": {"type": "string"},

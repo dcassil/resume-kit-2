@@ -10,6 +10,7 @@ from resume_core import Error, Result, ResolutionState, VerificationState
 
 
 JsonObject = dict[str, Any]
+CAREER_STORE_SCHEMA_VERSION = "career-store.v1"
 INTERPRETATION_PROPOSAL_OUTCOMES = {"affirmed", "denied", "unclear"}
 
 
@@ -275,6 +276,7 @@ SCHEMAS: dict[str, JsonObject] = {
 
 
 __all__ = [
+    "CAREER_STORE_SCHEMA_VERSION",
     "CareerFact",
     "ConflictRecord",
     "Evidence",

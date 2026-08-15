@@ -39,7 +39,7 @@ from .honesty import _years_met as _years_met
 from .guardrails_config import resolve_guardrails_config
 from .match_dimensions import _configured_default_weight, _match_dimensions, _score_from_dimensions
 from .match_decision import decide_match, empty_match, match_decision_explanation
-from .matching_config import resolve_matching_config
+from .matching_config import MATCHING_CONFIG_VERSION, resolve_matching_config
 from .quality_warnings import duplicate_warnings as _duplicate_warnings
 from .quality_warnings import keyword_warnings as _keyword_warnings
 from .resume_config import resolve_resume_config
@@ -119,6 +119,17 @@ _GENERIC_TERMS = {
     "through",
     "with",
 }
+
+
+def matchingVersions() -> JsonObject:
+    """Return public matching version identifiers without exposing scoring internals."""
+
+    return {
+        "matching_algorithm_version": ALGORITHM_VERSION,
+        "matching_config_version": MATCHING_CONFIG_VERSION,
+    }
+
+
 _TERM_VARIANTS = {
     "api": ("api", "apis", "rest api", "rest apis"),
     "api architecture": (

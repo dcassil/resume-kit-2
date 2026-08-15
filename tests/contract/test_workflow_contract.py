@@ -8,7 +8,10 @@ import inspect
 import json
 import tempfile
 import unittest
+from dataclasses import asdict
+from importlib import metadata as importlib_metadata
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -40,6 +43,16 @@ def load_workflow_module(test_case: unittest.TestCase):
 
 def serialized(value: object) -> str:
     return json.dumps(value, sort_keys=True).lower()
+
+
+def contains_value(value: object, expected: object) -> bool:
+    if value == expected:
+        return True
+    if isinstance(value, dict):
+        return any(contains_value(item, expected) for item in value.values())
+    if isinstance(value, list):
+        return any(contains_value(item, expected) for item in value)
+    return False
 
 
 class WorkflowSurfaceManifestTests(unittest.TestCase):
@@ -109,6 +122,48 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         for field in ["run_id", "current_checkpoint", "config_hash", "schema_versions", "package_versions", "stage_state", "recovery_markers"]:
             self.assertIn(field, run_state)
         self.assertEqual(run_state["current_checkpoint"], "INIT")
+
+    def test_collect_versions_uses_installed_metadata_schema_constants_and_core_matching_surface(self):
+        import career_store
+        import resume_core
+        from workflow.versions import CAREER_DB_VERSION_UNAVAILABLE, collectVersions
+
+        versions = collectVersions(workspace=self.workspace, config=self.config)
+        installed_version = importlib_metadata.version("resume-kit")
+        self.assertEqual(
+            versions["package_versions"],
+            {
+                "workflow": installed_version,
+                "resume-core": installed_version,
+                "career-store": installed_version,
+            },
+        )
+        self.assertEqual(versions["schema_versions"]["canonical_resume"], resume_core.CANONICAL_RESUME_SCHEMA_VERSION)
+        self.assertEqual(versions["schema_versions"]["job"], resume_core.JOB_MODEL_SCHEMA_VERSION)
+        self.assertEqual(versions["schema_versions"]["career_db"], career_store.CAREER_STORE_SCHEMA_VERSION)
+        self.assertEqual(versions["schema_versions"]["change_operation"], resume_core.RESUME_CHANGE_OPERATION_SCHEMA_VERSION)
+        self.assertEqual(versions["schema_versions"]["run_manifest"], self.workflow.RUN_MANIFEST_SCHEMA["schema_version"])
+        self.assertEqual(
+            {
+                "matching_algorithm_version": versions["matching_algorithm_version"],
+                "matching_config_version": versions["matching_config_version"],
+            },
+            resume_core.matchingVersions(),
+        )
+        self.assertEqual(versions["careerDbVersion"], CAREER_DB_VERSION_UNAVAILABLE)
+
+    def test_collect_versions_raises_typed_error_when_installed_source_is_unavailable(self):
+        import workflow.versions as version_module
+
+        with mock.patch.object(version_module.importlib_metadata, "packages_distributions", return_value={}):
+            with mock.patch.object(
+                version_module.importlib_metadata,
+                "version",
+                side_effect=version_module.importlib_metadata.PackageNotFoundError,
+            ):
+                with self.assertRaises(version_module.VersionSourceUnavailableError) as raised:
+                    version_module.collectVersions(workspace=self.workspace, config=self.config)
+        self.assertEqual(raised.exception.source, "package_versions.workflow")
 
     def test_same_config_runs_get_distinct_ids_and_coexisting_persisted_state(self):
         first = self.create_run()
@@ -233,6 +288,61 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         self.assertTrue(MANIFEST_FIELDS <= set(manifest))
         self.assertEqual(manifest["facts_verified"], ["fact_aws"])
         self.assertEqual(manifest["operations_rejected"], ["op_bad"])
+
+    def test_run_manifest_versions_have_no_placeholders_and_match_real_sources(self):
+        import career_store
+        import resume_core
+        from workflow.versions import CAREER_DB_VERSION_UNAVAILABLE
+
+        run_state = self.create_run()
+        run_state.update(
+            {
+                "base_resume_id": "base_1",
+                "base_resume_hash": "hash_base",
+                "job_id": "job_1",
+                "renderer_template_version": "ats-clean@1",
+            }
+        )
+        manifest = maybe_await(self.workflow.buildRunManifest(run_state))
+        installed_version = importlib_metadata.version("resume-kit")
+        self.assertFalse(contains_value(manifest, "0.0.0"))
+        self.assertEqual(
+            manifest["package_versions"],
+            {
+                "workflow": installed_version,
+                "resume-core": installed_version,
+                "career-store": installed_version,
+            },
+        )
+        self.assertEqual(manifest["canonical_resume_schema_version"], resume_core.CANONICAL_RESUME_SCHEMA_VERSION)
+        self.assertEqual(manifest["job_schema_version"], resume_core.JOB_MODEL_SCHEMA_VERSION)
+        self.assertEqual(manifest["career_db_schema_version"], career_store.CAREER_STORE_SCHEMA_VERSION)
+        self.assertEqual(manifest["change_operation_schema_version"], resume_core.RESUME_CHANGE_OPERATION_SCHEMA_VERSION)
+        self.assertEqual(
+            {
+                "matching_algorithm_version": manifest["matching_algorithm_version"],
+                "matching_config_version": manifest["matching_config_version"],
+            },
+            resume_core.matchingVersions(),
+        )
+        self.assertEqual(manifest["careerDbVersion"], CAREER_DB_VERSION_UNAVAILABLE)
+
+    def test_run_manifest_career_db_version_equals_store_state(self):
+        import career_store
+
+        career_db = self.workspace / "data" / "career.db"
+        store = career_store.openCareerStore(str(career_db), clock=lambda: "2026-01-01T00:00:00Z")
+        run_state = self.create_run()
+        run_state.update(
+            {
+                "base_resume_id": "base_1",
+                "base_resume_hash": "hash_base",
+                "job_id": "job_1",
+                "renderer_template_version": "ats-clean@1",
+            }
+        )
+        manifest = maybe_await(self.workflow.buildRunManifest(run_state))
+        self.assertEqual(manifest["careerDbVersion"], asdict(store.getMigrationState()))
 
     def test_recovery_does_not_duplicate_questions_facts_or_applied_operations(self):
         run_state = self.create_run()

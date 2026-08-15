@@ -4,14 +4,14 @@ level: initiative
 title: "Workflow Artifact Schemas and Run State Contract"
 short_code: "RKIT-I-0022"
 created_at: 2026-08-13T20:41:37.353788+00:00
-updated_at: 2026-08-15T02:48:28.911965+00:00
+updated_at: 2026-08-15T02:49:49.773585+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: []
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/decompose"
+  - "#phase/active"
 
 
 exit_criteria_met: false

@@ -9,6 +9,20 @@ from typing import Any
 
 JsonObject = dict[str, Any]
 
+RESULT_SCHEMA_VERSION = "result.v1"
+ERROR_SCHEMA_VERSION = "error.v1"
+CANONICAL_RESUME_SCHEMA_VERSION = "canonical-resume.v1"
+JOB_REQUIREMENT_SCHEMA_VERSION = "job-requirement.v1"
+JOB_TERM_SCHEMA_VERSION = "job-term.v1"
+TERM_RELATIONSHIP_SCHEMA_VERSION = "term-relationship.v1"
+JOB_MODEL_SCHEMA_VERSION = "job-model.v1"
+MATCH_DIMENSION_SCHEMA_VERSION = "match-dimension.v1"
+MATCH_RESULT_SCHEMA_VERSION = "match-result.v1"
+CONTENT_SELECTION_ENTRY_SCHEMA_VERSION = "content-selection-entry.v1"
+CONTENT_SELECTION_CONSTRAINT_REPORT_SCHEMA_VERSION = "content-selection-constraint-report.v1"
+CONTENT_SELECTION_PLAN_SCHEMA_VERSION = "content-selection-plan.v1"
+RESUME_CHANGE_OPERATION_SCHEMA_VERSION = "resume-change-operation.v1"
+
 
 class Status(str, Enum):
     OK = "ok"
@@ -264,7 +278,7 @@ def require_fields(payload: JsonObject, required_fields: set[str], schema_name: 
 
 
 RESULT_SCHEMA: JsonObject = {
-    "schema_version": "result.v1",
+    "schema_version": RESULT_SCHEMA_VERSION,
     "type": "object",
     "required": ["schema_version", "status"],
     "properties": {
@@ -278,7 +292,7 @@ RESULT_SCHEMA: JsonObject = {
 }
 
 ERROR_SCHEMA: JsonObject = {
-    "schema_version": "error.v1",
+    "schema_version": ERROR_SCHEMA_VERSION,
     "type": "object",
     "required": ["code", "message", "severity"],
     "properties": {
@@ -291,7 +305,7 @@ ERROR_SCHEMA: JsonObject = {
 }
 
 CANONICAL_RESUME_SCHEMA: JsonObject = {
-    "schema_version": "canonical-resume.v1",
+    "schema_version": CANONICAL_RESUME_SCHEMA_VERSION,
     "type": "object",
     "required": ["schema_version", "resume_id", "source", "experience", "skills", "education"],
     "properties": {
@@ -308,7 +322,7 @@ CANONICAL_RESUME_SCHEMA: JsonObject = {
 }
 
 JOB_REQUIREMENT_SCHEMA: JsonObject = {
-    "schema_version": "job-requirement.v1",
+    "schema_version": JOB_REQUIREMENT_SCHEMA_VERSION,
     "type": "object",
     "required": ["requirement_id", "classification", "concept", "importance", "weight", "source_text", "normalized_terms"],
     "properties": {
@@ -323,7 +337,7 @@ JOB_REQUIREMENT_SCHEMA: JsonObject = {
 }
 
 JOB_TERM_SCHEMA: JsonObject = {
-    "schema_version": "job-term.v1",
+    "schema_version": JOB_TERM_SCHEMA_VERSION,
     "type": "object",
     "required": ["surface", "canonical", "source", "weight"],
     "properties": {
@@ -335,7 +349,7 @@ JOB_TERM_SCHEMA: JsonObject = {
 }
 
 TERM_RELATIONSHIP_SCHEMA: JsonObject = {
-    "schema_version": "term-relationship.v1",
+    "schema_version": TERM_RELATIONSHIP_SCHEMA_VERSION,
     "type": "object",
     "required": ["from", "to", "kind", "provenance"],
     "properties": {
@@ -347,7 +361,7 @@ TERM_RELATIONSHIP_SCHEMA: JsonObject = {
 }
 
 JOB_MODEL_SCHEMA: JsonObject = {
-    "schema_version": "job-model.v1",
+    "schema_version": JOB_MODEL_SCHEMA_VERSION,
     "type": "object",
     "required": ["schema_version", "job_id", "requirements", "preferred", "industries", "domains", "terminology"],
     "properties": {
@@ -367,7 +381,7 @@ JOB_MODEL_SCHEMA: JsonObject = {
 }
 
 MATCH_DIMENSION_SCHEMA: JsonObject = {
-    "schema_version": "match-dimension.v1",
+    "schema_version": MATCH_DIMENSION_SCHEMA_VERSION,
     "type": "object",
     "required": ["name", "weight", "score", "contribution", "evidence"],
     "properties": {
@@ -389,7 +403,7 @@ MATCH_DIMENSION_SCHEMA: JsonObject = {
 }
 
 MATCH_RESULT_SCHEMA: JsonObject = {
-    "schema_version": "match-result.v1",
+    "schema_version": MATCH_RESULT_SCHEMA_VERSION,
     "type": "object",
     "required": [
         "schema_version",
@@ -422,7 +436,7 @@ MATCH_RESULT_SCHEMA: JsonObject = {
 }
 
 CONTENT_SELECTION_ENTRY_SCHEMA: JsonObject = {
-    "schema_version": "content-selection-entry.v1",
+    "schema_version": CONTENT_SELECTION_ENTRY_SCHEMA_VERSION,
     "type": "object",
     "required": ["path", "action", "relevance", "reason", "requirement_ids", "fact_ids"],
     "properties": {
@@ -436,7 +450,7 @@ CONTENT_SELECTION_ENTRY_SCHEMA: JsonObject = {
 }
 
 CONTENT_SELECTION_CONSTRAINT_REPORT_SCHEMA: JsonObject = {
-    "schema_version": "content-selection-constraint-report.v1",
+    "schema_version": CONTENT_SELECTION_CONSTRAINT_REPORT_SCHEMA_VERSION,
     "type": "object",
     "required": ["constraint", "limit", "actual", "status"],
     "properties": {
@@ -448,7 +462,7 @@ CONTENT_SELECTION_CONSTRAINT_REPORT_SCHEMA: JsonObject = {
 }
 
 CONTENT_SELECTION_PLAN_SCHEMA: JsonObject = {
-    "schema_version": "content-selection-plan.v1",
+    "schema_version": CONTENT_SELECTION_PLAN_SCHEMA_VERSION,
     "type": "object",
     "required": ["schema_version", "sections", "entries", "constraint_report", "metadata"],
     "properties": {
@@ -468,7 +482,7 @@ CONTENT_SELECTION_PLAN_SCHEMA: JsonObject = {
 }
 
 RESUME_CHANGE_OPERATION_SCHEMA: JsonObject = {
-    "schema_version": "resume-change-operation.v1",
+    "schema_version": RESUME_CHANGE_OPERATION_SCHEMA_VERSION,
     "type": "object",
     "required": [
         "schema_version",

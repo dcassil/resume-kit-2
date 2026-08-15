@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .schemas import RUN_MANIFEST_SCHEMA, SCHEMAS, Checkpoint, RunManifest
+from .versions import collectVersions
 
 
 JsonObject = dict[str, Any]
@@ -39,23 +40,15 @@ def createRun(workspace: str | Path, config: JsonObject) -> JsonObject:
     workspace_path = Path(workspace)
     config_hash = _stable_hash(config)
     run_id = _new_run_id(workspace_path, config_hash)
+    versions = collectVersions(workspace=workspace_path, config=config)
     run_state = {
         "run_id": run_id,
         "workspace": str(workspace_path),
         "current_checkpoint": "INIT",
         "config_hash": config_hash,
-        "schema_versions": {
-            "canonical_resume": "canonical-resume.v1",
-            "job": "job-model.v1",
-            "career_db": "career-store.v1",
-            "change_operation": "resume-change-operation.v1",
-            "run_manifest": RUN_MANIFEST_SCHEMA["schema_version"],
-        },
-        "package_versions": {
-            "workflow": "0.0.0",
-            "resume-core": "0.0.0",
-            "career-store": "0.0.0",
-        },
+        "schema_versions": dict(versions["schema_versions"]),
+        "package_versions": dict(versions["package_versions"]),
+        "careerDbVersion": dict(versions["careerDbVersion"]),
         "stage_state": {},
         "recovery_markers": [],
         "operation_log_refs": [],
@@ -165,19 +158,21 @@ def recordCheckpointResult(run_state: JsonObject, checkpoint: str, result: JsonO
 
 
 def buildRunManifest(run_state: JsonObject) -> JsonObject:
-    schema_versions = run_state.get("schema_versions", {})
+    versions = collectVersions(workspace=run_state.get("workspace"), run_state=run_state)
+    schema_versions = versions["schema_versions"]
     manifest = {
         "run_id": run_state.get("run_id", ""),
         "base_resume_id": run_state.get("base_resume_id", ""),
         "base_resume_hash": run_state.get("base_resume_hash", ""),
         "job_id": run_state.get("job_id", ""),
         "config_hash": run_state.get("config_hash", ""),
-        "canonical_resume_schema_version": run_state.get("canonical_resume_schema_version", schema_versions.get("canonical_resume", "")),
-        "job_schema_version": run_state.get("job_schema_version", schema_versions.get("job", "")),
-        "career_db_schema_version": run_state.get("career_db_schema_version", schema_versions.get("career_db", "")),
-        "change_operation_schema_version": run_state.get("change_operation_schema_version", schema_versions.get("change_operation", "")),
-        "matching_algorithm_version": run_state.get("matching_algorithm_version", "resume-core.matching.v1"),
-        "matching_config_version": run_state.get("matching_config_version", "matching-config.v1"),
+        "canonical_resume_schema_version": schema_versions["canonical_resume"],
+        "job_schema_version": schema_versions["job"],
+        "career_db_schema_version": schema_versions["career_db"],
+        "careerDbVersion": dict(versions["careerDbVersion"]),
+        "change_operation_schema_version": schema_versions["change_operation"],
+        "matching_algorithm_version": versions["matching_algorithm_version"],
+        "matching_config_version": versions["matching_config_version"],
         "renderer_template_version": run_state.get("renderer_template_version", ""),
         "agent_model_config": run_state.get("agent_model_config", {}),
         "initial_score": run_state.get("initial_score", 0.0),
@@ -189,7 +184,7 @@ def buildRunManifest(run_state: JsonObject) -> JsonObject:
         "validation_status": run_state.get("validation_status", "unknown"),
         "output_artifact_paths": list(run_state.get("output_artifact_paths", [])),
         "schema_version": RUN_MANIFEST_SCHEMA["schema_version"],
-        "package_versions": dict(run_state.get("package_versions", {})),
+        "package_versions": dict(versions["package_versions"]),
         "recovery_markers": list(run_state.get("recovery_markers", [])),
         "audit_refs": list(run_state.get("audit_refs", [])),
     }

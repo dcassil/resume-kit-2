@@ -124,6 +124,7 @@ class SharedDtoSchemaContractTests(unittest.TestCase):
                 "canonical_resume_schema_version",
                 "job_schema_version",
                 "career_db_schema_version",
+                "careerDbVersion",
                 "change_operation_schema_version",
                 "matching_algorithm_version",
                 "matching_config_version",

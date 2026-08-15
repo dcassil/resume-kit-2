@@ -4,14 +4,14 @@ level: task
 title: "collectVersions with real package/schema/matching sources and careerDbVersion via getMigrationState"
 short_code: "RKIT-T-0058"
 created_at: 2026-08-15T02:48:33.727838+00:00
-updated_at: 2026-08-15T02:48:33.727838+00:00
+updated_at: 2026-08-15T02:49:50.256691+00:00
 parent: workflow-artifact-schemas-and-run
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0022
 ## Objective
 
 Kill the fake versions (RKIT-I-0022 Requirements 2-4, Detailed Design "Version recording"): a `collectVersions()` helper resolves every manifest version from its real source — installed package metadata, schema-module constants, resume-core's public surface for matching versions, and career-store `getMigrationState()` for careerDbVersion. No literal fallbacks; unresolvable sources raise typed errors, never '0.0.0'.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -60,4 +62,4 @@ Rationale: cross-package version plumbing with an honesty rule (no placeholders 
 
 ## Status Updates
 
-*To be added during implementation*
+2026-08-15 implementation: added `workflow.versions.collectVersions()` with installed distribution metadata, schema-module constants, resume-core matching version accessor, and career-store `getMigrationState()` integration. `workflow/__init__.py` now seeds and builds manifests from collected versions with no placeholder fallbacks; no-DB runs record `{"status": "unavailable", "reason": "career_db_not_configured"}` as documented in `RUN_MANIFEST_SCHEMA`. Added contract coverage for real sources, typed unavailable source errors, no placeholder manifest values, and `careerDbVersion` equality with store state. Verification green: PR gate, smoke gate, unit discovery, and workflow placeholder grep.

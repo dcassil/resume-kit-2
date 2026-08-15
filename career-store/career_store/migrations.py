@@ -10,9 +10,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from resume_core import ResolutionState, VerificationState
+from .schemas import CAREER_STORE_SCHEMA_VERSION
 
 
-SCHEMA_VERSION = "career-store.v1"
+SCHEMA_VERSION = CAREER_STORE_SCHEMA_VERSION
 
 
 class IncompatibleSchemaVersionError(RuntimeError):
