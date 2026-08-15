@@ -180,6 +180,24 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
             "max_score": impact_rank,
         }
 
+    def advance_tail_to_complete_gate(self, run_state):
+        self.advance_ok(run_state, "PROPOSE_TAILORING_CHANGES", {"selection_plan": self.dto_ref("SelectionPlanEvidence", {"status": "ok", "selection_plan": {}})})
+        self.advance_ok(run_state, "VALIDATE_CHANGES", {"proposed_operations": self.dto_ref("ProposedOperationsEvidence", {"status": "ok", "operations": []})})
+        self.advance_ok(run_state, "APPLY_CHANGES", {"change_validation": self.dto_ref("ChangeValidationEvidence", {"status": "ok", "validation": {}})})
+        apply_record = maybe_await(self.workflow.recordCheckpointResult(run_state, "APPLY_CHANGES", {"operations_applied": ["op_1"]}))
+        self.assertEqual(apply_record["status"], "ok")
+        self.advance_ok(run_state, "FINAL_MATCH", {"operations_applied": {"kind": "run_state", "key": "operations_applied"}})
+        self.advance_ok(run_state, "GROUNDING_AUDIT", {"final_match": self.dto_ref("FinalMatchEvidence", {"status": "passed", "final_match": {}})})
+        self.advance_ok(run_state, "ATS_STRUCTURE_VALIDATION", {"grounding_audit": self.dto_ref("WorkflowStatusEvidence")})
+        self.advance_ok(run_state, "RENDER", {"ats_structure_validation": self.dto_ref("WorkflowStatusEvidence")})
+        self.advance_ok(run_state, "RENDER_VALIDATION", {"render_result": self.artifact_ref("render/resume.md", {"status": "rendered"})})
+
+        complete_decision = maybe_await(self.workflow.getNextCheckpoint(run_state))
+        self.assertEqual(complete_decision["next_checkpoint"], "COMPLETE")
+        self.assertIn("render_validation", complete_decision["blocking_reasons"])
+        self.assertIn("audit_manifest_ref", complete_decision["blocking_reasons"])
+        return complete_decision
+
     def valid_manifest_run_state(self):
         run_state = self.create_run()
         run_state.update(
@@ -411,6 +429,139 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         self.assertIn("render_validation", complete_decision["blocking_reasons"])
         self.assertIn("audit_manifest_ref", complete_decision["blocking_reasons"])
 
+    def test_resolution_loop_identical_fact_batch_triggers_only_one_match_rerun(self):
+        run_state = self.enter_resolve_gaps_with_recorded_match(
+            self.match_result(
+                "resolve_gaps",
+                [self.requirement_result("req_aws", 8.0, classification="required")],
+                unresolved=["req_aws"],
+            )
+        )
+        self.assertEqual(run_state["resolution_loop_state"]["iteration_count"], 0)
+
+        recorded = maybe_await(
+            self.workflow.recordCheckpointResult(
+                run_state,
+                "RESOLVE_GAPS",
+                {"facts_verified": ["fact_aws"], "question_answer_log_refs": ["qa_aws"]},
+            )
+        )
+        self.assertEqual(recorded["status"], "ok")
+        rerun_decision = maybe_await(self.workflow.getNextCheckpoint(run_state))
+        self.assertEqual(rerun_decision["resolution_loop"]["predicate"]["branch"], "rerun_match_for_new_facts")
+        self.assertEqual(rerun_decision["next_checkpoint"], "MATCH_BASE")
+
+        self.advance_ok(run_state, "MATCH_BASE", {"job_normalized": self.dto_ref("WorkflowStatusEvidence")})
+        self.assertEqual(run_state["last_match_fact_watermark"], [])
+        self.assertEqual(run_state["resolution_loop_state"]["facts_since_last_match"], ["fact_aws"])
+        match_result = self.match_result("continue", [self.requirement_result("req_aws", 8.0, classification="required", unresolved=False)])
+        match_record = maybe_await(self.workflow.recordCheckpointResult(run_state, "MATCH_BASE", {"match_result": match_result}))
+        self.assertEqual(match_record["status"], "ok")
+        self.assertEqual(run_state["last_match_fact_watermark"], ["fact_aws"])
+        self.assertEqual(run_state["facts_verified"], ["fact_aws"])
+        self.assertEqual(run_state["resolution_loop_state"]["facts_since_last_match"], [])
+        self.assertEqual(run_state["resolution_loop_state"]["iteration_count"], 1)
+
+        self.advance_ok(
+            run_state,
+            "RESOLVE_GAPS",
+            {"match_result": self.dto_ref("MatchResultEvidence", {"status": "ok", "match_result": match_result})},
+        )
+        duplicate_record = maybe_await(self.workflow.recordCheckpointResult(run_state, "RESOLVE_GAPS", {"facts_verified": ["fact_aws"]}))
+        self.assertEqual(duplicate_record["status"], "ok")
+        self.assertEqual(run_state["facts_verified"], ["fact_aws"])
+
+        continue_decision = maybe_await(self.workflow.getNextCheckpoint(run_state))
+        self.assertEqual(continue_decision["resolution_loop"]["predicate"]["branch"], "a_continue")
+        self.assertEqual(continue_decision["next_checkpoint"], "BUILD_SELECTION_PLAN")
+        self.assertEqual(continue_decision["resolution_loop"]["state"]["iteration_count"], 1)
+        repeated_decision = maybe_await(self.workflow.getNextCheckpoint(run_state))
+        self.assertEqual(repeated_decision["next_checkpoint"], "BUILD_SELECTION_PLAN")
+
+    def test_multi_iteration_resolution_loop_two_fact_batches_reaches_complete_gate(self):
+        run_state = self.enter_resolve_gaps_with_recorded_match(
+            self.match_result(
+                "resolve_gaps",
+                [
+                    self.requirement_result("req_aws", 8.0, classification="required"),
+                    self.requirement_result("req_gcp", 7.0, classification="required"),
+                ],
+                unresolved=["req_aws", "req_gcp"],
+            )
+        )
+        self.assertEqual(run_state["resolution_loop_state"]["iteration_count"], 0)
+
+        first_batch = maybe_await(self.workflow.recordCheckpointResult(run_state, "RESOLVE_GAPS", {"facts_verified": ["fact_aws"]}))
+        self.assertEqual(first_batch["status"], "ok")
+        first_rerun = maybe_await(self.workflow.getNextCheckpoint(run_state))
+        self.assertEqual(first_rerun["next_checkpoint"], "MATCH_BASE")
+        self.assertEqual(first_rerun["resolution_loop"]["predicate"]["branch"], "rerun_match_for_new_facts")
+
+        self.advance_ok(run_state, "MATCH_BASE", {"job_normalized": self.dto_ref("WorkflowStatusEvidence")})
+        first_rerun_match = self.match_result(
+            "resolve_gaps",
+            [
+                self.requirement_result("req_aws", 8.0, classification="required", unresolved=False),
+                self.requirement_result("req_gcp", 7.0, classification="required"),
+            ],
+            unresolved=["req_gcp"],
+        )
+        self.assertEqual(
+            maybe_await(self.workflow.recordCheckpointResult(run_state, "MATCH_BASE", {"match_result": first_rerun_match}))["status"],
+            "ok",
+        )
+        self.assertEqual(run_state["resolution_loop_state"]["iteration_count"], 1)
+        self.assertEqual(run_state["resolution_loop_state"]["facts_since_last_match"], [])
+        self.assertEqual(run_state["last_match_fact_watermark"], ["fact_aws"])
+        self.assertEqual(run_state["facts_verified"], ["fact_aws"])
+
+        self.advance_ok(
+            run_state,
+            "RESOLVE_GAPS",
+            {"match_result": self.dto_ref("MatchResultEvidence", {"status": "ok", "match_result": first_rerun_match})},
+        )
+        next_topic = maybe_await(self.workflow.getNextCheckpoint(run_state))
+        self.assertEqual(next_topic["next_checkpoint"], "RESOLVE_GAPS")
+        self.assertEqual(next_topic["resolution_loop"]["predicate"]["branch"], "b_resolve_gaps_next_topic")
+        self.assertEqual(next_topic["resolution_loop"]["next_topic"]["requirement_id"], "req_gcp")
+
+        second_batch = maybe_await(self.workflow.recordCheckpointResult(run_state, "RESOLVE_GAPS", {"facts_verified": ["fact_gcp"]}))
+        self.assertEqual(second_batch["status"], "ok")
+        mid_recovery = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=run_state["run_id"]))
+        self.assertEqual(mid_recovery["resolution_loop_state"]["iteration_count"], 1)
+        self.assertEqual(mid_recovery["resolution_loop_state"]["facts_since_last_match"], ["fact_gcp"])
+        second_rerun = maybe_await(self.workflow.getNextCheckpoint(run_state))
+        self.assertEqual(second_rerun["next_checkpoint"], "MATCH_BASE")
+        self.assertEqual(second_rerun["resolution_loop"]["predicate"]["branch"], "rerun_match_for_new_facts")
+
+        self.advance_ok(run_state, "MATCH_BASE", {"job_normalized": self.dto_ref("WorkflowStatusEvidence")})
+        self.assertEqual(run_state["last_match_fact_watermark"], ["fact_aws"])
+        self.assertEqual(run_state["resolution_loop_state"]["facts_since_last_match"], ["fact_gcp"])
+        final_match = self.match_result(
+            "continue",
+            [
+                self.requirement_result("req_aws", 8.0, classification="required", unresolved=False),
+                self.requirement_result("req_gcp", 7.0, classification="required", unresolved=False),
+            ],
+        )
+        self.assertEqual(maybe_await(self.workflow.recordCheckpointResult(run_state, "MATCH_BASE", {"match_result": final_match}))["status"], "ok")
+        self.assertEqual(run_state["resolution_loop_state"]["iteration_count"], 2)
+        self.assertEqual(run_state["resolution_loop_state"]["facts_since_last_match"], [])
+        self.assertEqual(run_state["last_match_fact_watermark"], ["fact_aws", "fact_gcp"])
+        self.assertEqual(run_state["facts_verified"], ["fact_aws", "fact_gcp"])
+
+        self.advance_ok(
+            run_state,
+            "RESOLVE_GAPS",
+            {"match_result": self.dto_ref("MatchResultEvidence", {"status": "ok", "match_result": final_match})},
+        )
+        continue_decision = maybe_await(self.workflow.getNextCheckpoint(run_state))
+        self.assertEqual(continue_decision["resolution_loop"]["predicate"]["branch"], "a_continue")
+        self.assertEqual(continue_decision["next_checkpoint"], "BUILD_SELECTION_PLAN")
+
+        self.advance_ok(run_state, "BUILD_SELECTION_PLAN", {"gaps_resolved": {"kind": "run_state", "key": "facts_verified"}})
+        self.advance_tail_to_complete_gate(run_state)
+
     def test_resolution_loop_branch_a_continue_advances_to_build_selection_plan(self):
         run_state = self.enter_resolve_gaps_with_recorded_match(self.match_result("continue"))
 
@@ -560,7 +711,7 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         recovery = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=run_state["run_id"]))
 
         self.assertEqual(recovery["resolution_loop_state"]["facts_since_last_match"], ["fact_aws"])
-        self.assertEqual(recovery["resolution_loop_state"]["iteration_count"], 1)
+        self.assertEqual(recovery["resolution_loop_state"]["iteration_count"], 0)
         self.assertEqual(
             recovery["resolution_loop_state"]["asked_questions"],
             [{"question_id": "q_aws", "requirement_id": "req_aws", "interaction_ref": "career-store/interactions/int_aws"}],

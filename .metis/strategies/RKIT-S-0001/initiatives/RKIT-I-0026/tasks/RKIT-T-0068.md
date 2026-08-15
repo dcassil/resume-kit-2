@@ -4,14 +4,14 @@ level: task
 title: "ResolutionLoopState DTO, persistence, and the tri-state termination predicate"
 short_code: "RKIT-T-0068"
 created_at: 2026-08-15T04:05:15.509762+00:00
-updated_at: 2026-08-15T04:06:36.897729+00:00
+updated_at: 2026-08-15T04:17:07.910214+00:00
 parent: workflow-requirement-resolution
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0026
 ## Objective
 
 Build the resolution-loop substrate (RKIT-I-0026 Requirements 1-4, Detailed Design "Loop-state DTO"/"Termination predicate"/"Topic selection"): a persisted ResolutionLoopState (impact-ordered open-requirement queue, exhaustion statuses, asked-question registry) and the section 14.D.9 termination predicate over the tri-state MatchResult.decision with `requireHardRequirementsResolved` gating.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

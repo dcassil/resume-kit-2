@@ -200,6 +200,8 @@ def advanceCheckpoint(run_state: JsonObject, target_checkpoint: str, evidence: J
         "stage_state": {**working_state.get("stage_state", {}), target_checkpoint: dict(verified_evidence)},
         "verified_evidence": verified_by_checkpoint,
     }
+    if current == "RESOLVE_GAPS" and target_checkpoint == "MATCH_BASE":
+        updated["resolution_match_rerun_pending"] = True
     event = _append_advance_audit_event(
         updated,
         checkpoint=target_checkpoint,
@@ -251,6 +253,8 @@ def recordCheckpointResult(run_state: JsonObject, checkpoint: str, result: JsonO
     _extend_ref_unique(working_state, "checkpoint_result_refs", [checkpoint_ref])
     _extend_ref_unique(working_state, "artifact_refs", artifact_refs)
     _update_resolution_loop_state(working_state, checkpoint, checkpoint_result, question_records)
+    if checkpoint == "MATCH_BASE":
+        working_state.pop("resolution_match_rerun_pending", None)
     _persist_run(working_state)
     run_state.update(working_state)
     event = _record_audit("recordCheckpointResult", checkpoint, timestamp)

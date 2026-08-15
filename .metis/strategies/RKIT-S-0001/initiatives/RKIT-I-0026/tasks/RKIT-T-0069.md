@@ -4,14 +4,14 @@ level: task
 title: "Single-rerun discipline over the watermark with multi-iteration deadlock regression"
 short_code: "RKIT-T-0069"
 created_at: 2026-08-15T04:05:15.568002+00:00
-updated_at: 2026-08-15T04:05:15.568002+00:00
+updated_at: 2026-08-15T04:17:08.192303+00:00
 parent: workflow-requirement-resolution
-blocked_by: ["RKIT-T-0068"]
+blocked_by: [RKIT-T-0068]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0026
 ## Objective
 
 Enforce the single-rerun discipline (RKIT-I-0026 Detailed Design "Single-rerun discipline") on the T-0068 loop: a batch of newly verified facts (watermark delta non-empty) triggers exactly ONE MATCH_BASE rerun; the watermark update on rerun completion makes a second rerun from the same facts impossible; the multi-iteration contract regression proves the section-14 tail is reachable across successive fact batches.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -59,4 +61,4 @@ Rationale: focused wiring + regression authorship on decided mechanics.
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-14: Implemented pending-resolution-rerun tracking so `iteration_count` increments only when a RESOLVE_GAPS -> MATCH_BASE rerun completes. Added contract coverage for identical-batch single-rerun discipline and two successive fact batches reaching BUILD_SELECTION_PLAN and COMPLETE's gate while preserving cumulative `facts_verified`. Verification passed: `python3 tools/run_gate.py --pr --root .`, `python3 tools/run_gate.py --smoke --root .`, and `python3 -m unittest discover -s tests/unit -v`.

@@ -41,8 +41,9 @@ def update_resolution_loop_state(
     question_records: list[JsonObject],
 ) -> None:
     loop_state = normalize_resolution_loop_state(run_state.get("resolution_loop_state", {}), run_state)
-    if checkpoint == "MATCH_BASE":
+    if checkpoint == "MATCH_BASE" and run_state.get("resolution_match_rerun_pending") is True:
         loop_state["iteration_count"] = int(loop_state.get("iteration_count", 0)) + 1
+    if checkpoint == "MATCH_BASE":
         match_result = _match_result_from_checkpoint_payload(checkpoint_result)
         loop_state["open_requirements"] = _merge_match_requirements(loop_state.get("open_requirements", []), match_result)
         run_state["resolution_blocking_reasons"] = _match_blocking_reasons(match_result) if _match_decision(match_result) == "blocked" else []
