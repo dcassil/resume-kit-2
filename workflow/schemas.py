@@ -13,6 +13,11 @@ RUN_MANIFEST_SCHEMA_VERSION = "run-manifest.v1"
 CAREER_DB_VERSION_UNAVAILABLE_STATUS = "unavailable"
 NON_EMPTY_STRING: JsonObject = {"type": "string", "minLength": 1}
 VERSION_STRING: JsonObject = {"type": "string", "minLength": 1, "not": {"enum": ["0.0.0"]}}
+STATUS_OK_SCHEMA: JsonObject = {
+    "type": "object",
+    "required": ["status"],
+    "properties": {"status": {"enum": ["ok", "pass", "passed"]}},
+}
 
 
 class Checkpoint(str, Enum):
@@ -166,4 +171,53 @@ RUN_MANIFEST_SCHEMA: JsonObject = {
 
 SCHEMAS: dict[str, JsonObject] = {
     "RunManifest": RUN_MANIFEST_SCHEMA,
+    "WorkflowStatusEvidence": STATUS_OK_SCHEMA,
+    "MatchResultEvidence": {
+        "type": "object",
+        "required": ["status", "match_result"],
+        "properties": {
+            "status": {"enum": ["ok", "pass", "passed"]},
+            "match_result": {"type": "object"},
+        },
+    },
+    "SelectionPlanEvidence": {
+        "type": "object",
+        "required": ["status", "selection_plan"],
+        "properties": {
+            "status": {"enum": ["ok", "pass", "passed"]},
+            "selection_plan": {"type": "object"},
+        },
+    },
+    "ProposedOperationsEvidence": {
+        "type": "object",
+        "required": ["status", "operations"],
+        "properties": {
+            "status": {"enum": ["ok", "pass", "passed"]},
+            "operations": {"type": "array", "items": {"type": "object"}},
+        },
+    },
+    "ChangeValidationEvidence": {
+        "type": "object",
+        "required": ["status", "validation"],
+        "properties": {
+            "status": {"enum": ["ok", "pass", "passed"]},
+            "validation": {"type": "object"},
+        },
+    },
+    "FinalMatchEvidence": {
+        "type": "object",
+        "required": ["status", "final_match"],
+        "properties": {
+            "status": {"enum": ["ok", "pass", "passed"]},
+            "final_match": {"type": "object"},
+        },
+    },
+    "RenderValidationEvidence": {
+        "type": "object",
+        "required": ["status", "render_validation"],
+        "properties": {
+            "status": {"enum": ["ok", "pass", "passed"]},
+            "render_validation": {"type": "object"},
+        },
+    },
 }

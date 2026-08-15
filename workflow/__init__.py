@@ -15,24 +15,27 @@ JsonObject = dict[str, Any]
 
 CHECKPOINT_ORDER = [checkpoint.value for checkpoint in Checkpoint]
 
-_ADVANCE_REQUIREMENTS: dict[str, tuple[str, ...]] = {
-    "INGEST_RESUME": ("config_validated",),
-    "VALIDATE_BASE": ("canonical_resume_exists",),
-    "EXTRACT_PERSIST_CAREER_FACTS": ("base_validation",),
-    "INGEST_JOB": ("career_facts_persisted",),
-    "NORMALIZE_JOB": ("job_ingested",),
-    "MATCH_BASE": ("job_normalized",),
-    "RESOLVE_GAPS": ("match_result",),
-    "BUILD_SELECTION_PLAN": ("gaps_resolved",),
-    "PROPOSE_TAILORING_CHANGES": ("selection_plan",),
-    "VALIDATE_CHANGES": ("proposed_operations",),
-    "APPLY_CHANGES": ("change_validation",),
-    "FINAL_MATCH": ("operations_applied",),
-    "GROUNDING_AUDIT": ("final_match",),
-    "ATS_STRUCTURE_VALIDATION": ("grounding_audit",),
-    "RENDER": ("ats_structure_validation",),
-    "RENDER_VALIDATION": ("render_result",),
-    "COMPLETE": ("render_validation", "audit_manifest_ref"),
+_ADVANCE_REQUIREMENTS: dict[str, tuple[JsonObject, ...]] = {
+    "INGEST_RESUME": ({"name": "config_validated", "kind": "dto", "schema_id": "WorkflowStatusEvidence"},),
+    "VALIDATE_BASE": ({"name": "canonical_resume_exists", "kind": "artifact"},),
+    "EXTRACT_PERSIST_CAREER_FACTS": ({"name": "base_validation", "kind": "dto", "schema_id": "WorkflowStatusEvidence"},),
+    "INGEST_JOB": ({"name": "career_facts_persisted", "kind": "artifact"},),
+    "NORMALIZE_JOB": ({"name": "job_ingested", "kind": "artifact"},),
+    "MATCH_BASE": ({"name": "job_normalized", "kind": "dto", "schema_id": "WorkflowStatusEvidence"},),
+    "RESOLVE_GAPS": ({"name": "match_result", "kind": "dto", "schema_id": "MatchResultEvidence"},),
+    "BUILD_SELECTION_PLAN": ({"name": "gaps_resolved", "kind": "run_state", "key": "facts_verified"},),
+    "PROPOSE_TAILORING_CHANGES": ({"name": "selection_plan", "kind": "dto", "schema_id": "SelectionPlanEvidence"},),
+    "VALIDATE_CHANGES": ({"name": "proposed_operations", "kind": "dto", "schema_id": "ProposedOperationsEvidence"},),
+    "APPLY_CHANGES": ({"name": "change_validation", "kind": "dto", "schema_id": "ChangeValidationEvidence"},),
+    "FINAL_MATCH": ({"name": "operations_applied", "kind": "run_state", "key": "operations_applied"},),
+    "GROUNDING_AUDIT": ({"name": "final_match", "kind": "dto", "schema_id": "FinalMatchEvidence"},),
+    "ATS_STRUCTURE_VALIDATION": ({"name": "grounding_audit", "kind": "dto", "schema_id": "WorkflowStatusEvidence"},),
+    "RENDER": ({"name": "ats_structure_validation", "kind": "dto", "schema_id": "WorkflowStatusEvidence"},),
+    "RENDER_VALIDATION": ({"name": "render_result", "kind": "artifact"},),
+    "COMPLETE": (
+        {"name": "render_validation", "kind": "dto", "schema_id": "RenderValidationEvidence"},
+        {"name": "audit_manifest_ref", "kind": "artifact"},
+    ),
 }
 
 
@@ -93,8 +96,8 @@ def getNextCheckpoint(run_state: JsonObject) -> JsonObject:
         "status": "ok",
         "current_checkpoint": current,
         "next_checkpoint": next_checkpoint,
-        "required_inputs": list(_ADVANCE_REQUIREMENTS.get(next_checkpoint, ())),
-        "blocking_reasons": [],
+        "required_inputs": _required_input_names(next_checkpoint),
+        "blocking_reasons": _blocking_reasons_for(run_state, next_checkpoint),
         "determinism_key": _stable_hash({"current": current, "next": next_checkpoint, "policy": run_state.get("policy", {})}),
     }
 
@@ -103,15 +106,20 @@ def advanceCheckpoint(run_state: JsonObject, target_checkpoint: str, evidence: J
     current = str(run_state.get("current_checkpoint", "INIT"))
     expected = getNextCheckpoint(run_state)["next_checkpoint"]
     blocking_reasons: list[str] = []
+    evidence_errors: list[JsonObject] = []
+    verified_evidence: JsonObject = {}
     if target_checkpoint != expected:
         blocking_reasons.append(f"expected {expected} after {current}")
-    for required in _ADVANCE_REQUIREMENTS.get(target_checkpoint, ()):
-        if not _evidence_present(evidence, required):
-            blocking_reasons.append(f"missing evidence: {required}")
-    if target_checkpoint == "EXTRACT_PERSIST_CAREER_FACTS" and evidence.get("base_validation") != "passed":
-        blocking_reasons.append("base validation must pass")
+    for requirement in _ADVANCE_REQUIREMENTS.get(target_checkpoint, ()):
+        required_name = str(requirement["name"])
+        result = _verify_evidence_ref(run_state, requirement, evidence.get(required_name))
+        if result.get("status") != "ok":
+            blocking_reasons.append(required_name)
+            evidence_errors.append(result)
+        else:
+            verified_evidence[required_name] = result["evidence_ref"]
     if target_checkpoint == "COMPLETE":
-        complete = assertCanComplete({**run_state, **evidence})
+        complete = assertCanComplete(_completion_gate_state(run_state, verified_evidence))
         if not complete["can_complete"]:
             blocking_reasons.extend(complete["failed_gates"])
     if blocking_reasons:
@@ -122,11 +130,17 @@ def advanceCheckpoint(run_state: JsonObject, target_checkpoint: str, evidence: J
             "transition_evidence": dict(evidence),
             "audit_event": _audit("advanceCheckpoint", current, target_checkpoint, False),
             "blocking_reasons": sorted(set(blocking_reasons)),
+            "evidence_errors": evidence_errors,
         }
+    verified_by_checkpoint = {
+        **run_state.get("verified_evidence", {}),
+        target_checkpoint: verified_evidence,
+    }
     updated = {
         **run_state,
         "current_checkpoint": target_checkpoint,
-        "stage_state": {**run_state.get("stage_state", {}), target_checkpoint: dict(evidence)},
+        "stage_state": {**run_state.get("stage_state", {}), target_checkpoint: dict(verified_evidence)},
+        "verified_evidence": verified_by_checkpoint,
     }
     updated.setdefault("audit_events", []).append(_audit("advanceCheckpoint", current, target_checkpoint, True))
     _persist_run(updated)
@@ -135,6 +149,7 @@ def advanceCheckpoint(run_state: JsonObject, target_checkpoint: str, evidence: J
         "previous_checkpoint": current,
         "current_checkpoint": target_checkpoint,
         "transition_evidence": dict(evidence),
+        "verified_evidence": dict(verified_evidence),
         "audit_event": updated["audit_events"][-1],
         "blocking_reasons": [],
     }
@@ -392,13 +407,159 @@ def _jsonable(value: Any) -> Any:
     return value
 
 
-def _evidence_present(evidence: JsonObject, key: str) -> bool:
-    value = evidence.get(key)
-    if key == "base_validation":
-        return value == "passed"
-    if isinstance(value, bool):
-        return value
-    return value not in (None, "", [], {})
+def _required_input_names(checkpoint: str) -> list[str]:
+    return [str(requirement["name"]) for requirement in _ADVANCE_REQUIREMENTS.get(checkpoint, ())]
+
+
+def _blocking_reasons_for(run_state: JsonObject, checkpoint: str) -> list[str]:
+    verified_names = _verified_requirement_names(run_state, checkpoint)
+    reasons = [name for name in _required_input_names(checkpoint) if name not in verified_names]
+    if checkpoint == "COMPLETE":
+        complete = assertCanComplete(run_state)
+        if not complete["can_complete"]:
+            reasons.extend(complete["failed_gates"])
+    return sorted(set(reasons))
+
+
+def _verified_requirement_names(run_state: JsonObject, checkpoint: str) -> set[str]:
+    evidence_by_checkpoint = run_state.get("verified_evidence", {})
+    if not isinstance(evidence_by_checkpoint, dict):
+        return set()
+    checkpoint_evidence = evidence_by_checkpoint.get(checkpoint, {})
+    if not isinstance(checkpoint_evidence, dict):
+        return set()
+    return {
+        str(name)
+        for name, evidence_ref in checkpoint_evidence.items()
+        if isinstance(evidence_ref, dict) and evidence_ref.get("kind") in {"artifact", "dto", "run_state"}
+    }
+
+
+def _verify_evidence_ref(run_state: JsonObject, requirement: JsonObject, evidence_ref: Any) -> JsonObject:
+    requirement_name = str(requirement["name"])
+    expected_kind = str(requirement["kind"])
+    if not isinstance(evidence_ref, dict):
+        return _evidence_error(
+            requirement_name,
+            "invalid_evidence_ref",
+            "Evidence must be a typed EvidenceRef object, not a literal or bare truth value.",
+        )
+    actual_kind = evidence_ref.get("kind")
+    if actual_kind != expected_kind:
+        return _evidence_error(
+            requirement_name,
+            "invalid_evidence_kind",
+            f"Expected {expected_kind} evidence.",
+            {"actual_kind": actual_kind},
+        )
+    if expected_kind == "artifact":
+        return _verify_artifact_ref(run_state, requirement_name, evidence_ref)
+    if expected_kind == "dto":
+        return _verify_dto_ref(requirement, requirement_name, evidence_ref)
+    if expected_kind == "run_state":
+        return _verify_run_state_ref(run_state, requirement, requirement_name, evidence_ref)
+    return _evidence_error(requirement_name, "unsupported_evidence_kind", f"Unsupported evidence kind: {expected_kind}")
+
+
+def _verify_artifact_ref(run_state: JsonObject, requirement_name: str, evidence_ref: JsonObject) -> JsonObject:
+    path_value = evidence_ref.get("path")
+    sha256_value = evidence_ref.get("sha256")
+    if not isinstance(path_value, str) or not path_value:
+        return _evidence_error(requirement_name, "invalid_artifact_ref", "Artifact evidence requires a non-empty path.")
+    if not isinstance(sha256_value, str) or not sha256_value:
+        return _evidence_error(requirement_name, "invalid_artifact_ref", "Artifact evidence requires a sha256.")
+    path = Path(path_value)
+    if not path.is_absolute():
+        workspace = run_state.get("workspace")
+        path = Path(str(workspace)) / path if workspace else path
+    if not path.exists() or not path.is_file():
+        return _evidence_error(requirement_name, "artifact_missing", "Artifact evidence path does not exist.", {"path": str(path)})
+    actual_sha256 = _file_sha256(path)
+    if actual_sha256 != sha256_value:
+        return _evidence_error(
+            requirement_name,
+            "artifact_hash_mismatch",
+            "Artifact sha256 does not match.",
+            {"path": str(path), "expected_sha256": sha256_value, "actual_sha256": actual_sha256},
+        )
+    return {"status": "ok", "evidence_ref": dict(evidence_ref)}
+
+
+def _verify_dto_ref(requirement: JsonObject, requirement_name: str, evidence_ref: JsonObject) -> JsonObject:
+    schema_id = evidence_ref.get("schema_id")
+    expected_schema_id = requirement.get("schema_id")
+    if schema_id != expected_schema_id:
+        return _evidence_error(
+            requirement_name,
+            "invalid_schema_id",
+            f"Expected DTO schema {expected_schema_id}.",
+            {"actual_schema_id": schema_id},
+        )
+    if not isinstance(schema_id, str) or schema_id not in SCHEMAS:
+        return _evidence_error(requirement_name, "unknown_schema_id", "DTO evidence references an unknown schema.", {"schema_id": schema_id})
+    if "payload" not in evidence_ref:
+        return _evidence_error(requirement_name, "missing_dto_payload", "DTO evidence requires a payload.")
+    errors = _schema_errors(evidence_ref["payload"], SCHEMAS[schema_id], "")
+    if errors:
+        return _evidence_error(requirement_name, "dto_schema_error", "DTO payload failed schema validation.", {"schema_id": schema_id, "errors": errors})
+    return {"status": "ok", "evidence_ref": dict(evidence_ref)}
+
+
+def _verify_run_state_ref(run_state: JsonObject, requirement: JsonObject, requirement_name: str, evidence_ref: JsonObject) -> JsonObject:
+    key = evidence_ref.get("key")
+    expected_key = requirement.get("key")
+    if key != expected_key:
+        return _evidence_error(requirement_name, "invalid_run_state_key", f"Expected run-state key {expected_key}.", {"actual_key": key})
+    persisted = _load_persisted_run_state(run_state)
+    if not isinstance(persisted, dict):
+        return _evidence_error(requirement_name, "run_state_unavailable", "Persisted run state is unavailable.")
+    value = persisted.get(str(key))
+    if value in (None, "", [], {}):
+        return _evidence_error(requirement_name, "run_state_key_missing", "Required key is absent from persisted run state.", {"key": key})
+    return {"status": "ok", "evidence_ref": dict(evidence_ref)}
+
+
+def _completion_gate_state(run_state: JsonObject, verified_evidence: JsonObject) -> JsonObject:
+    gate_state = dict(run_state)
+    render_validation_ref = verified_evidence.get("render_validation")
+    if isinstance(render_validation_ref, dict):
+        payload = render_validation_ref.get("payload")
+        if isinstance(payload, dict) and isinstance(payload.get("render_validation"), dict):
+            gate_state["render_validation"] = payload["render_validation"]
+    audit_manifest_ref = verified_evidence.get("audit_manifest_ref")
+    if isinstance(audit_manifest_ref, dict) and audit_manifest_ref.get("path"):
+        gate_state["audit_manifest_ref"] = audit_manifest_ref["path"]
+    return gate_state
+
+
+def _load_persisted_run_state(run_state: JsonObject) -> JsonObject | None:
+    workspace = run_state.get("workspace")
+    run_id = run_state.get("run_id")
+    if not workspace or not run_id:
+        return None
+    path = _run_path(Path(str(workspace)), str(run_id))
+    if not path.exists():
+        return None
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    return loaded if isinstance(loaded, dict) else None
+
+
+def _evidence_error(requirement: str, code: str, message: str, details: JsonObject | None = None) -> JsonObject:
+    error: JsonObject = {"type": code, "requirement": requirement, "message": message}
+    if details:
+        error["details"] = details
+    return error
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _extend_unique(target: JsonObject, key: str, values: list[str]) -> None:

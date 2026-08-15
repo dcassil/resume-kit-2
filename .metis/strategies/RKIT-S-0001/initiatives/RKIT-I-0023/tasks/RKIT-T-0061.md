@@ -4,14 +4,14 @@ level: task
 title: "Grounded EvidenceRef model, advanceCheckpoint verification, computed blocking_reasons"
 short_code: "RKIT-T-0061"
 created_at: 2026-08-15T03:11:05.319879+00:00
-updated_at: 2026-08-15T03:11:05.319879+00:00
+updated_at: 2026-08-15T03:17:28.287971+00:00
 parent: workflow-deterministic-checkpoint
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -60,4 +60,12 @@ Rationale: the enforcement model every later workflow initiative consumes; wrong
 
 ## Status Updates
 
-*To be added during implementation*
+### 2026-08-15 Implementation
+- Replaced honor-system checkpoint evidence in `workflow/__init__.py` with typed EvidenceRef declarations and verification for `artifact`, `dto`, and `run_state` refs.
+- Added workflow evidence DTO schemas in `workflow/schemas.py` and reused the existing stdlib `_schema_errors` walker for dto payload validation.
+- `advanceCheckpoint` now verifies every declared requirement before transition, rejects bare booleans with typed `evidence_errors`, persists verified refs under `verified_evidence` and `stage_state`, and returns named blocking reasons.
+- `getNextCheckpoint` now computes deterministic blocking reasons from unmet next-checkpoint evidence names plus COMPLETE policy-gate failures.
+- Rewrote workflow contract tests from literal booleans to grounded refs and added regressions for bare boolean evidence, legacy boolean persisted evidence, and persisted run-state evidence.
+- Migrated `tools/run_smoke.py` to run a grounded workflow checkpoint pass using real smoke artifacts, DTO payloads, and persisted checkpoint result state.
+- Protected `tools/workflow_guardrails.py` was read only; no protected edits made.
+- Verification passed: `python3 tools/run_gate.py --pr --root .`, `python3 tools/run_gate.py --smoke --root .`, `python3 -m unittest discover -s tests/unit -v`.

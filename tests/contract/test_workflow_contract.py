@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import importlib
 import inspect
 import json
@@ -117,6 +118,18 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
     def create_run(self):
         return maybe_await(self.workflow.createRun(workspace=self.workspace, config=self.config))
 
+    def dto_ref(self, schema_id, payload=None):
+        return {"kind": "dto", "schema_id": schema_id, "payload": payload or {"status": "passed"}}
+
+    def artifact_ref(self, relative_path, payload=None):
+        path = self.workspace / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if payload is None:
+            path.write_text(f"artifact:{relative_path}", encoding="utf-8")
+        else:
+            path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+        return {"kind": "artifact", "path": relative_path, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+
     def valid_manifest_run_state(self):
         run_state = self.create_run()
         run_state.update(
@@ -179,7 +192,13 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
 
     def test_same_config_runs_get_distinct_ids_and_coexisting_persisted_state(self):
         first = self.create_run()
-        advanced = maybe_await(self.workflow.advanceCheckpoint(first, "INGEST_RESUME", {"config_validated": True}))
+        advanced = maybe_await(
+            self.workflow.advanceCheckpoint(
+                first,
+                "INGEST_RESUME",
+                {"config_validated": self.dto_ref("WorkflowStatusEvidence")},
+            )
+        )
         self.assertEqual(advanced["status"], "ok")
 
         second = self.create_run()
@@ -211,24 +230,68 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         index = json.loads(index_path.read_text(encoding="utf-8"))
         self.assertEqual(index.get(first["config_hash"]), [first["run_id"], second["run_id"]])
 
-    def test_valid_transition_sequence_requires_checkpoint_evidence(self):
+    def test_valid_transition_sequence_requires_grounded_checkpoint_evidence(self):
         run_state = self.create_run()
         transitions = [
-            ("INGEST_RESUME", {"config_validated": True}),
-            ("VALIDATE_BASE", {"canonical_resume_exists": True}),
-            ("EXTRACT_PERSIST_CAREER_FACTS", {"base_validation": "passed"}),
-            ("INGEST_JOB", {"career_facts_persisted": True}),
-            ("NORMALIZE_JOB", {"job_ingested": True}),
-            ("MATCH_BASE", {"job_normalized": True}),
+            ("INGEST_RESUME", {"config_validated": self.dto_ref("WorkflowStatusEvidence")}),
+            ("VALIDATE_BASE", {"canonical_resume_exists": self.artifact_ref("resume/base.json", {"resume_id": "base_1"})}),
+            ("EXTRACT_PERSIST_CAREER_FACTS", {"base_validation": self.dto_ref("WorkflowStatusEvidence")}),
+            ("INGEST_JOB", {"career_facts_persisted": self.artifact_ref("data/career.db")}),
+            ("NORMALIZE_JOB", {"job_ingested": self.artifact_ref("job/current.json", {"job_id": "job_1"})}),
+            ("MATCH_BASE", {"job_normalized": self.dto_ref("WorkflowStatusEvidence")}),
         ]
         for target, evidence in transitions:
             with self.subTest(target=target):
                 decision = maybe_await(self.workflow.getNextCheckpoint(run_state))
                 self.assertEqual(decision["next_checkpoint"], target)
+                for required_name in evidence:
+                    self.assertIn(required_name, decision["blocking_reasons"])
                 advanced = maybe_await(self.workflow.advanceCheckpoint(run_state, target, evidence))
                 self.assertEqual(advanced["status"], "ok")
                 self.assertEqual(advanced["current_checkpoint"], target)
+                self.assertEqual(advanced["verified_evidence"], evidence)
                 run_state["current_checkpoint"] = target
+
+    def test_bare_boolean_checkpoint_evidence_is_typed_rejection(self):
+        run_state = self.create_run()
+        result = maybe_await(self.workflow.advanceCheckpoint(run_state, "INGEST_RESUME", {"config_validated": True}))
+        self.assertEqual(result["status"], "blocked")
+        self.assertIn("config_validated", result["blocking_reasons"])
+        self.assertIn("evidence_errors", result)
+        self.assertEqual(result["evidence_errors"][0]["type"], "invalid_evidence_ref")
+        self.assertEqual(result["evidence_errors"][0]["requirement"], "config_validated")
+
+    def test_legacy_persisted_boolean_evidence_is_ungrounded(self):
+        run_state = self.create_run()
+        run_state["stage_state"]["INGEST_RESUME"] = {"config_validated": True}
+        run_state["verified_evidence"] = {"INGEST_RESUME": {"config_validated": True}}
+        result = maybe_await(self.workflow.advanceCheckpoint(run_state, "INGEST_RESUME", {}))
+        self.assertEqual(result["status"], "blocked")
+        self.assertIn("config_validated", result["blocking_reasons"])
+
+    def test_run_state_evidence_must_exist_in_persisted_checkpoint_result(self):
+        run_state = self.create_run()
+        run_state["current_checkpoint"] = "APPLY_CHANGES"
+        blocked = maybe_await(
+            self.workflow.advanceCheckpoint(
+                run_state,
+                "FINAL_MATCH",
+                {"operations_applied": {"kind": "run_state", "key": "operations_applied"}},
+            )
+        )
+        self.assertEqual(blocked["status"], "blocked")
+        self.assertIn("operations_applied", blocked["blocking_reasons"])
+
+        record = maybe_await(self.workflow.recordCheckpointResult(run_state, "APPLY_CHANGES", {"operations_applied": ["op_1"]}))
+        self.assertEqual(record["status"], "ok")
+        advanced = maybe_await(
+            self.workflow.advanceCheckpoint(
+                run_state,
+                "FINAL_MATCH",
+                {"operations_applied": {"kind": "run_state", "key": "operations_applied"}},
+            )
+        )
+        self.assertEqual(advanced["status"], "ok")
 
     def test_invalid_transitions_are_blocked_with_reasons(self):
         run_state = self.create_run()

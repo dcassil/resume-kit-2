@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import importlib
 import importlib.metadata
 import json
@@ -96,6 +97,7 @@ def run_smoke(root: Path, workspace: Path, keep_workspace: bool) -> None:
     career_store = modules["career_store"]
     career_mcp = modules["career_mcp"]
     resume_cli = modules["resume_cli"]
+    workflow = modules["workflow"]
 
     resume_file = root / "fixtures" / "resumes" / "resume-main.txt"
     job_file = root / "fixtures" / "jobs" / "job-a-staff-software-engineer.txt"
@@ -232,6 +234,15 @@ def run_smoke(root: Path, workspace: Path, keep_workspace: bool) -> None:
         require(expected in audit_text, f"audit report missed {expected}")
     require("op_hallucinated_scale" in audit_text, "audit report missed rejected hallucinated change")
 
+    verify_grounded_workflow_path(
+        workflow,
+        workspace,
+        ingest=ingest,
+        job_ingest=job_ingest,
+        initial_match=initial_match,
+        resolved=resolved,
+    )
+
     if keep_workspace:
         print(f"Smoke workspace: {workspace}", flush=True)
     print("smoke passed: installed packages, workspace flow, honesty guardrails, rendering, and audit are operational.", flush=True)
@@ -273,6 +284,45 @@ def require_requirement(match_result: JsonObject, requirement_id: str, allowed_s
             require("evidence" in item or item.get("status") == "unresolved", f"{requirement_id} missed requirement-level evidence")
             return item
     raise SmokeFailure(f"match result missed requirement {requirement_id}")
+
+
+def verify_grounded_workflow_path(
+    workflow: Any,
+    workspace: Path,
+    *,
+    ingest: JsonObject,
+    job_ingest: JsonObject,
+    initial_match: JsonObject,
+    resolved: JsonObject,
+) -> None:
+    config = require_json(workspace / "config.json", "config.json")
+    run_state = workflow.createRun(workspace=workspace, config=config)
+
+    def advance(target: str, evidence: JsonObject) -> None:
+        result = workflow.advanceCheckpoint(run_state, target, evidence)
+        require(result.get("status") == "ok", f"workflow advance {target} blocked: {result.get('blocking_reasons')}")
+        run_state["current_checkpoint"] = target
+        run_state.setdefault("verified_evidence", {})[target] = result.get("verified_evidence", {})
+
+    advance("INGEST_RESUME", {"config_validated": dto_ref("WorkflowStatusEvidence", {"status": "passed", "config_version": config.get("config_version")})})
+    advance("VALIDATE_BASE", {"canonical_resume_exists": artifact_ref(workspace, "resume/base.json")})
+    advance("EXTRACT_PERSIST_CAREER_FACTS", {"base_validation": dto_ref("WorkflowStatusEvidence", {"status": "passed", "validation": ingest.get("validation", {})})})
+    workflow.recordCheckpointResult(run_state, "EXTRACT_PERSIST_CAREER_FACTS", {"facts_verified": [fact for fact in ingest.get("career_facts", []) if fact]})
+    advance("INGEST_JOB", {"career_facts_persisted": artifact_ref(workspace, "data/career.db")})
+    advance("NORMALIZE_JOB", {"job_ingested": artifact_ref(workspace, "job/current.json")})
+    advance("MATCH_BASE", {"job_normalized": dto_ref("WorkflowStatusEvidence", {"status": "passed", "job_id": job_ingest.get("job_id")})})
+    advance("RESOLVE_GAPS", {"match_result": dto_ref("MatchResultEvidence", {"status": "ok", "match_result": initial_match.get("match_result", {})})})
+    workflow.recordCheckpointResult(run_state, "RESOLVE_GAPS", {"facts_verified": [resolved.get("fact", {}).get("fact_id")], "question_answer_log_refs": ["smoke/aws-answer"]})
+    advance("MATCH_BASE", {"job_normalized": dto_ref("WorkflowStatusEvidence", {"status": "passed", "match_result": resolved.get("match_result", {})})})
+
+
+def dto_ref(schema_id: str, payload: JsonObject) -> JsonObject:
+    return {"kind": "dto", "schema_id": schema_id, "payload": payload}
+
+
+def artifact_ref(workspace: Path, relative_path: str) -> JsonObject:
+    path = workspace / relative_path
+    return {"kind": "artifact", "path": relative_path, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
 
 
 def require_job_requirement_classification(job: JsonObject, requirement_id: str, expected_classification: str) -> None:
