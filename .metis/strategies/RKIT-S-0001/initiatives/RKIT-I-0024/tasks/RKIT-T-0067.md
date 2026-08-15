@@ -4,14 +4,14 @@ level: task
 title: "Migrate resume audit onto reconstruction; no-createRun boundary; I-0024 close-out"
 short_code: "RKIT-T-0067"
 created_at: 2026-08-15T03:39:09.940741+00:00
-updated_at: 2026-08-15T03:55:48.468333+00:00
+updated_at: 2026-08-15T04:03:26.554525+00:00
 parent: workflow-checkpoint-result
 blocked_by: [RKIT-T-0066]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0024
 ## Objective
 
 Close out RKIT-I-0024 (Requirement 6's CLI half + Testing Strategy): resume-cli `resume audit` consumes `reconstructRunManifest` from workflow-owned persisted run state instead of fabricating a fresh run via createRun at audit time (old resume_cli/__init__.py:347-360 defect); an unprotected boundary test proves audit performs no createRun; three-gate close-out with mutation probe.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

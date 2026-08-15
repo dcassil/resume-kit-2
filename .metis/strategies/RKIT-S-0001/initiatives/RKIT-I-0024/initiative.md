@@ -4,14 +4,14 @@ level: initiative
 title: "Workflow Checkpoint Result Recording, Audit Trail, and Manifest Reconstruction"
 short_code: "RKIT-I-0024"
 created_at: 2026-08-13T20:41:37.413289+00:00
-updated_at: 2026-08-15T03:40:21.678400+00:00
+updated_at: 2026-08-15T04:03:42.519612+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0023]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -92,6 +92,8 @@ Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
 - **Let resume-cli keep assembling audit output from report files.** Rejected: violates workflow's run-manifest ownership (CONTRACT_SURFACE_ALIGNMENT.md:298) and produces a simulation of a run rather than a reconstruction of it — the exact defect the audit verified.
 
 ## Implementation Plan **[REQUIRED]**
+
+**COMPLETE 2026-08-15 (continuous mode).** Executed as RKIT-T-0065..0067: T-0065 durable AuditEvents at decision time (sequence event ids, injectable clock; blocked events persist + survive restart), checkpoint payloads actually written w/ sha256-matched refs, substring validation/render fabrication DELETED w/ adversarial regression; T-0066 append-only operations.jsonl/questions.jsonl (fsync; interaction-id refs never content), manifest audit fields populated from logs, reconstructRunManifest reading only persisted state (per-field source table in task report; typed UnknownRunError; legacy runs get not-recorded markers; reconstructed==built proven); T-0067 resume audit migrated onto reconstruction (index → highest-sequence run; audit-time createRun REMOVED; no-createRun boundary tests; honest empty result with no runs). Gates at close: --pr 368 OK, --smoke OK, --future-contract 375 OK, unit 202. Approval-batch additions: workflow_surface.json reconstructRunManifest declaration (guardrail hardcodes surface); run_tests.py modules test_workflow_durable_audit_and_refs_unit + test_resume_cli_audit_reconstruction_unit.
 
 Decomposition guidance (tasks to be created at decompose phase, in dependency order):
 1. Durable audit-event persistence for allowed and blocked decisions, with restart-survival regression test.
