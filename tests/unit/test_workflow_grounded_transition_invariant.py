@@ -35,6 +35,9 @@ class WorkflowGroundedTransitionInvariantTests(unittest.TestCase):
             path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
         return {"kind": "artifact", "path": relative_path, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
 
+    def operation_state_ref(self, *operation_ids):
+        return {"kind": "run_state", "key": "operation_statuses", "operation_ids": list(operation_ids)}
+
     def persisted_state(self):
         path = self.workspace / ".workflow" / "runs" / f"{self.run_state['run_id']}.json"
         return json.loads(path.read_text(encoding="utf-8"))
@@ -91,13 +94,19 @@ class WorkflowGroundedTransitionInvariantTests(unittest.TestCase):
         self.advance("MATCH_BASE", {"job_normalized": self.dto_ref("WorkflowStatusEvidence")})
         self.record("MATCH_BASE", {"match_result": {"score": 8.1}})
         self.advance("RESOLVE_GAPS", {"match_result": self.dto_ref("MatchResultEvidence", {"status": "ok", "match_result": {"score": 8.1}})})
-        self.advance("BUILD_SELECTION_PLAN", {"gaps_resolved": {"kind": "run_state", "key": "facts_verified"}})
+        self.advance("BUILD_SELECTION_PLAN", {"selection_plan": self.artifact_ref("plans/selection-plan.json", {"status": "ok"})})
+        self.record("BUILD_SELECTION_PLAN", {"operations_proposed": ["op_1"]})
+        self.advance("PROPOSE_TAILORING_CHANGES", {"proposed_operations": self.operation_state_ref("op_1")})
+        self.record("PROPOSE_TAILORING_CHANGES", {"operations_validated": ["op_1"]})
+        self.advance("VALIDATE_CHANGES", {"validated_operations": self.operation_state_ref("op_1")})
+        self.record("VALIDATE_CHANGES", {"operations_applied": ["op_1"]})
+        self.advance("APPLY_CHANGES", {"applied_operations": self.operation_state_ref("op_1")})
 
         persisted = self.persisted_state()
         self.assert_grounded_transition_invariant(persisted)
 
         corrupted = dict(persisted)
         corrupted["verified_evidence"] = dict(persisted["verified_evidence"])
-        corrupted["verified_evidence"].pop("BUILD_SELECTION_PLAN")
+        corrupted["verified_evidence"].pop("APPLY_CHANGES")
         with self.assertRaises(AssertionError):
             self.assert_grounded_transition_invariant(corrupted)

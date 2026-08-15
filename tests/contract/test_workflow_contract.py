@@ -179,6 +179,9 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
             path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
         return {"kind": "artifact", "path": relative_path, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
 
+    def operation_state_ref(self, *operation_ids):
+        return {"kind": "run_state", "key": "operation_statuses", "operation_ids": list(operation_ids)}
+
     def advance_ok(self, run_state, target, evidence):
         advanced = maybe_await(self.workflow.advanceCheckpoint(run_state, target, evidence))
         self.assertEqual(advanced["status"], "ok", advanced.get("blocking_reasons"))
@@ -230,21 +233,33 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         }
 
     def advance_tail_to_complete_gate(self, run_state):
-        self.advance_ok(run_state, "PROPOSE_TAILORING_CHANGES", {"selection_plan": self.dto_ref("SelectionPlanEvidence", {"status": "ok", "selection_plan": {}})})
-        self.advance_ok(run_state, "VALIDATE_CHANGES", {"proposed_operations": self.dto_ref("ProposedOperationsEvidence", {"status": "ok", "operations": []})})
-        self.advance_ok(run_state, "APPLY_CHANGES", {"change_validation": self.dto_ref("ChangeValidationEvidence", {"status": "ok", "validation": {}})})
-        apply_record = maybe_await(self.workflow.recordCheckpointResult(run_state, "APPLY_CHANGES", {"operations_applied": ["op_1"]}))
-        self.assertEqual(apply_record["status"], "ok")
-        self.advance_ok(run_state, "FINAL_MATCH", {"operations_applied": {"kind": "run_state", "key": "operations_applied"}})
-        self.advance_ok(run_state, "GROUNDING_AUDIT", {"final_match": self.dto_ref("FinalMatchEvidence", {"status": "passed", "final_match": {}})})
-        self.advance_ok(run_state, "ATS_STRUCTURE_VALIDATION", {"grounding_audit": self.dto_ref("WorkflowStatusEvidence")})
-        self.advance_ok(run_state, "RENDER", {"ats_structure_validation": self.dto_ref("WorkflowStatusEvidence")})
-        self.advance_ok(run_state, "RENDER_VALIDATION", {"render_result": self.artifact_ref("render/resume.md", {"status": "rendered"})})
+        self.advance_ok(run_state, "BUILD_SELECTION_PLAN", {"selection_plan": self.artifact_ref("plans/selection-plan.json", {"status": "ok", "selection_plan": {}})})
+        proposed = maybe_await(self.workflow.recordCheckpointResult(run_state, "BUILD_SELECTION_PLAN", {"operations_proposed": ["op_1"]}))
+        self.assertEqual(proposed["status"], "ok")
+        self.advance_ok(run_state, "PROPOSE_TAILORING_CHANGES", {"proposed_operations": self.operation_state_ref("op_1")})
+        validated = maybe_await(self.workflow.recordCheckpointResult(run_state, "PROPOSE_TAILORING_CHANGES", {"operations_validated": ["op_1"]}))
+        self.assertEqual(validated["status"], "ok")
+        self.advance_ok(run_state, "VALIDATE_CHANGES", {"validated_operations": self.operation_state_ref("op_1")})
+        applied = maybe_await(self.workflow.recordCheckpointResult(run_state, "VALIDATE_CHANGES", {"operations_applied": ["op_1"]}))
+        self.assertEqual(applied["status"], "ok")
+        self.advance_ok(run_state, "APPLY_CHANGES", {"applied_operations": self.operation_state_ref("op_1")})
+        self.advance_ok(run_state, "FINAL_MATCH", {"match_report": self.artifact_ref("reports/final-match.json", {"status": "passed"})})
+        self.advance_ok(run_state, "GROUNDING_AUDIT", {"grounding_audit": self.artifact_ref("reports/grounding-audit.json", {"status": "passed"})})
+        self.advance_ok(run_state, "ATS_STRUCTURE_VALIDATION", {"ats_report": self.artifact_ref("reports/ats.json", {"status": "passed"})})
+        self.advance_ok(
+            run_state,
+            "RENDER",
+            {
+                "render_output": self.artifact_ref("render/resume.md", {"status": "rendered"}),
+                "measure_layout": self.artifact_ref("render/measure-layout.json", {"status": "fits", "required_reduction": 0}),
+            },
+        )
+        self.advance_ok(run_state, "RENDER_VALIDATION", {"render_validation_report": self.artifact_ref("reports/render-validation.json", {"status": "pass"})})
 
         complete_decision = maybe_await(self.workflow.getNextCheckpoint(run_state))
         self.assertEqual(complete_decision["next_checkpoint"], "COMPLETE")
-        self.assertIn("render_validation", complete_decision["blocking_reasons"])
-        self.assertIn("audit_manifest_ref", complete_decision["blocking_reasons"])
+        self.assertNotIn("render_validation", complete_decision["blocking_reasons"])
+        self.assertIn("audit_ref", complete_decision["blocking_reasons"])
         return complete_decision
 
     def valid_manifest_run_state(self):
@@ -400,24 +415,25 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
 
     def test_run_state_evidence_must_exist_in_persisted_checkpoint_result(self):
         run_state = self.create_run()
-        run_state["current_checkpoint"] = "APPLY_CHANGES"
+        run_state["current_checkpoint"] = "BUILD_SELECTION_PLAN"
         blocked = maybe_await(
             self.workflow.advanceCheckpoint(
                 run_state,
-                "FINAL_MATCH",
-                {"operations_applied": {"kind": "run_state", "key": "operations_applied"}},
+                "PROPOSE_TAILORING_CHANGES",
+                {"proposed_operations": self.operation_state_ref("op_1")},
             )
         )
         self.assertEqual(blocked["status"], "blocked")
-        self.assertIn("operations_applied", blocked["blocking_reasons"])
+        self.assertIn("proposed_operations", blocked["blocking_reasons"])
+        self.assertEqual(blocked["evidence_errors"][0]["type"], "operation_status_missing")
 
-        record = maybe_await(self.workflow.recordCheckpointResult(run_state, "APPLY_CHANGES", {"operations_applied": ["op_1"]}))
+        record = maybe_await(self.workflow.recordCheckpointResult(run_state, "BUILD_SELECTION_PLAN", {"operations_proposed": ["op_1"]}))
         self.assertEqual(record["status"], "ok")
         advanced = maybe_await(
             self.workflow.advanceCheckpoint(
                 run_state,
-                "FINAL_MATCH",
-                {"operations_applied": {"kind": "run_state", "key": "operations_applied"}},
+                "PROPOSE_TAILORING_CHANGES",
+                {"proposed_operations": self.operation_state_ref("op_1")},
             )
         )
         self.assertEqual(advanced["status"], "ok")
@@ -461,24 +477,13 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         advance("RESOLVE_GAPS", {"match_result": self.dto_ref("MatchResultEvidence", {"status": "ok", "match_result": {"score": 7.4}})})
         decision = maybe_await(self.workflow.getNextCheckpoint(run_state))
         self.assertEqual(decision["next_checkpoint"], "BUILD_SELECTION_PLAN")
-        self.assertIn("gaps_resolved", decision["blocking_reasons"])
+        self.assertIn("selection_plan", decision["blocking_reasons"])
 
-        advance("BUILD_SELECTION_PLAN", {"gaps_resolved": {"kind": "run_state", "key": "facts_verified"}})
-        advance("PROPOSE_TAILORING_CHANGES", {"selection_plan": self.dto_ref("SelectionPlanEvidence", {"status": "ok", "selection_plan": {}})})
-        advance("VALIDATE_CHANGES", {"proposed_operations": self.dto_ref("ProposedOperationsEvidence", {"status": "ok", "operations": []})})
-        advance("APPLY_CHANGES", {"change_validation": self.dto_ref("ChangeValidationEvidence", {"status": "ok", "validation": {}})})
-        apply_record = maybe_await(self.workflow.recordCheckpointResult(run_state, "APPLY_CHANGES", {"operations_applied": ["op_1"]}))
-        self.assertEqual(apply_record["status"], "ok")
-        advance("FINAL_MATCH", {"operations_applied": {"kind": "run_state", "key": "operations_applied"}})
-        advance("GROUNDING_AUDIT", {"final_match": self.dto_ref("FinalMatchEvidence", {"status": "passed", "final_match": {}})})
-        advance("ATS_STRUCTURE_VALIDATION", {"grounding_audit": self.dto_ref("WorkflowStatusEvidence")})
-        advance("RENDER", {"ats_structure_validation": self.dto_ref("WorkflowStatusEvidence")})
-        advance("RENDER_VALIDATION", {"render_result": self.artifact_ref("render/resume.md", {"status": "rendered"})})
+        self.advance_tail_to_complete_gate(run_state)
 
         complete_decision = maybe_await(self.workflow.getNextCheckpoint(run_state))
         self.assertEqual(complete_decision["next_checkpoint"], "COMPLETE")
-        self.assertIn("render_validation", complete_decision["blocking_reasons"])
-        self.assertIn("audit_manifest_ref", complete_decision["blocking_reasons"])
+        self.assertEqual(complete_decision["blocking_reasons"], ["audit_ref"])
 
     def test_resolution_loop_identical_fact_batch_triggers_only_one_match_rerun(self):
         run_state = self.enter_resolve_gaps_with_recorded_match(
@@ -610,7 +615,6 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         self.assertEqual(continue_decision["resolution_loop"]["predicate"]["branch"], "a_continue")
         self.assertEqual(continue_decision["next_checkpoint"], "BUILD_SELECTION_PLAN")
 
-        self.advance_ok(run_state, "BUILD_SELECTION_PLAN", {"gaps_resolved": {"kind": "run_state", "key": "facts_verified"}})
         self.advance_tail_to_complete_gate(run_state)
 
     def test_resolution_loop_branch_a_continue_advances_to_build_selection_plan(self):
@@ -624,7 +628,7 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
             self.workflow.advanceCheckpoint(
                 run_state,
                 "BUILD_SELECTION_PLAN",
-                {"gaps_resolved": {"kind": "run_state", "key": "resolution_loop_state"}},
+                {"selection_plan": self.artifact_ref("plans/selection-plan.json", {"status": "ok", "selection_plan": {}})},
             )
         )
         self.assertEqual(advanced["status"], "ok", advanced.get("blocking_reasons"))
@@ -651,7 +655,7 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
             self.workflow.advanceCheckpoint(
                 run_state,
                 "BUILD_SELECTION_PLAN",
-                {"gaps_resolved": {"kind": "run_state", "key": "resolution_loop_state"}},
+                {"selection_plan": self.artifact_ref("plans/selection-plan-blocked.json", {"status": "ok"})},
             )
         )
         self.assertEqual(blocked["status"], "blocked")
@@ -702,7 +706,7 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
             self.workflow.advanceCheckpoint(
                 run_state,
                 "BUILD_SELECTION_PLAN",
-                {"gaps_resolved": {"kind": "run_state", "key": "resolution_loop_state"}},
+                {"selection_plan": self.artifact_ref("plans/selection-plan-exhausted.json", {"status": "ok"})},
             )
         )
         self.assertEqual(advanced["status"], "ok", advanced.get("blocking_reasons"))
@@ -765,7 +769,7 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
             self.workflow.advanceCheckpoint(
                 run_state,
                 "BUILD_SELECTION_PLAN",
-                {"gaps_resolved": {"kind": "run_state", "key": "resolution_loop_state"}},
+                {"selection_plan": self.artifact_ref("plans/selection-plan-declined.json", {"status": "ok"})},
             )
         )
         self.assertEqual(advanced["status"], "ok", advanced.get("blocking_reasons"))
@@ -801,7 +805,7 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
             self.workflow.advanceCheckpoint(
                 run_state,
                 "BUILD_SELECTION_PLAN",
-                {"gaps_resolved": {"kind": "run_state", "key": "resolution_loop_state"}},
+                {"selection_plan": self.artifact_ref("plans/selection-plan-hard-blocked.json", {"status": "ok"})},
             )
         )
         self.assertEqual(blocked["status"], "blocked")
@@ -868,27 +872,61 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         legacy_decision = maybe_await(self.workflow.getNextCheckpoint(legacy_persisted))
         self.assertEqual(legacy_decision["next_checkpoint"], "MATCH_BASE")
 
-    def test_completion_gate_requires_final_validation_render_validation_and_audit(self):
-        run_state = self.create_run()
-        run_state.update(
-            {
-                "current_checkpoint": "RENDER",
-                "final_match": {"status": "passed"},
-                "grounding_audit": {"status": "passed"},
-                "ats_structure_validation": {"status": "passed"},
-                "render_validation": None,
-                "audit_manifest_ref": None,
-            }
-        )
-        blocked = maybe_await(self.workflow.assertCanComplete(run_state))
-        self.assertFalse(blocked["can_complete"])
-        self.assertIn("render_validation", serialized(blocked))
-        self.assertIn("audit", serialized(blocked))
+    def test_completion_gate_requires_real_artifact_refs_for_each_persisted_gate(self):
+        gate_state_keys = {
+            "final_match": "match_report_ref",
+            "grounding": "grounding_audit_ref",
+            "ats": "ats_report_ref",
+            "render_validation": "render_validation_report_ref",
+            "audit_ref": "audit_ref",
+        }
+        for gate, state_key in gate_state_keys.items():
+            with self.subTest(gate=gate):
+                run_state = self.create_run()
+                run_state.update(self.passing_completion_gate_state())
+                run_state.pop(state_key)
 
-        run_state["render_validation"] = {"status": "passed"}
-        run_state["audit_manifest_ref"] = "reports/run-manifest.json"
-        allowed = maybe_await(self.workflow.assertCanComplete(run_state))
-        self.assertTrue(allowed["can_complete"])
+                blocked = maybe_await(self.workflow.assertCanComplete(run_state))
+
+                self.assertFalse(blocked["can_complete"])
+                self.assertIn(gate, blocked["failed_gates"])
+                self.assertEqual(blocked["failed_gate_reasons"][gate], "missing_ref")
+
+    def test_completion_gate_blocks_hash_mismatched_artifact_refs_for_each_persisted_gate(self):
+        gate_state_keys = {
+            "final_match": "match_report_ref",
+            "grounding": "grounding_audit_ref",
+            "ats": "ats_report_ref",
+            "render_validation": "render_validation_report_ref",
+            "audit_ref": "audit_ref",
+        }
+        for gate, state_key in gate_state_keys.items():
+            with self.subTest(gate=gate):
+                run_state = self.create_run()
+                run_state.update(self.passing_completion_gate_state())
+                artifact_path = self.workspace / run_state[state_key]["path"]
+                artifact_path.write_text(json.dumps({"status": "tampered"}, sort_keys=True), encoding="utf-8")
+
+                blocked = maybe_await(self.workflow.assertCanComplete(run_state))
+
+                self.assertFalse(blocked["can_complete"])
+                self.assertIn(gate, blocked["failed_gates"])
+                self.assertEqual(blocked["failed_gate_reasons"][gate], "artifact_hash_mismatch")
+
+    def test_complete_checkpoint_succeeds_only_with_all_real_gate_artifacts_present(self):
+        run_state = self.enter_resolve_gaps_with_recorded_match(self.match_result("continue"))
+        self.advance_tail_to_complete_gate(run_state)
+
+        completed = maybe_await(
+            self.workflow.advanceCheckpoint(
+                run_state,
+                "COMPLETE",
+                {"audit_ref": self.artifact_ref("reports/audit-trail.json", {"status": "passed", "events": []})},
+            )
+        )
+
+        self.assertEqual(completed["status"], "ok", completed.get("blocking_reasons"))
+        self.assertEqual(completed["current_checkpoint"], "COMPLETE")
 
     def test_completion_gate_blocks_hallucination_flagged_non_rejected_operation_from_persisted_state(self):
         run_state = self.create_run()
@@ -1149,12 +1187,12 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
 
     def passing_completion_gate_state(self):
         return {
-            "current_checkpoint": "RENDER",
-            "final_match": {"status": "passed"},
-            "grounding_audit": {"status": "passed"},
-            "ats_structure_validation": {"status": "passed"},
-            "render_validation": {"status": "passed"},
-            "audit_manifest_ref": "reports/run-manifest.json",
+            "current_checkpoint": "RENDER_VALIDATION",
+            "match_report_ref": self.artifact_ref("reports/final-match-gate.json", {"status": "passed"}),
+            "grounding_audit_ref": self.artifact_ref("reports/grounding-gate.json", {"status": "passed"}),
+            "ats_report_ref": self.artifact_ref("reports/ats-gate.json", {"status": "passed"}),
+            "render_validation_report_ref": self.artifact_ref("reports/render-validation-gate.json", {"status": "pass"}),
+            "audit_ref": self.artifact_ref("reports/audit-gate.json", {"status": "passed"}),
         }
 
     def hallucination_rejection_validation(self):

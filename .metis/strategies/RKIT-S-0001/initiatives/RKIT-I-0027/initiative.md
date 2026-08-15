@@ -4,14 +4,14 @@ level: initiative
 title: "Workflow Tailoring, Validation, Render, and Completion Orchestration"
 short_code: "RKIT-I-0027"
 created_at: 2026-08-13T20:41:37.507312+00:00
-updated_at: 2026-08-15T04:29:35.514389+00:00
+updated_at: 2026-08-15T04:30:48.850529+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0026]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/decompose"
+  - "#phase/active"
 
 
 exit_criteria_met: false

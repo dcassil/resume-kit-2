@@ -4,14 +4,14 @@ level: task
 title: "Tailoring-tail stage evidence declarations and grounded completion gates"
 short_code: "RKIT-T-0071"
 created_at: 2026-08-15T04:29:40.575022+00:00
-updated_at: 2026-08-15T04:29:40.575022+00:00
+updated_at: 2026-08-15T04:30:49.338364+00:00
 parent: workflow-tailoring-validation
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0027
 ## Objective
 
 Ground the tailoring tail (RKIT-I-0027 Requirements 3 + Detailed Design "Stage evidence declarations"/"Grounded completion"): each tail checkpoint (BUILD_SELECTION_PLAN through COMPLETE) declares grounded evidence per the I-0023 model, and every assertCanComplete gate maps to a persisted artifact/report ref per the I-0024 model — completion unreachable on missing or hash-mismatched refs, boolean gate evidence gone.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -59,4 +61,5 @@ Rationale: completion-integrity semantics; the gate-to-ref map is what makes COM
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-15: Read task and parent initiative. Verified Straight Jacket state; only the four expected pre-existing protected checksum mismatches are present. Investigated workflow evidence verification, resume-render public render/measure/validation surfaces, and resume-core operation lifecycle statuses. Implementation plan: extend tail `_ADVANCE_REQUIREMENTS` to artifact/run-state evidence, make `assertCanComplete` verify persisted artifact refs and operation-policy gates, then rewrite old boolean/DTO completion tests to real hashed files.
+- 2026-08-15: Implemented tail evidence declarations and grounded completion gates. Focused workflow tests passed, then requested PR, smoke, and unit discovery gates all passed. Smoke did not require protected-file changes.

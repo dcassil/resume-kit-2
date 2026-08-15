@@ -31,21 +31,37 @@ _ADVANCE_REQUIREMENTS: dict[str, tuple[JsonObject, ...]] = {
     "NORMALIZE_JOB": ({"name": "job_ingested", "kind": "artifact"},),
     "MATCH_BASE": ({"name": "job_normalized", "kind": "dto", "schema_id": "WorkflowStatusEvidence"},),
     "RESOLVE_GAPS": ({"name": "match_result", "kind": "dto", "schema_id": "MatchResultEvidence"},),
-    "BUILD_SELECTION_PLAN": (
-        {"name": "gaps_resolved", "kind": "run_state", "key": "facts_verified", "alternate_keys": ["resolution_loop_state"]},
+    "BUILD_SELECTION_PLAN": ({"name": "selection_plan", "kind": "artifact"},),
+    "PROPOSE_TAILORING_CHANGES": (
+        {"name": "proposed_operations", "kind": "run_state", "key": "operation_statuses", "statuses": ["proposed"]},
     ),
-    "PROPOSE_TAILORING_CHANGES": ({"name": "selection_plan", "kind": "dto", "schema_id": "SelectionPlanEvidence"},),
-    "VALIDATE_CHANGES": ({"name": "proposed_operations", "kind": "dto", "schema_id": "ProposedOperationsEvidence"},),
-    "APPLY_CHANGES": ({"name": "change_validation", "kind": "dto", "schema_id": "ChangeValidationEvidence"},),
-    "FINAL_MATCH": ({"name": "operations_applied", "kind": "run_state", "key": "operations_applied"},),
-    "GROUNDING_AUDIT": ({"name": "final_match", "kind": "dto", "schema_id": "FinalMatchEvidence"},),
-    "ATS_STRUCTURE_VALIDATION": ({"name": "grounding_audit", "kind": "dto", "schema_id": "WorkflowStatusEvidence"},),
-    "RENDER": ({"name": "ats_structure_validation", "kind": "dto", "schema_id": "WorkflowStatusEvidence"},),
-    "RENDER_VALIDATION": ({"name": "render_result", "kind": "artifact"},),
-    "COMPLETE": (
-        {"name": "render_validation", "kind": "dto", "schema_id": "RenderValidationEvidence"},
-        {"name": "audit_manifest_ref", "kind": "artifact"},
+    "VALIDATE_CHANGES": (
+        {"name": "validated_operations", "kind": "run_state", "key": "operation_statuses", "statuses": ["validated"]},
     ),
+    "APPLY_CHANGES": (
+        {"name": "applied_operations", "kind": "run_state", "key": "operation_statuses", "statuses": ["applied"]},
+    ),
+    "FINAL_MATCH": ({"name": "match_report", "kind": "artifact"},),
+    "GROUNDING_AUDIT": ({"name": "grounding_audit", "kind": "artifact"},),
+    "ATS_STRUCTURE_VALIDATION": ({"name": "ats_report", "kind": "artifact"},),
+    "RENDER": (
+        {"name": "render_output", "kind": "artifact"},
+        {"name": "measure_layout", "kind": "artifact"},
+    ),
+    "RENDER_VALIDATION": ({"name": "render_validation_report", "kind": "artifact"},),
+    "COMPLETE": ({"name": "audit_ref", "kind": "artifact"},),
+}
+
+_COMPLETION_ARTIFACT_GATES: dict[str, JsonObject] = {
+    "final_match": {"checkpoint": "FINAL_MATCH", "name": "match_report", "state_keys": ["match_report_ref", "final_match_ref"]},
+    "grounding": {"checkpoint": "GROUNDING_AUDIT", "name": "grounding_audit", "state_keys": ["grounding_audit_ref", "grounding_ref"]},
+    "ats": {"checkpoint": "ATS_STRUCTURE_VALIDATION", "name": "ats_report", "state_keys": ["ats_report_ref", "ats_ref"]},
+    "render_validation": {
+        "checkpoint": "RENDER_VALIDATION",
+        "name": "render_validation_report",
+        "state_keys": ["render_validation_report_ref", "render_validation_ref"],
+    },
+    "audit_ref": {"checkpoint": "COMPLETE", "name": "audit_ref", "state_keys": ["audit_ref", "audit_manifest_ref"]},
 }
 
 
@@ -348,23 +364,38 @@ def recoverRun(workspace: str | Path, run_id: str) -> JsonObject:
 
 
 def assertCanComplete(run_state: JsonObject) -> JsonObject:
-    required_gates = {
-        "final_match": _status_is_passed(run_state.get("final_match")),
-        "grounding_audit": _status_is_passed(run_state.get("grounding_audit")),
-        "ats_structure_validation": _status_is_passed(run_state.get("ats_structure_validation")),
-        "render_validation": _status_is_passed(run_state.get("render_validation")),
-        "audit_manifest_ref": bool(run_state.get("audit_manifest_ref")),
-        "hallucination_rejection": _hallucination_rejection_passed(run_state),
-    }
-    if run_state.get("unresolved_hard_requirements") and run_state.get("policy", {}).get("requireHardRequirementsResolved", True):
-        required_gates["unresolved_hard_requirements"] = False
+    working_state = _working_run_state(run_state)
+    required_gates: dict[str, bool] = {}
+    failed_gate_reasons: JsonObject = {}
+    gate_errors: list[JsonObject] = []
+    for gate, declaration in _COMPLETION_ARTIFACT_GATES.items():
+        result = _completion_artifact_gate_result(working_state, gate, declaration)
+        required_gates[gate] = result["passed"]
+        if not result["passed"]:
+            failed_gate_reasons[gate] = result["reason"]
+            if isinstance(result.get("error"), dict):
+                gate_errors.append(result["error"])
+
+    hallucination_passed = _hallucination_rejection_passed(working_state)
+    required_gates["hallucination_rejection"] = hallucination_passed
+    if not hallucination_passed:
+        failed_gate_reasons["hallucination_rejection"] = "flagged_operation_not_rejected"
+
+    hard_requirements_passed = _hard_requirements_gate_passed(working_state)
+    required_gates["hard_requirements"] = hard_requirements_passed
+    if not hard_requirements_passed:
+        failed_gate_reasons["hard_requirements"] = "unresolved_hard_requirements"
+
     failed = [gate for gate, passed in required_gates.items() if not passed]
     return {
         "status": "ok" if not failed else "blocked",
         "can_complete": not failed,
         "required_gates": list(required_gates),
         "failed_gates": failed,
-        "audit_manifest_ref": run_state.get("audit_manifest_ref"),
+        "failed_gate_reasons": failed_gate_reasons,
+        "gate_errors": gate_errors,
+        "gate_refs": _completion_gate_refs(working_state),
+        "audit_ref": _completion_gate_ref(working_state, _COMPLETION_ARTIFACT_GATES["audit_ref"]),
     }
 
 
@@ -1039,23 +1070,103 @@ def _verify_run_state_ref(run_state: JsonObject, requirement: JsonObject, requir
     persisted = _load_persisted_run_state(run_state)
     if not isinstance(persisted, dict):
         return _evidence_error(requirement_name, "run_state_unavailable", "Persisted run state is unavailable.")
+    statuses = requirement.get("statuses")
+    if isinstance(statuses, list) and statuses:
+        return _verify_operation_status_ref(persisted, requirement_name, evidence_ref, {str(status) for status in statuses})
     value = persisted.get(str(key))
     if value in (None, "", [], {}):
         return _evidence_error(requirement_name, "run_state_key_missing", "Required key is absent from persisted run state.", {"key": key})
     return {"status": "ok", "evidence_ref": dict(evidence_ref)}
 
 
+def _verify_operation_status_ref(persisted: JsonObject, requirement_name: str, evidence_ref: JsonObject, statuses: set[str]) -> JsonObject:
+    operation_ids = evidence_ref.get("operation_ids")
+    if not isinstance(operation_ids, list) or not operation_ids or any(not isinstance(item, str) or not item for item in operation_ids):
+        return _evidence_error(
+            requirement_name,
+            "missing_operation_ids",
+            "Operation lifecycle evidence requires non-empty operation_ids.",
+            {"allowed_statuses": sorted(statuses)},
+        )
+    records = {
+        str(record.get("operation_id")): str(record.get("status", ""))
+        for record in persisted.get("operation_statuses", [])
+        if isinstance(record, dict) and record.get("operation_id")
+    }
+    missing = [operation_id for operation_id in operation_ids if operation_id not in records]
+    wrong_status = [
+        {"operation_id": operation_id, "status": records[operation_id]}
+        for operation_id in operation_ids
+        if operation_id in records and records[operation_id] not in statuses
+    ]
+    if missing:
+        return _evidence_error(
+            requirement_name,
+            "operation_status_missing",
+            "Operation ids are absent from persisted operation records.",
+            {"operation_ids": missing, "allowed_statuses": sorted(statuses)},
+        )
+    if wrong_status:
+        return _evidence_error(
+            requirement_name,
+            "operation_status_mismatch",
+            "Operation ids are not in the required lifecycle state.",
+            {"operations": wrong_status, "allowed_statuses": sorted(statuses)},
+        )
+    return {"status": "ok", "evidence_ref": dict(evidence_ref)}
+
+
 def _completion_gate_state(run_state: JsonObject, verified_evidence: JsonObject) -> JsonObject:
     gate_state = dict(run_state)
-    render_validation_ref = verified_evidence.get("render_validation")
-    if isinstance(render_validation_ref, dict):
-        payload = render_validation_ref.get("payload")
-        if isinstance(payload, dict) and isinstance(payload.get("render_validation"), dict):
-            gate_state["render_validation"] = payload["render_validation"]
-    audit_manifest_ref = verified_evidence.get("audit_manifest_ref")
-    if isinstance(audit_manifest_ref, dict) and audit_manifest_ref.get("path"):
-        gate_state["audit_manifest_ref"] = audit_manifest_ref["path"]
+    audit_ref = verified_evidence.get("audit_ref")
+    if isinstance(audit_ref, dict):
+        gate_state["audit_ref"] = dict(audit_ref)
     return gate_state
+
+
+def _completion_artifact_gate_result(run_state: JsonObject, gate: str, declaration: JsonObject) -> JsonObject:
+    ref = _completion_gate_ref(run_state, declaration)
+    if not isinstance(ref, dict):
+        return {"passed": False, "reason": "missing_ref"}
+    verified = _verify_artifact_ref(run_state, gate, ref)
+    if verified.get("status") == "ok":
+        return {"passed": True, "reason": "ok", "ref": verified["evidence_ref"]}
+    return {"passed": False, "reason": verified.get("type", "invalid_ref"), "error": verified, "ref": dict(ref)}
+
+
+def _completion_gate_refs(run_state: JsonObject) -> JsonObject:
+    refs: JsonObject = {}
+    for gate, declaration in _COMPLETION_ARTIFACT_GATES.items():
+        ref = _completion_gate_ref(run_state, declaration)
+        if isinstance(ref, dict):
+            refs[gate] = ref
+    return refs
+
+
+def _completion_gate_ref(run_state: JsonObject, declaration: JsonObject) -> JsonObject | None:
+    for key in declaration.get("state_keys", []):
+        value = run_state.get(str(key))
+        if isinstance(value, dict) and value.get("kind") == "artifact":
+            return dict(value)
+    checkpoint = str(declaration["checkpoint"])
+    name = str(declaration["name"])
+    for container_name in ("stage_state", "verified_evidence"):
+        container = run_state.get(container_name, {})
+        if not isinstance(container, dict):
+            continue
+        checkpoint_evidence = container.get(checkpoint, {})
+        if not isinstance(checkpoint_evidence, dict):
+            continue
+        ref = checkpoint_evidence.get(name)
+        if isinstance(ref, dict) and ref.get("kind") == "artifact":
+            return dict(ref)
+    return None
+
+
+def _hard_requirements_gate_passed(run_state: JsonObject) -> bool:
+    if not run_state.get("unresolved_hard_requirements"):
+        return True
+    return not run_state.get("policy", {}).get("requireHardRequirementsResolved", True)
 
 
 def _load_persisted_run_state(run_state: JsonObject) -> JsonObject | None:
