@@ -4,14 +4,14 @@ level: task
 title: "Section 6 schema realignment migrations: facts columns, jobs table, match/relationship columns"
 short_code: "RKIT-T-0040"
 created_at: 2026-08-14T23:56:07.436663+00:00
-updated_at: 2026-08-14T23:56:07.436663+00:00
+updated_at: 2026-08-15T00:07:40.660638+00:00
 parent: durable-career-store-package-and
-blocked_by: ["RKIT-T-0039"]
+blocked_by: [RKIT-T-0039]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0005
 ## Objective
 
 Deliver the vision section 6 recommended-table realignment as registry migrations on the T-0039 substrate (RKIT-I-0005 Requirement 4): facts gain canonical_name/description/years/confidence; a lightweight `jobs` table replaces free-string-only job identity; `job_fact_matches` gain match_type/confidence/user_confirmed; `fact_relationships` gain confidence. Wave-era databases migrate forward with data intact.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

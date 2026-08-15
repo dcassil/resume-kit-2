@@ -266,8 +266,9 @@ class CareerStore:
                 conn.execute(
                     """
                     INSERT INTO facts (
-                        fact_id, type, text, normalized_terms_json, verification_state, created_at, updated_at, metadata_json
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        fact_id, type, text, normalized_terms_json, verification_state, created_at, updated_at,
+                        metadata_json, canonical_name, description, years, confidence
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         fact_id,
@@ -278,6 +279,10 @@ class CareerStore:
                         now,
                         now,
                         _to_json(fact.get("metadata", {})),
+                        _optional_text(fact.get("canonical_name")),
+                        _optional_text(fact.get("description")),
+                        _optional_int(fact.get("years")),
+                        _optional_float(fact.get("confidence")),
                     ),
                 )
             else:
@@ -289,7 +294,8 @@ class CareerStore:
                 conn.execute(
                     """
                     UPDATE facts
-                    SET type = ?, text = ?, normalized_terms_json = ?, verification_state = ?, updated_at = ?, metadata_json = ?
+                    SET type = ?, text = ?, normalized_terms_json = ?, verification_state = ?, updated_at = ?,
+                        metadata_json = ?, canonical_name = ?, description = ?, years = ?, confidence = ?
                     WHERE fact_id = ?
                     """,
                     (
@@ -299,6 +305,10 @@ class CareerStore:
                         next_state,
                         now,
                         _to_json(_merged_metadata(_from_json(str(existing["metadata_json"]), {}), fact.get("metadata", {}))),
+                        _optional_text(fact.get("canonical_name")),
+                        _optional_text(fact.get("description")),
+                        _optional_int(fact.get("years")),
+                        _optional_float(fact.get("confidence")),
                         fact_id,
                     ),
                 )
@@ -418,11 +428,12 @@ class CareerStore:
             conn.execute(
                 """
                 INSERT INTO relationships (
-                    relationship_id, from_fact_id, to_fact_id, relationship_type, evidence_json, created_at, metadata_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    relationship_id, from_fact_id, to_fact_id, relationship_type, evidence_json, created_at, metadata_json, confidence
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(relationship_id) DO UPDATE SET
                     evidence_json = excluded.evidence_json,
-                    metadata_json = excluded.metadata_json
+                    metadata_json = excluded.metadata_json,
+                    confidence = excluded.confidence
                 """,
                 (
                     relationship_id,
@@ -432,6 +443,7 @@ class CareerStore:
                     _to_json(evidence_or_rationale or {}),
                     now,
                     _to_json({"policy": policy}),
+                    _optional_float((evidence_or_rationale or {}).get("confidence")),
                 ),
             )
             if relationship_type == "contradicts":
@@ -566,40 +578,72 @@ class CareerStore:
         now = self._clock()
         clean_fact_ids = sorted(str(fact_id) for fact_id in fact_ids)
         job_match_id = _stable_id("job_match", job_id, requirement_id, "|".join(clean_fact_ids), resolution_state)
+        match_type = _optional_text((metadata or {}).get("match_type")) or resolution_state
+        confidence = _optional_float((metadata or {}).get("confidence"))
+        user_confirmed = _optional_bool((metadata or {}).get("user_confirmed", (metadata or {}).get("confirmed")))
         match_metadata = {
             "fact_count": len(clean_fact_ids),
             "resolution_state": resolution_state,
             **(metadata or {}),
         }
+        job_identity_id = _stable_id("job", job_id)
+        job_metadata = _job_metadata(metadata or {})
         with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO jobs (job_id, source_job_id, created_at, updated_at, metadata_json)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(source_job_id) DO UPDATE SET
+                    updated_at = excluded.updated_at,
+                    metadata_json = excluded.metadata_json
+                """,
+                (job_identity_id, str(job_id), now, now, _to_json(job_metadata)),
+            )
             existing = conn.execute("SELECT job_match_id FROM job_matches WHERE job_match_id = ?", (job_match_id,)).fetchone()
             mutation_status = "updated" if existing else "created"
             conn.execute(
                 """
                 INSERT INTO job_matches (
-                    job_match_id, job_id, requirement_id, fact_ids_json, resolution_state, created_at, metadata_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    job_match_id, job_id, requirement_id, fact_ids_json, resolution_state, created_at, metadata_json,
+                    match_type, confidence, user_confirmed
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(job_match_id) DO UPDATE SET
                     fact_ids_json = excluded.fact_ids_json,
                     resolution_state = excluded.resolution_state,
-                    metadata_json = excluded.metadata_json
+                    metadata_json = excluded.metadata_json,
+                    match_type = excluded.match_type,
+                    confidence = excluded.confidence,
+                    user_confirmed = excluded.user_confirmed
                 """,
-                (job_match_id, str(job_id), str(requirement_id), _to_json(clean_fact_ids), resolution_state, now, _to_json(match_metadata)),
+                (
+                    job_match_id,
+                    str(job_id),
+                    str(requirement_id),
+                    _to_json(clean_fact_ids),
+                    resolution_state,
+                    now,
+                    _to_json(match_metadata),
+                    match_type,
+                    confidence,
+                    user_confirmed,
+                ),
             )
             conn.commit()
-        return _clean_result(
-            {
-                "schema_version": SCHEMA_VERSION,
-                "status": mutation_status,
-                "mutation_status": mutation_status,
-                "job_match_id": job_match_id,
-                "job_id": str(job_id),
-                "requirement_id": str(requirement_id),
-                "fact_ids": clean_fact_ids,
-                "resolution_state": resolution_state,
-                "audit": self._audit("recordJobMatch", mutated=True),
-            }
-        )
+        result = {
+            "schema_version": SCHEMA_VERSION,
+            "status": mutation_status,
+            "mutation_status": mutation_status,
+            "job_match_id": job_match_id,
+            "job_id": str(job_id),
+            "requirement_id": str(requirement_id),
+            "fact_ids": clean_fact_ids,
+            "resolution_state": resolution_state,
+            "match_type": match_type,
+            "audit": self._audit("recordJobMatch", mutated=True),
+        }
+        _add_if_not_none(result, "confidence", confidence)
+        _add_if_not_none(result, "user_confirmed", user_confirmed)
+        return _clean_result(result)
 
     def findConflicts(self, fact_or_claim: JsonObject, scope: JsonObject | None = None) -> JsonObject:
         conflicts = self._detect_conflicts(fact_or_claim)
@@ -672,7 +716,7 @@ class CareerStore:
         if row is None:
             return {}
         evidence_ids = [item["evidence_id"] for item in self._evidence_for_fact(str(row["fact_id"]))]
-        return {
+        fact = {
             "fact_id": str(row["fact_id"]),
             "type": str(row["type"]),
             "text": str(row["text"]),
@@ -683,6 +727,11 @@ class CareerStore:
             "updated_at": str(row["updated_at"]),
             "metadata": _from_json(str(row["metadata_json"]), {}),
         }
+        _add_if_not_none(fact, "canonical_name", row["canonical_name"])
+        _add_if_not_none(fact, "description", row["description"])
+        _add_if_not_none(fact, "years", row["years"])
+        _add_if_not_none(fact, "confidence", row["confidence"])
+        return fact
 
     def _insert_evidence(self, conn: sqlite3.Connection, fact_id: str, evidence: JsonObject, source: str, now: str) -> str:
         evidence_source = str(evidence.get("source", source))
@@ -748,8 +797,9 @@ class CareerStore:
                 """,
                 (fact_id, fact_id),
             ).fetchall()
-        return [
-            {
+        relationships = []
+        for row in rows:
+            relationship = {
                 "relationship_id": str(row["relationship_id"]),
                 "from_fact_id": str(row["from_fact_id"]),
                 "to_fact_id": str(row["to_fact_id"]),
@@ -758,8 +808,9 @@ class CareerStore:
                 "created_at": str(row["created_at"]),
                 "metadata": _from_json(str(row["metadata_json"]), {}),
             }
-            for row in rows
-        ]
+            _add_if_not_none(relationship, "confidence", row["confidence"])
+            relationships.append(relationship)
+        return relationships
 
     def _relationship_terms(self, fact_id: str) -> list[str]:
         terms: list[str] = []
@@ -1050,6 +1101,56 @@ def _from_json(value: str | None, fallback: Any) -> Any:
         return json.loads(value)
     except json.JSONDecodeError:
         return fallback
+
+
+def _optional_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value)
+    return text if text else None
+
+
+def _optional_int(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _optional_float(value: Any) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _optional_bool(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return 1 if value else 0
+    if isinstance(value, (int, float)):
+        return 1 if value else 0
+    normalized = _normalize(value)
+    if normalized in {"true", "yes", "confirmed", "user confirmed", "1"}:
+        return 1
+    if normalized in {"false", "no", "unconfirmed", "0"}:
+        return 0
+    return None
+
+
+def _add_if_not_none(target: JsonObject, key: str, value: Any) -> None:
+    if value is not None:
+        target[key] = value
+
+
+def _job_metadata(metadata: JsonObject) -> JsonObject:
+    job_keys = {"title", "job_title", "company", "employer", "url", "job_url", "source", "source_id"}
+    return {key: value for key, value in metadata.items() if key in job_keys}
 
 
 def _normalize(value: Any) -> str:

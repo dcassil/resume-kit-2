@@ -34,6 +34,13 @@ SOURCE_EVIDENCE = {
     "text": "React, TypeScript, Node.js",
 }
 
+EXPECTED_MIGRATIONS = [
+    "001_initial",
+    "002_section_6_fact_columns",
+    "003_jobs_table_backfill",
+    "004_match_relationship_columns",
+]
+
 
 def maybe_await(value):
     if inspect.isawaitable(value):
@@ -150,13 +157,13 @@ class CareerStoreSchemaStateContractTests(unittest.TestCase):
             self.assertIsInstance(state, module.MigrationState)
             self.assertEqual(state.schema_version, "career-store.v1")
             self.assertEqual(state.database_path, str(database_path))
-            self.assertEqual(state.applied_migrations, ["001_initial"])
+            self.assertEqual(state.applied_migrations, EXPECTED_MIGRATIONS)
             self.assertEqual(state.pending_migrations, [])
             self.assertEqual(state.status, "ok")
-            self.assertEqual(state.metadata["user_version"], 1)
+            self.assertEqual(state.metadata["user_version"], 4)
             with sqlite3.connect(database_path) as conn:
                 rows = conn.execute("SELECT id, applied_at FROM schema_migrations ORDER BY id").fetchall()
-                self.assertEqual(rows, [("001_initial", "2026-01-01T00:00:00Z")])
+                self.assertEqual(rows, [(migration_id, "2026-01-01T00:00:00Z") for migration_id in EXPECTED_MIGRATIONS])
 
     def test_reopen_is_idempotent(self):
         module = load_store_module(self)
@@ -188,7 +195,7 @@ class CareerStoreSchemaStateContractTests(unittest.TestCase):
             with self.assertRaises(module.IncompatibleSchemaVersionError) as raised:
                 maybe_await(module.openCareerStore(str(database_path), clock=lambda: "2026-01-01T00:00:00Z"))
             self.assertEqual(raised.exception.found, 999)
-            self.assertEqual(raised.exception.supported, 1)
+            self.assertEqual(raised.exception.supported, 4)
 
 
 class CareerStorePersistenceContractTests(unittest.TestCase):

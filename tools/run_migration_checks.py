@@ -85,6 +85,17 @@ def observed_tables(conn: sqlite3.Connection) -> list[str]:
     return [str(row["name"]) for row in rows]
 
 
+def table_columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    return {str(row["name"]) for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+
+
+def add_present(row: sqlite3.Row, item: JsonObject, columns: set[str], *names: str) -> JsonObject:
+    for name in names:
+        if name in columns:
+            item[name] = row[name]
+    return item
+
+
 def observed_rows(database_path: Path) -> JsonObject:
     with connection(database_path) as conn:
         tables = observed_tables(conn)
@@ -120,6 +131,15 @@ def observed_rows(database_path: Path) -> JsonObject:
                     """
                 ).fetchall()
             ]
+            columns = table_columns(conn, "facts")
+            if {"canonical_name", "description", "years", "confidence"} <= columns:
+                result["facts"] = [
+                    add_present(row, dict(item), columns, "canonical_name", "description", "years", "confidence")
+                    for item, row in zip(
+                        result["facts"],
+                        conn.execute("SELECT * FROM facts ORDER BY fact_id").fetchall(),
+                    )
+                ]
         if "evidence" in tables:
             result["evidence"] = [
                 {
@@ -140,9 +160,24 @@ def observed_rows(database_path: Path) -> JsonObject:
                     """
                 ).fetchall()
             ]
-        for table in ("relationships", "conflicts", "job_matches"):
+        if "jobs" in tables:
+            result["jobs"] = [
+                {
+                    "job_id": str(row["job_id"]),
+                    "source_job_id": str(row["source_job_id"]),
+                    "created_at": str(row["created_at"]),
+                    "updated_at": str(row["updated_at"]),
+                    "metadata": normalize_json(row["metadata_json"], {}),
+                }
+                for row in conn.execute(
+                    "SELECT job_id, source_job_id, created_at, updated_at, metadata_json FROM jobs ORDER BY source_job_id"
+                ).fetchall()
+            ]
+        for table in ("relationships", "conflicts"):
             if table in tables:
                 result[table] = []
+        if "job_matches" in tables:
+            result["job_matches"] = []
         return result
 
 
@@ -205,7 +240,7 @@ def check_fresh(module: Any, tmp: Path, current_version: str) -> tuple[Path, Jso
     require(state["schema_version"] == current_version, case, f"schema_version={state['schema_version']!r}, expected {current_version!r}.")
     require(state["pending_migrations"] == [], case, f"pending migrations remain: {state['pending_migrations']!r}.")
     require(state["applied_migrations"].count("001_initial") == 1, case, "expected exactly one 001_initial migration record.")
-    require({"migrations", "facts", "evidence", "relationships", "conflicts", "job_matches"} <= set(rows["tables"]), case, "current tables are incomplete.")
+    require({"migrations", "facts", "evidence", "relationships", "conflicts", "jobs", "job_matches"} <= set(rows["tables"]), case, "current tables are incomplete.")
     detail = f"schema_version={state['schema_version']}; applied={','.join(state['applied_migrations'])}"
     return database_path, state, detail
 
@@ -241,7 +276,9 @@ def check_no_destructive_change(module: Any, tmp: Path, previous_fixture: Path) 
     before = observed_rows(database_path)
     open_store(module, database_path)
     after = observed_rows(database_path)
-    require(after.get("facts", []) == before.get("facts", []), case, "populated facts changed during migration without an audited policy.")
+    before_facts = [{key: value for key, value in item.items() if key not in {"canonical_name", "description", "years", "confidence"}} for item in before.get("facts", [])]
+    after_facts = [{key: value for key, value in item.items() if key not in {"canonical_name", "description", "years", "confidence"}} for item in after.get("facts", [])]
+    require(after_facts == before_facts, case, "populated facts changed during migration without an audited policy.")
     require(after.get("evidence", []) == before.get("evidence", []), case, "populated evidence changed during migration without an audited policy.")
     require("001_initial" in [row["migration_id"] for row in after.get("migrations", [])], case, "current migration record was not applied.")
     return "populated facts/evidence preserved; no destructive action observed"

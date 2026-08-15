@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -127,8 +128,64 @@ def _apply_initial(conn: sqlite3.Connection) -> None:
     )
 
 
+def _table_columns(conn: sqlite3.Connection, table_name: str) -> set[str]:
+    rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    return {str(row["name"] if isinstance(row, sqlite3.Row) else row[1]) for row in rows}
+
+
+def _add_column(conn: sqlite3.Connection, table_name: str, column_definition: str) -> None:
+    column_name = column_definition.split()[0]
+    if column_name not in _table_columns(conn, table_name):
+        conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_definition}")
+
+
+def _stable_id(prefix: str, *parts: Any) -> str:
+    payload = "\x1f".join(str(part) for part in parts)
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:24]
+    return f"{prefix}_{digest}"
+
+
+def _apply_section_6_fact_columns(conn: sqlite3.Connection) -> None:
+    _add_column(conn, "facts", "canonical_name TEXT")
+    _add_column(conn, "facts", "description TEXT")
+    _add_column(conn, "facts", "years INTEGER")
+    _add_column(conn, "facts", "confidence REAL")
+
+
+def _apply_jobs_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS jobs (
+            job_id TEXT PRIMARY KEY,
+            source_job_id TEXT NOT NULL UNIQUE,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            metadata_json TEXT NOT NULL
+        )
+        """
+    )
+    conn.create_function("career_stable_job_id", 1, lambda value: _stable_id("job", value))
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO jobs (job_id, source_job_id, created_at, updated_at, metadata_json)
+        SELECT career_stable_job_id(job_id), job_id, '1970-01-01T00:00:00Z', '1970-01-01T00:00:00Z', '{}'
+        FROM (SELECT DISTINCT job_id FROM job_matches WHERE job_id IS NOT NULL AND job_id != '' ORDER BY job_id)
+        """
+    )
+
+
+def _apply_match_relationship_columns(conn: sqlite3.Connection) -> None:
+    _add_column(conn, "job_matches", "match_type TEXT")
+    _add_column(conn, "job_matches", "confidence REAL")
+    _add_column(conn, "job_matches", "user_confirmed INTEGER")
+    _add_column(conn, "relationships", "confidence REAL")
+
+
 MIGRATIONS: tuple[MigrationEntry, ...] = (
     MigrationEntry("001_initial", _apply_initial),
+    MigrationEntry("002_section_6_fact_columns", _apply_section_6_fact_columns),
+    MigrationEntry("003_jobs_table_backfill", _apply_jobs_table),
+    MigrationEntry("004_match_relationship_columns", _apply_match_relationship_columns),
 )
 
 SUPPORTED_SCHEMA_VERSION = len(MIGRATIONS)

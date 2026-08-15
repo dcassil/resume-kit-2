@@ -37,6 +37,10 @@ class Fact:
     text: str
     normalized_terms: list[str]
     verification_state: VerificationState | str
+    canonical_name: str | None = None
+    description: str | None = None
+    years: int | None = None
+    confidence: float | None = None
     evidence_ids: list[str] = field(default_factory=list)
     created_at: str | None = None
     updated_at: str | None = None
@@ -53,6 +57,7 @@ class FactRelationship:
     to_fact_id: str
     relationship_type: RelationshipType | str
     evidence_or_rationale: JsonObject = field(default_factory=dict)
+    confidence: float | None = None
     created_at: str | None = None
     metadata: JsonObject = field(default_factory=dict)
 
@@ -74,6 +79,9 @@ class JobAssociation:
     requirement_id: str
     fact_ids: list[str]
     resolution_state: ResolutionState | str
+    match_type: str | None = None
+    confidence: float | None = None
+    user_confirmed: bool | None = None
     created_at: str | None = None
     metadata: JsonObject = field(default_factory=dict)
 
@@ -108,6 +116,10 @@ FACT_SCHEMA: JsonObject = {
         "text": {"type": "string"},
         "normalized_terms": {"type": "array", "items": {"type": "string"}},
         "verification_state": {"enum": [state.value for state in VerificationState]},
+        "canonical_name": {"type": ["string", "null"]},
+        "description": {"type": ["string", "null"]},
+        "years": {"type": ["integer", "null"]},
+        "confidence": {"type": ["number", "null"]},
         "evidence_ids": {"type": "array", "items": {"type": "string"}},
     },
 }
@@ -136,6 +148,7 @@ FACT_RELATIONSHIP_SCHEMA: JsonObject = {
         "to_fact_id": {"type": "string"},
         "relationship_type": {"enum": [state.value for state in RelationshipType]},
         "evidence_or_rationale": {"type": "object"},
+        "confidence": {"type": ["number", "null"]},
     },
 }
 
