@@ -4,14 +4,14 @@ level: task
 title: "Azure contract-test replacement, TEST_SPEC strengthening; I-0007 close-out"
 short_code: "RKIT-T-0053"
 created_at: 2026-08-15T01:23:28.483508+00:00
-updated_at: 2026-08-15T01:23:28.483508+00:00
+updated_at: 2026-08-15T02:01:17.009386+00:00
 parent: relationship-aware-matching-and
-blocked_by: ["RKIT-T-0052"]
+blocked_by: [RKIT-T-0052]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0007
 ## Objective
 
 Close out RKIT-I-0007 (Requirement 7 + Testing Strategy): replace the vacuous Azure string-absence contract test with outcome assertions; consolidate confirmation/dictionary-removal/parent-child/searchFacts regressions; strengthen career-store/TEST_SPEC.md's relationship and match-type framing; run the three-gate close-out with a mutation probe.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -60,4 +62,7 @@ Rationale: consolidation over a decided mechanism set; judgment is in outcome-as
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-15: Gap analysis found Requirement 6 needed an explicit cross-job reuse test that also exercises the I-0005 `match_type`/`confidence`/`user_confirmed` columns through `recordJobMatch`; added `CareerStoreJobsUnitTests.test_job_b_reuses_job_a_verified_facts_and_records_match_metadata_columns`.
+- 2026-08-15: Strengthened `career-store/TEST_SPEC.md` with executable outcome-based coverage names for related pollution, dictionary removal, confirmation policy, parent/child directionality, contradicts signals, searchFacts filters/evidence minimization, and job association metadata.
+- 2026-08-15: Mutation probe reintroduced one-hop relationship term folding in `_store_fact_match_terms`; focused regression run failed with Azure/AWS becoming `exact_match` and parent/child directional candidates disappearing. Restored source and reran the same focused targets green.
+- 2026-08-15: Close-out verification green: `python3 tools/run_gate.py --pr --root .` (352 tests), `--smoke` (passed), `--future-contract` (359 tests), `python3 -m unittest discover -s tests/unit -v` (169 tests), and `python3 tools/run_migration_checks.py --root .` (all four checks passed). Straight Jacket still reports pre-existing protected checksum mismatches for `tools/pre-commit-resume-cli-guardrails.sh`, `tools/run_tests.py`, and `tools/TEST_SPEC.md`; no protected files were edited.

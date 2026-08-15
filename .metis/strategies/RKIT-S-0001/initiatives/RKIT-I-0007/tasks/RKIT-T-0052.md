@@ -4,14 +4,14 @@ level: task
 title: "searchFacts concept/terms/alias filtering and evidence minimization"
 short_code: "RKIT-T-0052"
 created_at: 2026-08-15T01:23:28.435082+00:00
-updated_at: 2026-08-15T01:49:53.512428+00:00
+updated_at: 2026-08-15T02:01:16.618690+00:00
 parent: relationship-aware-matching-and
 blocked_by: [RKIT-T-0051]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0007
 ## Objective
 
 Bring searchFacts up to TEST_SPEC:83-84 (RKIT-I-0007 Requirement 5): accept concept, normalized-terms, alias (via stored relationships), and verification_state filters; include_evidence returns the minimum-necessary evidence rows for the match rather than all rows.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

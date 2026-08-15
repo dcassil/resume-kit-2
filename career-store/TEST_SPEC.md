@@ -90,7 +90,16 @@ Executable case names:
 - Keep `related` distinct from `alias/equivalent`.
 - Prevent Azure from becoming proof of AWS through a related relationship.
 - Retain relationship evidence or rationale.
-- Defer `parent` and `child` relationship vocabulary coverage until the protected career-store guardrail lock is updated with the A-0006 relationship realignment batch.
+- Effective store behavior covers the restored A-0006 relationship vocabulary: `alias`, `equivalent`, `related`, `parent`, `child`, and `contradicts`.
+- Defer `parent` and `child` relationship vocabulary coverage in `store_surface.json` until the protected career-store guardrail lock is updated with the A-0006 relationship realignment batch; the current protected parser still pins the manifest vocabulary to `alias`, `equivalent`, `related`, and `contradicts`.
+
+Executable case names:
+
+- Related-pollution outcome: `tests.contract.test_career_store_contract.CareerStorePersistenceContractTests.test_related_relationship_does_not_become_equivalent_match_without_policy`.
+- Dictionary-removal outcome: `tests.contract.test_career_store_contract.CareerStorePersistenceContractTests.test_compiled_dictionary_pairs_do_not_match_without_stored_relationships`.
+- Confirmation policy: `tests.unit.test_career_store_relationship_confirmation_unit.CareerStoreRelationshipConfirmationUnitTests.test_unconfirmed_then_confirmed_alias_policy_applies_in_both_relationship_directions`.
+- Parent/child directionality: `tests.unit.test_career_store_relationship_confirmation_unit.CareerStoreRelationshipConfirmationUnitTests.test_parent_child_relationships_are_directional_and_never_exact_or_alias`.
+- Contradicts signal: `tests.unit.test_career_store_relationship_confirmation_unit.CareerStoreRelationshipConfirmationUnitTests.test_contradicts_relationship_emits_conflict_signal_and_no_candidate`.
 
 ### Search and matching
 
@@ -98,8 +107,15 @@ Executable case names:
 - Return minimum necessary evidence.
 - Return deterministic ordering for identical inputs.
 - Find candidate matches for job requirements.
-- Distinguish exact, alias, verified-fact, related, possible, unknown, explicitly missing, and not-applicable states in returned DTOs.
+- Distinguish `exact_match`, `alias_match`, `verified_fact_match`, `related_match`, `possible_match`, `unknown`, `explicitly_missing`, and `not_applicable` states in returned DTOs.
 - Return conflicts as conflict records instead of encoding conflicts as verification or resolution states.
+
+Executable case names:
+
+- Direct verified match DTO: `tests.contract.test_career_store_contract.CareerStorePersistenceContractTests.test_user_verified_direct_terms_emit_verified_candidate_without_relationship_path`.
+- Search filters: `tests.unit.test_career_store_search_facts_unit.CareerStoreSearchFactsUnitTests.test_search_facts_filters_concept_terms_and_verification_state_composably`.
+- Confirmed alias filtering: `tests.unit.test_career_store_search_facts_unit.CareerStoreSearchFactsUnitTests.test_search_facts_alias_filter_expands_terms_only_after_confirmation`.
+- Evidence minimization: `tests.unit.test_career_store_search_facts_unit.CareerStoreSearchFactsUnitTests.test_search_facts_include_evidence_returns_only_rows_matching_matched_terms`.
 
 ### Conflict detection
 
@@ -118,6 +134,13 @@ Executable case names:
 - Preserve which facts were used for Job A versus Job B.
 - Reuse user-verified AWS and GraphQL facts learned during Job A when matching Job B.
 - Do not pollute base resume or job-specific working resume state.
+
+Executable case names:
+
+- Job metadata columns: `tests.unit.test_career_store_jobs_unit.CareerStoreJobsUnitTests.test_record_job_match_creates_stable_job_identity_row`.
+- Cross-job reuse with metadata columns: `tests.unit.test_career_store_jobs_unit.CareerStoreJobsUnitTests.test_job_b_reuses_job_a_verified_facts_and_records_match_metadata_columns`.
+- Per-job association retention: `tests.unit.test_career_store_jobs_unit.CareerStoreJobsUnitTests.test_record_job_match_preserves_job_associations_by_job`.
+- Resume-state non-pollution: `tests.contract.test_career_store_contract.CareerStorePersistenceContractTests.test_job_match_recording_does_not_mutate_resume_state_or_return_raw_database_handles`.
 
 ### Interaction and preference history
 

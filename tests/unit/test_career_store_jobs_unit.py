@@ -201,6 +201,96 @@ class CareerStoreJobsUnitTests(unittest.TestCase):
                     ],
                 )
 
+    def test_job_b_reuses_job_a_verified_facts_and_records_match_metadata_columns(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "career.db"
+            store = openCareerStore(str(database_path), clock=lambda: FIXED_TIME)
+            learned = {
+                "req_aws": store.upsertFact(
+                    {
+                        "type": "skill",
+                        "text": "AWS experience",
+                        "normalized_terms": ["aws"],
+                        "verification_state": "user_verified",
+                    },
+                    {"source": "user_answer", "text": "Confirmed AWS deployment ownership"},
+                    source="user_answer",
+                    policy={"explicit_confirmation": True},
+                ),
+                "req_graphql": store.upsertFact(
+                    {
+                        "type": "skill",
+                        "text": "GraphQL APIs",
+                        "normalized_terms": ["graphql"],
+                        "verification_state": "user_verified",
+                    },
+                    {"source": "user_answer", "text": "Confirmed GraphQL API work"},
+                    source="user_answer",
+                    policy={"explicit_confirmation": True},
+                ),
+            }
+            for index, (requirement_id, fact) in enumerate(learned.items(), start=1):
+                result = store.recordJobMatch(
+                    "job_a",
+                    requirement_id,
+                    [fact["fact_id"]],
+                    "verified_fact_match",
+                    {"confidence": 0.9 + index / 100, "user_confirmed": True},
+                )
+                self.assertEqual(result["match_type"], "verified_fact_match")
+                self.assertEqual(result["user_confirmed"], 1)
+
+            reopened = openCareerStore(str(database_path), clock=lambda: FIXED_TIME)
+            matches = reopened.findCandidateMatches(
+                [
+                    {"requirement_id": "req_aws", "concept": "AWS", "normalized_terms": ["aws"]},
+                    {"requirement_id": "req_graphql", "concept": "GraphQL", "normalized_terms": ["graphql"]},
+                ],
+                policy={},
+                job_id="job_b",
+            )
+
+            self.assertEqual(matches["status"], "ok")
+            self.assertEqual(matches["unresolved"], [])
+            by_requirement = {match["requirement_id"]: match for match in matches["matches"]}
+            self.assertEqual(set(by_requirement), set(learned))
+            for index, (requirement_id, match) in enumerate(sorted(by_requirement.items()), start=1):
+                self.assertEqual(match["matchType"], "verified_fact_match")
+                self.assertEqual(match["fact_id"], learned[requirement_id]["fact_id"])
+                self.assertEqual(match["viaRelationships"], [])
+                recorded = reopened.recordJobMatch(
+                    "job_b",
+                    requirement_id,
+                    [match["fact_id"]],
+                    match["resolution_state"],
+                    {
+                        "match_type": match["matchType"],
+                        "confidence": 0.8 + index / 100,
+                        "user_confirmed": True,
+                    },
+                )
+                self.assertEqual(recorded["match_type"], "verified_fact_match")
+                self.assertEqual(recorded["user_confirmed"], 1)
+
+            with sqlite3.connect(database_path) as conn:
+                conn.row_factory = sqlite3.Row
+                jobs = [tuple(row) for row in conn.execute("SELECT source_job_id FROM jobs ORDER BY source_job_id").fetchall()]
+                self.assertEqual(jobs, [("job_a",), ("job_b",)])
+                rows = conn.execute(
+                    """
+                    SELECT job_id, requirement_id, fact_ids_json, resolution_state, match_type, confidence, user_confirmed
+                    FROM job_matches
+                    ORDER BY job_id, requirement_id
+                    """
+                ).fetchall()
+                self.assertEqual(len(rows), 4)
+                for row in rows:
+                    self.assertEqual(row["resolution_state"], "verified_fact_match")
+                    self.assertEqual(row["match_type"], "verified_fact_match")
+                    self.assertIsNotNone(row["confidence"])
+                    self.assertEqual(row["user_confirmed"], 1)
+                    self.assertEqual(json.loads(row["fact_ids_json"]), [learned[row["requirement_id"]]["fact_id"]])
+
 
 def _legacy_conflict_id(fact_id: str) -> str:
     return _stable_id("conflict", fact_id, "legacy conflicted verification state")
