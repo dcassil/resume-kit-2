@@ -173,7 +173,7 @@ def observed_rows(database_path: Path) -> JsonObject:
                     "SELECT job_id, source_job_id, created_at, updated_at, metadata_json FROM jobs ORDER BY source_job_id"
                 ).fetchall()
             ]
-        for table in ("relationships", "conflicts"):
+        for table in ("relationships", "conflicts", "interactions"):
             if table in tables:
                 result[table] = []
         if "job_matches" in tables:
@@ -240,7 +240,11 @@ def check_fresh(module: Any, tmp: Path, current_version: str) -> tuple[Path, Jso
     require(state["schema_version"] == current_version, case, f"schema_version={state['schema_version']!r}, expected {current_version!r}.")
     require(state["pending_migrations"] == [], case, f"pending migrations remain: {state['pending_migrations']!r}.")
     require(state["applied_migrations"].count("001_initial") == 1, case, "expected exactly one 001_initial migration record.")
-    require({"migrations", "facts", "evidence", "relationships", "conflicts", "jobs", "job_matches"} <= set(rows["tables"]), case, "current tables are incomplete.")
+    require(
+        {"migrations", "facts", "evidence", "relationships", "conflicts", "interactions", "jobs", "job_matches"} <= set(rows["tables"]),
+        case,
+        "current tables are incomplete.",
+    )
     detail = f"schema_version={state['schema_version']}; applied={','.join(state['applied_migrations'])}"
     return database_path, state, detail
 

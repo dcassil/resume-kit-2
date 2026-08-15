@@ -18,6 +18,7 @@ EXPECTED_MIGRATIONS = [
     "005_enum_value_remap",
     "006_fact_merge_redirects",
     "007_relationship_confirmation_columns",
+    "008_interactions_table",
 ]
 
 

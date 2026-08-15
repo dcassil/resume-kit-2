@@ -276,6 +276,24 @@ def _apply_relationship_confirmation_columns(conn: sqlite3.Connection) -> None:
     )
 
 
+def _apply_interactions_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS interactions (
+            id TEXT PRIMARY KEY,
+            interaction_type TEXT NOT NULL,
+            subject_id TEXT NOT NULL,
+            input_json TEXT NOT NULL,
+            result_json TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_interactions_type ON interactions(interaction_type)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_interactions_subject ON interactions(subject_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_interactions_created_at ON interactions(created_at)")
+
+
 MIGRATIONS: tuple[MigrationEntry, ...] = (
     MigrationEntry("001_initial", _apply_initial),
     MigrationEntry("002_section_6_fact_columns", _apply_section_6_fact_columns),
@@ -284,6 +302,7 @@ MIGRATIONS: tuple[MigrationEntry, ...] = (
     MigrationEntry("005_enum_value_remap", _apply_enum_value_remap),
     MigrationEntry("006_fact_merge_redirects", _apply_fact_merge_redirects),
     MigrationEntry("007_relationship_confirmation_columns", _apply_relationship_confirmation_columns),
+    MigrationEntry("008_interactions_table", _apply_interactions_table),
 )
 
 SUPPORTED_SCHEMA_VERSION = len(MIGRATIONS)

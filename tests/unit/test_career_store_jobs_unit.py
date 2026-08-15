@@ -33,7 +33,7 @@ class CareerStoreRealignmentTests(unittest.TestCase):
 
             self.assertEqual(state.applied_migrations, EXPECTED_MIGRATIONS)
             self.assertEqual(state.pending_migrations, [])
-            self.assertEqual(state.metadata["user_version"], 7)
+            self.assertEqual(state.metadata["user_version"], 8)
             with sqlite3.connect(database_path) as conn:
                 conn.row_factory = sqlite3.Row
                 self.assertEqual(conn.execute("SELECT COUNT(*) FROM facts").fetchone()[0], 2)

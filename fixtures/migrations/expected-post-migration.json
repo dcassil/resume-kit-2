@@ -12,6 +12,7 @@
       "evidence",
       "fact_merges",
       "facts",
+      "interactions",
       "job_matches",
       "jobs",
       "migrations",
@@ -56,6 +57,11 @@
       },
       {
         "migration_id": "007_relationship_confirmation_columns",
+        "schema_version": "career-store.v1",
+        "applied_at": "2026-01-01T00:00:00Z"
+      },
+      {
+        "migration_id": "008_interactions_table",
         "schema_version": "career-store.v1",
         "applied_at": "2026-01-01T00:00:00Z"
       }
@@ -177,6 +183,7 @@
       }
     ],
     "relationships": [],
+    "interactions": [],
     "conflicts": [],
     "job_matches": [],
     "jobs": []

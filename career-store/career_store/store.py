@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .confirmations import proposal_evidence, validate_interpretation_proposal
+from .interactions import _list_interactions_result, _record_interaction_result
 from .migrations import (
     MIGRATIONS,
     SCHEMA_VERSION,
@@ -21,7 +22,7 @@ from .migrations import (
     set_user_version,
     user_version,
 )
-from .schemas import InvalidInterpretationProposalError, MigrationState, TransactionResult
+from .schemas import InvalidInterpretationProposalError, MigrationState, TransactionResult, VerificationState
 from .store_support import (
     _add_if_not_none,
     _after_merge_repoint,
@@ -86,35 +87,10 @@ from .verification import (
     user_affirmed_proposal_authority,
 )
 
-_VERIFICATION_STATES = {
-    # Confirmation policy keeps inferred/unknown distinct from user_verified.
-    "source_stated",
-    "user_verified",
-    "imported",
-    "inferred",
-    "unknown",
-}
+_VERIFICATION_STATES = {state.value for state in VerificationState}
 _RELATIONSHIP_TYPES = {"alias", "related", "parent", "child", "equivalent", "contradicts"}
-_RESOLUTION_STATES = {
-    "exact_match",
-    "alias_match",
-    "verified_fact_match",
-    "related_match",
-    "possible_match",
-    "unknown",
-    "explicitly_missing",
-    "not_applicable",
-}
-_RESOLUTION_RANK = {
-    "not_applicable": 0,
-    "unknown": 1,
-    "explicitly_missing": 2,
-    "possible_match": 3,
-    "related_match": 4,
-    "alias_match": 5,
-    "exact_match": 6,
-    "verified_fact_match": 7,
-}
+_RESOLUTION_STATES = {"exact_match", "alias_match", "verified_fact_match", "related_match", "possible_match", "unknown", "explicitly_missing", "not_applicable"}
+_RESOLUTION_RANK = {"not_applicable": 0, "unknown": 1, "explicitly_missing": 2, "possible_match": 3, "related_match": 4, "alias_match": 5, "exact_match": 6, "verified_fact_match": 7}
 
 
 JsonObject = dict[str, Any]
@@ -933,6 +909,22 @@ class CareerStore:
         _add_if_not_none(result, "confidence", confidence)
         _add_if_not_none(result, "user_confirmed", user_confirmed)
         return _clean_result(result)
+
+    def recordInteraction(
+        self,
+        interaction_type: str,
+        subject_id: str,
+        input_json: JsonObject,
+        result_json: JsonObject | None = None,
+    ) -> JsonObject:
+        return _clean_result(
+            _record_interaction_result(
+                self._transaction, self._clock, self._audit, transaction_result_payload, SCHEMA_VERSION, interaction_type, subject_id, input_json, result_json
+            )
+        )
+
+    def listInteractions(self, filters: JsonObject | None = None) -> JsonObject:
+        return _clean_result(_list_interactions_result(self._connect, self._audit, SCHEMA_VERSION, filters))
 
     def findConflicts(self, fact_or_claim: JsonObject, scope: JsonObject | None = None) -> JsonObject:
         conflicts = self._detect_conflicts(fact_or_claim)

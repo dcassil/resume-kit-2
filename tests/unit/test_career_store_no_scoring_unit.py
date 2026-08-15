@@ -28,6 +28,8 @@ ALLOWED_PUBLIC_METHODS = {
     "getMigrationState",
     "mergeFacts",
     "recordJobMatch",
+    "recordInteraction",
+    "listInteractions",
     "searchFacts",
     "upsertFact",
     "verifyFact",

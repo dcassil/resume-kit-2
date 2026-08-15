@@ -4,14 +4,14 @@ level: task
 title: "Interactions substrate: table migration, recordInteraction/listInteractions, no-write-path boundary"
 short_code: "RKIT-T-0054"
 created_at: 2026-08-15T02:07:49.663909+00:00
-updated_at: 2026-08-15T02:07:49.663909+00:00
+updated_at: 2026-08-15T02:09:16.694579+00:00
 parent: conflict-audit-recovery-and
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0008
 ## Objective
 
 Build the RKIT-A-0001 item 2-3 interactions substrate (RKIT-I-0008 Requirements 2-3): append-only interactions table via the migration registry, public recordInteraction/listInteractions with the decided vocabulary, and executable enforcement that no write path exists from interaction records to fact verification state.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -62,3 +64,6 @@ Rationale: new substrate with an ADR-mandated boundary invariant; the module-sep
 ## Status Updates
 
 *To be added during implementation*
+
+- 2026-08-15: Implemented migration 008, `career_store.interactions`, store `recordInteraction`/`listInteractions`, additive migration fixture realignment, and focused interaction boundary tests. Focused interaction tests and migration checks pass locally; full required gates pending.
+- 2026-08-15: Required verification is green: PR gate, smoke gate, unit discovery, and migration checks all passed.

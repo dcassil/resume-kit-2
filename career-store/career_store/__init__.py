@@ -25,6 +25,13 @@ from .schemas import (
     TransactionResult,
     VerificationState,
 )
+from .interactions import (
+    INTERACTION_TYPES,
+    InteractionError,
+    MalformedInteractionError,
+    MalformedInteractionFilterError,
+    UnknownInteractionTypeError,
+)
 from .store import CareerStore, IncompatibleSchemaVersionError, MigrationFailedError, openCareerStore
 from .verification import (
     AUTHORITY_AGENT_INFERENCE_PROVENANCE,
@@ -60,6 +67,8 @@ __all__ = [
     "FACT_SCHEMA",
     "INTERPRETATION_PROPOSAL_OUTCOMES",
     "INTERPRETATION_PROPOSAL_SCHEMA",
+    "INTERACTION_TYPES",
+    "InteractionError",
     "SCHEMAS",
     "CareerFact",
     "CareerStore",
@@ -72,6 +81,8 @@ __all__ = [
     "InvalidInterpretationProposalError",
     "InvalidRelationshipConfirmationError",
     "JobAssociation",
+    "MalformedInteractionError",
+    "MalformedInteractionFilterError",
     "MergeConflictError",
     "IncompatibleSchemaVersionError",
     "MigrationState",
@@ -81,6 +92,7 @@ __all__ = [
     "ResolutionState",
     "Result",
     "TransactionResult",
+    "UnknownInteractionTypeError",
     "VERIFICATION_TRANSITION_MATRIX",
     "VerificationAuthority",
     "VerificationState",
