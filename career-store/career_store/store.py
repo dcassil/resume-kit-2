@@ -28,7 +28,6 @@ from .store_support import (
     _add_if_not_none,
     _after_merge_repoint,
     _authority_ref,
-    _clean_result,
     _confirm_relationship,
     _conflict_from_row,
     _conflict_object,
@@ -153,44 +152,38 @@ class CareerStore:
         matches.sort(key=lambda item: (item["type"], item["text"].casefold(), item["fact_id"]))
         if limit is not None:
             matches = matches[: max(0, int(limit))]
-        return _clean_result(
-            {
-                "schema_version": SCHEMA_VERSION,
-                "status": "ok",
-                "facts": matches,
-                "query": query,
-                "audit": self._audit("searchFacts", mutated=False),
-            }
-        )
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "status": "ok",
+            "facts": matches,
+            "query": query,
+            "audit": self._audit("searchFacts", mutated=False),
+        }
 
     def getFact(self, fact_id: str) -> JsonObject:
         with self._connect() as conn:
             resolved_fact_id = _resolve_fact_id(conn, fact_id)
             row = self._fact_row(resolved_fact_id, conn=conn) if resolved_fact_id else None
             if row is None:
-                return _clean_result(
-                    {
-                        "schema_version": SCHEMA_VERSION,
-                        "status": "not_found",
-                        "fact": None,
-                        "evidence": [],
-                        "relationships": [],
-                        "conflicts": [],
-                        "audit": self._audit("getFact", mutated=False),
-                    }
-                )
-            fact = self._fact_from_row(row, conn=conn)
-            return _clean_result(
-                {
+                return {
                     "schema_version": SCHEMA_VERSION,
-                    "status": "ok",
-                    "fact": fact,
-                    "evidence": self._evidence_for_fact(fact["fact_id"], conn=conn),
-                    "relationships": self._relationships_for_fact(fact["fact_id"], conn=conn),
-                    "conflicts": self._conflicts_for_fact(fact["fact_id"], conn=conn),
+                    "status": "not_found",
+                    "fact": None,
+                    "evidence": [],
+                    "relationships": [],
+                    "conflicts": [],
                     "audit": self._audit("getFact", mutated=False),
                 }
-            )
+            fact = self._fact_from_row(row, conn=conn)
+            return {
+                "schema_version": SCHEMA_VERSION,
+                "status": "ok",
+                "fact": fact,
+                "evidence": self._evidence_for_fact(fact["fact_id"], conn=conn),
+                "relationships": self._relationships_for_fact(fact["fact_id"], conn=conn),
+                "conflicts": self._conflicts_for_fact(fact["fact_id"], conn=conn),
+                "audit": self._audit("getFact", mutated=False),
+            }
 
     def mergeFacts(self, survivorId: str, mergedId: str, provenance: JsonObject | list[JsonObject] | None) -> JsonObject:
         survivor_id = str(survivorId)
@@ -274,7 +267,7 @@ class CareerStore:
                 }
         transaction_result = txn.result
         result["transaction_result"] = transaction_result_payload(transaction_result)
-        return _clean_result(result)
+        return result
 
     def upsertFact(
         self,
@@ -382,20 +375,18 @@ class CareerStore:
         transaction_result = txn.result
         if result is not None:
             result["transaction_result"] = transaction_result_payload(transaction_result)
-            return _clean_result(result)
-        return _clean_result(
-            {
-                "schema_version": SCHEMA_VERSION,
-                "status": mutation_status,
-                "mutation_status": mutation_status,
-                "fact_id": fact_id,
-                "verification_state": requested_state,
-                "conflicts": conflicts,
-                "confirmation_required": bool(confirmation_required),
-                "transaction_result": transaction_result_payload(transaction_result),
-                "audit": self._audit("upsertFact", mutated=True),
-            }
-        )
+            return result
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "status": mutation_status,
+            "mutation_status": mutation_status,
+            "fact_id": fact_id,
+            "verification_state": requested_state,
+            "conflicts": conflicts,
+            "confirmation_required": bool(confirmation_required),
+            "transaction_result": transaction_result_payload(transaction_result),
+            "audit": self._audit("upsertFact", mutated=True),
+        }
 
     def _insert_fact_row(
         self,
@@ -491,37 +482,33 @@ class CareerStore:
                     for evidence in proposal_evidence(proposal, requested_state, source):
                         evidence_id = self._insert_evidence(conn, fact_id, evidence, source, now)
                         txn.touch("evidence_id", evidence_id)
-                    result = _clean_result(
-                        {
-                            "schema_version": SCHEMA_VERSION,
-                            "status": "unchanged",
-                            "mutation_status": "evidence_only",
-                            "fact_id": fact_id,
-                            "verification_state": current_state,
-                            "conflicts": self._conflicts_for_fact(fact_id, conn=conn),
-                            "confirmation_required": requested_state == "user_verified",
-                            "transaction_result": None,
-                            "audit": self._audit("verifyFact", mutated=True, source=source, outcome=proposal.outcome),
-                        }
-                    )
+                    result = {
+                        "schema_version": SCHEMA_VERSION,
+                        "status": "unchanged",
+                        "mutation_status": "evidence_only",
+                        "fact_id": fact_id,
+                        "verification_state": current_state,
+                        "conflicts": self._conflicts_for_fact(fact_id, conn=conn),
+                        "confirmation_required": requested_state == "user_verified",
+                        "transaction_result": None,
+                        "audit": self._audit("verifyFact", mutated=True, source=source, outcome=proposal.outcome),
+                    }
                 elif requested_state == current_state:
                     txn.set_mutation_status("evidence_only")
                     for evidence in proposal_evidence(proposal, requested_state, source):
                         evidence_id = self._insert_evidence(conn, fact_id, evidence, source, now)
                         txn.touch("evidence_id", evidence_id)
-                    result = _clean_result(
-                        {
-                            "schema_version": SCHEMA_VERSION,
-                            "status": "unchanged",
-                            "mutation_status": "evidence_only",
-                            "fact_id": fact_id,
-                            "verification_state": current_state,
-                            "conflicts": self._conflicts_for_fact(fact_id, conn=conn),
-                            "confirmation_required": False,
-                            "transaction_result": None,
-                            "audit": self._audit("verifyFact", mutated=True, source=source, outcome=proposal.outcome),
-                        }
-                    )
+                    result = {
+                        "schema_version": SCHEMA_VERSION,
+                        "status": "unchanged",
+                        "mutation_status": "evidence_only",
+                        "fact_id": fact_id,
+                        "verification_state": current_state,
+                        "conflicts": self._conflicts_for_fact(fact_id, conn=conn),
+                        "confirmation_required": False,
+                        "transaction_result": None,
+                        "audit": self._audit("verifyFact", mutated=True, source=source, outcome=proposal.outcome),
+                    }
                 else:
                     try:
                         authority = user_affirmed_proposal_authority(proposal)
@@ -563,7 +550,7 @@ class CareerStore:
                         }
         transaction_result = txn.result
         result["transaction_result"] = transaction_result_payload(transaction_result)
-        return _clean_result(result)
+        return result
 
     def addEvidence(self, fact_id: str, evidence: JsonObject, source: str) -> JsonObject:
         now = self._clock()
@@ -594,7 +581,7 @@ class CareerStore:
                 }
         transaction_result = txn.result
         result["transaction_result"] = transaction_result_payload(transaction_result)
-        return _clean_result(result)
+        return result
 
     def addRelationship(
         self,
@@ -690,7 +677,7 @@ class CareerStore:
                 }
         transaction_result = txn.result
         result["transaction_result"] = transaction_result_payload(transaction_result)
-        return _clean_result(result)
+        return result
 
     def confirmRelationship(self, relationshipId: str, provenance: list[JsonObject]) -> JsonObject:
         return _confirm_relationship(self, SCHEMA_VERSION, relationshipId, provenance)
@@ -795,21 +782,19 @@ class CareerStore:
         matches.sort(key=lambda item: (item["requirement_id"], item["resolution_state"], item["fact_id"]))
         unresolved.sort(key=lambda item: item["requirement_id"])
         conflict_signals = _dedupe_conflict_signals(conflict_signals)
-        return _clean_result(
-            {
-                "schema_version": SCHEMA_VERSION,
-                "status": "ok",
-                "matches": matches,
-                "unresolved": unresolved,
-                "conflicts": _dedupe_conflicts(conflicts),
-                # Result contract for RKIT-I-0008: contradicts relationships are
-                # not match candidates. They surface here as typed directional
-                # signals shaped as {type, factId, relationshipId,
-                # contradictedFactId, requirementId}.
-                "conflict_signals": conflict_signals,
-                "audit": self._audit("findCandidateMatches", mutated=False),
-            }
-        )
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "status": "ok",
+            "matches": matches,
+            "unresolved": unresolved,
+            "conflicts": _dedupe_conflicts(conflicts),
+            # Result contract for RKIT-I-0008: contradicts relationships are
+            # not match candidates. They surface here as typed directional
+            # signals shaped as {type, factId, relationshipId,
+            # contradictedFactId, requirementId}.
+            "conflict_signals": conflict_signals,
+            "audit": self._audit("findCandidateMatches", mutated=False),
+        }
 
     def recordJobMatch(
         self,
@@ -897,7 +882,7 @@ class CareerStore:
         }
         _add_if_not_none(result, "confidence", confidence)
         _add_if_not_none(result, "user_confirmed", user_confirmed)
-        return _clean_result(result)
+        return result
 
     def recordInteraction(
         self,
@@ -906,14 +891,12 @@ class CareerStore:
         input_json: JsonObject,
         result_json: JsonObject | None = None,
     ) -> JsonObject:
-        return _clean_result(
-            _record_interaction_result(
-                self._transaction, self._clock, self._audit, transaction_result_payload, SCHEMA_VERSION, interaction_type, subject_id, input_json, result_json
-            )
+        return _record_interaction_result(
+            self._transaction, self._clock, self._audit, transaction_result_payload, SCHEMA_VERSION, interaction_type, subject_id, input_json, result_json
         )
 
     def listInteractions(self, filters: JsonObject | None = None) -> JsonObject:
-        return _clean_result(_list_interactions_result(self._connect, self._audit, SCHEMA_VERSION, filters))
+        return _list_interactions_result(self._connect, self._audit, SCHEMA_VERSION, filters)
 
     def adjudicateConflict(self, conflictId: str, decision: str | JsonObject, provenance: list[JsonObject]) -> JsonObject:
         return _adjudicate_conflict(self, SCHEMA_VERSION, conflictId, decision, provenance)
@@ -923,14 +906,12 @@ class CareerStore:
         fact_id = fact_or_claim.get("fact_id")
         if fact_id:
             conflicts.extend(self._conflicts_for_fact(str(fact_id)))
-        return _clean_result(
-            {
-                "schema_version": SCHEMA_VERSION,
-                "status": "ok",
-                "conflicts": _dedupe_conflicts(conflicts),
-                "audit": self._audit("findConflicts", mutated=False, scope=scope or {}),
-            }
-        )
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "status": "ok",
+            "conflicts": _dedupe_conflicts(conflicts),
+            "audit": self._audit("findConflicts", mutated=False, scope=scope or {}),
+        }
 
     def getMigrationState(self) -> MigrationState:
         with self._connect() as conn:
@@ -1384,21 +1365,19 @@ class CareerStore:
         status: str,
         confirmation_required: bool,
     ) -> JsonObject:
-        return _clean_result(
-            {
-                "schema_version": SCHEMA_VERSION,
-                "status": "error" if status != "rejected" else "rejected",
-                "mutation_status": "rejected",
-                "fact_id": fact_id,
-                "verification_state": verification_state,
-                "conflicts": [],
-                "confirmation_required": confirmation_required,
-                "errors": [_validation_error(status, "verification_state", _VERIFICATION_STATES)]
-                if status == "invalid_verification_state"
-                else [{"code": status, "message": status.replace("_", " ")}],
-                "audit": self._audit(operation, mutated=False, reason=status),
-            }
-        )
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "status": "error" if status != "rejected" else "rejected",
+            "mutation_status": "rejected",
+            "fact_id": fact_id,
+            "verification_state": verification_state,
+            "conflicts": [],
+            "confirmation_required": confirmation_required,
+            "errors": [_validation_error(status, "verification_state", _VERIFICATION_STATES)]
+            if status == "invalid_verification_state"
+            else [{"code": status, "message": status.replace("_", " ")}],
+            "audit": self._audit(operation, mutated=False, reason=status),
+        }
 
     def _interpretation_proposal_error(
         self,
@@ -1407,19 +1386,17 @@ class CareerStore:
         error: InvalidInterpretationProposalError,
         source: str,
     ) -> JsonObject:
-        return _clean_result(
-            {
-                "schema_version": SCHEMA_VERSION,
-                "status": "error",
-                "mutation_status": "rejected",
-                "fact_id": fact_id,
-                "verification_state": verification_state,
-                "conflicts": [],
-                "confirmation_required": True,
-                "errors": [error.to_error()],
-                "audit": self._audit("verifyFact", mutated=False, source=source, reason=error.code),
-            }
-        )
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "status": "error",
+            "mutation_status": "rejected",
+            "fact_id": fact_id,
+            "verification_state": verification_state,
+            "conflicts": [],
+            "confirmation_required": True,
+            "errors": [error.to_error()],
+            "audit": self._audit("verifyFact", mutated=False, source=source, reason=error.code),
+        }
 
     def _disallowed_transition_error(
         self,
@@ -1429,53 +1406,47 @@ class CareerStore:
         source: str,
         operation: str = "verifyFact",
     ) -> JsonObject:
-        return _clean_result(
-            {
-                "schema_version": SCHEMA_VERSION,
-                "status": "error",
-                "mutation_status": "rejected",
-                "fact_id": fact_id,
-                "verification_state": verification_state,
-                "conflicts": [],
-                "confirmation_required": error.requiredAuthority == "user_affirmed_proposal",
-                "errors": [error.to_error()],
-                "audit": self._audit(operation, mutated=False, source=source, reason="disallowed_verification_transition"),
-            }
-        )
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "status": "error",
+            "mutation_status": "rejected",
+            "fact_id": fact_id,
+            "verification_state": verification_state,
+            "conflicts": [],
+            "confirmation_required": error.requiredAuthority == "user_affirmed_proposal",
+            "errors": [error.to_error()],
+            "audit": self._audit(operation, mutated=False, source=source, reason="disallowed_verification_transition"),
+        }
 
     def _relationship_error(self, fact_id: str, reason: str, confirmation_required: bool) -> JsonObject:
-        return _clean_result(
-            {
-                "schema_version": SCHEMA_VERSION,
-                "status": "error",
-                "mutation_status": "rejected",
-                "fact_id": fact_id,
-                "relationship_id": None,
-                "verification_state": "unknown",
-                "conflicts": [],
-                "confirmation_required": confirmation_required,
-                "errors": [_validation_error(reason, "relationship_type", _RELATIONSHIP_TYPES)]
-                if reason == "invalid_relationship_type"
-                else [{"code": reason, "message": reason.replace("_", " ")}],
-                "audit": self._audit("addRelationship", mutated=False, reason=reason),
-            }
-        )
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "status": "error",
+            "mutation_status": "rejected",
+            "fact_id": fact_id,
+            "relationship_id": None,
+            "verification_state": "unknown",
+            "conflicts": [],
+            "confirmation_required": confirmation_required,
+            "errors": [_validation_error(reason, "relationship_type", _RELATIONSHIP_TYPES)]
+            if reason == "invalid_relationship_type"
+            else [{"code": reason, "message": reason.replace("_", " ")}],
+            "audit": self._audit("addRelationship", mutated=False, reason=reason),
+        }
 
     def _job_match_error(self, job_id: str, requirement_id: str, reason: str) -> JsonObject:
-        return _clean_result(
-            {
-                "schema_version": SCHEMA_VERSION,
-                "status": "error",
-                "mutation_status": "rejected",
-                "job_match_id": None,
-                "job_id": str(job_id),
-                "requirement_id": str(requirement_id),
-                "fact_ids": [],
-                "resolution_state": "unknown",
-                "errors": [_validation_error(reason, "resolution_state", _RESOLUTION_STATES)],
-                "audit": self._audit("recordJobMatch", mutated=False, reason=reason),
-            }
-        )
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "status": "error",
+            "mutation_status": "rejected",
+            "job_match_id": None,
+            "job_id": str(job_id),
+            "requirement_id": str(requirement_id),
+            "fact_ids": [],
+            "resolution_state": "unknown",
+            "errors": [_validation_error(reason, "resolution_state", _RESOLUTION_STATES)],
+            "audit": self._audit("recordJobMatch", mutated=False, reason=reason),
+        }
 
 
 def openCareerStore(database_path: str, clock: Callable[[], str] | None = None) -> CareerStore:

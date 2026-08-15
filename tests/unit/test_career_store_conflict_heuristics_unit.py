@@ -1,3 +1,4 @@
+import sqlite3
 import sys
 import tempfile
 import unittest
@@ -61,6 +62,44 @@ class CareerStoreConflictHeuristicUnitTests(unittest.TestCase):
             self.assertEqual(len(result["conflicts"]), 1)
             self.assertEqual(result["conflicts"][0]["metadata"]["existing_claim"], {"concept": "aws", "years": 5})
             self.assertEqual(result["conflicts"][0]["metadata"]["proposed_claim"], {"concept": "aws", "years": 8})
+
+    def test_duplicate_conflict_creation_replays_produce_single_open_conflict_row(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "career.db"
+            store = openCareerStore(str(database_path), clock=lambda: FIXED_TIME)
+            store.upsertFact(
+                {
+                    "fact_id": "fact_aws_5",
+                    "type": "skill",
+                    "text": "AWS, 5 years",
+                    "normalized_terms": ["aws", "5 years"],
+                    "verification_state": "source_stated",
+                },
+                {"source": "resume", "text": "5 years of AWS"},
+                source="resume",
+                policy={},
+            )
+            competing_claim = {
+                "fact_id": "fact_aws_8",
+                "type": "skill",
+                "text": "AWS, 8 years",
+                "normalized_terms": ["aws", "8 years"],
+                "verification_state": "source_stated",
+            }
+
+            first = store.upsertFact(competing_claim, {"source": "resume", "text": "8 years of AWS"}, source="resume", policy={})
+            replay = store.upsertFact(competing_claim, {"source": "resume", "text": "8 years of AWS"}, source="resume", policy={})
+
+            self.assertEqual(first["status"], "created")
+            self.assertEqual(replay["status"], "updated")
+            self.assertEqual(len(first["conflicts"]), 1)
+            self.assertEqual(replay["conflicts"], first["conflicts"])
+            self.assertEqual(first["transaction_result"]["ids"]["conflict_ids"], first["conflicts"][0]["conflict_id"])
+            with sqlite3.connect(database_path) as conn:
+                rows = conn.execute("SELECT conflict_id, status, metadata_json FROM conflicts").fetchall()
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0][0], first["conflicts"][0]["conflict_id"])
+            self.assertEqual(rows[0][1], "open")
 
     def test_number_word_above_ten_years_claim_parses_and_conflicts(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

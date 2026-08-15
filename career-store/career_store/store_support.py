@@ -66,22 +66,6 @@ _TITLE_ROLE_GENERIC_TERMS = {
     "title",
 }
 
-_FORBIDDEN_RESULT_KEYS = {
-    "raw_sql",
-    "connection",
-    "internal_rows",
-    "silent_user_verified_promotion",
-    "implicit_confirmation",
-    "destructive_delete",
-    "related_as_equivalent_without_policy",
-    "official_score",
-    "destructive_resolution",
-    "resume_patch",
-    "working_resume",
-    "base_resume",
-}
-
-
 def _stable_id(prefix: str, *parts: Any) -> str:
     payload = "\x1f".join(str(part) for part in parts)
     digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:24]
@@ -267,14 +251,6 @@ def _dedupe_conflicts(conflicts: list[JsonObject]) -> list[JsonObject]:
     return [deduped[key] for key in sorted(deduped)]
 
 
-def _clean_result(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {key: _clean_result(item) for key, item in value.items() if key not in _FORBIDDEN_RESULT_KEYS}
-    if isinstance(value, list):
-        return [_clean_result(item) for item in value]
-    return value
-
-
 def _normalized_terms(value: JsonObject) -> list[str]:
     raw_terms = value.get("normalized_terms") or []
     if isinstance(raw_terms, str):
@@ -435,23 +411,21 @@ def _relationship_candidate(
 
 
 def _search_error(store: Any, schema_version: str, code: str, field_path: str) -> JsonObject:
-    return _clean_result(
-        {
-            "schema_version": schema_version,
-            "status": "error",
-            "mutation_status": "rejected",
-            "facts": [],
-            "errors": [
-                {
-                    "type": "InvalidSearchFilterError",
-                    "code": code,
-                    "field_path": field_path,
-                    "message": f"Invalid {field_path}.",
-                }
-            ],
-            "audit": store._audit("searchFacts", mutated=False, reason=code),
-        }
-    )
+    return {
+        "schema_version": schema_version,
+        "status": "error",
+        "mutation_status": "rejected",
+        "facts": [],
+        "errors": [
+            {
+                "type": "InvalidSearchFilterError",
+                "code": code,
+                "field_path": field_path,
+                "message": f"Invalid {field_path}.",
+            }
+        ],
+        "audit": store._audit("searchFacts", mutated=False, reason=code),
+    }
 
 
 def _search_filters(store: Any, schema_version: str, filters: JsonObject | None) -> JsonObject:
@@ -860,7 +834,7 @@ def _confirm_relationship(store: Any, schema_version: str, relationshipId: str, 
                     }
     transaction_result = txn.result
     result["transaction_result"] = transaction_result_payload(transaction_result)
-    return _clean_result(result)
+    return result
 
 
 def _relationship_confirmation_error(
@@ -869,17 +843,15 @@ def _relationship_confirmation_error(
     relationship_id: str,
     error: InvalidRelationshipConfirmationError,
 ) -> JsonObject:
-    return _clean_result(
-        {
-            "schema_version": schema_version,
-            "status": "error",
-            "mutation_status": "rejected",
-            "relationship_id": relationship_id,
-            "confirmation_status": RELATIONSHIP_CONFIRMATION_UNCONFIRMED,
-            "errors": [error.to_error()],
-            "audit": store._audit("confirmRelationship", mutated=False, reason=error.code),
-        }
-    )
+    return {
+        "schema_version": schema_version,
+        "status": "error",
+        "mutation_status": "rejected",
+        "relationship_id": relationship_id,
+        "confirmation_status": RELATIONSHIP_CONFIRMATION_UNCONFIRMED,
+        "errors": [error.to_error()],
+        "audit": store._audit("confirmRelationship", mutated=False, reason=error.code),
+    }
 
 
 def _merged_metadata(existing: JsonObject, incoming: Any) -> JsonObject:
@@ -946,21 +918,19 @@ def _merge_conflict(conn: sqlite3.Connection, survivor_id: str, merged_id: str) 
 
 
 def _merge_conflict_result(error: MergeConflictError, schema_version: str, audit: JsonObject) -> JsonObject:
-    return _clean_result(
-        {
-            "schema_version": schema_version,
-            "status": "error",
-            "mutation_status": "rejected",
-            "fact_id": error.survivor_id,
-            "survivor_fact_id": error.survivor_id,
-            "merged_fact_id": error.merged_id,
-            "verification_state": "unknown",
-            "conflicts": [],
-            "confirmation_required": False,
-            "errors": [error.to_error()],
-            "audit": audit,
-        }
-    )
+    return {
+        "schema_version": schema_version,
+        "status": "error",
+        "mutation_status": "rejected",
+        "fact_id": error.survivor_id,
+        "survivor_fact_id": error.survivor_id,
+        "merged_fact_id": error.merged_id,
+        "verification_state": "unknown",
+        "conflicts": [],
+        "confirmation_required": False,
+        "errors": [error.to_error()],
+        "audit": audit,
+    }
 
 
 def _insert_merge_alias_relationship(

@@ -6,7 +6,7 @@ from typing import Any
 
 from .interactions import _record_interaction_in_transaction
 from .schemas import InterpretationProposal
-from .store_support import CONFLICT_TERMINAL_STATUSES, _clean_result, _conflict_from_row, _state_value, _to_json
+from .store_support import CONFLICT_TERMINAL_STATUSES, _conflict_from_row, _state_value, _to_json
 from .transactions import transaction_result_payload
 from .verification import (
     DisallowedTransitionError,
@@ -173,7 +173,7 @@ def _adjudicate_conflict(store: Any, schema_version: str, conflictId: str, decis
                         "audit": store._audit("adjudicateConflict", mutated=True),
                     }
     result["transaction_result"] = transaction_result_payload(txn.result)
-    return _clean_result(result)
+    return result
 
 
 def _apply_adjudication_verification_transition(
@@ -247,20 +247,18 @@ def _conflict_adjudication_error(
     error: ConflictAdjudicationError,
     current_status: str,
 ) -> JsonObject:
-    return _clean_result(
-        {
-            "schema_version": schema_version,
-            "status": "error",
-            "mutation_status": "rejected",
-            "conflict_id": conflict_id,
-            "current_status": current_status,
-            "conflict": None,
-            "verification_state": None,
-            "interaction_id": None,
-            "errors": [error.to_error()],
-            "audit": store._audit("adjudicateConflict", mutated=False, reason=error.code),
-        }
-    )
+    return {
+        "schema_version": schema_version,
+        "status": "error",
+        "mutation_status": "rejected",
+        "conflict_id": conflict_id,
+        "current_status": current_status,
+        "conflict": None,
+        "verification_state": None,
+        "interaction_id": None,
+        "errors": [error.to_error()],
+        "audit": store._audit("adjudicateConflict", mutated=False, reason=error.code),
+    }
 
 
 def _validate_conflict_decision(decision: str | JsonObject) -> JsonObject:

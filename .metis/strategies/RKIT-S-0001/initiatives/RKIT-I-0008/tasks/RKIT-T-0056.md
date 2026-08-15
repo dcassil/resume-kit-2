@@ -4,14 +4,14 @@ level: task
 title: "Honest years/title conflict heuristics and dead-branch removal"
 short_code: "RKIT-T-0056"
 created_at: 2026-08-15T02:07:49.766969+00:00
-updated_at: 2026-08-15T02:30:56.840609+00:00
+updated_at: 2026-08-15T02:38:30.272772+00:00
 parent: conflict-audit-recovery-and
 blocked_by: [RKIT-T-0055]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0008
 ## Objective
 
 Replace the fixture-tuned conflict heuristics (RKIT-I-0008 Requirements 4-6): `_year_claim`'s bare-digit sniffing replaced with the salvaged `_YEARS_RE` explicit-pattern extraction (in the initiative doc, verbatim); `_title_claim`'s hardcoded 5-title list replaced with a general structured-claim title model; the dead identical if/else in `_detect_conflicts` removed and the same-fact contract scenario rewritten to real semantics.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

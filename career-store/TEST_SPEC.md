@@ -123,6 +123,32 @@ Executable case names:
 - Detect conflicting title claims, such as actual title versus fabricated Staff title.
 - Detect mutually incompatible source statements.
 - Return conflict details without silently overwriting existing fact truth.
+- Replaying the same conflicting claim must not create duplicate conflict rows.
+
+Executable case names:
+
+- Years heuristic regressions: `tests.unit.test_career_store_conflict_heuristics_unit.CareerStoreConflictHeuristicUnitTests.test_react_version_numbers_do_not_create_years_conflict`, `test_explicit_digit_years_conflict_on_same_concept`, and `test_number_word_above_ten_years_claim_parses_and_conflicts`.
+- Title heuristic regressions: `tests.unit.test_career_store_conflict_heuristics_unit.CareerStoreConflictHeuristicUnitTests.test_structured_title_claims_conflict_for_same_role_slot_outside_legacy_title_list` and `test_staff_title_fixture_conflicts_via_structured_title_model`.
+- Self-claim and replay idempotency: `tests.unit.test_career_store_conflict_heuristics_unit.CareerStoreConflictHeuristicUnitTests.test_claim_fact_id_is_not_checked_against_itself_but_competing_claim_conflicts` and `test_duplicate_conflict_creation_replays_produce_single_open_conflict_row`.
+- Contract conflict shape: `tests.contract.test_career_store_contract.CareerStorePersistenceContractTests.test_conflicting_claims_are_returned_without_overwriting_history`.
+
+### Conflict workflow
+
+- Resolve conflicts by recording the user answer, preserving both competing claims, and marking the conflict resolved.
+- Dismiss conflicts by recording the user answer without requiring a winning claim.
+- Re-adjudicating with the identical decision must be idempotent; re-adjudicating with a different decision must be rejected.
+- Adjudication must not overwrite stored fact text, evidence, or conflict metadata.
+- Verification-changing adjudication must route through the verification transition engine.
+- Agent-only adjudication must not change verification state or close the conflict.
+
+Executable case names:
+
+- Resolve/no-overwrite: `tests.unit.test_career_store_conflict_lifecycle_unit.CareerStoreConflictLifecycleUnitTests.test_resolve_conflict_records_answer_interaction_and_preserves_both_claims`.
+- Dismiss: `tests.unit.test_career_store_conflict_lifecycle_unit.CareerStoreConflictLifecycleUnitTests.test_dismiss_conflict_records_answer_interaction_without_winner`.
+- Adjudicate idempotency/no-overwrite: `tests.unit.test_career_store_conflict_lifecycle_unit.CareerStoreConflictLifecycleUnitTests.test_identical_readjudication_is_idempotent_but_different_readjudication_is_rejected`.
+- Engine routing: `tests.unit.test_career_store_conflict_lifecycle_unit.CareerStoreConflictLifecycleUnitTests.test_user_adjudication_routes_verification_change_through_engine`.
+- Agent authority rejection: `tests.unit.test_career_store_conflict_lifecycle_unit.CareerStoreConflictLifecycleUnitTests.test_agent_only_adjudication_cannot_change_verification_state_and_leaves_conflict_open`.
+- Typed validation: `tests.unit.test_career_store_conflict_lifecycle_unit.CareerStoreConflictLifecycleUnitTests.test_unknown_conflict_invalid_decision_and_malformed_provenance_are_typed_errors`.
 
 ### Job associations
 
@@ -149,6 +175,14 @@ Executable case names:
 - Assert preference learning cannot change verification state.
 - Assert rejecting phrasing does not remove the underlying career fact.
 
+Executable case names:
+
+- Schema and append-only storage: `tests.unit.test_career_store_interactions_unit.CareerStoreInteractionsUnitTests.test_schema_008_creates_append_only_interactions_table`.
+- Vocabulary, transaction result, and replay idempotency: `tests.unit.test_career_store_interactions_unit.CareerStoreInteractionsUnitTests.test_record_interaction_uses_vocabulary_validation_transaction_and_replay_idempotency`.
+- Deterministic listing/filtering: `tests.unit.test_career_store_interactions_unit.CareerStoreInteractionsUnitTests.test_list_interactions_filters_deterministically_and_rejects_malformed_filters`.
+- Preference/confirmation non-promotion: `tests.unit.test_career_store_interactions_unit.CareerStoreInteractionsUnitTests.test_fact_confirmed_interaction_does_not_mutate_verification_state`.
+- Boundary isolation: `tests.unit.test_career_store_interactions_unit.CareerStoreInteractionsUnitTests.test_interactions_module_has_no_verification_or_state_mutation_imports`.
+
 ### Transactions and recovery
 
 - Execute conflict detection and fact/evidence writes inside one store-owned transaction.
@@ -165,12 +199,27 @@ Executable merge-retention case names:
 - Merge retention: `tests.unit.test_career_store_merge_facts_unit.CareerStoreMergeFactsUnitTests.test_merge_facts_retains_aliases_evidence_history_redirect_and_job_matches`, `test_merge_facts_preserves_user_verified_survivor_when_merged_is_inferred`, and `test_merge_facts_does_not_promote_inferred_survivor_from_user_verified_merged_fact`.
 - Merge atomicity: `tests.unit.test_career_store_merge_facts_unit.CareerStoreMergeFactsUnitTests.test_merge_facts_rolls_back_after_repoint_interruption`.
 
+Executable transaction/retry case names:
+
+- Upsert rollback: `tests.unit.test_career_store_transactions_unit.CareerStoreTransactionUnitTests.test_upsert_rollback_after_conflict_detection_leaves_no_partial_rows_and_reports_transaction`.
+- Interaction replay: `tests.unit.test_career_store_interactions_unit.CareerStoreInteractionsUnitTests.test_record_interaction_uses_vocabulary_validation_transaction_and_replay_idempotency`.
+- Conflict creation replay: `tests.unit.test_career_store_conflict_heuristics_unit.CareerStoreConflictHeuristicUnitTests.test_duplicate_conflict_creation_replays_produce_single_open_conflict_row`.
+- Conflict adjudication replay: `tests.unit.test_career_store_conflict_lifecycle_unit.CareerStoreConflictLifecycleUnitTests.test_identical_readjudication_is_idempotent_but_different_readjudication_is_rejected`.
+- Adjudication rollback: `tests.unit.test_career_store_conflict_lifecycle_unit.CareerStoreConflictLifecycleUnitTests.test_adjudicate_conflict_rolls_back_when_interaction_insert_fails_after_conflict_update`.
+
 ## Boundary Tests
 
 - Fail if store imports CLI/plugin host code.
 - Fail if store asks natural-language questions.
 - Fail if store renders resumes or changes resume files.
 - Fail if any public API exposes raw SQL execution.
+- Assert real store outputs are built without raw SQL handles, resume mutation payloads, official scores, or silent verification-promotion fields; this is a result-shape contract, not a sanitizer implementation contract.
+
+Executable real-output case names:
+
+- Source fact output shape: `tests.contract.test_career_store_contract.CareerStorePersistenceContractTests.test_fact_upsert_persists_source_stated_fact_with_evidence`.
+- Job match output shape: `tests.contract.test_career_store_contract.CareerStorePersistenceContractTests.test_job_match_recording_does_not_mutate_resume_state_or_return_raw_database_handles`.
+- MCP match output shape: `tests.contract.test_career_mcp_contract.CareerMcpAdapterContractTests.test_find_matches_returns_resolution_states_without_official_scores`.
 
 ## Smoke Coverage
 

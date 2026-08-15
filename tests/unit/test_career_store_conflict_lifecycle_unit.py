@@ -98,7 +98,8 @@ class CareerStoreConflictLifecycleUnitTests(unittest.TestCase):
 
     def test_identical_readjudication_is_idempotent_but_different_readjudication_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            store = openCareerStore(str(Path(directory) / "career.db"), clock=lambda: FIXED_TIME)
+            database_path = Path(directory) / "career.db"
+            store = openCareerStore(str(database_path), clock=lambda: FIXED_TIME)
             six, ten, conflict = _conflicting_aws_claims(store)
             decision = {"status": "resolved", "winning_claim_ref": six["fact_id"]}
 
@@ -113,10 +114,50 @@ class CareerStoreConflictLifecycleUnitTests(unittest.TestCase):
             self.assertEqual(first["status"], "updated")
             self.assertEqual(repeated["status"], "unchanged")
             self.assertEqual(repeated["mutation_status"], "unchanged")
+            self.assertEqual(repeated["interaction_id"], None)
+            self.assertEqual(repeated["conflict"], first["conflict"])
+            self.assertEqual(repeated["transaction_result"]["mutation_status"], "unchanged")
             self.assertEqual(conflicting["status"], "error")
             self.assertEqual(conflicting["errors"][0]["code"], "conflicting_readjudication")
             interactions = store.listInteractions({"subject_id": conflict["conflict_id"]})
             self.assertEqual(len(interactions["interactions"]), 1)
+            with sqlite3.connect(database_path) as conn:
+                status, count = conn.execute(
+                    "SELECT status, COUNT(*) OVER () FROM conflicts WHERE conflict_id = ?",
+                    (conflict["conflict_id"],),
+                ).fetchone()
+            self.assertEqual(status, "resolved")
+            self.assertEqual(count, 1)
+
+    def test_adjudicate_conflict_rolls_back_when_interaction_insert_fails_after_conflict_update(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "career.db"
+            store = openCareerStore(str(database_path), clock=lambda: FIXED_TIME)
+            six, _, conflict = _conflicting_aws_claims(store)
+
+            def fail_after_conflict_update(*args, **kwargs):
+                raise RuntimeError("injected adjudication interaction failure")
+
+            with patch.object(conflict_lifecycle_module, "_record_interaction_in_transaction", side_effect=fail_after_conflict_update):
+                with self.assertRaises(RuntimeError) as raised:
+                    store.adjudicateConflict(
+                        conflict["conflict_id"],
+                        {"status": "resolved", "winning_claim_ref": six["fact_id"]},
+                        USER_PROVENANCE,
+                    )
+
+            transaction_result = raised.exception.transaction_result
+            self.assertEqual(transaction_result.status, "rolled_back")
+            self.assertEqual(transaction_result.mutation_status, "rolled_back")
+            with sqlite3.connect(database_path) as conn:
+                conn.row_factory = sqlite3.Row
+                conflict_row = conn.execute("SELECT * FROM conflicts WHERE conflict_id = ?", (conflict["conflict_id"],)).fetchone()
+                interaction_count = conn.execute("SELECT COUNT(*) FROM interactions").fetchone()[0]
+            self.assertEqual(conflict_row["status"], "open")
+            self.assertIsNone(conflict_row["resolution_provenance_json"])
+            self.assertIsNone(conflict_row["resolved_at"])
+            self.assertIsNone(conflict_row["winning_claim_ref"])
+            self.assertEqual(interaction_count, 0)
 
     def test_user_adjudication_routes_verification_change_through_engine(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
