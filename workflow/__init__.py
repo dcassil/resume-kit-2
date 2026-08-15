@@ -150,7 +150,8 @@ def getNextCheckpoint(run_state: JsonObject) -> JsonObject:
 def advanceCheckpoint(run_state: JsonObject, target_checkpoint: str, evidence: JsonObject, clock: Callable[[], str] | None = None) -> JsonObject:
     working_state = _working_run_state(run_state)
     current = str(working_state.get("current_checkpoint", "INIT"))
-    expected = getNextCheckpoint(working_state)["next_checkpoint"]
+    checkpoint_plan = getNextCheckpoint(working_state)
+    expected = checkpoint_plan["next_checkpoint"]
     blocking_reasons: list[str] = []
     evidence_errors: list[JsonObject] = []
     verified_evidence: JsonObject = {}
@@ -202,6 +203,8 @@ def advanceCheckpoint(run_state: JsonObject, target_checkpoint: str, evidence: J
     }
     if current == "RESOLVE_GAPS" and target_checkpoint == "MATCH_BASE":
         updated["resolution_match_rerun_pending"] = True
+    if current == "RESOLVE_GAPS" and target_checkpoint == "BUILD_SELECTION_PLAN":
+        _record_resolution_loop_exit_unresolved(updated, checkpoint_plan)
     event = _append_advance_audit_event(
         updated,
         checkpoint=target_checkpoint,
@@ -1211,6 +1214,36 @@ def _extend_requirement_unique(run_state: JsonObject, requirements: Any) -> None
     existing = _normalized_unresolved_requirements(run_state.get("unresolved_requirements", []))
     incoming = _normalized_unresolved_requirements(requirements)
     run_state["unresolved_requirements"] = _dedupe_dicts(existing + incoming)
+
+
+def _record_resolution_loop_exit_unresolved(run_state: JsonObject, checkpoint_plan: JsonObject) -> None:
+    predicate = checkpoint_plan.get("resolution_loop", {}).get("predicate", {})
+    if predicate.get("action") != "advance_with_unresolved":
+        return
+    _extend_requirement_unique(run_state, _loop_exit_unresolved_requirements(predicate.get("unresolved_requirements", [])))
+
+
+def _loop_exit_unresolved_requirements(requirements: Any) -> list[JsonObject]:
+    if not isinstance(requirements, list):
+        return []
+    records: list[JsonObject] = []
+    for item in requirements:
+        if not isinstance(item, dict):
+            continue
+        requirement_id = item.get("requirement_id")
+        status = item.get("status")
+        if not isinstance(requirement_id, str) or not requirement_id:
+            continue
+        if status not in {"user_declined", "exhausted"}:
+            continue
+        records.append(
+            {
+                "requirement_id": requirement_id,
+                "resolution_state": status,
+                "reason": status,
+            }
+        )
+    return records
 
 
 def _append_unresolved_requirements(target: list[JsonObject], requirements: Any) -> None:

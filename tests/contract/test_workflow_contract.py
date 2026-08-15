@@ -105,6 +105,55 @@ class WorkflowSurfaceManifestTests(unittest.TestCase):
             self.assertIn(field, MANIFEST_FIELDS)
 
 
+class WorkflowPublicSurfaceBoundaryTests(unittest.TestCase):
+    def test_workflow_exports_only_manifested_non_interactive_public_surface(self):
+        module = load_workflow_module(self)
+        expected_exports = (
+            "RUN_MANIFEST_SCHEMA",
+            "SCHEMAS",
+            "Checkpoint",
+            "RunManifest",
+            "RunManifestValidationError",
+            "UnknownRunError",
+            "createRun",
+            "getNextCheckpoint",
+            "advanceCheckpoint",
+            "recordCheckpointResult",
+            "buildRunManifest",
+            "reconstructRunManifest",
+            "recoverRun",
+            "assertCanComplete",
+        )
+        self.assertEqual(tuple(module.__all__), expected_exports)
+        self.assertEqual(
+            tuple(name for name in module.__all__ if inspect.isfunction(getattr(module, name, None))),
+            (
+                "createRun",
+                "getNextCheckpoint",
+                "advanceCheckpoint",
+                "recordCheckpointResult",
+                "buildRunManifest",
+                "reconstructRunManifest",
+                "recoverRun",
+                "assertCanComplete",
+            ),
+        )
+
+    def test_exported_workflow_functions_have_no_interaction_question_api_shape(self):
+        module = load_workflow_module(self)
+        forbidden_terms = ("ask", "prompt", "question", "answer", "interact", "user_input")
+        for name in module.__all__:
+            value = getattr(module, name)
+            if not inspect.isfunction(value):
+                continue
+            signature = inspect.signature(value)
+            public_tokens = [name, *signature.parameters]
+            self.assertFalse(
+                any(term in token.lower() for token in public_tokens for term in forbidden_terms),
+                f"{name}{signature} must remain orchestration-only, not a user-interaction API.",
+            )
+
+
 class WorkflowStateMachineContractTests(unittest.TestCase):
     def setUp(self):
         self.workflow = load_workflow_module(self)
@@ -206,6 +255,8 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
                 "base_resume_hash": "hash_base",
                 "job_id": "job_1",
                 "renderer_template_version": "ats-clean@1",
+                "initial_score": 6.4,
+                "final_score": 8.2,
             }
         )
         return run_state
@@ -655,6 +706,80 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
             )
         )
         self.assertEqual(advanced["status"], "ok", advanced.get("blocking_reasons"))
+        manifest_state = {
+            **run_state,
+            "base_resume_id": "base_1",
+            "base_resume_hash": "hash_base",
+            "job_id": "job_1",
+            "renderer_template_version": "ats-clean@1",
+        }
+        built = maybe_await(self.workflow.buildRunManifest(manifest_state))
+        reconstructed = maybe_await(self.workflow.reconstructRunManifest(run_state["run_id"], workspace=self.workspace))
+        self.assertEqual(
+            run_state["unresolved_requirements"],
+            [
+                {"requirement_id": "req_aws", "resolution_state": "exhausted", "reason": "exhausted"},
+                {"requirement_id": "pref_k8s", "resolution_state": "exhausted", "reason": "exhausted"},
+            ],
+        )
+        self.assertEqual(reconstructed["unresolved_requirements"], built["unresolved_requirements"])
+        self.assertEqual(reconstructed["unresolved_requirements"], run_state["unresolved_requirements"])
+
+    def test_resolution_loop_branch_c_records_user_declined_reason_in_manifest(self):
+        run_state = self.enter_resolve_gaps_with_recorded_match(
+            self.match_result(
+                "resolve_gaps",
+                [
+                    self.requirement_result("req_aws", 8.0, classification="required"),
+                    self.requirement_result("pref_k8s", 3.0, classification="preferred"),
+                ],
+                unresolved=["req_aws"],
+                preferred=["pref_k8s"],
+            )
+        )
+        run_state.update(
+            {
+                "base_resume_id": "base_1",
+                "base_resume_hash": "hash_base",
+                "job_id": "job_1",
+                "renderer_template_version": "ats-clean@1",
+                "initial_score": 6.4,
+                "final_score": 8.2,
+            }
+        )
+        recorded = maybe_await(
+            self.workflow.recordCheckpointResult(
+                run_state,
+                "RESOLVE_GAPS",
+                {
+                    "user_declined_requirements": ["req_aws"],
+                    "exhausted_requirements": ["pref_k8s"],
+                },
+            )
+        )
+        self.assertEqual(recorded["status"], "ok")
+        decision = maybe_await(self.workflow.getNextCheckpoint(run_state))
+        self.assertEqual(decision["resolution_loop"]["predicate"]["branch"], "c_resolve_gaps_all_exhausted")
+
+        advanced = maybe_await(
+            self.workflow.advanceCheckpoint(
+                run_state,
+                "BUILD_SELECTION_PLAN",
+                {"gaps_resolved": {"kind": "run_state", "key": "resolution_loop_state"}},
+            )
+        )
+        self.assertEqual(advanced["status"], "ok", advanced.get("blocking_reasons"))
+        built = maybe_await(self.workflow.buildRunManifest(run_state))
+        reconstructed = maybe_await(self.workflow.reconstructRunManifest(run_state["run_id"], workspace=self.workspace))
+
+        self.assertEqual(
+            built["unresolved_requirements"],
+            [
+                {"requirement_id": "req_aws", "resolution_state": "user_declined", "reason": "user_declined"},
+                {"requirement_id": "pref_k8s", "resolution_state": "exhausted", "reason": "exhausted"},
+            ],
+        )
+        self.assertEqual(reconstructed, built)
 
     def test_resolution_loop_branch_d_blocks_unresolved_hard_requirement_when_required(self):
         run_state = self.enter_resolve_gaps_with_recorded_match(

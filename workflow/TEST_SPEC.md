@@ -55,8 +55,9 @@ Tests should expect workflow artifacts around:
 - Job ingest can move to normalization only after the ingested job artifact exists and its hash matches the EvidenceRef.
 - Normalization can move to matching only after a normalization DTO resolves against the declared workflow schema.
 - Match can move to gap resolution only after a match-result DTO resolves against the declared workflow schema.
-- Gap resolution must rerun match when persisted verified facts exist beyond the last match watermark.
-- After the rerun records a match watermark covering the verified facts, BUILD_SELECTION_PLAN must be reachable with grounded run-state evidence and the loop must terminate.
+- Gap resolution with new persisted verified facts beyond the last match watermark must rerun match exactly once for that fact batch; after the rerun records a covering watermark, the loop continues and BUILD_SELECTION_PLAN must be reachable with grounded run-state evidence.
+- Gap resolution with exhausted unresolved non-hard gaps must advance to BUILD_SELECTION_PLAN and record unresolved_requirements entries in the run manifest source state.
+- Gap resolution with an unresolved hard requirement and requireHardRequirementsResolved enabled must remain blocked and must not advance to BUILD_SELECTION_PLAN.
 - Tailoring can move to agent rewrite proposals only after a selection-plan DTO resolves against the declared workflow schema.
 - Changes can move to application only after change-validation DTO evidence resolves against the declared workflow schema.
 - Final match can move to grounding audit only after operations-applied evidence resolves from persisted run state.
