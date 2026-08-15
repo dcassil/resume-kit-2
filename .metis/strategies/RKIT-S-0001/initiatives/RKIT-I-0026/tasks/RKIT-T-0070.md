@@ -4,14 +4,14 @@ level: task
 title: "Exhaustion honesty into the manifest, TEST_SPEC termination cases, no-interaction boundary; I-0026 close-out"
 short_code: "RKIT-T-0070"
 created_at: 2026-08-15T04:05:15.623143+00:00
-updated_at: 2026-08-15T04:22:53.142427+00:00
+updated_at: 2026-08-15T04:28:49.697942+00:00
 parent: workflow-requirement-resolution
 blocked_by: [RKIT-T-0069]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0026
 ## Objective
 
 Close out RKIT-I-0026 (Requirement 5 + Testing Strategy): exiting the loop with unresolved gaps records them into run state feeding the manifest's unresolved_requirements field (populating I-0022's schema obligation with real loop outcomes); workflow/TEST_SPEC.md:57 gains the three termination cases; a boundary test keeps the no-interaction surface structural; three-gate close-out with mutation probe.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

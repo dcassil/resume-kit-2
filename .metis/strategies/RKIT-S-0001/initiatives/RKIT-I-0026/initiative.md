@@ -4,14 +4,14 @@ level: initiative
 title: "Workflow Requirement Resolution Loop Orchestration"
 short_code: "RKIT-I-0026"
 created_at: 2026-08-13T20:41:37.474248+00:00
-updated_at: 2026-08-15T04:06:36.160684+00:00
+updated_at: 2026-08-15T04:29:04.649321+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0023]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -86,6 +86,8 @@ Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
 - **Clear facts_verified after each rerun instead of tracking a watermark.** Rejected in RKIT-I-0023 and equally here: facts_verified is cumulative audit data; the loop must terminate without destroying the trail.
 
 ## Implementation Plan **[REQUIRED]**
+
+**COMPLETE 2026-08-15 (continuous mode).** Executed as RKIT-T-0068..0070: T-0068 ResolutionLoopState (impact-ordered queue, asked-question id/ref registry, watermark-fed facts_since_last_match, iteration_count; lossless recovery) + four-branch termination predicate over recorded MATCH_BASE decisions (continue→advance; resolve_gaps→deterministic next topic, workflow-held cursor; exhausted→honest advance; blocked hard requirement→no advance) + read-only getNextCheckpoint.resolution_loop surface; T-0069 single-rerun discipline (pending marker set on advance/cleared on record; watermark consumed only at completion; multi-batch regression traverses to COMPLETE's gate w/ mid-iteration recovery); T-0070 exhaustion honesty (terminal user_declined/exhausted entries recorded once, manifest+reconstruction read one source), TEST_SPEC three termination cases, structural __all__-allowlist boundary, mutation probe. Gates at close: --pr 378 OK, --smoke OK, --future-contract 385 OK. Section 14.D.9 termination is now real; RKIT-I-0027 (tailoring/render/completion orchestration) and RKIT-I-0037 (CLI resolve UX) consume this substrate.
 
 Decomposition guidance (tasks to be created at decompose phase, in dependency order):
 1. ResolutionLoopState DTO plus persistence (queue, exhaustion status, asked-question registry).
