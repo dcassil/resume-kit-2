@@ -164,6 +164,9 @@ class ConflictRecord:
     status: str = "open"
     evidence_ids: list[str] = field(default_factory=list)
     metadata: JsonObject = field(default_factory=dict)
+    resolution_provenance: JsonObject | None = None
+    resolved_at: str | None = None
+    winning_claim_ref: str | None = None
 
 
 @dataclass(frozen=True)

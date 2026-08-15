@@ -111,6 +111,31 @@ def insert_interaction(conn: sqlite3.Connection, row: JsonObject) -> None:
     )
 
 
+def _record_interaction_in_transaction(
+    conn: sqlite3.Connection,
+    txn: Any,
+    interaction_type: str,
+    subject_id: str,
+    input_json: JsonObject,
+    result_json: JsonObject | None,
+    created_at: str,
+) -> JsonObject:
+    row = build_interaction_row(interaction_type, subject_id, input_json, result_json, created_at)
+    interaction_id = str(row["id"])
+    txn.touch("interaction_id", interaction_id)
+    existing = conn.execute("SELECT id FROM interactions WHERE id = ?", (interaction_id,)).fetchone()
+    insert_interaction(conn, row)
+    return {
+        "id": interaction_id,
+        "interaction_type": row["interaction_type"],
+        "subject_id": row["subject_id"],
+        "input_json": input_json,
+        "result_json": result_json or {},
+        "created_at": row["created_at"],
+        "mutation_status": "unchanged" if existing else "created",
+    }
+
+
 def list_interactions(conn: sqlite3.Connection, filters: Any | None = None) -> list[JsonObject]:
     clean_filters = _validate_filters(filters)
     clauses: list[str] = []
@@ -162,12 +187,18 @@ def _record_interaction_result(
     with transaction("recordInteraction", "created") as txn:
         conn = txn.connection
         assert conn is not None
-        interaction_id = str(row["id"])
-        txn.touch("interaction_id", interaction_id)
-        existing = conn.execute("SELECT id FROM interactions WHERE id = ?", (interaction_id,)).fetchone()
-        mutation_status = "unchanged" if existing else "created"
+        interaction = _record_interaction_in_transaction(
+            conn,
+            txn,
+            row["interaction_type"],
+            row["subject_id"],
+            input_json,
+            result_json,
+            row["created_at"],
+        )
+        interaction_id = str(interaction["id"])
+        mutation_status = str(interaction["mutation_status"])
         txn.set_mutation_status(mutation_status)
-        insert_interaction(conn, row)
         result = {
             "schema_version": schema_version,
             "status": mutation_status,
@@ -175,11 +206,11 @@ def _record_interaction_result(
             "interaction_id": interaction_id,
             "interaction": {
                 "id": interaction_id,
-                "interaction_type": row["interaction_type"],
-                "subject_id": row["subject_id"],
+                "interaction_type": interaction["interaction_type"],
+                "subject_id": interaction["subject_id"],
                 "input_json": input_json,
                 "result_json": result_json or {},
-                "created_at": row["created_at"],
+                "created_at": interaction["created_at"],
             },
             "transaction_result": None,
             "audit": audit("recordInteraction", mutated=True),

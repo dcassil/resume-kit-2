@@ -19,6 +19,7 @@ EXPECTED_MIGRATIONS = [
     "006_fact_merge_redirects",
     "007_relationship_confirmation_columns",
     "008_interactions_table",
+    "009_conflict_lifecycle",
 ]
 
 

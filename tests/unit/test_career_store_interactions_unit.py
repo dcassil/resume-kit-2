@@ -35,8 +35,9 @@ class CareerStoreInteractionsUnitTests(unittest.TestCase):
             store = openCareerStore(str(database_path), clock=lambda: FIXED_TIME)
             state = store.getMigrationState()
 
-            self.assertEqual(state.applied_migrations[-1], "008_interactions_table")
-            self.assertEqual(state.metadata["user_version"], 8)
+            self.assertIn("008_interactions_table", state.applied_migrations)
+            self.assertEqual(state.applied_migrations[-1], "009_conflict_lifecycle")
+            self.assertEqual(state.metadata["user_version"], 9)
             conn = sqlite3.connect(database_path)
             conn.row_factory = sqlite3.Row
             try:

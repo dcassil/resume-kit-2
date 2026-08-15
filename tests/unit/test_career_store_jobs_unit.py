@@ -33,7 +33,7 @@ class CareerStoreRealignmentTests(unittest.TestCase):
 
             self.assertEqual(state.applied_migrations, EXPECTED_MIGRATIONS)
             self.assertEqual(state.pending_migrations, [])
-            self.assertEqual(state.metadata["user_version"], 8)
+            self.assertEqual(state.metadata["user_version"], 9)
             with sqlite3.connect(database_path) as conn:
                 conn.row_factory = sqlite3.Row
                 self.assertEqual(conn.execute("SELECT COUNT(*) FROM facts").fetchone()[0], 2)
@@ -113,7 +113,7 @@ class CareerStoreRealignmentTests(unittest.TestCase):
                 }
                 existing_id = _legacy_conflict_id("fact_conflicted_existing")
                 created_id = _legacy_conflict_id("fact_conflicted_new")
-                self.assertEqual(conflicts[existing_id]["status"], "already_open")
+                self.assertEqual(conflicts[existing_id]["status"], "open")
                 self.assertEqual(conflicts[existing_id]["metadata"]["preserved"], True)
                 self.assertEqual(conflicts[created_id]["fact_ids"], ["fact_conflicted_new"])
                 self.assertEqual(conflicts[created_id]["reason"], "legacy conflicted verification state")

@@ -109,7 +109,7 @@ def _apply_initial(conn: sqlite3.Connection) -> None:
             conflict_id TEXT PRIMARY KEY,
             fact_ids_json TEXT NOT NULL,
             reason TEXT NOT NULL,
-            status TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'open',
             evidence_ids_json TEXT NOT NULL,
             metadata_json TEXT NOT NULL,
             created_at TEXT NOT NULL
@@ -294,6 +294,75 @@ def _apply_interactions_table(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_interactions_created_at ON interactions(created_at)")
 
 
+def _apply_conflict_lifecycle_columns(conn: sqlite3.Connection) -> None:
+    columns = _table_columns(conn, "conflicts")
+    if {
+        "conflict_id",
+        "fact_ids_json",
+        "reason",
+        "status",
+        "evidence_ids_json",
+        "metadata_json",
+        "created_at",
+        "resolution_provenance_json",
+        "resolved_at",
+        "winning_claim_ref",
+    } <= columns:
+        conn.execute(
+            """
+            UPDATE conflicts
+            SET status = 'open'
+            WHERE status IS NULL OR status NOT IN ('open', 'resolved', 'dismissed')
+            """
+        )
+        return
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS conflicts_lifecycle_migration (
+            conflict_id TEXT PRIMARY KEY,
+            fact_ids_json TEXT NOT NULL,
+            reason TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'open',
+            evidence_ids_json TEXT NOT NULL,
+            metadata_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            resolution_provenance_json TEXT,
+            resolved_at TEXT,
+            winning_claim_ref TEXT
+        )
+        """
+    )
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO conflicts_lifecycle_migration (
+            conflict_id, fact_ids_json, reason, status, evidence_ids_json, metadata_json, created_at,
+            resolution_provenance_json, resolved_at, winning_claim_ref
+        )
+        SELECT
+            conflict_id,
+            fact_ids_json,
+            reason,
+            CASE WHEN status IN ('open', 'resolved', 'dismissed') THEN status ELSE 'open' END,
+            evidence_ids_json,
+            metadata_json,
+            created_at,
+            NULL,
+            NULL,
+            NULL
+        FROM conflicts
+        """
+    )
+    conn.execute("DROP TABLE conflicts")
+    conn.execute("ALTER TABLE conflicts_lifecycle_migration RENAME TO conflicts")
+    conn.execute(
+        """
+        UPDATE conflicts
+        SET status = 'open'
+        WHERE status IS NULL OR status NOT IN ('open', 'resolved', 'dismissed')
+        """
+    )
+
+
 MIGRATIONS: tuple[MigrationEntry, ...] = (
     MigrationEntry("001_initial", _apply_initial),
     MigrationEntry("002_section_6_fact_columns", _apply_section_6_fact_columns),
@@ -303,6 +372,7 @@ MIGRATIONS: tuple[MigrationEntry, ...] = (
     MigrationEntry("006_fact_merge_redirects", _apply_fact_merge_redirects),
     MigrationEntry("007_relationship_confirmation_columns", _apply_relationship_confirmation_columns),
     MigrationEntry("008_interactions_table", _apply_interactions_table),
+    MigrationEntry("009_conflict_lifecycle", _apply_conflict_lifecycle_columns),
 )
 
 SUPPORTED_SCHEMA_VERSION = len(MIGRATIONS)

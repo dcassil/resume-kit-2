@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .confirmations import proposal_evidence, validate_interpretation_proposal
+from .conflict_lifecycle import _adjudicate_conflict
 from .interactions import _list_interactions_result, _record_interaction_result
 from .migrations import (
     MIGRATIONS,
@@ -925,6 +926,9 @@ class CareerStore:
 
     def listInteractions(self, filters: JsonObject | None = None) -> JsonObject:
         return _clean_result(_list_interactions_result(self._connect, self._audit, SCHEMA_VERSION, filters))
+
+    def adjudicateConflict(self, conflictId: str, decision: str | JsonObject, provenance: list[JsonObject]) -> JsonObject:
+        return _adjudicate_conflict(self, SCHEMA_VERSION, conflictId, decision, provenance)
 
     def findConflicts(self, fact_or_claim: JsonObject, scope: JsonObject | None = None) -> JsonObject:
         conflicts = self._detect_conflicts(fact_or_claim)

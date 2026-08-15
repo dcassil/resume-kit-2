@@ -4,14 +4,14 @@ level: task
 title: "Conflict lifecycle: adjudicateConflict routing through the verification engine"
 short_code: "RKIT-T-0055"
 created_at: 2026-08-15T02:07:49.717199+00:00
-updated_at: 2026-08-15T02:07:49.717199+00:00
+updated_at: 2026-08-15T02:17:45.991063+00:00
 parent: conflict-audit-recovery-and
-blocked_by: ["RKIT-T-0054"]
+blocked_by: [RKIT-T-0054]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0008
 ## Objective
 
 Give conflicts their workflow half (RKIT-I-0008 Requirement 1, Detailed Design "Conflict lifecycle"): conflicts transition open → resolved | dismissed via `adjudicateConflict(conflictId, decision, provenance)`; resolution never deletes or overwrites competing claims; adjudication affecting a fact routes through RKIT-I-0006's transition engine, never direct writes.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -61,3 +63,5 @@ Rationale: workflow semantics bridging two engines (conflict lifecycle + verific
 ## Status Updates
 
 *To be added during implementation*
+
+- 2026-08-15: Implemented migration 009 (`009_conflict_lifecycle`) for conflict lifecycle columns and added transactional `CareerStore.adjudicateConflict(...)` routing optional verification-state changes through the T-0045 verification engine. Adjudication appends resolution metadata and an `answer_recorded` interaction via the interaction substrate; original conflict claim/evidence payloads are preserved. Added unit coverage for resolve, dismiss, idempotent replay, conflicting re-adjudication, engine-call observation, and agent-only rejection. Required gates run: PR gate pass, smoke gate pass, full unit discovery pass, migration checks pass. Straight Jacket verify still reports pre-existing protected checksum mismatches in `tools/pre-commit-resume-cli-guardrails.sh`, `tools/run_tests.py`, and `tools/TEST_SPEC.md`; this task did not modify those files.

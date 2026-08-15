@@ -20,6 +20,7 @@ RELATIONSHIP_CONFIRMATION_STATUSES = {
     RELATIONSHIP_CONFIRMATION_UNCONFIRMED,
     RELATIONSHIP_CONFIRMATION_USER_CONFIRMED,
 }
+CONFLICT_TERMINAL_STATUSES = {"resolved", "dismissed"}
 
 _FORBIDDEN_RESULT_KEYS = {
     "raw_sql",
@@ -199,7 +200,7 @@ def _conflict_object(fact_ids: list[str], reason: str, metadata: JsonObject) -> 
 
 
 def _conflict_from_row(row: sqlite3.Row) -> JsonObject:
-    return {
+    conflict = {
         "conflict_id": str(row["conflict_id"]),
         "fact_ids": _from_json(str(row["fact_ids_json"]), []),
         "reason": str(row["reason"]),
@@ -207,6 +208,14 @@ def _conflict_from_row(row: sqlite3.Row) -> JsonObject:
         "evidence_ids": _from_json(str(row["evidence_ids_json"]), []),
         "metadata": _from_json(str(row["metadata_json"]), {}),
     }
+    keys = set(row.keys())
+    if "resolution_provenance_json" in keys:
+        conflict["resolution_provenance"] = _from_json(row["resolution_provenance_json"], None)
+    if "resolved_at" in keys:
+        conflict["resolved_at"] = row["resolved_at"]
+    if "winning_claim_ref" in keys:
+        conflict["winning_claim_ref"] = row["winning_claim_ref"]
+    return conflict
 
 
 def _dedupe_conflicts(conflicts: list[JsonObject]) -> list[JsonObject]:
