@@ -4,20 +4,20 @@ level: initiative
 title: "Workflow Deterministic Checkpoint State Machine and Policy Gates"
 short_code: "RKIT-I-0023"
 created_at: 2026-08-13T20:41:37.382760+00:00
-updated_at: 2026-08-13T20:41:37.382760+00:00
+updated_at: 2026-08-15T03:10:59.409696+00:00
 parent: resume-kit-2-full-product-buildout
-blocked_by: ["RKIT-I-0022"]
+blocked_by: [RKIT-I-0022]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/discovery"
+  - "#phase/decompose"
 
 
 exit_criteria_met: false
 estimated_complexity: M
 strategy_id: RKIT-S-0001
-initiative_id: NULL
+initiative_id: workflow-deterministic-checkpoint
 ---
 
 # Workflow Deterministic Checkpoint State Machine and Policy Gates Initiative
