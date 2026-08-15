@@ -8,6 +8,13 @@ import os
 from pathlib import Path
 from typing import Any, Callable
 
+from .resolution_loop import (
+    empty_resolution_loop_state as _empty_resolution_loop_state,
+    normalize_resolution_loop_state as _normalize_resolution_loop_state,
+    resolution_loop_decision as _resolution_loop_decision,
+    resolution_loop_surface as _resolution_loop_surface,
+    update_resolution_loop_state as _update_resolution_loop_state,
+)
 from .schemas import RUN_MANIFEST_SCHEMA, SCHEMAS, Checkpoint, RunManifest
 from .versions import collectVersions
 
@@ -24,7 +31,9 @@ _ADVANCE_REQUIREMENTS: dict[str, tuple[JsonObject, ...]] = {
     "NORMALIZE_JOB": ({"name": "job_ingested", "kind": "artifact"},),
     "MATCH_BASE": ({"name": "job_normalized", "kind": "dto", "schema_id": "WorkflowStatusEvidence"},),
     "RESOLVE_GAPS": ({"name": "match_result", "kind": "dto", "schema_id": "MatchResultEvidence"},),
-    "BUILD_SELECTION_PLAN": ({"name": "gaps_resolved", "kind": "run_state", "key": "facts_verified"},),
+    "BUILD_SELECTION_PLAN": (
+        {"name": "gaps_resolved", "kind": "run_state", "key": "facts_verified", "alternate_keys": ["resolution_loop_state"]},
+    ),
     "PROPOSE_TAILORING_CHANGES": ({"name": "selection_plan", "kind": "dto", "schema_id": "SelectionPlanEvidence"},),
     "VALIDATE_CHANGES": ({"name": "proposed_operations", "kind": "dto", "schema_id": "ProposedOperationsEvidence"},),
     "APPLY_CHANGES": ({"name": "change_validation", "kind": "dto", "schema_id": "ChangeValidationEvidence"},),
@@ -91,6 +100,8 @@ def createRun(workspace: str | Path, config: JsonObject) -> JsonObject:
         "already_asked_questions": [],
         "already_written_facts": [],
         "last_match_fact_watermark": [],
+        "resolution_loop_state": _empty_resolution_loop_state(),
+        "resolution_blocking_reasons": [],
     }
     _persist_run(run_state)
     _index_run(workspace_path, config_hash, run_id)
@@ -98,21 +109,41 @@ def createRun(workspace: str | Path, config: JsonObject) -> JsonObject:
 
 
 def getNextCheckpoint(run_state: JsonObject) -> JsonObject:
-    current = str(run_state.get("current_checkpoint", "INIT"))
-    if current == "RESOLVE_GAPS" and _facts_beyond_match_watermark(run_state):
+    working_state = _working_run_state(run_state)
+    current = str(working_state.get("current_checkpoint", "INIT"))
+    resolution_decision = _resolution_loop_decision(working_state) if current == "RESOLVE_GAPS" else _resolution_loop_surface(working_state)
+    if current == "RESOLVE_GAPS" and resolution_decision["predicate"]["action"] == "rerun_match":
         next_checkpoint = "MATCH_BASE"
+    elif current == "RESOLVE_GAPS" and resolution_decision["predicate"]["action"] == "select_next_topic":
+        next_checkpoint = "RESOLVE_GAPS"
+    elif current == "RESOLVE_GAPS" and resolution_decision["predicate"]["action"] == "blocked":
+        next_checkpoint = "RESOLVE_GAPS"
     elif current in CHECKPOINT_ORDER:
         index = CHECKPOINT_ORDER.index(current)
         next_checkpoint = CHECKPOINT_ORDER[min(index + 1, len(CHECKPOINT_ORDER) - 1)]
     else:
         next_checkpoint = "INIT"
+    required_inputs = [] if current == next_checkpoint == "RESOLVE_GAPS" else _required_input_names(next_checkpoint)
+    blocking_reasons = (
+        list(resolution_decision["predicate"]["blocking_reasons"])
+        if current == next_checkpoint == "RESOLVE_GAPS"
+        else _blocking_reasons_for(working_state, next_checkpoint)
+    )
     return {
-        "status": "ok",
+        "status": "blocked" if resolution_decision["predicate"]["action"] == "blocked" else "ok",
         "current_checkpoint": current,
         "next_checkpoint": next_checkpoint,
-        "required_inputs": _required_input_names(next_checkpoint),
-        "blocking_reasons": _blocking_reasons_for(run_state, next_checkpoint),
-        "determinism_key": _stable_hash({"current": current, "next": next_checkpoint, "policy": run_state.get("policy", {})}),
+        "required_inputs": required_inputs,
+        "blocking_reasons": blocking_reasons,
+        "resolution_loop": resolution_decision,
+        "determinism_key": _stable_hash(
+            {
+                "current": current,
+                "next": next_checkpoint,
+                "policy": working_state.get("policy", {}),
+                "resolution_loop": resolution_decision["predicate"],
+            }
+        ),
     }
 
 
@@ -125,6 +156,8 @@ def advanceCheckpoint(run_state: JsonObject, target_checkpoint: str, evidence: J
     verified_evidence: JsonObject = {}
     if target_checkpoint != expected:
         blocking_reasons.append(f"expected {expected} after {current}")
+    if current == target_checkpoint == "RESOLVE_GAPS":
+        blocking_reasons.append("resolution_loop_pending_topic")
     for requirement in _ADVANCE_REQUIREMENTS.get(target_checkpoint, ()):
         required_name = str(requirement["name"])
         result = _verify_evidence_ref(working_state, requirement, evidence.get(required_name))
@@ -217,6 +250,7 @@ def recordCheckpointResult(run_state: JsonObject, checkpoint: str, result: JsonO
     _extend_ref_unique(working_state, "render_refs", render_refs)
     _extend_ref_unique(working_state, "checkpoint_result_refs", [checkpoint_ref])
     _extend_ref_unique(working_state, "artifact_refs", artifact_refs)
+    _update_resolution_loop_state(working_state, checkpoint, checkpoint_result, question_records)
     _persist_run(working_state)
     run_state.update(working_state)
     event = _record_audit("recordCheckpointResult", checkpoint, timestamp)
@@ -299,6 +333,8 @@ def recoverRun(workspace: str | Path, run_id: str) -> JsonObject:
         "already_asked_questions": _dedupe(run_state.get("already_asked_questions", [])),
         "already_written_facts": _dedupe(run_state.get("already_written_facts", run_state.get("facts_verified", []))),
         "last_match_fact_watermark": _dedupe(run_state.get("last_match_fact_watermark", [])),
+        "resolution_loop_state": _normalize_resolution_loop_state(run_state.get("resolution_loop_state", {}), run_state),
+        "resolution_blocking_reasons": _dedupe(run_state.get("resolution_blocking_reasons", [])),
         "required_reruns": required_reruns,
         "transactional_integrity": "valid",
     }
@@ -373,11 +409,14 @@ def _persist_run(run_state: JsonObject) -> None:
 def _working_run_state(run_state: JsonObject) -> JsonObject:
     persisted = _load_persisted_run_state(run_state)
     if not isinstance(persisted, dict):
-        return dict(run_state)
+        working = dict(run_state)
+        working["resolution_loop_state"] = _normalize_resolution_loop_state(working.get("resolution_loop_state", {}), working)
+        return working
     merged = {**persisted, **run_state}
     merged["audit_events"] = _merge_dict_records(persisted.get("audit_events", []), run_state.get("audit_events", []), "event_id")
     merged["verified_evidence"] = _merge_dict_values(persisted.get("verified_evidence", {}), run_state.get("verified_evidence", {}))
     merged["stage_state"] = _merge_dict_values(persisted.get("stage_state", {}), run_state.get("stage_state", {}))
+    merged["resolution_loop_state"] = _normalize_resolution_loop_state(merged.get("resolution_loop_state", {}), merged)
     return merged
 
 
@@ -987,7 +1026,8 @@ def _verify_dto_ref(requirement: JsonObject, requirement_name: str, evidence_ref
 def _verify_run_state_ref(run_state: JsonObject, requirement: JsonObject, requirement_name: str, evidence_ref: JsonObject) -> JsonObject:
     key = evidence_ref.get("key")
     expected_key = requirement.get("key")
-    if key != expected_key:
+    allowed_keys = {expected_key, *list(requirement.get("alternate_keys", []))}
+    if key not in allowed_keys:
         return _evidence_error(requirement_name, "invalid_run_state_key", f"Expected run-state key {expected_key}.", {"actual_key": key})
     persisted = _load_persisted_run_state(run_state)
     if not isinstance(persisted, dict):
@@ -1129,9 +1169,12 @@ def _question_records_from_list(value: Any) -> list[JsonObject]:
         record: JsonObject = {}
         for key in (
             "question_id",
+            "requirement_id",
+            "selected_requirement_id",
             "question_ref",
             "answer_ref",
             "question_answer_ref",
+            "interaction_ref",
             "status",
             "career_store_interaction_id",
             "career_store_interaction_ref",
@@ -1239,16 +1282,6 @@ def _file_sha256(path: Path) -> str:
 
 def _extend_unique(target: JsonObject, key: str, values: list[str]) -> None:
     target[key] = _dedupe(list(target.get(key, [])) + list(values or []))
-
-
-def _facts_beyond_match_watermark(run_state: JsonObject) -> bool:
-    return bool(_fact_id_set(run_state.get("facts_verified", [])) - _fact_id_set(run_state.get("last_match_fact_watermark", [])))
-
-
-def _fact_id_set(values: Any) -> set[str]:
-    if not isinstance(values, list):
-        return set()
-    return {str(value) for value in values}
 
 
 def _dedupe(values: list[str]) -> list[str]:

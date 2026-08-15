@@ -4,14 +4,14 @@ level: task
 title: "ResolutionLoopState DTO, persistence, and the tri-state termination predicate"
 short_code: "RKIT-T-0068"
 created_at: 2026-08-15T04:05:15.509762+00:00
-updated_at: 2026-08-15T04:05:15.509762+00:00
+updated_at: 2026-08-15T04:06:36.897729+00:00
 parent: workflow-requirement-resolution
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0026
 ## Objective
 
 Build the resolution-loop substrate (RKIT-I-0026 Requirements 1-4, Detailed Design "Loop-state DTO"/"Termination predicate"/"Topic selection"): a persisted ResolutionLoopState (impact-ordered open-requirement queue, exhaustion statuses, asked-question registry) and the section 14.D.9 termination predicate over the tri-state MatchResult.decision with `requireHardRequirementsResolved` gating.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -59,4 +61,5 @@ Rationale: the loop-policy substrate every later workflow initiative and the CLI
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-14: Read task and parent initiative first; confirmed Straight Jacket baseline has only the four expected pre-existing checksum mismatches. Chosen implementation path: persist `resolution_loop_state` in workflow run state and expose read-only loop predicate details through the existing `getNextCheckpoint` surface because `workflow_surface.json` public functions are guardrail-pinned.
+- 2026-08-14: Implemented private `workflow.resolution_loop` helpers plus workflow run-state integration. Added grounded contract coverage for predicate branches (a)-(d), deterministic next-topic ordering, all-exhausted advancement, hard-requirement blocked behavior, and recovery of question ids/refs without question text. Final requested gates passed: PR, smoke, and unit discovery.

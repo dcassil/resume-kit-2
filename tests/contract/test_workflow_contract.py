@@ -130,6 +130,56 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
             path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
         return {"kind": "artifact", "path": relative_path, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
 
+    def advance_ok(self, run_state, target, evidence):
+        advanced = maybe_await(self.workflow.advanceCheckpoint(run_state, target, evidence))
+        self.assertEqual(advanced["status"], "ok", advanced.get("blocking_reasons"))
+        return advanced
+
+    def enter_resolve_gaps_with_recorded_match(self, match_result):
+        run_state = self.create_run()
+        self.advance_ok(run_state, "INGEST_RESUME", {"config_validated": self.dto_ref("WorkflowStatusEvidence")})
+        self.advance_ok(run_state, "VALIDATE_BASE", {"canonical_resume_exists": self.artifact_ref("resume/base.json", {"resume_id": "base_1"})})
+        self.advance_ok(run_state, "EXTRACT_PERSIST_CAREER_FACTS", {"base_validation": self.dto_ref("WorkflowStatusEvidence")})
+        self.advance_ok(run_state, "INGEST_JOB", {"career_facts_persisted": self.artifact_ref("data/career.db")})
+        self.advance_ok(run_state, "NORMALIZE_JOB", {"job_ingested": self.artifact_ref("job/current.json", {"job_id": "job_1"})})
+        self.advance_ok(run_state, "MATCH_BASE", {"job_normalized": self.dto_ref("WorkflowStatusEvidence")})
+        recorded = maybe_await(self.workflow.recordCheckpointResult(run_state, "MATCH_BASE", {"match_result": match_result}))
+        self.assertEqual(recorded["status"], "ok")
+        self.advance_ok(
+            run_state,
+            "RESOLVE_GAPS",
+            {"match_result": self.dto_ref("MatchResultEvidence", {"status": "ok", "match_result": match_result})},
+        )
+        return run_state
+
+    def match_result(self, decision, requirements=None, unresolved=None, preferred=None, explanations=None):
+        requirements = list(requirements or [])
+        unresolved = list(unresolved or [])
+        preferred = list(preferred or [])
+        return {
+            "schema_version": "match-result.v1",
+            "score": 7.0,
+            "threshold": 7.5,
+            "hardRequirementsResolved": decision != "blocked",
+            "decision": decision,
+            "can_continue": decision == "continue",
+            "requirement_results": requirements,
+            "unresolved_requirement_ids": unresolved,
+            "preferred_unresolved_requirement_ids": preferred,
+            "explanations": explanations or [],
+        }
+
+    def requirement_result(self, requirement_id, impact_rank, *, classification="required", unresolved=True, blocking=False):
+        return {
+            "requirement_id": requirement_id,
+            "classification": classification,
+            "impact_rank": impact_rank,
+            "resolution_state": "unknown" if unresolved else "verified_fact_match",
+            "unresolved": unresolved,
+            "blocking": blocking,
+            "max_score": impact_rank,
+        }
+
     def valid_manifest_run_state(self):
         run_state = self.create_run()
         run_state.update(
@@ -360,6 +410,163 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         self.assertEqual(complete_decision["next_checkpoint"], "COMPLETE")
         self.assertIn("render_validation", complete_decision["blocking_reasons"])
         self.assertIn("audit_manifest_ref", complete_decision["blocking_reasons"])
+
+    def test_resolution_loop_branch_a_continue_advances_to_build_selection_plan(self):
+        run_state = self.enter_resolve_gaps_with_recorded_match(self.match_result("continue"))
+
+        decision = maybe_await(self.workflow.getNextCheckpoint(run_state))
+
+        self.assertEqual(decision["resolution_loop"]["predicate"]["branch"], "a_continue")
+        self.assertEqual(decision["next_checkpoint"], "BUILD_SELECTION_PLAN")
+        advanced = maybe_await(
+            self.workflow.advanceCheckpoint(
+                run_state,
+                "BUILD_SELECTION_PLAN",
+                {"gaps_resolved": {"kind": "run_state", "key": "resolution_loop_state"}},
+            )
+        )
+        self.assertEqual(advanced["status"], "ok", advanced.get("blocking_reasons"))
+
+    def test_resolution_loop_branch_b_resolve_gaps_selects_next_topic_by_impact_rank(self):
+        run_state = self.enter_resolve_gaps_with_recorded_match(
+            self.match_result(
+                "resolve_gaps",
+                [
+                    self.requirement_result("req_low", 2.0, classification="preferred"),
+                    self.requirement_result("req_high", 9.0, classification="required"),
+                    self.requirement_result("req_high_tiebreak", 9.0, classification="required"),
+                ],
+                unresolved=["req_low", "req_high_tiebreak", "req_high"],
+            )
+        )
+
+        decision = maybe_await(self.workflow.getNextCheckpoint(run_state))
+
+        self.assertEqual(decision["resolution_loop"]["predicate"]["branch"], "b_resolve_gaps_next_topic")
+        self.assertEqual(decision["next_checkpoint"], "RESOLVE_GAPS")
+        self.assertEqual(decision["resolution_loop"]["next_topic"]["requirement_id"], "req_high")
+        blocked = maybe_await(
+            self.workflow.advanceCheckpoint(
+                run_state,
+                "BUILD_SELECTION_PLAN",
+                {"gaps_resolved": {"kind": "run_state", "key": "resolution_loop_state"}},
+            )
+        )
+        self.assertEqual(blocked["status"], "blocked")
+        self.assertIn("expected RESOLVE_GAPS after RESOLVE_GAPS", blocked["blocking_reasons"])
+
+    def test_resolution_loop_branch_c_resolve_gaps_all_exhausted_advances_with_unresolved_recorded(self):
+        run_state = self.enter_resolve_gaps_with_recorded_match(
+            self.match_result(
+                "resolve_gaps",
+                [
+                    self.requirement_result("req_aws", 8.0, classification="required"),
+                    self.requirement_result("pref_k8s", 3.0, classification="preferred"),
+                ],
+                unresolved=["req_aws"],
+                preferred=["pref_k8s"],
+            )
+        )
+        recorded = maybe_await(
+            self.workflow.recordCheckpointResult(
+                run_state,
+                "RESOLVE_GAPS",
+                {
+                    "exhausted_requirements": ["req_aws", "pref_k8s"],
+                    "question_answers": [
+                        {
+                            "question_id": "q_aws",
+                            "requirement_id": "req_aws",
+                            "interaction_ref": "career-store/interactions/int_aws",
+                            "question_text": "Should not be stored in loop state",
+                        }
+                    ],
+                },
+            )
+        )
+        self.assertEqual(recorded["status"], "ok")
+
+        decision = maybe_await(self.workflow.getNextCheckpoint(run_state))
+
+        self.assertEqual(decision["resolution_loop"]["predicate"]["branch"], "c_resolve_gaps_all_exhausted")
+        self.assertEqual(decision["next_checkpoint"], "BUILD_SELECTION_PLAN")
+        self.assertIsNone(decision["resolution_loop"]["next_topic"])
+        self.assertEqual(
+            {item["requirement_id"]: item["status"] for item in decision["resolution_loop"]["state"]["open_requirements"]},
+            {"req_aws": "exhausted", "pref_k8s": "exhausted"},
+        )
+        self.assertNotIn("question_text", json.dumps(decision["resolution_loop"]["state"], sort_keys=True))
+        advanced = maybe_await(
+            self.workflow.advanceCheckpoint(
+                run_state,
+                "BUILD_SELECTION_PLAN",
+                {"gaps_resolved": {"kind": "run_state", "key": "resolution_loop_state"}},
+            )
+        )
+        self.assertEqual(advanced["status"], "ok", advanced.get("blocking_reasons"))
+
+    def test_resolution_loop_branch_d_blocks_unresolved_hard_requirement_when_required(self):
+        run_state = self.enter_resolve_gaps_with_recorded_match(
+            self.match_result(
+                "blocked",
+                [self.requirement_result("req_node", 10.0, classification="required", blocking=True)],
+                unresolved=["req_node"],
+                explanations=["Required unresolved requirements block continuation."],
+            )
+        )
+
+        decision = maybe_await(self.workflow.getNextCheckpoint(run_state))
+
+        self.assertEqual(decision["status"], "blocked")
+        self.assertEqual(decision["resolution_loop"]["predicate"]["branch"], "d_blocked_hard_requirement")
+        self.assertEqual(decision["next_checkpoint"], "RESOLVE_GAPS")
+        self.assertIn("unresolved_hard_requirement:req_node", decision["blocking_reasons"])
+        blocked = maybe_await(
+            self.workflow.advanceCheckpoint(
+                run_state,
+                "BUILD_SELECTION_PLAN",
+                {"gaps_resolved": {"kind": "run_state", "key": "resolution_loop_state"}},
+            )
+        )
+        self.assertEqual(blocked["status"], "blocked")
+
+    def test_resolution_loop_state_persists_to_recovery_losslessly(self):
+        run_state = self.enter_resolve_gaps_with_recorded_match(
+            self.match_result(
+                "resolve_gaps",
+                [self.requirement_result("req_aws", 8.0, classification="required")],
+                unresolved=["req_aws"],
+            )
+        )
+        maybe_await(
+            self.workflow.recordCheckpointResult(
+                run_state,
+                "RESOLVE_GAPS",
+                {
+                    "facts_verified": ["fact_aws"],
+                    "question_answers": [
+                        {
+                            "question_id": "q_aws",
+                            "requirement_id": "req_aws",
+                            "interaction_ref": "career-store/interactions/int_aws",
+                            "question_text": "Do you have AWS experience?",
+                            "answer_text": "Yes.",
+                        }
+                    ],
+                },
+            )
+        )
+
+        recovery = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=run_state["run_id"]))
+
+        self.assertEqual(recovery["resolution_loop_state"]["facts_since_last_match"], ["fact_aws"])
+        self.assertEqual(recovery["resolution_loop_state"]["iteration_count"], 1)
+        self.assertEqual(
+            recovery["resolution_loop_state"]["asked_questions"],
+            [{"question_id": "q_aws", "requirement_id": "req_aws", "interaction_ref": "career-store/interactions/int_aws"}],
+        )
+        self.assertNotIn("question_text", json.dumps(recovery["resolution_loop_state"], sort_keys=True))
+        self.assertNotIn("answer_text", json.dumps(recovery["resolution_loop_state"], sort_keys=True))
 
     def test_match_fact_watermark_persists_to_recovery_and_legacy_runs_default_to_zero(self):
         run_state = self.create_run()
