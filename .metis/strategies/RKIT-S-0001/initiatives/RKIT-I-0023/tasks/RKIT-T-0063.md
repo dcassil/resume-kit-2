@@ -4,14 +4,14 @@ level: task
 title: "hallucination_rejection completion gate in assertCanComplete"
 short_code: "RKIT-T-0063"
 created_at: 2026-08-15T03:11:05.431420+00:00
-updated_at: 2026-08-15T03:11:05.431420+00:00
+updated_at: 2026-08-15T03:26:00.445834+00:00
 parent: workflow-deterministic-checkpoint
-blocked_by: ["RKIT-T-0062"]
+blocked_by: [RKIT-T-0062]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0023
 ## Objective
 
 Add the missing completion gate (RKIT-I-0023 Requirement 4, Detailed Design "Hallucination-rejection gate"): assertCanComplete's required_gates gains `hallucination_rejection`, reading PERSISTED operation statuses (resume-core-owned lifecycle per RKIT-A-0006 item 3) and failing completion while any hallucination-flagged proposal lacks a rejected terminal status — satisfying workflow/TEST_SPEC.md:70's until-now-unenforced invalid-transition rule.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -59,4 +61,4 @@ Rationale: single gate on decided semantics; judgment is in the persisted-status
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-15: Added workflow plumbing plan: persist operation status records from checkpoint results, add `hallucination_rejection` to `assertCanComplete`, and cover flagged/non-rejected, flagged/rejected, and no-flag cases in workflow contract tests. Protected `tools/run_smoke.py` was inspected read-only and does not currently drive workflow completion.

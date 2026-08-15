@@ -4,14 +4,14 @@ level: task
 title: "Match watermark and terminating RESOLVE_GAPS loop-back with deadlock regression"
 short_code: "RKIT-T-0062"
 created_at: 2026-08-15T03:11:05.376990+00:00
-updated_at: 2026-08-15T03:21:04.349343+00:00
+updated_at: 2026-08-15T03:26:00.041280+00:00
 parent: workflow-deterministic-checkpoint
 blocked_by: [RKIT-T-0061]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0023
 ## Objective
 
 Fix the verified non-terminating RESOLVE_GAPS→MATCH_BASE loop (RKIT-I-0023 Requirement 3, Detailed Design "Loop-termination substrate"): run state gains `last_match_fact_watermark` snapshotting facts_verified at each completed MATCH_BASE; loop-back fires only when facts exist beyond the watermark; BUILD_SELECTION_PLAN through COMPLETE become reachable after gap resolution.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

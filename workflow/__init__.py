@@ -74,6 +74,7 @@ def createRun(workspace: str | Path, config: JsonObject) -> JsonObject:
         "validation_refs": [],
         "render_refs": [],
         "audit_events": [],
+        "operation_statuses": [],
         "already_applied_operations": [],
         "already_asked_questions": [],
         "already_written_facts": [],
@@ -162,6 +163,7 @@ def recordCheckpointResult(run_state: JsonObject, checkpoint: str, result: JsonO
     _extend_unique(run_state, "facts_added", checkpoint_result.get("facts_added", []))
     _extend_unique(run_state, "operations_applied", checkpoint_result.get("operations_applied", []))
     _extend_unique(run_state, "operations_rejected", checkpoint_result.get("operations_rejected", []))
+    _merge_operation_statuses(run_state, _operation_status_records(checkpoint_result))
     _extend_unique(run_state, "already_applied_operations", checkpoint_result.get("operations_applied", []))
     _extend_unique(run_state, "already_asked_questions", checkpoint_result.get("question_answer_log_refs", []))
     _extend_unique(run_state, "already_written_facts", checkpoint_result.get("facts_verified", []) + checkpoint_result.get("facts_added", []))
@@ -252,6 +254,7 @@ def assertCanComplete(run_state: JsonObject) -> JsonObject:
         "ats_structure_validation": _status_is_passed(run_state.get("ats_structure_validation")),
         "render_validation": _status_is_passed(run_state.get("render_validation")),
         "audit_manifest_ref": bool(run_state.get("audit_manifest_ref")),
+        "hallucination_rejection": _hallucination_rejection_passed(run_state),
     }
     if run_state.get("unresolved_hard_requirements") and run_state.get("policy", {}).get("requireHardRequirementsResolved", True):
         required_gates["unresolved_hard_requirements"] = False
@@ -549,6 +552,85 @@ def _load_persisted_run_state(run_state: JsonObject) -> JsonObject | None:
     except json.JSONDecodeError:
         return None
     return loaded if isinstance(loaded, dict) else None
+
+
+def _hallucination_rejection_passed(run_state: JsonObject) -> bool:
+    persisted = _load_persisted_run_state(run_state)
+    if not isinstance(persisted, dict):
+        return True
+    records = persisted.get("operation_statuses", [])
+    if not isinstance(records, list):
+        return True
+    flagged = [record for record in records if isinstance(record, dict) and _is_hallucination_flagged(record)]
+    return all(str(record.get("status", "")) == "rejected" for record in flagged)
+
+
+def _is_hallucination_flagged(record: JsonObject) -> bool:
+    validation = record.get("validation")
+    if not isinstance(validation, dict):
+        return False
+    grounding = validation.get("grounding", {})
+    error_codes = {
+        str(error.get("code", ""))
+        for error in validation.get("errors", [])
+        if isinstance(error, dict)
+    }
+    grounding_failure_codes = {
+        "unsupported_guarded_claim",
+        "unsupported_years_claim",
+        "title_inflation",
+    }
+    return isinstance(grounding, dict) and grounding.get("supported") is False and bool(error_codes & grounding_failure_codes)
+
+
+def _operation_status_records(checkpoint_result: JsonObject) -> list[JsonObject]:
+    records: list[JsonObject] = []
+    for key in ("operation_statuses", "operation_records", "validation_results"):
+        records.extend(_operation_records_from_list(checkpoint_result.get(key)))
+    records.extend(_operation_records_from_list(checkpoint_result.get("validated"), default_status="validated"))
+    records.extend(_operation_records_from_list(checkpoint_result.get("applied"), default_status="applied"))
+    records.extend(_operation_records_from_list(checkpoint_result.get("rejected"), default_status="rejected"))
+    return records
+
+
+def _operation_records_from_list(value: Any, default_status: str | None = None) -> list[JsonObject]:
+    if not isinstance(value, list):
+        return []
+    records: list[JsonObject] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        operation_id = str(item.get("operation_id", ""))
+        if not operation_id:
+            validation = item.get("validation")
+            if isinstance(validation, dict):
+                operation_id = str(validation.get("operation_id", ""))
+        if not operation_id:
+            continue
+        record = dict(item)
+        record["operation_id"] = operation_id
+        record["status"] = str(record.get("status") or default_status or record.get("validation_state") or "")
+        if "validation" not in record and _looks_like_validation_result(item):
+            record["validation"] = dict(item)
+        records.append(record)
+    return records
+
+
+def _looks_like_validation_result(value: JsonObject) -> bool:
+    return "validation_state" in value or "grounding" in value or "errors" in value
+
+
+def _merge_operation_statuses(run_state: JsonObject, records: list[JsonObject]) -> None:
+    if not records:
+        return
+    merged = {
+        str(record.get("operation_id")): dict(record)
+        for record in run_state.get("operation_statuses", [])
+        if isinstance(record, dict) and record.get("operation_id")
+    }
+    for record in records:
+        merged[str(record["operation_id"])] = dict(record)
+    run_state["operation_statuses"] = list(merged.values())
 
 
 def _evidence_error(requirement: str, code: str, message: str, details: JsonObject | None = None) -> JsonObject:

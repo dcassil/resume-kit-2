@@ -407,6 +407,88 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         allowed = maybe_await(self.workflow.assertCanComplete(run_state))
         self.assertTrue(allowed["can_complete"])
 
+    def test_completion_gate_blocks_hallucination_flagged_non_rejected_operation_from_persisted_state(self):
+        run_state = self.create_run()
+        maybe_await(
+            self.workflow.recordCheckpointResult(
+                run_state,
+                "VALIDATE_CHANGES",
+                {
+                    "operation_statuses": [
+                        {
+                            "operation_id": "op_hallucinated_scale",
+                            "status": "proposed",
+                            "validation": self.hallucination_rejection_validation(),
+                        }
+                    ]
+                },
+            )
+        )
+        run_state.pop("operation_statuses", None)
+        run_state.update(self.passing_completion_gate_state())
+
+        blocked = maybe_await(self.workflow.assertCanComplete(run_state))
+
+        self.assertFalse(blocked["can_complete"])
+        self.assertIn("hallucination_rejection", blocked["required_gates"])
+        self.assertIn("hallucination_rejection", blocked["failed_gates"])
+
+    def test_completion_gate_allows_hallucination_flagged_persisted_rejected_operation(self):
+        run_state = self.create_run()
+        maybe_await(
+            self.workflow.recordCheckpointResult(
+                run_state,
+                "VALIDATE_CHANGES",
+                {
+                    "rejected": [
+                        {
+                            "operation_id": "op_hallucinated_scale",
+                            "status": "rejected",
+                            "validation": self.hallucination_rejection_validation(),
+                        }
+                    ]
+                },
+            )
+        )
+        run_state.pop("operation_statuses", None)
+        run_state.update(self.passing_completion_gate_state())
+
+        allowed = maybe_await(self.workflow.assertCanComplete(run_state))
+
+        self.assertTrue(allowed["can_complete"], allowed)
+        self.assertIn("hallucination_rejection", allowed["required_gates"])
+
+    def test_completion_gate_hallucination_rejection_passes_vacuously_without_flagged_operations(self):
+        run_state = self.create_run()
+        maybe_await(
+            self.workflow.recordCheckpointResult(
+                run_state,
+                "VALIDATE_CHANGES",
+                {
+                    "operation_statuses": [
+                        {
+                            "operation_id": "op_grounded_react",
+                            "status": "validated",
+                            "validation": {
+                                "status": "ok",
+                                "operation_id": "op_grounded_react",
+                                "validation_state": "validated",
+                                "errors": [],
+                                "grounding": {"supported": True},
+                            },
+                        }
+                    ]
+                },
+            )
+        )
+        run_state.pop("operation_statuses", None)
+        run_state.update(self.passing_completion_gate_state())
+
+        allowed = maybe_await(self.workflow.assertCanComplete(run_state))
+
+        self.assertTrue(allowed["can_complete"], allowed)
+        self.assertIn("hallucination_rejection", allowed["required_gates"])
+
     def test_run_manifest_records_traceability_fields(self):
         run_state = self.create_run()
         run_state.update(
@@ -581,6 +663,36 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         self.assertEqual(recovery["already_asked_questions"].count("req_aws"), 1)
         self.assertEqual(recovery["already_written_facts"].count("fact_aws"), 1)
         self.assertIn("FINAL_MATCH", recovery["required_reruns"])
+
+    def passing_completion_gate_state(self):
+        return {
+            "current_checkpoint": "RENDER",
+            "final_match": {"status": "passed"},
+            "grounding_audit": {"status": "passed"},
+            "ats_structure_validation": {"status": "passed"},
+            "render_validation": {"status": "passed"},
+            "audit_manifest_ref": "reports/run-manifest.json",
+        }
+
+    def hallucination_rejection_validation(self):
+        return {
+            "status": "rejected",
+            "operation_id": "op_hallucinated_scale",
+            "validation_state": "rejected",
+            "errors": [
+                {
+                    "code": "unsupported_guarded_claim",
+                    "message": "Guarded claims require exact supplied verified fact DTO support.",
+                    "field_path": "after",
+                }
+            ],
+            "grounding": {
+                "supported": False,
+                "supporting_fact_ids": [],
+                "supporting_requirement_ids": ["req_scale"],
+                "guarded_claims": ["scale:20m users"],
+            },
+        }
 
 
 if __name__ == "__main__":

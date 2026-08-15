@@ -219,7 +219,7 @@
     },
     {
       "name": "assertCanComplete",
-      "description": "Block COMPLETE unless final match, grounding audit, ATS/structure validation, render validation, audit artifacts, and unresolved-hard-requirement policy all pass.",
+      "description": "Block COMPLETE unless final match, grounding audit, ATS/structure validation, render validation, audit artifacts, hallucination rejection, and unresolved-hard-requirement policy all pass.",
       "input_contract": {
         "required": [
           "run_state"
