@@ -8,12 +8,22 @@ import os
 from pathlib import Path
 from typing import Any, Callable
 
+from .config import resolve_workflow_config as _resolve_workflow_config
 from .resolution_loop import (
     empty_resolution_loop_state as _empty_resolution_loop_state,
     normalize_resolution_loop_state as _normalize_resolution_loop_state,
     resolution_loop_decision as _resolution_loop_decision,
     resolution_loop_surface as _resolution_loop_surface,
     update_resolution_loop_state as _update_resolution_loop_state,
+)
+from .render_overflow import (
+    empty_render_overflow_state as _empty_render_overflow_state,
+    mark_render_overflow_consumed as _mark_render_overflow_consumed,
+    normalize_render_overflow_state as _normalize_render_overflow_state,
+    record_render_overflow_result as _record_render_overflow_result,
+    render_overflow_completion_gate_passed as _render_overflow_completion_gate_passed,
+    render_overflow_completion_reason as _render_overflow_completion_reason,
+    render_overflow_decision as _render_overflow_decision,
 )
 from .schemas import RUN_MANIFEST_SCHEMA, SCHEMAS, Checkpoint, RunManifest
 from .versions import collectVersions
@@ -93,6 +103,7 @@ def createRun(workspace: str | Path, config: JsonObject) -> JsonObject:
     config_hash = _stable_hash(config)
     run_id = _new_run_id(workspace_path, config_hash)
     versions = collectVersions(workspace=workspace_path, config=config)
+    workflow_config = _resolve_workflow_config(config)
     run_state = {
         "run_id": run_id,
         "workspace": str(workspace_path),
@@ -118,6 +129,12 @@ def createRun(workspace: str | Path, config: JsonObject) -> JsonObject:
         "last_match_fact_watermark": [],
         "resolution_loop_state": _empty_resolution_loop_state(),
         "resolution_blocking_reasons": [],
+        "workflow_config": workflow_config.config.to_dict(),
+        "workflow_config_errors": list(workflow_config.errors),
+        "workflow_config_warnings": list(workflow_config.warnings),
+        "overflow_iteration": 0,
+        "render_overflow_state": _empty_render_overflow_state(),
+        "render_overflow_blocking_reasons": [],
     }
     _persist_run(run_state)
     _index_run(workspace_path, config_hash, run_id)
@@ -128,36 +145,47 @@ def getNextCheckpoint(run_state: JsonObject) -> JsonObject:
     working_state = _working_run_state(run_state)
     current = str(working_state.get("current_checkpoint", "INIT"))
     resolution_decision = _resolution_loop_decision(working_state) if current == "RESOLVE_GAPS" else _resolution_loop_surface(working_state)
+    render_overflow_decision = _render_overflow_decision(working_state)
     if current == "RESOLVE_GAPS" and resolution_decision["predicate"]["action"] == "rerun_match":
         next_checkpoint = "MATCH_BASE"
     elif current == "RESOLVE_GAPS" and resolution_decision["predicate"]["action"] == "select_next_topic":
         next_checkpoint = "RESOLVE_GAPS"
     elif current == "RESOLVE_GAPS" and resolution_decision["predicate"]["action"] == "blocked":
         next_checkpoint = "RESOLVE_GAPS"
+    elif current == "RENDER" and render_overflow_decision["predicate"]["action"] == "loop_back":
+        next_checkpoint = "BUILD_SELECTION_PLAN"
+    elif current == "RENDER" and render_overflow_decision["predicate"]["action"] == "blocked":
+        next_checkpoint = "RENDER"
     elif current in CHECKPOINT_ORDER:
         index = CHECKPOINT_ORDER.index(current)
         next_checkpoint = CHECKPOINT_ORDER[min(index + 1, len(CHECKPOINT_ORDER) - 1)]
     else:
         next_checkpoint = "INIT"
-    required_inputs = [] if current == next_checkpoint == "RESOLVE_GAPS" else _required_input_names(next_checkpoint)
-    blocking_reasons = (
-        list(resolution_decision["predicate"]["blocking_reasons"])
-        if current == next_checkpoint == "RESOLVE_GAPS"
-        else _blocking_reasons_for(working_state, next_checkpoint)
-    )
+    if current == next_checkpoint == "RESOLVE_GAPS":
+        required_inputs = []
+        blocking_reasons = list(resolution_decision["predicate"]["blocking_reasons"])
+    elif current == next_checkpoint == "RENDER" and render_overflow_decision["predicate"]["action"] == "blocked":
+        required_inputs = []
+        blocking_reasons = list(render_overflow_decision["predicate"]["blocking_reasons"])
+    else:
+        required_inputs = _required_input_names(working_state, next_checkpoint)
+        blocking_reasons = _blocking_reasons_for(working_state, next_checkpoint)
+    status = "blocked" if resolution_decision["predicate"]["action"] == "blocked" or render_overflow_decision["predicate"]["action"] == "blocked" else "ok"
     return {
-        "status": "blocked" if resolution_decision["predicate"]["action"] == "blocked" else "ok",
+        "status": status,
         "current_checkpoint": current,
         "next_checkpoint": next_checkpoint,
         "required_inputs": required_inputs,
         "blocking_reasons": blocking_reasons,
         "resolution_loop": resolution_decision,
+        "render_overflow": render_overflow_decision,
         "determinism_key": _stable_hash(
             {
                 "current": current,
                 "next": next_checkpoint,
                 "policy": working_state.get("policy", {}),
                 "resolution_loop": resolution_decision["predicate"],
+                "render_overflow": render_overflow_decision["predicate"],
             }
         ),
     }
@@ -175,7 +203,7 @@ def advanceCheckpoint(run_state: JsonObject, target_checkpoint: str, evidence: J
         blocking_reasons.append(f"expected {expected} after {current}")
     if current == target_checkpoint == "RESOLVE_GAPS":
         blocking_reasons.append("resolution_loop_pending_topic")
-    for requirement in _ADVANCE_REQUIREMENTS.get(target_checkpoint, ()):
+    for requirement in _advance_requirements(working_state, target_checkpoint):
         required_name = str(requirement["name"])
         result = _verify_evidence_ref(working_state, requirement, evidence.get(required_name))
         if result.get("status") != "ok":
@@ -221,6 +249,8 @@ def advanceCheckpoint(run_state: JsonObject, target_checkpoint: str, evidence: J
         updated["resolution_match_rerun_pending"] = True
     if current == "RESOLVE_GAPS" and target_checkpoint == "BUILD_SELECTION_PLAN":
         _record_resolution_loop_exit_unresolved(updated, checkpoint_plan)
+    if current == "RENDER" and target_checkpoint == "BUILD_SELECTION_PLAN":
+        _mark_render_overflow_consumed(updated)
     event = _append_advance_audit_event(
         updated,
         checkpoint=target_checkpoint,
@@ -265,6 +295,10 @@ def recordCheckpointResult(run_state: JsonObject, checkpoint: str, result: JsonO
     artifact_refs = [checkpoint_ref] + _normalize_artifact_refs(working_state, checkpoint_result.get("artifact_refs", []), "artifact_refs")
     validation_refs = _normalize_artifact_refs(working_state, checkpoint_result.get("validation_refs", []), "validation_refs")
     render_refs = _normalize_artifact_refs(working_state, checkpoint_result.get("render_refs", []), "render_refs")
+    render_overflow_result = _record_render_overflow_result(working_state, checkpoint, checkpoint_result)
+    if render_overflow_result.get("constraint_ref"):
+        artifact_refs.append(render_overflow_result["constraint_ref"])
+        render_refs.append(render_overflow_result["constraint_ref"])
     _extend_unique(working_state, "operation_log_refs", operation_refs)
     _extend_unique(working_state, "question_answer_log_refs", question_refs)
     _extend_ref_unique(working_state, "validation_refs", validation_refs)
@@ -277,8 +311,9 @@ def recordCheckpointResult(run_state: JsonObject, checkpoint: str, result: JsonO
     _persist_run(working_state)
     run_state.update(working_state)
     event = _record_audit("recordCheckpointResult", checkpoint, timestamp)
+    status = "blocked" if render_overflow_result.get("status") == "blocked" else "ok"
     return {
-        "status": "ok",
+        "status": status,
         "checkpoint": checkpoint,
         "artifact_refs": artifact_refs,
         "operation_log_refs": operation_refs,
@@ -286,6 +321,8 @@ def recordCheckpointResult(run_state: JsonObject, checkpoint: str, result: JsonO
         "validation_refs": validation_refs,
         "render_refs": render_refs,
         "audit_event": event,
+        "render_overflow": render_overflow_result,
+        "blocking_reasons": list(render_overflow_result.get("blocking_reasons", [])),
     }
 
 
@@ -358,6 +395,8 @@ def recoverRun(workspace: str | Path, run_id: str) -> JsonObject:
         "last_match_fact_watermark": _dedupe(run_state.get("last_match_fact_watermark", [])),
         "resolution_loop_state": _normalize_resolution_loop_state(run_state.get("resolution_loop_state", {}), run_state),
         "resolution_blocking_reasons": _dedupe(run_state.get("resolution_blocking_reasons", [])),
+        "render_overflow_state": _normalize_render_overflow_state(run_state.get("render_overflow_state", {}), run_state),
+        "render_overflow_blocking_reasons": _dedupe(run_state.get("render_overflow_blocking_reasons", [])),
         "required_reruns": required_reruns,
         "transactional_integrity": "valid",
     }
@@ -385,6 +424,11 @@ def assertCanComplete(run_state: JsonObject) -> JsonObject:
     required_gates["hard_requirements"] = hard_requirements_passed
     if not hard_requirements_passed:
         failed_gate_reasons["hard_requirements"] = "unresolved_hard_requirements"
+
+    render_overflow_passed = _render_overflow_completion_gate_passed(working_state)
+    required_gates["render_overflow"] = render_overflow_passed
+    if not render_overflow_passed:
+        failed_gate_reasons["render_overflow"] = _render_overflow_completion_reason(working_state)
 
     failed = [gate for gate, passed in required_gates.items() if not passed]
     return {
@@ -449,12 +493,16 @@ def _working_run_state(run_state: JsonObject) -> JsonObject:
     if not isinstance(persisted, dict):
         working = dict(run_state)
         working["resolution_loop_state"] = _normalize_resolution_loop_state(working.get("resolution_loop_state", {}), working)
+        working["render_overflow_state"] = _normalize_render_overflow_state(working.get("render_overflow_state", {}), working)
+        working["overflow_iteration"] = int(working["render_overflow_state"].get("iteration_count", 0))
         return working
     merged = {**persisted, **run_state}
     merged["audit_events"] = _merge_dict_records(persisted.get("audit_events", []), run_state.get("audit_events", []), "event_id")
     merged["verified_evidence"] = _merge_dict_values(persisted.get("verified_evidence", {}), run_state.get("verified_evidence", {}))
     merged["stage_state"] = _merge_dict_values(persisted.get("stage_state", {}), run_state.get("stage_state", {}))
     merged["resolution_loop_state"] = _normalize_resolution_loop_state(merged.get("resolution_loop_state", {}), merged)
+    merged["render_overflow_state"] = _normalize_render_overflow_state(merged.get("render_overflow_state", {}), merged)
+    merged["overflow_iteration"] = int(merged["render_overflow_state"].get("iteration_count", 0))
     return merged
 
 
@@ -963,13 +1011,20 @@ def _jsonable(value: Any) -> Any:
     return value
 
 
-def _required_input_names(checkpoint: str) -> list[str]:
-    return [str(requirement["name"]) for requirement in _ADVANCE_REQUIREMENTS.get(checkpoint, ())]
+def _advance_requirements(run_state: JsonObject, checkpoint: str) -> tuple[JsonObject, ...]:
+    requirements = list(_ADVANCE_REQUIREMENTS.get(checkpoint, ()))
+    if checkpoint == "BUILD_SELECTION_PLAN" and _render_overflow_decision(run_state)["predicate"]["action"] == "loop_back":
+        requirements.append({"name": "render_overflow_constraints", "kind": "artifact"})
+    return tuple(requirements)
+
+
+def _required_input_names(run_state: JsonObject, checkpoint: str) -> list[str]:
+    return [str(requirement["name"]) for requirement in _advance_requirements(run_state, checkpoint)]
 
 
 def _blocking_reasons_for(run_state: JsonObject, checkpoint: str) -> list[str]:
     verified_names = _verified_requirement_names(run_state, checkpoint)
-    reasons = [name for name in _required_input_names(checkpoint) if name not in verified_names]
+    reasons = [name for name in _required_input_names(run_state, checkpoint) if name not in verified_names]
     if checkpoint == "COMPLETE":
         complete = assertCanComplete(run_state)
         if not complete["can_complete"]:
@@ -1441,33 +1496,4 @@ def _dedupe(values: list[str]) -> list[str]:
             seen.add(text)
             result.append(text)
     return result
-
-
-def _audit(operation: str, previous: str, current: str, accepted: bool) -> JsonObject:
-    return {
-        "operation": operation,
-        "previous_checkpoint": previous,
-        "current_checkpoint": current,
-        "accepted": accepted,
-    }
-
-
-def _status_is_passed(value: Any) -> bool:
-    return isinstance(value, dict) and value.get("status") == "passed"
-
-__all__ = [
-    "RUN_MANIFEST_SCHEMA",
-    "SCHEMAS",
-    "Checkpoint",
-    "RunManifest",
-    "RunManifestValidationError",
-    "UnknownRunError",
-    "createRun",
-    "getNextCheckpoint",
-    "advanceCheckpoint",
-    "recordCheckpointResult",
-    "buildRunManifest",
-    "reconstructRunManifest",
-    "recoverRun",
-    "assertCanComplete",
-]
+__all__ = ["RUN_MANIFEST_SCHEMA", "SCHEMAS", "Checkpoint", "RunManifest", "RunManifestValidationError", "UnknownRunError", "createRun", "getNextCheckpoint", "advanceCheckpoint", "recordCheckpointResult", "buildRunManifest", "reconstructRunManifest", "recoverRun", "assertCanComplete"]

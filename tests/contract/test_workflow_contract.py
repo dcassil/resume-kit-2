@@ -233,6 +233,26 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         }
 
     def advance_tail_to_complete_gate(self, run_state):
+        self.advance_tail_to_render_checkpoint(run_state)
+        self.advance_ok(
+            run_state,
+            "RENDER",
+            {
+                "render_output": self.artifact_ref("render/resume.md", {"status": "rendered"}),
+                "measure_layout": self.artifact_ref("render/measure-layout.json", {"status": "fits", "required_reduction": 0}),
+            },
+        )
+        rendered = maybe_await(self.workflow.recordCheckpointResult(run_state, "RENDER", {"status": "fits", "requiredReduction": 0}))
+        self.assertEqual(rendered["status"], "ok")
+        self.advance_ok(run_state, "RENDER_VALIDATION", {"render_validation_report": self.artifact_ref("reports/render-validation.json", {"status": "pass"})})
+
+        complete_decision = maybe_await(self.workflow.getNextCheckpoint(run_state))
+        self.assertEqual(complete_decision["next_checkpoint"], "COMPLETE")
+        self.assertNotIn("render_validation", complete_decision["blocking_reasons"])
+        self.assertIn("audit_ref", complete_decision["blocking_reasons"])
+        return complete_decision
+
+    def advance_tail_to_render_checkpoint(self, run_state):
         self.advance_ok(run_state, "BUILD_SELECTION_PLAN", {"selection_plan": self.artifact_ref("plans/selection-plan.json", {"status": "ok", "selection_plan": {}})})
         proposed = maybe_await(self.workflow.recordCheckpointResult(run_state, "BUILD_SELECTION_PLAN", {"operations_proposed": ["op_1"]}))
         self.assertEqual(proposed["status"], "ok")
@@ -246,21 +266,50 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         self.advance_ok(run_state, "FINAL_MATCH", {"match_report": self.artifact_ref("reports/final-match.json", {"status": "passed"})})
         self.advance_ok(run_state, "GROUNDING_AUDIT", {"grounding_audit": self.artifact_ref("reports/grounding-audit.json", {"status": "passed"})})
         self.advance_ok(run_state, "ATS_STRUCTURE_VALIDATION", {"ats_report": self.artifact_ref("reports/ats.json", {"status": "passed"})})
-        self.advance_ok(
-            run_state,
-            "RENDER",
-            {
-                "render_output": self.artifact_ref("render/resume.md", {"status": "rendered"}),
-                "measure_layout": self.artifact_ref("render/measure-layout.json", {"status": "fits", "required_reduction": 0}),
-            },
-        )
-        self.advance_ok(run_state, "RENDER_VALIDATION", {"render_validation_report": self.artifact_ref("reports/render-validation.json", {"status": "pass"})})
 
-        complete_decision = maybe_await(self.workflow.getNextCheckpoint(run_state))
-        self.assertEqual(complete_decision["next_checkpoint"], "COMPLETE")
-        self.assertNotIn("render_validation", complete_decision["blocking_reasons"])
-        self.assertIn("audit_ref", complete_decision["blocking_reasons"])
-        return complete_decision
+    def advance_looped_selection_to_render_checkpoint(self, run_state, operation_id):
+        recorded = maybe_await(self.workflow.recordCheckpointResult(run_state, "BUILD_SELECTION_PLAN", {"operations_proposed": [operation_id]}))
+        self.assertEqual(recorded["status"], "ok")
+        self.advance_ok(run_state, "PROPOSE_TAILORING_CHANGES", {"proposed_operations": self.operation_state_ref(operation_id)})
+        validated = maybe_await(self.workflow.recordCheckpointResult(run_state, "PROPOSE_TAILORING_CHANGES", {"operations_validated": [operation_id]}))
+        self.assertEqual(validated["status"], "ok")
+        self.advance_ok(run_state, "VALIDATE_CHANGES", {"validated_operations": self.operation_state_ref(operation_id)})
+        applied = maybe_await(self.workflow.recordCheckpointResult(run_state, "VALIDATE_CHANGES", {"operations_applied": [operation_id]}))
+        self.assertEqual(applied["status"], "ok")
+        self.advance_ok(run_state, "APPLY_CHANGES", {"applied_operations": self.operation_state_ref(operation_id)})
+        self.advance_ok(run_state, "FINAL_MATCH", {"match_report": self.artifact_ref(f"reports/final-match-{operation_id}.json", {"status": "passed"})})
+        self.advance_ok(run_state, "GROUNDING_AUDIT", {"grounding_audit": self.artifact_ref(f"reports/grounding-audit-{operation_id}.json", {"status": "passed"})})
+        self.advance_ok(run_state, "ATS_STRUCTURE_VALIDATION", {"ats_report": self.artifact_ref(f"reports/ats-{operation_id}.json", {"status": "passed"})})
+
+    def overflow_layout_payload(self):
+        import resume_render
+
+        long_resume = {
+            "schema_version": "test-1",
+            "basics": {"name": "Candidate"},
+            "sections": [
+                {"id": "summary", "heading": "Summary", "items": ["React platform engineer."]},
+                {
+                    "id": "experience",
+                    "heading": "Experience",
+                    "items": [
+                        {
+                            "company": "Example SaaS",
+                            "title": "Engineer",
+                            "bullets": [
+                                f"Built validated product capability {index} with React, TypeScript, and REST API delivery."
+                                for index in range(95)
+                            ],
+                        }
+                    ],
+                },
+            ],
+        }
+        template = {"template_version": "1.0.0", "section_order": ["summary", "experience"], "target_pages": 1}
+        layout = maybe_await(resume_render.measureLayout(long_resume, template))
+        self.assertEqual(layout["status"], "overflow", layout)
+        self.assertGreater(layout["requiredReduction"], layout["estimated_pages"] - layout["target_pages"])
+        return layout
 
     def valid_manifest_run_state(self):
         run_state = self.create_run()
@@ -447,6 +496,117 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
                 self.assertEqual(result["status"], "blocked")
                 self.assertIn("blocking_reasons", result)
                 self.assertTrue(result["blocking_reasons"])
+
+    def test_render_overflow_routes_back_with_character_count_constraint_evidence(self):
+        run_state = self.enter_resolve_gaps_with_recorded_match(self.match_result("continue"))
+        self.advance_tail_to_render_checkpoint(run_state)
+        layout = self.overflow_layout_payload()
+
+        self.advance_ok(
+            run_state,
+            "RENDER",
+            {
+                "render_output": self.artifact_ref("render/overflow-resume.md", {"status": "rendered"}),
+                "measure_layout": self.artifact_ref("render/overflow-measure-layout.json", layout),
+            },
+        )
+        recorded = maybe_await(self.workflow.recordCheckpointResult(run_state, "RENDER", layout))
+
+        self.assertEqual(recorded["status"], "ok", recorded.get("blocking_reasons"))
+        self.assertEqual(run_state["overflow_iteration"], 1)
+        constraints = recorded["render_overflow"]["constraints"]
+        self.assertEqual(constraints["requiredReduction"], layout["requiredReduction"])
+        self.assertIsInstance(constraints["requiredReduction"], int)
+        self.assertGreater(constraints["requiredReduction"], layout["estimated_pages"] - layout["target_pages"])
+        self.assertEqual(constraints["offending_sections"], layout["offending_sections"])
+
+        decision = maybe_await(self.workflow.getNextCheckpoint(run_state))
+        self.assertEqual(decision["next_checkpoint"], "BUILD_SELECTION_PLAN")
+        self.assertEqual(decision["render_overflow"]["predicate"]["branch"], "render_overflow_loop_back")
+        self.assertIn("selection_plan", decision["required_inputs"])
+        self.assertIn("render_overflow_constraints", decision["required_inputs"])
+
+        looped = maybe_await(
+            self.workflow.advanceCheckpoint(
+                run_state,
+                "BUILD_SELECTION_PLAN",
+                {
+                    "selection_plan": self.artifact_ref("plans/selection-plan-overflow.json", {"status": "ok", "selection_plan": {}}),
+                    "render_overflow_constraints": recorded["render_overflow"]["constraint_ref"],
+                },
+            )
+        )
+        self.assertEqual(looped["status"], "ok", looped.get("blocking_reasons"))
+        self.assertEqual(run_state["render_overflow_state"]["status"], "consumed")
+        self.assertEqual(
+            run_state["verified_evidence"]["BUILD_SELECTION_PLAN"]["render_overflow_constraints"],
+            recorded["render_overflow"]["constraint_ref"],
+        )
+
+    def test_render_overflow_bound_exhaustion_blocks_with_persisted_reasons(self):
+        self.config = {
+            "schemaVersion": "1.0",
+            "matching": {"requireHardRequirementsResolved": True},
+            "workflow": {"maxRenderOverflowIterations": 1},
+        }
+        run_state = self.enter_resolve_gaps_with_recorded_match(self.match_result("continue"))
+        first_layout = self.overflow_layout_payload()
+        self.advance_tail_to_render_checkpoint(run_state)
+        self.advance_ok(
+            run_state,
+            "RENDER",
+            {
+                "render_output": self.artifact_ref("render/overflow-first.md", {"status": "rendered"}),
+                "measure_layout": self.artifact_ref("render/overflow-first-layout.json", first_layout),
+            },
+        )
+        first_recorded = maybe_await(self.workflow.recordCheckpointResult(run_state, "RENDER", first_layout))
+        self.assertEqual(first_recorded["status"], "ok", first_recorded.get("blocking_reasons"))
+        self.advance_ok(
+            run_state,
+            "BUILD_SELECTION_PLAN",
+            {
+                "selection_plan": self.artifact_ref("plans/selection-plan-overflow-first.json", {"status": "ok"}),
+                "render_overflow_constraints": first_recorded["render_overflow"]["constraint_ref"],
+            },
+        )
+
+        self.advance_looped_selection_to_render_checkpoint(run_state, "op_2")
+        second_layout = self.overflow_layout_payload()
+        self.advance_ok(
+            run_state,
+            "RENDER",
+            {
+                "render_output": self.artifact_ref("render/overflow-second.md", {"status": "rendered"}),
+                "measure_layout": self.artifact_ref("render/overflow-second-layout.json", second_layout),
+            },
+        )
+        second_recorded = maybe_await(self.workflow.recordCheckpointResult(run_state, "RENDER", second_layout))
+
+        self.assertEqual(second_recorded["status"], "blocked")
+        self.assertEqual(run_state["overflow_iteration"], 2)
+        self.assertIn("render_overflow_bound_exhausted", second_recorded["blocking_reasons"])
+        persisted = json.loads((self.workspace / ".workflow" / "runs" / f"{run_state['run_id']}.json").read_text(encoding="utf-8"))
+        self.assertEqual(persisted["render_overflow_state"]["status"], "blocked")
+        self.assertIn("workflow.maxRenderOverflowIterations:1", persisted["render_overflow_blocking_reasons"])
+
+        decision = maybe_await(self.workflow.getNextCheckpoint(run_state))
+        self.assertEqual(decision["status"], "blocked")
+        self.assertEqual(decision["next_checkpoint"], "RENDER")
+        self.assertIn("render_overflow_bound_exhausted", decision["blocking_reasons"])
+        blocked_complete = maybe_await(
+            self.workflow.advanceCheckpoint(
+                run_state,
+                "COMPLETE",
+                {"audit_ref": self.artifact_ref("reports/audit-after-overflow-block.json", {"status": "passed"})},
+            )
+        )
+        self.assertEqual(blocked_complete["status"], "blocked")
+        self.assertNotEqual(run_state["current_checkpoint"], "COMPLETE")
+        run_state.update(self.passing_completion_gate_state())
+        complete_gate = maybe_await(self.workflow.assertCanComplete(run_state))
+        self.assertFalse(complete_gate["can_complete"])
+        self.assertIn("render_overflow", complete_gate["failed_gates"])
 
     def test_deadlock_regression_verified_fact_reruns_match_then_reaches_complete_gate(self):
         run_state = self.create_run()

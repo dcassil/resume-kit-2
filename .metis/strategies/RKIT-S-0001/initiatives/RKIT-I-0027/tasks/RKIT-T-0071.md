@@ -4,14 +4,14 @@ level: task
 title: "Tailoring-tail stage evidence declarations and grounded completion gates"
 short_code: "RKIT-T-0071"
 created_at: 2026-08-15T04:29:40.575022+00:00
-updated_at: 2026-08-15T04:30:49.338364+00:00
+updated_at: 2026-08-15T04:38:15.134036+00:00
 parent: workflow-tailoring-validation
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0027
 ## Objective
 
 Ground the tailoring tail (RKIT-I-0027 Requirements 3 + Detailed Design "Stage evidence declarations"/"Grounded completion"): each tail checkpoint (BUILD_SELECTION_PLAN through COMPLETE) declares grounded evidence per the I-0023 model, and every assertCanComplete gate maps to a persisted artifact/report ref per the I-0024 model — completion unreachable on missing or hash-mismatched refs, boolean gate evidence gone.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

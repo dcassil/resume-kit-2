@@ -184,10 +184,20 @@ class ResumeRenderContractTests(unittest.TestCase):
         self.assertIn("estimated_pages", result)
         self.assertIn("target_pages", result)
         self.assertIn("required_reduction", result)
+        self.assertIn("requiredReduction", result)
         if result["status"] == "overflow":
             self.assertGreater(result["estimated_pages"], result["target_pages"])
             self.assertGreater(result["required_reduction"], 0)
+            self.assertEqual(result["requiredReduction"], result["required_reduction"])
+            self.assertGreater(
+                result["requiredReduction"],
+                result["estimated_pages"] - result["target_pages"],
+                "requiredReduction must be a character count, not a page delta.",
+            )
             self.assertIn("constraints", result)
+            self.assertEqual(result["constraints"]["requiredReduction"], result["requiredReduction"])
+            self.assertTrue(result["offending_sections"])
+            self.assertEqual(result["constraints"]["offending_sections"], result["offending_sections"])
         self.assertNotIn("shortened_content", result)
         self.assertNotIn("deleted_bullets", result)
 

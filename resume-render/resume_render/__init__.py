@@ -124,6 +124,22 @@ def _section_ids(sections: list[dict[str, Any]]) -> list[str]:
     return result
 
 
+def _section_text_blocks(resume: dict[str, Any], template: dict[str, Any]) -> list[tuple[str, str]]:
+    sections = _ordered_sections(resume, template)
+    blocks: list[tuple[str, str]] = []
+
+    basics = _render_basics(resume)
+    if basics:
+        blocks.append(("basics", "\n".join(basics)))
+
+    for section in sections:
+        rendered = _render_section(section)
+        if rendered:
+            section_id = str(section.get("id") or section.get("heading") or "section")
+            blocks.append((section_id, "\n".join(rendered)))
+    return blocks
+
+
 def _clean_scalar(value: Any) -> str:
     text = str(value).replace("\r\n", "\n").replace("\r", "\n")
     return "\n".join(part.strip() for part in text.splitlines()).strip()
@@ -248,17 +264,7 @@ def _render_section(section: dict[str, Any]) -> list[str]:
 
 def _render_markdown_text(resume: dict[str, Any], template: dict[str, Any]) -> tuple[str, list[str]]:
     sections = _ordered_sections(resume, template)
-    blocks: list[str] = []
-
-    basics = _render_basics(resume)
-    if basics:
-        blocks.append("\n".join(basics))
-
-    for section in sections:
-        rendered = _render_section(section)
-        if rendered:
-            blocks.append("\n".join(rendered))
-
+    blocks = [block for _section_id, block in _section_text_blocks(resume, template)]
     return "\n\n".join(blocks).strip() + "\n", _section_ids(sections)
 
 
@@ -397,24 +403,42 @@ def measureLayout(resume: Any, template: Any) -> RenderDict:
     if target_pages < 1:
         return _typed_error("validation_error", "Template target_pages must be at least 1.")
 
-    content, _sections = _render_markdown_text(resume, template)
+    section_blocks = _section_text_blocks(resume, template)
+    content = "\n\n".join(block for _section_id, block in section_blocks).strip() + "\n"
     non_empty_lines = [line for line in content.splitlines() if line.strip()]
     estimated_lines = 0
     for line in non_empty_lines:
         estimated_lines += max(1, math.ceil(len(line) / 90))
     estimated_pages = max(1, math.ceil(estimated_lines / 45))
-    required_reduction = max(0, estimated_pages - target_pages)
+    target_line_capacity = target_pages * 45
+    overflow_lines = max(0, estimated_lines - target_line_capacity)
+    required_reduction = overflow_lines * 90
     status = "overflow" if required_reduction else "fits"
+    section_lengths = [
+        {"section_id": section_id, "character_count": len(block)}
+        for section_id, block in section_blocks
+    ]
+    offending_sections = [
+        entry["section_id"]
+        for entry in sorted(section_lengths, key=lambda item: (-int(item["character_count"]), str(item["section_id"])))[:3]
+        if required_reduction > 0
+    ]
 
     return {
         "status": status,
         "estimated_pages": estimated_pages,
         "target_pages": target_pages,
         "required_reduction": required_reduction,
+        "requiredReduction": required_reduction,
+        "offending_sections": offending_sections,
         "constraints": {
+            "requiredReduction": required_reduction,
+            "offending_sections": offending_sections,
             "line_capacity_per_page": 45,
             "character_wrap_width": 90,
             "content_lines": estimated_lines,
+            "overflow_lines": overflow_lines,
+            "section_character_counts": section_lengths,
         },
         "warnings": ["Content exceeds target page estimate."] if status == "overflow" else [],
     }

@@ -4,14 +4,14 @@ level: task
 title: "Render-overflow loop-back with character-count requiredReduction and bounded honest blocking"
 short_code: "RKIT-T-0072"
 created_at: 2026-08-15T04:29:40.636408+00:00
-updated_at: 2026-08-15T04:29:40.636408+00:00
+updated_at: 2026-08-15T04:38:15.481520+00:00
 parent: workflow-tailoring-validation
-blocked_by: ["RKIT-T-0071"]
+blocked_by: [RKIT-T-0071]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0027
 ## Objective
 
 Implement the render-overflow loop-back that exists nowhere in the repo (RKIT-I-0027 Requirements 1-2, Detailed Design "Overflow loop"): a render checkpoint result carrying overflow constraints from resume-render measureLayout routes the machine back to the selection-plan checkpoint with `requiredReduction` as a CHARACTER COUNT (RKIT-A-0006 item 7 — not a page delta); iterations are bounded via the section 13 config vocabulary; bound exhaustion yields an honest blocked outcome; renderer truncation is forbidden.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -59,4 +61,6 @@ Rationale: cross-package loop with decided-but-unimplemented contract semantics;
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-15: Implemented render-overflow loop-back in workflow with persisted `render_overflow_state`, `overflow_iteration`, constraint artifacts, and dynamic `render_overflow_constraints` evidence on the backward transition to `BUILD_SELECTION_PLAN`.
+- 2026-08-15: Realigned `resume_render.measureLayout` so `requiredReduction` / `required_reduction` are character counts, not page deltas, and added offending section reporting.
+- 2026-08-15: Added section-13-style `workflow.maxRenderOverflowIterations` config resolver with typed unknown-key/value errors; bound exhaustion records named reasons and blocks completion.

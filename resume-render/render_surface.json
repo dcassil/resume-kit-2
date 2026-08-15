@@ -188,6 +188,8 @@
           "estimated_pages",
           "target_pages",
           "required_reduction",
+          "requiredReduction",
+          "offending_sections",
           "constraints",
           "warnings"
         ],
@@ -199,7 +201,9 @@
         "overflow_required_fields": [
           "estimated_pages",
           "target_pages",
-          "required_reduction"
+          "required_reduction",
+          "requiredReduction",
+          "offending_sections"
         ]
       }
     },
