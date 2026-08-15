@@ -370,9 +370,13 @@ class CareerStorePersistenceContractTests(unittest.TestCase):
                 policy={"explicit_confirmation": True},
             )
         )
-        conflicts = maybe_await(
+        same_fact = maybe_await(
             self.store.findConflicts({"text": "AWS, ten years", "normalized_terms": ["aws", "ten years"], "fact_id": six["fact_id"]})
         )
+        conflicts = maybe_await(
+            self.store.findConflicts({"text": "AWS, ten years", "normalized_terms": ["aws", "ten years"], "fact_id": "fact_competing"})
+        )
+        self.assertEqual(same_fact["conflicts"], [])
         text = serialized(conflicts)
         self.assertIn("conflict", text)
         self.assertIn("six", text)

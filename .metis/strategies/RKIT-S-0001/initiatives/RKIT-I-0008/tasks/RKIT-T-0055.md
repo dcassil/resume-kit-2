@@ -4,14 +4,14 @@ level: task
 title: "Conflict lifecycle: adjudicateConflict routing through the verification engine"
 short_code: "RKIT-T-0055"
 created_at: 2026-08-15T02:07:49.717199+00:00
-updated_at: 2026-08-15T02:17:45.991063+00:00
+updated_at: 2026-08-15T02:30:56.546387+00:00
 parent: conflict-audit-recovery-and
 blocked_by: [RKIT-T-0054]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0008
 ## Objective
 
 Give conflicts their workflow half (RKIT-I-0008 Requirement 1, Detailed Design "Conflict lifecycle"): conflicts transition open → resolved | dismissed via `adjudicateConflict(conflictId, decision, provenance)`; resolution never deletes or overwrites competing claims; adjudication affecting a fact routes through RKIT-I-0006's transition engine, never direct writes.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

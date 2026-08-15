@@ -49,10 +49,7 @@ from .store_support import (
     _merged_metadata,
     _normalize,
     _normalized_terms,
-    _optional_bool,
-    _optional_float,
-    _optional_int,
-    _optional_text,
+    _optional_bool, _optional_float, _optional_int, _optional_text,
     _required_years,
     _repoint_job_matches,
     _resolve_fact_id,
@@ -60,21 +57,12 @@ from .store_support import (
     _relationship_conflict_signals,
     _relationship_direction,
     _relationship_policy_match_type,
-    _source_document_ref,
-    _stable_id,
-    _state_value,
-    _title_claim,
-    _to_json,
+    _source_document_ref, _stable_id, _state_value, _title_claim, _to_json,
     _upsert_user_proposal,
     _validation_error,
     _evidence_for_fact_matching_terms,
-    _search_alias_terms,
-    _search_allowed_fact_ids,
-    _search_fact_concept_terms, _search_fact_match_terms,
-    _search_fact_normalized_terms,
-    _search_filters,
-    _store_fact_match_terms,
-    _year_claim,
+    _search_alias_terms, _search_allowed_fact_ids, _search_fact_concept_terms, _search_fact_match_terms,
+    _search_fact_normalized_terms, _search_filters, _store_fact_match_terms, _year_claim, _year_claim_tuple,
 )
 from .transactions import TransactionScope, transaction_result_payload
 from .verification import (
@@ -1149,34 +1137,41 @@ class CareerStore:
     def _detect_conflicts(self, claim: JsonObject, conn: sqlite3.Connection | None = None) -> list[JsonObject]:
         claim_terms = set(_normalized_terms(claim))
         claim_text = str(claim.get("text", ""))
-        claim_year = _year_claim(claim_text, claim_terms)
-        claim_title = _title_claim(claim_text, claim_terms)
+        claim_id = str(claim.get("fact_id", "")) if claim.get("fact_id") else ""
+        claim_year = _year_claim_tuple(claim, claim_terms)
+        claim_title = _title_claim(claim, claim_terms)
         conflicts: list[JsonObject] = []
         for row in self._fact_rows(conn=conn):
             fact = self._fact_from_row(row, conn=conn)
-            if claim.get("fact_id") and fact["fact_id"] == claim.get("fact_id"):
-                related = set(fact["normalized_terms"]).intersection(claim_terms)
-            else:
-                related = set(fact["normalized_terms"]).intersection(claim_terms)
-            if not related:
+            if claim_id and fact["fact_id"] == claim_id:
                 continue
-            fact_terms = set(fact["normalized_terms"])
-            fact_year = _year_claim(fact["text"], fact_terms)
-            if claim_year and fact_year and claim_year != fact_year:
+            fact_terms = set(_normalized_terms(fact))
+            fact_year = _year_claim_tuple(fact, fact_terms)
+            if claim_year and fact_year and claim_year[0] == fact_year[0] and claim_year[1] != fact_year[1]:
                 conflicts.append(
                     _conflict_object(
-                        [fact["fact_id"], str(claim.get("fact_id", "claim"))],
+                        [fact["fact_id"], claim_id or "claim"],
                         f"conflicting years claim: existing '{fact['text']}' versus proposed '{claim_text}'",
-                        {"existing": fact["text"], "proposed": claim_text},
+                        {
+                            "existing": fact["text"],
+                            "proposed": claim_text,
+                            "existing_claim": {"concept": fact_year[0], "years": fact_year[1]},
+                            "proposed_claim": {"concept": claim_year[0], "years": claim_year[1]},
+                        },
                     )
                 )
-            fact_title = _title_claim(fact["text"], fact_terms)
-            if claim_title and fact_title and claim_title != fact_title:
+            fact_title = _title_claim(fact, fact_terms)
+            if claim_title and fact_title and claim_title[0] == fact_title[0] and claim_title[1] != fact_title[1]:
                 conflicts.append(
                     _conflict_object(
-                        [fact["fact_id"], str(claim.get("fact_id", "claim"))],
+                        [fact["fact_id"], claim_id or "claim"],
                         f"conflicting title claim: existing '{fact['text']}' versus proposed '{claim_text}'",
-                        {"existing": fact["text"], "proposed": claim_text},
+                        {
+                            "existing": fact["text"],
+                            "proposed": claim_text,
+                            "existing_claim": {"role": fact_title[0], "title": fact_title[1]},
+                            "proposed_claim": {"role": claim_title[0], "title": claim_title[1]},
+                        },
                     )
                 )
         return conflicts

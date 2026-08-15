@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sqlite3
 from typing import Any
 
@@ -21,6 +22,49 @@ RELATIONSHIP_CONFIRMATION_STATUSES = {
     RELATIONSHIP_CONFIRMATION_USER_CONFIRMED,
 }
 CONFLICT_TERMINAL_STATUSES = {"resolved", "dismissed"}
+_YEARS_RE = re.compile(
+    r"\b(?P<value>\d+|zero|one|two|three|four|five|six|seven|eight|nine|ten|"
+    r"eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|"
+    r"nineteen|twenty)\+?\s+years?\b",
+    re.IGNORECASE,
+)
+_NUMBER_WORDS = {
+    "zero": 0,
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "eleven": 11,
+    "twelve": 12,
+    "thirteen": 13,
+    "fourteen": 14,
+    "fifteen": 15,
+    "sixteen": 16,
+    "seventeen": 17,
+    "eighteen": 18,
+    "nineteen": 19,
+    "twenty": 20,
+}
+_YEAR_VALUE_TERMS = {str(value) for value in range(0, 101)} | set(_NUMBER_WORDS)
+_YEAR_GENERIC_TERMS = {"year", "years", "yr", "yrs"}
+_YEAR_CONCEPT_GENERIC_TERMS = {"fact", "skill", "skills"}
+_TITLE_FACT_TYPES = {"title", "job title", "employment title", "role", "position", "role title"}
+_TITLE_SIGNAL_TERMS = {"title", "job title", "employment title", "role", "position"}
+_TITLE_ROLE_GENERIC_TERMS = {
+    "current",
+    "employment",
+    "formal",
+    "job",
+    "position",
+    "role",
+    "title",
+}
 
 _FORBIDDEN_RESULT_KEYS = {
     "raw_sql",
@@ -984,39 +1028,121 @@ def _legacy_state_conflict(fact: JsonObject, state: str) -> JsonObject:
     )
 
 
-def _year_claim(text: str, terms: set[str]) -> str | None:
-    combined = " ".join([_normalize(text), *terms])
-    number_words = {
-        "one": "1",
-        "two": "2",
-        "three": "3",
-        "four": "4",
-        "five": "5",
-        "six": "6",
-        "seven": "7",
-        "eight": "8",
-        "nine": "9",
-        "ten": "10",
-    }
-    for word, number in number_words.items():
-        if f"{word} year" in combined or f"{word} years" in combined:
-            return number
-    for token in combined.split():
-        if token.isdigit() and 0 < int(token) < 60:
-            return token
-    return None
+def _year_claim(text: str, terms: set[str]) -> int | None:
+    combined = " ".join([str(text), *terms])
+    match = _YEARS_RE.search(combined)
+    if match is None:
+        return None
+    value = match.group("value").casefold()
+    if value.isdigit():
+        return int(value)
+    return _NUMBER_WORDS[value]
 
 
-def _title_claim(text: str, terms: set[str]) -> str | None:
-    combined = " ".join([_normalize(text), *terms])
-    titles = [
-        "staff engineer",
-        "principal engineer",
-        "senior engineer",
-        "engineering manager",
-        "software engineer",
+def _year_claim_tuple(claim: JsonObject, terms: set[str]) -> tuple[str, int] | None:
+    fields = _claim_fields(claim)
+    years = _year_claim(" ".join(fields), terms)
+    if years is None:
+        return None
+    concept = _year_claim_concept(fields, _claim_normalized_terms_only(claim) or terms)
+    if not concept:
+        return None
+    return (concept, years)
+
+
+def _title_claim(claim: JsonObject, terms: set[str]) -> tuple[str, str] | None:
+    if not _is_structured_title_claim(claim, terms):
+        return None
+    canonical_name = _optional_text(claim.get("canonical_name"))
+    description = _optional_text(claim.get("description"))
+    title = _normalize(canonical_name or description or "")
+    if not title:
+        return None
+    role = _title_role_slot(claim, terms, title)
+    if not role:
+        return None
+    return (role, title)
+
+
+def _claim_fields(claim: JsonObject) -> list[str]:
+    fields = []
+    for key in ("text", "canonical_name", "description"):
+        value = claim.get(key)
+        if isinstance(value, (str, int, float, bool)):
+            fields.append(str(value))
+    return fields
+
+
+def _claim_normalized_terms_only(claim: JsonObject) -> set[str]:
+    raw_terms = claim.get("normalized_terms") or []
+    if isinstance(raw_terms, str):
+        raw_terms = [raw_terms]
+    if not isinstance(raw_terms, (list, tuple, set)):
+        return set()
+    return set(_expanded_terms([term for term in raw_terms if isinstance(term, str)]))
+
+
+def _year_claim_concept(fields: list[str], terms: set[str]) -> str:
+    concept_terms = _expanded_terms([*fields, *terms])
+    return " ".join(
+        sorted(
+            term
+            for term in concept_terms
+            if term
+            and term not in _YEAR_VALUE_TERMS
+            and term not in _YEAR_GENERIC_TERMS
+            and term not in _YEAR_CONCEPT_GENERIC_TERMS
+            and not _has_year_component(term)
+            and not _YEARS_RE.fullmatch(term)
+        )
+    )
+
+
+def _has_year_component(term: str) -> bool:
+    pieces = set(term.split())
+    return bool(pieces.intersection(_YEAR_GENERIC_TERMS) or pieces.intersection(_YEAR_VALUE_TERMS))
+
+
+def _is_structured_title_claim(claim: JsonObject, terms: set[str]) -> bool:
+    if not (_optional_text(claim.get("canonical_name")) or _optional_text(claim.get("description"))):
+        return False
+    fact_type = _normalize(claim.get("type", ""))
+    if fact_type in _TITLE_FACT_TYPES:
+        return True
+    expanded_terms = set(_expanded_terms(terms))
+    return bool(expanded_terms.intersection(_TITLE_SIGNAL_TERMS))
+
+
+def _title_role_slot(claim: JsonObject, terms: set[str], title: str) -> str:
+    title_terms = set(_expanded_terms([title]))
+    description = _optional_text(claim.get("description"))
+    if description and _normalize(description) != title:
+        fallback_role = _normalize(description)
+        description_terms = [
+            term
+            for term in _expanded_terms([description])
+            if term
+            and term not in title_terms
+            and term not in _TITLE_ROLE_GENERIC_TERMS
+            and not _has_title_role_generic_component(term)
+        ]
+        if description_terms:
+            return " ".join(sorted(description_terms))
+        if fallback_role:
+            return fallback_role
+    role_source_terms = _claim_normalized_terms_only(claim) or terms
+    role_terms = [
+        term
+        for term in _expanded_terms(role_source_terms)
+        if term
+        and term not in title_terms
+        and term not in _TITLE_ROLE_GENERIC_TERMS
+        and not _has_title_role_generic_component(term)
     ]
-    for title in titles:
-        if title in combined:
-            return title
-    return None
+    if role_terms:
+        return " ".join(sorted(role_terms))
+    return ""
+
+
+def _has_title_role_generic_component(term: str) -> bool:
+    return bool(set(term.split()).intersection(_TITLE_ROLE_GENERIC_TERMS))
