@@ -26,6 +26,7 @@ from .render_overflow import (
     render_overflow_decision as _render_overflow_decision,
 )
 from .recovery import recover_run as _recover_run
+from .recovery_gate import checkpoint_result_event as _checkpoint_result_event, next_checkpoint_result_sequence as _next_checkpoint_result_sequence, recovery_reruns_gate_result as _recovery_reruns_gate_result
 from .schemas import RUN_MANIFEST_SCHEMA, SCHEMAS, Checkpoint, RunManifest
 from .versions import collectVersions
 
@@ -67,11 +68,7 @@ _COMPLETION_ARTIFACT_GATES: dict[str, JsonObject] = {
     "final_match": {"checkpoint": "FINAL_MATCH", "name": "match_report", "state_keys": ["match_report_ref", "final_match_ref"]},
     "grounding": {"checkpoint": "GROUNDING_AUDIT", "name": "grounding_audit", "state_keys": ["grounding_audit_ref", "grounding_ref"]},
     "ats": {"checkpoint": "ATS_STRUCTURE_VALIDATION", "name": "ats_report", "state_keys": ["ats_report_ref", "ats_ref"]},
-    "render_validation": {
-        "checkpoint": "RENDER_VALIDATION",
-        "name": "render_validation_report",
-        "state_keys": ["render_validation_report_ref", "render_validation_ref"],
-    },
+    "render_validation": {"checkpoint": "RENDER_VALIDATION", "name": "render_validation_report", "state_keys": ["render_validation_report_ref", "render_validation_ref"]},
     "audit_ref": {"checkpoint": "COMPLETE", "name": "audit_ref", "state_keys": ["audit_ref", "audit_manifest_ref"]},
 }
 
@@ -275,6 +272,8 @@ def advanceCheckpoint(run_state: JsonObject, target_checkpoint: str, evidence: J
 def recordCheckpointResult(run_state: JsonObject, checkpoint: str, result: JsonObject, clock: Callable[[], str] | None = None) -> JsonObject:
     working_state = _working_run_state(run_state)
     checkpoint_result = dict(result)
+    result_sequence = _next_checkpoint_result_sequence(working_state)
+    checkpoint_result["result_sequence"] = result_sequence
     timestamp = _timestamp(clock)
     operation_records = _operation_status_records(checkpoint_result)
     question_records = _question_log_records(checkpoint_result)
@@ -299,6 +298,7 @@ def recordCheckpointResult(run_state: JsonObject, checkpoint: str, result: JsonO
     if render_overflow_result.get("constraint_ref"):
         artifact_refs.append(render_overflow_result["constraint_ref"])
         render_refs.append(render_overflow_result["constraint_ref"])
+    working_state.setdefault("checkpoint_result_events", []).append(_checkpoint_result_event(working_state, checkpoint, result_sequence, checkpoint_ref))
     _extend_unique(working_state, "operation_log_refs", operation_refs)
     _extend_unique(working_state, "question_answer_log_refs", question_refs)
     _extend_ref_unique(working_state, "validation_refs", validation_refs)
@@ -423,6 +423,11 @@ def assertCanComplete(run_state: JsonObject) -> JsonObject:
     if not render_overflow_passed:
         failed_gate_reasons["render_overflow"] = _render_overflow_completion_reason(working_state)
 
+    recovery_result = _recovery_reruns_gate_result(working_state)
+    required_gates["recovery_reruns"] = recovery_result["passed"]
+    if not recovery_result["passed"]:
+        failed_gate_reasons["recovery_reruns"] = recovery_result["reason"]
+
     failed = [gate for gate, passed in required_gates.items() if not passed]
     return {
         "status": "ok" if not failed else "blocked",
@@ -491,6 +496,8 @@ def _working_run_state(run_state: JsonObject) -> JsonObject:
         return working
     merged = {**persisted, **run_state}
     merged["audit_events"] = _merge_dict_records(persisted.get("audit_events", []), run_state.get("audit_events", []), "event_id")
+    merged["recovery_events"] = _merge_dict_records(persisted.get("recovery_events", []), run_state.get("recovery_events", []), "recovery_sequence")
+    merged["checkpoint_result_events"] = _merge_dict_records(persisted.get("checkpoint_result_events", []), run_state.get("checkpoint_result_events", []), "result_sequence")
     merged["verified_evidence"] = _merge_dict_values(persisted.get("verified_evidence", {}), run_state.get("verified_evidence", {}))
     merged["stage_state"] = _merge_dict_values(persisted.get("stage_state", {}), run_state.get("stage_state", {}))
     merged["resolution_loop_state"] = _normalize_resolution_loop_state(merged.get("resolution_loop_state", {}), merged)

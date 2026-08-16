@@ -4,14 +4,14 @@ level: task
 title: "Integrity verification: career-store surfaces, base-hash comparison, rejected-operation scan"
 short_code: "RKIT-T-0075"
 created_at: 2026-08-16T18:09:42.282493+00:00
-updated_at: 2026-08-16T18:19:08.264295+00:00
+updated_at: 2026-08-16T18:26:05.640427+00:00
 parent: workflow-recovery-and-idempotency
 blocked_by: [RKIT-T-0074]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0025
 ## Objective **[REQUIRED]**
 
 Implement the three real integrity verifications behind the structured contract RKIT-T-0074 introduced, so recovery PROVES the TEST_SPEC recovery assertions ("career DB remains transactionally valid", "base resume remains unchanged", "rejected operations stay rejected") instead of declaring them. After this task no integrity check returns `unverified` in the normal path.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

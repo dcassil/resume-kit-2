@@ -16,7 +16,32 @@ from .schemas import CAREER_DB_VERSION_UNAVAILABLE_STATUS
 JsonObject = dict[str, Any]
 
 _RECOVERY_INTEGRITY_CHECKS = ("career_db", "base_resume", "rejected_operations")
-_RERUN_CHECKPOINTS = {"APPLY_CHANGES", "FINAL_MATCH", "GROUNDING_AUDIT", "ATS_STRUCTURE_VALIDATION", "RENDER"}
+_RECOVERY_RERUN_SETS: dict[str, tuple[str, ...]] = {
+    "INIT": (),
+    "INGEST_RESUME": (),
+    "VALIDATE_BASE": (),
+    "EXTRACT_PERSIST_CAREER_FACTS": (),
+    "INGEST_JOB": (),
+    "NORMALIZE_JOB": (),
+    "MATCH_BASE": (),
+    "RESOLVE_GAPS": (),
+    "BUILD_SELECTION_PLAN": (),
+    "PROPOSE_TAILORING_CHANGES": (),
+    "VALIDATE_CHANGES": (),
+    # Partially applied changes can invalidate both groundedness and the final match score.
+    "APPLY_CHANGES": ("GROUNDING_AUDIT", "FINAL_MATCH"),
+    # Interrupted final scoring needs a fresh final match result.
+    "FINAL_MATCH": ("FINAL_MATCH",),
+    # Grounding changes can alter final-match trust, so both reruns are required.
+    "GROUNDING_AUDIT": ("GROUNDING_AUDIT", "FINAL_MATCH"),
+    # ATS validation is an independent structural gate and reruns in place.
+    "ATS_STRUCTURE_VALIDATION": ("ATS_STRUCTURE_VALIDATION",),
+    # Render overflow recovery must rerender and revalidate the rendered artifact.
+    "RENDER": ("RENDER", "RENDER_VALIDATION"),
+    # Render validation interruptions must preserve the render/validation pair.
+    "RENDER_VALIDATION": ("RENDER", "RENDER_VALIDATION"),
+    "COMPLETE": (),
+}
 
 
 def recover_run(
@@ -40,7 +65,14 @@ def recover_run(
         raise validation_error([issue("invalid_run_state", "Persisted run state must be an object.", "")])
     run_state = dict(loaded)
     current = str(run_state.get("current_checkpoint", "INIT"))
-    required_reruns = ["FINAL_MATCH"] if current in _RERUN_CHECKPOINTS else []
+    required_reruns = list(_RECOVERY_RERUN_SETS.get(current, ()))
+    recovery_event = {
+        "recovered_at_checkpoint": current,
+        "required_reruns": required_reruns,
+        "recovery_sequence": _next_recovery_sequence(run_state),
+    }
+    _append_recovery_event(run_state, recovery_event)
+    _persist_run_state(saved, run_state)
     integrity = _recovery_integrity(run_state, career_store=career_store)
     return {
         "status": "ok",
@@ -58,6 +90,28 @@ def recover_run(
         "integrity": integrity,
         "resumable": _recovery_resumable(integrity),
     }
+
+
+def _next_recovery_sequence(run_state: JsonObject) -> int:
+    sequence = 1
+    for event in run_state.get("recovery_events", []):
+        if not isinstance(event, dict):
+            continue
+        try:
+            sequence = max(sequence, int(event.get("recovery_sequence", 0)) + 1)
+        except (TypeError, ValueError):
+            continue
+    return sequence
+
+
+def _append_recovery_event(run_state: JsonObject, event: JsonObject) -> None:
+    run_state.setdefault("recovery_events", []).append(dict(event))
+    marker = {"kind": "recovery_event", **dict(event)}
+    run_state.setdefault("recovery_markers", []).append(marker)
+
+
+def _persist_run_state(path: Path, run_state: JsonObject) -> None:
+    path.write_text(json.dumps(run_state, sort_keys=True, indent=2), encoding="utf-8")
 
 
 def _recovery_integrity(run_state: JsonObject, *, career_store: Any | None = None) -> JsonObject:

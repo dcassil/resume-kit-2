@@ -204,6 +204,10 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         path = self.workspace / ".workflow" / "runs" / f"{run_state['run_id']}.json"
         path.write_text(json.dumps(run_state, sort_keys=True, indent=2), encoding="utf-8")
 
+    def persisted_run_state(self, run_state):
+        path = self.workspace / ".workflow" / "runs" / f"{run_state['run_id']}.json"
+        return json.loads(path.read_text(encoding="utf-8"))
+
     def store_state(self, *, schema_version=None, status="ok", pending=None):
         import career_store
 
@@ -597,6 +601,111 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         self.assertEqual(recovery["integrity"]["career_db"]["evidence_ref"]["state"]["schema_version"], self.store_state()["schema_version"])
         self.assertEqual(recovery["integrity"]["base_resume"]["evidence_ref"]["sha256"], base_ref["sha256"])
         self.assertEqual(recovery["integrity"]["rejected_operations"]["evidence_ref"]["rejected_operation_ids"], ["op_rejected"])
+
+    def test_recovery_at_apply_changes_requires_grounding_and_final_match_reruns_before_completion(self):
+        run_state = self.create_run()
+        run_state["current_checkpoint"] = "APPLY_CHANGES"
+        self.persist_run_state(run_state)
+
+        recovery = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=run_state["run_id"]))
+
+        self.assertEqual(recovery["required_reruns"], ["GROUNDING_AUDIT", "FINAL_MATCH"])
+        persisted = self.persisted_run_state(run_state)
+        self.assertEqual(
+            persisted["recovery_events"][-1],
+            {
+                "recovered_at_checkpoint": "APPLY_CHANGES",
+                "required_reruns": ["GROUNDING_AUDIT", "FINAL_MATCH"],
+                "recovery_sequence": 1,
+            },
+        )
+        run_state.update(self.passing_completion_gate_state())
+
+        blocked = maybe_await(self.workflow.assertCanComplete(run_state))
+        self.assertFalse(blocked["can_complete"])
+        self.assertIn("recovery_reruns", blocked["failed_gates"])
+        self.assertEqual(
+            blocked["failed_gate_reasons"]["recovery_reruns"]["missing_or_stale_checkpoints"],
+            ["GROUNDING_AUDIT", "FINAL_MATCH"],
+        )
+
+        maybe_await(self.workflow.recordCheckpointResult(run_state, "GROUNDING_AUDIT", {"status": "passed"}))
+        still_blocked = maybe_await(self.workflow.assertCanComplete(run_state))
+        self.assertFalse(still_blocked["can_complete"])
+        self.assertEqual(
+            still_blocked["failed_gate_reasons"]["recovery_reruns"]["missing_or_stale_checkpoints"],
+            ["FINAL_MATCH"],
+        )
+
+        maybe_await(self.workflow.recordCheckpointResult(run_state, "FINAL_MATCH", {"status": "passed"}))
+        allowed = maybe_await(self.workflow.assertCanComplete(run_state))
+        self.assertTrue(allowed["can_complete"], allowed)
+
+    def test_pre_recovery_rerun_results_do_not_satisfy_recovery_completion_gate(self):
+        run_state = self.create_run()
+        maybe_await(self.workflow.recordCheckpointResult(run_state, "GROUNDING_AUDIT", {"status": "passed"}))
+        maybe_await(self.workflow.recordCheckpointResult(run_state, "FINAL_MATCH", {"status": "passed"}))
+        run_state["current_checkpoint"] = "APPLY_CHANGES"
+        self.persist_run_state(run_state)
+
+        maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=run_state["run_id"]))
+        run_state.update(self.passing_completion_gate_state())
+
+        blocked = maybe_await(self.workflow.assertCanComplete(run_state))
+
+        self.assertFalse(blocked["can_complete"])
+        self.assertEqual(
+            blocked["failed_gate_reasons"]["recovery_reruns"]["missing_or_stale_checkpoints"],
+            ["GROUNDING_AUDIT", "FINAL_MATCH"],
+        )
+
+    def test_recovery_at_ingest_job_has_empty_rerun_set_and_vacuous_completion_gate(self):
+        run_state = self.create_run()
+        run_state["current_checkpoint"] = "INGEST_JOB"
+        self.persist_run_state(run_state)
+
+        recovery = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=run_state["run_id"]))
+        run_state.update(self.passing_completion_gate_state())
+        allowed = maybe_await(self.workflow.assertCanComplete(run_state))
+
+        self.assertEqual(recovery["required_reruns"], [])
+        self.assertTrue(allowed["can_complete"], allowed)
+
+    def test_latest_recovery_event_governs_recovery_rerun_gate(self):
+        run_state = self.create_run()
+        run_state["current_checkpoint"] = "APPLY_CHANGES"
+        self.persist_run_state(run_state)
+        first_recovery = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=run_state["run_id"]))
+        self.assertEqual(first_recovery["required_reruns"], ["GROUNDING_AUDIT", "FINAL_MATCH"])
+        maybe_await(self.workflow.recordCheckpointResult(run_state, "FINAL_MATCH", {"status": "passed"}))
+
+        run_state["current_checkpoint"] = "FINAL_MATCH"
+        self.persist_run_state(run_state)
+        second_recovery = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=run_state["run_id"]))
+        run_state.update(self.passing_completion_gate_state())
+        blocked = maybe_await(self.workflow.assertCanComplete(run_state))
+
+        self.assertEqual(second_recovery["required_reruns"], ["FINAL_MATCH"])
+        self.assertEqual(self.persisted_run_state(run_state)["recovery_events"][-1]["recovery_sequence"], 2)
+        self.assertFalse(blocked["can_complete"])
+        self.assertEqual(
+            blocked["failed_gate_reasons"]["recovery_reruns"]["missing_or_stale_checkpoints"],
+            ["FINAL_MATCH"],
+        )
+
+        maybe_await(self.workflow.recordCheckpointResult(run_state, "FINAL_MATCH", {"status": "passed"}))
+        allowed = maybe_await(self.workflow.assertCanComplete(run_state))
+        self.assertTrue(allowed["can_complete"], allowed)
+
+    def test_recovery_at_render_requires_render_and_render_validation_not_final_match(self):
+        run_state = self.create_run()
+        run_state["current_checkpoint"] = "RENDER"
+        self.persist_run_state(run_state)
+
+        recovery = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=run_state["run_id"]))
+
+        self.assertEqual(recovery["required_reruns"], ["RENDER", "RENDER_VALIDATION"])
+        self.assertNotEqual(recovery["required_reruns"], ["FINAL_MATCH"])
 
     def test_create_run_tolerates_malformed_workspace_index(self):
         runs_dir = self.workspace / ".workflow" / "runs"
@@ -1534,7 +1643,7 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         self.assertEqual(recovery["already_applied_operations"].count("op_1"), 1)
         self.assertEqual(recovery["already_asked_questions"].count("req_aws"), 1)
         self.assertEqual(recovery["already_written_facts"].count("fact_aws"), 1)
-        self.assertIn("FINAL_MATCH", recovery["required_reruns"])
+        self.assertEqual(recovery["required_reruns"], ["GROUNDING_AUDIT", "FINAL_MATCH"])
 
     def passing_completion_gate_state(self):
         return {

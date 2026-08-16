@@ -196,7 +196,7 @@
     },
     {
       "name": "recoverRun",
-      "description": "Resume from persisted deterministic state after interruption without duplicating user questions, fact writes, or applied operations.",
+      "description": "Resume from persisted deterministic state after interruption, persist a sequenced recovery event, and return reruns without duplicating user questions, fact writes, or applied operations.",
       "input_contract": {
         "required": [
           "workspace",
@@ -225,7 +225,7 @@
     },
     {
       "name": "assertCanComplete",
-      "description": "Block COMPLETE unless final match, grounding audit, ATS/structure validation, render validation, audit artifacts, hallucination rejection, and unresolved-hard-requirement policy all pass.",
+      "description": "Block COMPLETE unless final match, grounding audit, ATS/structure validation, render validation, audit artifacts, hallucination rejection, unresolved-hard-requirement policy, and post-recovery rerun gates all pass.",
       "input_contract": {
         "required": [
           "run_state"

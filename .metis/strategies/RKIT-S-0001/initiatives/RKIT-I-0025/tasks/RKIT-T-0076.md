@@ -4,14 +4,14 @@ level: task
 title: "Computed rerun sets per interruption checkpoint + completion-gate enforcement"
 short_code: "RKIT-T-0076"
 created_at: 2026-08-16T18:09:42.338523+00:00
-updated_at: 2026-08-16T18:09:42.338523+00:00
+updated_at: 2026-08-16T18:26:05.959755+00:00
 parent: workflow-recovery-and-idempotency
-blocked_by: ["RKIT-T-0074", "RKIT-T-0075"]
+blocked_by: [RKIT-T-0074, RKIT-T-0075]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0025
 ## Objective **[REQUIRED]**
 
 Replace the hardcoded FINAL_MATCH-only `required_reruns` (workflow/__init__.py:387) with a deterministic checkpoint→rerun-set map persisted into run state at recovery time, and give `assertCanComplete` a recovery gate so COMPLETE is structurally unreachable until every computed rerun has a fresh post-recovery recorded result. Reruns become enforced, not advisory (the workflow/__init__.py:198-212-era unenforced-rerun audit finding).
+
+## Acceptance Criteria
 
 ## Acceptance Criteria **[REQUIRED]**
 
@@ -54,4 +56,4 @@ RKIT-T-0074 (recoverRun contract), RKIT-T-0075 (integrity results feed `resumabl
 
 ## Status Updates **[REQUIRED]**
 
-*To be added during implementation*
+- 2026-08-16: T-0074/0075 landed and committed (gates 391/smoke/verify green; store-consultation mutation-probed by driver). Codex launched: 18-checkpoint rerun map, recovery events with monotonic recovery_sequence in run state (no new manifest fields — recovery_markers mirror only), recordCheckpointResult ordering stamp, recovery_reruns gate in assertCanComplete (vacuous without recovery).
