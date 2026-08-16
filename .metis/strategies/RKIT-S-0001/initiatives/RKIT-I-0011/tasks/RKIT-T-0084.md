@@ -4,14 +4,14 @@ level: task
 title: "Delete snake_case dual dispatch: single camelCase store-surface routing (R1)"
 short_code: "RKIT-T-0084"
 created_at: 2026-08-16T19:25:47.570560+00:00
-updated_at: 2026-08-16T19:25:47.570560+00:00
+updated_at: 2026-08-16T19:27:10.014325+00:00
 parent: align-career-mcp-semantics-with
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0011
 ## Objective **[REQUIRED]**
 
 Remove the audit's root-cause defect in `career-mcp/career_mcp/__init__.py`: the adapter prefers a private snake_case store dialect (`search_facts`/`get_fact`/`propose_fact`/... preference sites formerly at :62,82,103,118,126,137,152,163 — re-locate in the current post-I-0010 file) that only the test FakeCareerStore implements. After this task the adapter calls ONLY the declared camelCase `store_surface.json` surface (`searchFacts`/`getFact`/`upsertFact`/`verifyFact`/`addEvidence`/`addRelationship`/`findCandidateMatches`) via a per-tool mapping table; DTO conversion at the boundary is shape-only (key naming, sensitive-field stripping); vocabulary passes through untranslated (no drift-hiding translation shim — RKIT-A-0006).
+
+## Acceptance Criteria
 
 ## Acceptance Criteria **[REQUIRED]**
 
@@ -52,4 +54,4 @@ None within I-0011 (first task). Serial chain T-0084→0085→0086 (same files).
 
 ## Status Updates **[REQUIRED]**
 
-*To be added during implementation*
+- 2026-08-16: I-0010 complete (v0.16.0 pushed 5ec4ee1). I-0011 decomposed T-0084..0086. Driver verified: store CODE accepts parent/child/contradicts (_RELATIONSHIP_TYPES store.py:79) but protected career_store_guardrails.py:49/178 pins store_surface.json to the 4-type set — parent/child re-advertisement deferred to approval batch; T-0086 scoped accordingly. Codex launched on dual-dispatch deletion.

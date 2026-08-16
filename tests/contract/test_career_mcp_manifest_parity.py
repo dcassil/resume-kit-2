@@ -47,8 +47,8 @@ def runtime_tools() -> list[JsonObject]:
 
 def registered_runtime_tool_names() -> set[str]:
     career_mcp = importlib.import_module("career_mcp")
-    source = inspect.getsource(career_mcp.CareerMcpAdapter.call_tool)
-    return set(re.findall(r'name == "(career\.[a-z_]+)"', source))
+    table = getattr(career_mcp, "STORE_METHOD_BY_TOOL", {})
+    return {name for name in table if isinstance(name, str) and re.fullmatch(r"career\.[a-z_]+", name)}
 
 
 def assert_manifest_matches_runtime(

@@ -62,6 +62,26 @@ TOOL_ARGUMENTS = {
     "career.find_matches": {"requirements"},
     "career.get_unverified": {"topic", "limit"},
 }
+STORE_METHOD_BY_TOOL = {
+    "career.search_facts": "searchFacts",
+    "career.get_fact": "getFact",
+    "career.propose_fact": "upsertFact",
+    "career.add_evidence": "addEvidence",
+    "career.verify_fact": "verifyFact",
+    "career.add_relationship": "addRelationship",
+    "career.find_matches": "findCandidateMatches",
+    "career.get_unverified": "searchFacts",
+}
+HANDLER_BY_TOOL = {
+    "career.search_facts": "_handle_search",
+    "career.get_fact": "_handle_fetch",
+    "career.propose_fact": "_handle_proposal",
+    "career.add_evidence": "_handle_evidence_append",
+    "career.verify_fact": "_handle_verification",
+    "career.add_relationship": "_handle_relation",
+    "career.find_matches": "_handle_matching",
+    "career.get_unverified": "_handle_review_queue",
+}
 
 
 class CareerMcpAdapter:
@@ -90,24 +110,8 @@ class CareerMcpAdapter:
             return result
         try:
             _assert_consumed_arguments(name, arguments)
-            if name == "career.search_facts":
-                payload = await self._search_facts(arguments)
-            elif name == "career.get_fact":
-                payload = await self._get_fact(arguments)
-            elif name == "career.propose_fact":
-                payload = await self._propose_fact(arguments)
-            elif name == "career.add_evidence":
-                payload = await self._add_evidence(arguments)
-            elif name == "career.verify_fact":
-                payload = await self._verify_fact(arguments)
-            elif name == "career.add_relationship":
-                payload = await self._add_relationship(arguments)
-            elif name == "career.find_matches":
-                payload = await self._find_matches(arguments)
-            elif name == "career.get_unverified":
-                payload = await self._get_unverified(arguments)
-            else:
-                payload = {"status": "error", "error": {"type": "unknown_tool", "message": "Unknown career tool."}}
+            handler = getattr(self, HANDLER_BY_TOOL[name])
+            payload = await handler(name, arguments)
             result = _normalize_tool_result(name, payload)
         except AssertionError:
             raise
@@ -118,18 +122,18 @@ class CareerMcpAdapter:
         self._record_audit(name, result)
         return result
 
-    async def _search_facts(self, arguments: JsonObject) -> JsonObject:
-        if hasattr(self._store, "search_facts"):
-            value = await _maybe_await(self._store.search_facts(**arguments))
-        else:
-            value = await _maybe_await(
-                self._store.searchFacts(
-                    arguments["query"],
-                    filters={},
-                    limit=None,
-                    include_evidence=True,
-                )
+    def _surface(self, tool: str) -> Any:
+        return getattr(self._store, STORE_METHOD_BY_TOOL[tool])
+
+    async def _handle_search(self, tool: str, arguments: JsonObject) -> JsonObject:
+        value = await _maybe_await(
+            self._surface(tool)(
+                arguments["query"],
+                filters={},
+                limit=None,
+                include_evidence=True,
             )
+        )
         facts = value.get("facts", value) if isinstance(value, dict) else value
         filtered = _post_filter_facts(facts, arguments)
         limit = arguments.get("limit", 10)
@@ -138,12 +142,9 @@ class CareerMcpAdapter:
             "facts": sorted((_fact_summary(fact) for fact in filtered), key=lambda fact: fact["fact_id"])[:limit],
         }
 
-    async def _get_fact(self, arguments: JsonObject) -> JsonObject:
+    async def _handle_fetch(self, tool: str, arguments: JsonObject) -> JsonObject:
         include_conflicts = arguments.get("include_conflicts", True)
-        if hasattr(self._store, "get_fact"):
-            value = await _maybe_await(self._store.get_fact(**arguments))
-        else:
-            value = await _maybe_await(self._store.getFact(arguments["fact_id"]))
+        value = await _maybe_await(self._surface(tool)(arguments["fact_id"]))
         fact = _extract_fact(value)
         if not fact:
             return {"status": "error", "error": {"type": "not_found", "message": "Career fact not found."}}
@@ -166,86 +167,68 @@ class CareerMcpAdapter:
             "conflicts": normalized["conflicts"],
         }
 
-    async def _propose_fact(self, arguments: JsonObject) -> JsonObject:
-        if hasattr(self._store, "propose_fact"):
-            value = await _maybe_await(self._store.propose_fact(**arguments))
-        else:
-            if arguments.get("dedupe_key") is not None and not _method_accepts_argument(self._store.upsertFact, "dedupe_key"):
-                return _validation_error("Unsupported argument for career-store upsertFact: dedupe_key.")
-            fact = {"type": arguments["type"], "text": arguments["text"], "verification_state": "unknown"}
-            kwargs = {
-                "source": arguments["source"],
-                "policy": {**self._policy, "allow_inferred_final": False},
-            }
-            if _method_accepts_argument(self._store.upsertFact, "dedupe_key"):
-                kwargs["dedupe_key"] = arguments.get("dedupe_key")
-            value = await _maybe_await(self._store.upsertFact(fact, arguments.get("evidence"), **kwargs))
+    async def _handle_proposal(self, tool: str, arguments: JsonObject) -> JsonObject:
+        store_call = self._surface(tool)
+        if arguments.get("dedupe_key") is not None and not _method_accepts_argument(store_call, "dedupe_key"):
+            return _validation_error("Unsupported argument for career-store upsertFact: dedupe_key.")
+        fact = {"type": arguments["type"], "text": arguments["text"], "verification_state": "unknown"}
+        kwargs = {
+            "source": arguments["source"],
+            "policy": {**self._policy, "allow_inferred_final": False},
+        }
+        if _method_accepts_argument(store_call, "dedupe_key"):
+            kwargs["dedupe_key"] = arguments.get("dedupe_key")
+        value = await _maybe_await(store_call(fact, arguments.get("evidence"), **kwargs))
         return _mutation(value)
 
-    async def _add_evidence(self, arguments: JsonObject) -> JsonObject:
-        if hasattr(self._store, "add_evidence"):
-            value = await _maybe_await(self._store.add_evidence(**arguments))
-        else:
-            source = str(arguments["evidence"].get("source", "mcp_tool"))
-            value = await _maybe_await(self._store.addEvidence(arguments["fact_id"], arguments["evidence"], source=source))
+    async def _handle_evidence_append(self, tool: str, arguments: JsonObject) -> JsonObject:
+        source = str(arguments["evidence"].get("source", "mcp_tool"))
+        value = await _maybe_await(self._surface(tool)(arguments["fact_id"], arguments["evidence"], source=source))
         return _mutation(value)
 
-    async def _verify_fact(self, arguments: JsonObject) -> JsonObject:
+    async def _handle_verification(self, tool: str, arguments: JsonObject) -> JsonObject:
         if _verification_state_requires_evidence(arguments["verification_state"]) and not arguments.get("evidence_id"):
             return _validation_error(f"evidence_id is required when verification_state is {arguments['verification_state']}.")
-        if hasattr(self._store, "verify_fact"):
-            value = await _maybe_await(self._store.verify_fact(**arguments))
-        else:
-            confirmation = _confirmation_with_evidence_id(arguments["confirmation"], arguments.get("evidence_id"))
-            provenance = confirmation.get("provenance", []) if isinstance(confirmation, dict) else []
-            first_provenance = provenance[0] if provenance and isinstance(provenance[0], dict) else {}
-            source = str(first_provenance.get("source", first_provenance.get("kind", "mcp_tool")))
-            value = await _maybe_await(
-                self._store.verifyFact(arguments["fact_id"], arguments["verification_state"], confirmation, source=source)
-            )
+        confirmation = _confirmation_with_evidence_id(arguments["confirmation"], arguments.get("evidence_id"))
+        provenance = confirmation.get("provenance", []) if isinstance(confirmation, dict) else []
+        first_provenance = provenance[0] if provenance and isinstance(provenance[0], dict) else {}
+        source = str(first_provenance.get("source", first_provenance.get("kind", "mcp_tool")))
+        value = await _maybe_await(
+            self._surface(tool)(arguments["fact_id"], arguments["verification_state"], confirmation, source=source)
+        )
         return _mutation(value)
 
-    async def _add_relationship(self, arguments: JsonObject) -> JsonObject:
-        if hasattr(self._store, "add_relationship"):
-            value = await _maybe_await(self._store.add_relationship(**arguments))
-        else:
-            value = await _maybe_await(
-                self._store.addRelationship(
-                    arguments["from_fact_id"],
-                    arguments["to_fact_id"],
-                    arguments["relationship_type"],
-                    evidence_or_rationale=arguments.get("evidence") or arguments.get("confirmation") or {},
-                    policy=self._policy,
-                )
+    async def _handle_relation(self, tool: str, arguments: JsonObject) -> JsonObject:
+        value = await _maybe_await(
+            self._surface(tool)(
+                arguments["from_fact_id"],
+                arguments["to_fact_id"],
+                arguments["relationship_type"],
+                evidence_or_rationale=arguments.get("evidence") or arguments.get("confirmation") or {},
+                policy=self._policy,
             )
+        )
         return _mutation(value)
 
-    async def _find_matches(self, arguments: JsonObject) -> JsonObject:
-        if hasattr(self._store, "find_matches"):
-            value = await _maybe_await(self._store.find_matches(**arguments))
-        else:
-            value = await _maybe_await(self._store.findCandidateMatches(arguments["requirements"], policy=self._policy))
+    async def _handle_matching(self, tool: str, arguments: JsonObject) -> JsonObject:
+        value = await _maybe_await(self._surface(tool)(arguments["requirements"], policy=self._policy))
         rows = value.get("matches", value) if isinstance(value, dict) else value
         matches = [_match(row) for row in rows]
         if isinstance(value, dict):
             matches.extend(_unresolved_match(row) for row in value.get("unresolved", []))
         return {"status": "ok", "matches": sorted(matches, key=lambda item: item["requirement_id"])}
 
-    async def _get_unverified(self, arguments: JsonObject) -> JsonObject:
-        if hasattr(self._store, "get_unverified"):
-            value = await _maybe_await(self._store.get_unverified(**arguments))
-            facts = value.get("facts", value) if isinstance(value, dict) else value
-        else:
-            query = arguments.get("topic") or ""
-            value = await _maybe_await(
-                self._store.searchFacts(
-                    query,
-                    filters={"verification_state": "unknown"},
-                    limit=arguments.get("limit", 10),
-                    include_evidence=True,
-                )
+    async def _handle_review_queue(self, tool: str, arguments: JsonObject) -> JsonObject:
+        query = arguments.get("topic") or ""
+        value = await _maybe_await(
+            self._surface(tool)(
+                query,
+                filters={"verification_state": "unknown"},
+                limit=arguments.get("limit", 10),
+                include_evidence=True,
             )
-            facts = value.get("facts", [])
+        )
+        facts = value.get("facts", [])
         return {"status": "ok", "facts": [_unverified_fact(fact) for fact in facts]}
 
     def _record_audit(self, name: str, result: JsonObject) -> None:

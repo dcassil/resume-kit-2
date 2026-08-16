@@ -75,45 +75,97 @@ class FakeCareerStore:
                 "relationships": [],
                 "conflicts": [],
             },
+            "fact_candidate": {
+                "fact_id": "fact_candidate",
+                "type": "experience",
+                "text": "candidate architecture experience",
+                "verification_state": "unknown",
+                "evidence_summary": [],
+                "relationships": [],
+                "conflicts": [],
+            },
         }
 
-    def search_facts(self, **kwargs):
-        self.calls.append(("search_facts", kwargs))
-        query = kwargs["query"].lower()
+    def searchFacts(self, query: str, filters=None, limit=None, include_evidence=True):
+        self.calls.append(
+            (
+                "searchFacts",
+                {
+                    "query": query,
+                    "filters": filters or {},
+                    "limit": limit,
+                    "include_evidence": include_evidence,
+                },
+            )
+        )
+        query = query.lower()
+        verification_state = (filters or {}).get("verification_state")
         matches = [fact for fact in self.facts.values() if query in fact["text"].lower()]
-        return sorted(matches, key=lambda fact: fact["fact_id"])
+        if verification_state:
+            matches = [fact for fact in matches if fact.get("verification_state") == verification_state]
+        if limit is not None:
+            matches = matches[:limit]
+        return {"facts": sorted(matches, key=lambda fact: fact["fact_id"])}
 
-    def get_fact(self, fact_id: str, **kwargs):
-        self.calls.append(("get_fact", {"fact_id": fact_id, **kwargs}))
-        return self.facts.get(fact_id)
+    def getFact(self, fact_id: str):
+        self.calls.append(("getFact", {"fact_id": fact_id}))
+        fact = self.facts.get(fact_id)
+        if fact is None:
+            return {"status": "not_found"}
+        return {
+            "fact": fact,
+            "evidence": fact.get("evidence_summary", []),
+            "relationships": fact.get("relationships", []),
+            "conflicts": fact.get("conflicts", []),
+        }
 
-    def propose_fact(self, **kwargs):
-        self.calls.append(("propose_fact", kwargs))
-        fact_id = "fact_aws" if "aws" in kwargs["text"].lower() else "fact_candidate"
+    def upsertFact(self, fact: dict, evidence=None, source=None, policy=None, dedupe_key=None):
+        self.calls.append(
+            (
+                "upsertFact",
+                {
+                    "fact": fact,
+                    "evidence": evidence,
+                    "source": source,
+                    "policy": policy,
+                    "dedupe_key": dedupe_key,
+                },
+            )
+        )
+        fact_id = "fact_aws" if "aws" in fact["text"].lower() else "fact_candidate"
         return {
             "mutation_status": "deduped" if fact_id in self.facts else "created",
             "fact_id": fact_id,
             "verification_state": "unknown",
             "conflicts": [],
             "confirmation_required": True,
-            "audit": {"operation": "propose_fact"},
+            "audit": {"operation": "upsertFact"},
         }
 
-    def add_evidence(self, **kwargs):
-        self.calls.append(("add_evidence", kwargs))
+    def addEvidence(self, fact_id: str, evidence: dict, source: str):
+        self.calls.append(("addEvidence", {"fact_id": fact_id, "evidence": evidence, "source": source}))
         return {
             "mutation_status": "updated",
-            "fact_id": kwargs["fact_id"],
-            "verification_state": self.facts[kwargs["fact_id"]]["verification_state"],
+            "fact_id": fact_id,
+            "verification_state": self.facts[fact_id]["verification_state"],
             "conflicts": [],
             "confirmation_required": True,
-            "audit": {"operation": "add_evidence"},
+            "audit": {"operation": "addEvidence"},
         }
 
-    def verify_fact(self, **kwargs):
-        self.calls.append(("verify_fact", kwargs))
-        confirmation = kwargs.get("confirmation")
-        if kwargs["verification_state"] == "user_verified" and (
+    def verifyFact(self, fact_id: str, verification_state: str, confirmation: dict, source: str):
+        self.calls.append(
+            (
+                "verifyFact",
+                {
+                    "fact_id": fact_id,
+                    "verification_state": verification_state,
+                    "confirmation": confirmation,
+                    "source": source,
+                },
+            )
+        )
+        if verification_state == "user_verified" and (
             not isinstance(confirmation, dict)
             or confirmation.get("outcome") != "affirmed"
             or not confirmation.get("provenance")
@@ -121,28 +173,46 @@ class FakeCareerStore:
             raise ValueError("affirmed interpretation proposal required")
         return {
             "mutation_status": "updated",
-            "fact_id": kwargs["fact_id"],
-            "verification_state": kwargs["verification_state"],
+            "fact_id": fact_id,
+            "verification_state": verification_state,
             "conflicts": [],
             "confirmation_required": False,
-            "audit": {"operation": "verify_fact"},
+            "audit": {"operation": "verifyFact"},
         }
 
-    def add_relationship(self, **kwargs):
-        self.calls.append(("add_relationship", kwargs))
-        if kwargs["relationship_type"] not in RELATIONSHIP_TYPES:
+    def addRelationship(
+        self,
+        from_fact_id: str,
+        to_fact_id: str,
+        relationship_type: str,
+        evidence_or_rationale: dict,
+        policy: dict,
+    ):
+        self.calls.append(
+            (
+                "addRelationship",
+                {
+                    "from_fact_id": from_fact_id,
+                    "to_fact_id": to_fact_id,
+                    "relationship_type": relationship_type,
+                    "evidence_or_rationale": evidence_or_rationale,
+                    "policy": policy,
+                },
+            )
+        )
+        if relationship_type not in RELATIONSHIP_TYPES:
             raise ValueError("unsupported relationship type")
         return {
             "mutation_status": "created",
-            "fact_id": kwargs["from_fact_id"],
+            "fact_id": from_fact_id,
             "verification_state": "unknown",
             "conflicts": [],
-            "confirmation_required": kwargs["relationship_type"] in {"alias", "equivalent"},
-            "audit": {"operation": "add_relationship"},
+            "confirmation_required": relationship_type in {"alias", "equivalent"},
+            "audit": {"operation": "addRelationship"},
         }
 
-    def find_matches(self, **kwargs):
-        self.calls.append(("find_matches", kwargs))
+    def findCandidateMatches(self, requirements: list[dict], policy: dict):
+        self.calls.append(("findCandidateMatches", {"requirements": requirements, "policy": policy}))
         states = {
             "req_react": ("exact_match", ["fact_react"]),
             "req_api": ("verified_fact_match", ["fact_api"]),
@@ -159,19 +229,13 @@ class FakeCareerStore:
                 "fact_ids": states.get(req["requirement_id"], ("possible_match", []))[1],
                 "reasoning": "classified by career-store fact graph",
             }
-            for req in kwargs["requirements"]
+            for req in requirements
         ]
+        return {"matches": matches, "unresolved": []}
 
-    def get_unverified(self, **kwargs):
-        self.calls.append(("get_unverified", kwargs))
-        return [
-            {
-                "fact_id": "fact_candidate",
-                "text": "candidate architecture experience",
-                "verification_state": "unknown",
-                "confirmation_required": True,
-            }
-        ]
+    def findConflicts(self, fact_or_claim: dict, scope=None):
+        self.calls.append(("findConflicts", {"fact_or_claim": fact_or_claim, "scope": scope}))
+        return {"conflicts": fact_or_claim.get("conflicts", [])}
 
 
 def load_adapter(test_case: unittest.TestCase):
@@ -317,11 +381,10 @@ class CareerMcpAdapterContractTests(unittest.TestCase):
             {fact["verification_state"] for fact in result["facts"]},
             {"source_stated", "user_verified"},
         )
-        self.assertEqual(
-            self.adapter._store.calls[-1][1]["verification"],  # noqa: SLF001
-            ["user_verified", "source_stated"],
-        )
-        self.assertEqual(self.adapter._store.calls[-1][1]["types"], ["skill", "experience"])  # noqa: SLF001
+        self.assertEqual(self.adapter._store.calls[-1][0], "searchFacts")  # noqa: SLF001
+        self.assertEqual(self.adapter._store.calls[-1][1]["query"], "api")  # noqa: SLF001
+        self.assertEqual(self.adapter._store.calls[-1][1]["filters"], {})  # noqa: SLF001
+        self.assertIsNone(self.adapter._store.calls[-1][1]["limit"])  # noqa: SLF001
 
     def test_get_fact_returns_fact_context_and_typed_not_found(self):
         result = call_tool(self.adapter, "career.get_fact", {"fact_id": "fact_react"})
@@ -349,6 +412,7 @@ class CareerMcpAdapterContractTests(unittest.TestCase):
             },
         )
         self.assertEqual(result["status"], "ok")
+        self.assertEqual(self.adapter._store.calls[-1][0], "upsertFact")  # noqa: SLF001
         self.assertEqual(self.adapter._store.calls[-1][1]["dedupe_key"], "proposal:aws")  # noqa: SLF001
 
     def test_propose_fact_never_marks_agent_interpretation_user_verified(self):
