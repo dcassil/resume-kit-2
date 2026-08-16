@@ -4,20 +4,20 @@ level: initiative
 title: "Align Career-MCP Semantics with Career-Store State and Relationship Contracts"
 short_code: "RKIT-I-0011"
 created_at: 2026-08-13T20:41:37.059367+00:00
-updated_at: 2026-08-13T20:41:37.059367+00:00
+updated_at: 2026-08-16T19:25:43.407925+00:00
 parent: resume-kit-2-full-product-buildout
-blocked_by: ["RKIT-I-0005", "RKIT-I-0007"]
+blocked_by: [RKIT-I-0005, RKIT-I-0007]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/discovery"
+  - "#phase/decompose"
 
 
 exit_criteria_met: false
 estimated_complexity: M
 strategy_id: RKIT-S-0001
-initiative_id: NULL
+initiative_id: align-career-mcp-semantics-with
 ---
 
 # Align Career-MCP Semantics with Career-Store State and Relationship Contracts Initiative
