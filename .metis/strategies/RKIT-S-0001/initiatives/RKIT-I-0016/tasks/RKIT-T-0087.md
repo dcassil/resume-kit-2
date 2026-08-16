@@ -4,14 +4,14 @@ level: task
 title: "ModelAdapter protocol, request/result DTOs, failure taxonomy, shared schema validators"
 short_code: "RKIT-T-0087"
 created_at: 2026-08-16T19:46:40.467010+00:00
-updated_at: 2026-08-16T19:46:40.467010+00:00
+updated_at: 2026-08-16T19:48:42.655171+00:00
 parent: resume-agent-proposal-model
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0016
 ## Objective **[REQUIRED]**
 
 Build the provider-neutral seam RKIT-A-0003 decided: a `ModelAdapter` protocol (`complete(request) -> AdapterResult`) in the resume-agent package, with request DTOs carrying prompt/input payload + output JSON-schema id, result DTOs carrying the parsed SCHEMA-VALIDATED proposal payload + `adapter_id`, `adapter_version`, `model_id`, `runtime_config`, retry count, usage counters — validation INSIDE the adapter boundary so no caller ever sees unvalidated model output. Typed failure taxonomy `timeout | schema_invalid | refused | provider_error` extends the existing package error envelope; adapters may fail only through it.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria **[REQUIRED]**
 
@@ -53,4 +55,4 @@ None (first task). T-0088/0089/0090 build on the seam. Serial chain.
 
 ## Status Updates **[REQUIRED]**
 
-*To be added during implementation*
+- 2026-08-16: I-0011 complete (v0.17.0 pushed dab725b — career-mcp tier DONE, 19 initiatives). I-0016 decomposed T-0087..0090; T-0090 grounded against current Anthropic SDK docs via the claude-api skill (claude-sonnet-4-6 default, output_config.format structured outputs, typed SDK exceptions). Codex launched on the protocol/DTO/taxonomy/validator substrate.
