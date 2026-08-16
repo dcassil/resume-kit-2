@@ -4,14 +4,14 @@ level: task
 title: "find_matches coherence, get_unverified breadth, real filtering, enum parity + TEST_SPEC language (R3-R6) — close-out"
 short_code: "RKIT-T-0086"
 created_at: 2026-08-16T19:25:47.686789+00:00
-updated_at: 2026-08-16T19:38:42.419285+00:00
+updated_at: 2026-08-16T19:45:35.736155+00:00
 parent: align-career-mcp-semantics-with
 blocked_by: [RKIT-T-0084, RKIT-T-0085]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0011
 ## Objective **[REQUIRED]**
 
 Fix the three remaining semantic defects and land the parity substrate: (R3) `career.find_matches` concatenates the store's `matches` + `unresolved` lists while the store places weak matches in BOTH — each weak requirement appears twice with contradictory classifications, one with empty fact_ids and misleading "No confirmed career fact matched" reasoning; (R4) `career.get_unverified` queries only `verification_state='unknown'` and misses inferred facts (vision §7 line 524 requires unresolved/inferred/unknown); (R5) `types`/`verification` filters demonstrably filter on the real store; (R6, PARTIAL) enum parity within currently-declarable sets — full `parent`/`child` re-advertisement is BLOCKED by the protected career_store_guardrails pin on store_surface.json's 4-type relationship set and rides Daniel's approval batch. Plus the TEST_SPEC-language strengthening. Initiative close-out.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
