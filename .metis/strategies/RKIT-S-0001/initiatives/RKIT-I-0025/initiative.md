@@ -4,14 +4,14 @@ level: initiative
 title: "Workflow Recovery and Idempotency Semantics"
 short_code: "RKIT-I-0025"
 created_at: 2026-08-13T20:41:37.443233+00:00
-updated_at: 2026-08-16T18:09:36.051246+00:00
+updated_at: 2026-08-16T18:14:09.221430+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0027]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/decompose"
+  - "#phase/active"
 
 
 exit_criteria_met: false

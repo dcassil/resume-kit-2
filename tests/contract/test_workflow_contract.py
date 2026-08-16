@@ -104,6 +104,28 @@ class WorkflowSurfaceManifestTests(unittest.TestCase):
         ]:
             self.assertIn(field, MANIFEST_FIELDS)
 
+    def test_surface_declares_typed_recovery_plan_fields(self):
+        recover_surface = next(entry for entry in SURFACE["surfaces"] if entry["name"] == "recoverRun")
+        self.assertEqual(
+            recover_surface["output_contract"]["required_fields"],
+            [
+                "status",
+                "run_id",
+                "resume_from_checkpoint",
+                "already_applied_operations",
+                "already_asked_questions",
+                "already_written_facts",
+                "last_match_fact_watermark",
+                "resolution_loop_state",
+                "resolution_blocking_reasons",
+                "render_overflow_state",
+                "render_overflow_blocking_reasons",
+                "required_reruns",
+                "integrity",
+                "resumable",
+            ],
+        )
+
 
 class WorkflowPublicSurfaceBoundaryTests(unittest.TestCase):
     def test_workflow_exports_only_manifested_non_interactive_public_surface(self):
@@ -406,6 +428,53 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         self.assertEqual(recovered_first["resume_from_checkpoint"], "INGEST_RESUME")
         recovered_second = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=second["run_id"]))
         self.assertEqual(recovered_second["resume_from_checkpoint"], "INIT")
+
+    def test_recover_run_unknown_run_raises_unknown_run_error(self):
+        with self.assertRaises(self.workflow.UnknownRunError) as raised:
+            maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id="run_missing"))
+
+        self.assertEqual(raised.exception.run_id, "run_missing")
+        self.assertEqual(raised.exception.workspace, str(self.workspace))
+
+    def test_recover_run_never_fabricates_payload_for_missing_run_file(self):
+        runs_dir = self.workspace / ".workflow" / "runs"
+        runs_dir.mkdir(parents=True)
+        missing_path = runs_dir / "run_missing.json"
+        self.assertFalse(missing_path.exists())
+
+        with self.assertRaises(self.workflow.UnknownRunError):
+            maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id="run_missing"))
+
+        self.assertFalse(missing_path.exists())
+
+    def test_recover_run_returns_structured_unverified_integrity(self):
+        run_state = self.create_run()
+
+        recovery = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=run_state["run_id"]))
+
+        self.assertNotIn("transactional_integrity", recovery)
+        self.assertTrue(recovery["resumable"])
+        self.assertEqual(set(recovery["integrity"]), {"career_db", "base_resume", "rejected_operations"})
+        for check in recovery["integrity"].values():
+            self.assertIsInstance(check, dict)
+            self.assertEqual(check["status"], "unverified")
+            self.assertIsNone(check["evidence_ref"])
+            self.assertEqual(check["reason"], "verification_not_implemented")
+
+    def test_recover_run_marks_not_resumable_when_integrity_check_fails(self):
+        run_state = self.create_run()
+        recovery_module = importlib.import_module("workflow.recovery")
+
+        def fake_check(name, run_state):
+            if name == "base_resume":
+                return {"status": "failed", "evidence_ref": {"path": "resume/base.json"}, "reason": "hash_mismatch"}
+            return {"status": "unverified", "evidence_ref": None, "reason": "verification_not_implemented"}
+
+        with mock.patch.object(recovery_module, "_recovery_integrity_check", side_effect=fake_check):
+            recovery = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=run_state["run_id"]))
+
+        self.assertFalse(recovery["resumable"])
+        self.assertEqual(recovery["integrity"]["base_resume"]["status"], "failed")
 
     def test_create_run_tolerates_malformed_workspace_index(self):
         runs_dir = self.workspace / ".workflow" / "runs"

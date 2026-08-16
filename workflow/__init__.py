@@ -25,6 +25,7 @@ from .render_overflow import (
     render_overflow_completion_reason as _render_overflow_completion_reason,
     render_overflow_decision as _render_overflow_decision,
 )
+from .recovery import recover_run as _recover_run
 from .schemas import RUN_MANIFEST_SCHEMA, SCHEMAS, Checkpoint, RunManifest
 from .versions import collectVersions
 
@@ -73,7 +74,6 @@ _COMPLETION_ARTIFACT_GATES: dict[str, JsonObject] = {
     },
     "audit_ref": {"checkpoint": "COMPLETE", "name": "audit_ref", "state_keys": ["audit_ref", "audit_manifest_ref"]},
 }
-
 
 class RunManifestValidationError(ValueError):
     """Raised when an assembled run manifest violates the manifest schema."""
@@ -381,25 +381,7 @@ def reconstructRunManifest(run_id: str, workspace: str | Path = ".") -> JsonObje
 
 
 def recoverRun(workspace: str | Path, run_id: str) -> JsonObject:
-    saved = _run_path(Path(workspace), run_id)
-    run_state = json.loads(saved.read_text(encoding="utf-8")) if saved.exists() else {"run_id": run_id, "current_checkpoint": "INIT"}
-    current = str(run_state.get("current_checkpoint", "INIT"))
-    required_reruns = ["FINAL_MATCH"] if current in {"APPLY_CHANGES", "FINAL_MATCH", "GROUNDING_AUDIT", "ATS_STRUCTURE_VALIDATION", "RENDER"} else []
-    return {
-        "status": "ok",
-        "run_id": run_id,
-        "resume_from_checkpoint": current,
-        "already_applied_operations": _dedupe(run_state.get("already_applied_operations", run_state.get("operations_applied", []))),
-        "already_asked_questions": _dedupe(run_state.get("already_asked_questions", [])),
-        "already_written_facts": _dedupe(run_state.get("already_written_facts", run_state.get("facts_verified", []))),
-        "last_match_fact_watermark": _dedupe(run_state.get("last_match_fact_watermark", [])),
-        "resolution_loop_state": _normalize_resolution_loop_state(run_state.get("resolution_loop_state", {}), run_state),
-        "resolution_blocking_reasons": _dedupe(run_state.get("resolution_blocking_reasons", [])),
-        "render_overflow_state": _normalize_render_overflow_state(run_state.get("render_overflow_state", {}), run_state),
-        "render_overflow_blocking_reasons": _dedupe(run_state.get("render_overflow_blocking_reasons", [])),
-        "required_reruns": required_reruns,
-        "transactional_integrity": "valid",
-    }
+    return _recover_run(workspace, run_id, _run_path, UnknownRunError, RunManifestValidationError, _issue, _dedupe, _normalize_resolution_loop_state, _normalize_render_overflow_state)
 
 
 def assertCanComplete(run_state: JsonObject) -> JsonObject:

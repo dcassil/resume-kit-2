@@ -212,8 +212,14 @@
           "already_applied_operations",
           "already_asked_questions",
           "already_written_facts",
+          "last_match_fact_watermark",
+          "resolution_loop_state",
+          "resolution_blocking_reasons",
+          "render_overflow_state",
+          "render_overflow_blocking_reasons",
           "required_reruns",
-          "transactional_integrity"
+          "integrity",
+          "resumable"
         ]
       }
     },
