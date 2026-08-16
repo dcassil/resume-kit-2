@@ -4,14 +4,14 @@ level: task
 title: "Five-point interruption contract-test matrix + TEST_SPEC recovery strengthening"
 short_code: "RKIT-T-0078"
 created_at: 2026-08-16T18:09:42.455795+00:00
-updated_at: 2026-08-16T18:09:42.455795+00:00
+updated_at: 2026-08-16T18:38:37.356285+00:00
 parent: workflow-recovery-and-idempotency
-blocked_by: ["RKIT-T-0074", "RKIT-T-0075", "RKIT-T-0076", "RKIT-T-0077"]
+blocked_by: [RKIT-T-0074, RKIT-T-0075, RKIT-T-0076, RKIT-T-0077]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0025
 ## Objective **[REQUIRED]**
 
 Close out RKIT-I-0025 with the full contract-test matrix over the five TEST_SPEC interruption points (workflow/TEST_SPEC.md "Failure Recovery Test Cases": job ingest, user verification, proposed operations, partially applied operation sequence, render overflow) — today ZERO such tests exist despite the spec claiming them — and strengthen workflow/TEST_SPEC.md's recovery section so every spec assertion names its covering test. Initiative close-out: version bump + mutation probes.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria **[REQUIRED]**
 
@@ -54,4 +56,4 @@ RKIT-T-0074..0077 (all recovery behavior). Final task; after it: initiative → 
 
 ## Status Updates **[REQUIRED]**
 
-*To be added during implementation*
+- 2026-08-16: T-0074..0077 all landed and committed (PR 401/smoke/verify green at T-0077; driver probed duplicate-operation typed result end-to-end). Codex launched on close-out: five-point matrix module test_workflow_recovery_matrix.py, workflow/TEST_SPEC.md recovery section alignment, four mutation probes (mutate→fail→revert), --future-contract added to verify set. Version bump to 0.14.0 + push is the driver's job after this task.

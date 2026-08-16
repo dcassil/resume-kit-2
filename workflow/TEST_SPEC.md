@@ -113,22 +113,19 @@ Record:
 
 ## Failure Recovery Test Cases
 
-Simulate interruption after:
+The recovery contract is covered by `tests/contract/test_workflow_recovery_matrix.py` and is executed by the current PR/future gates through `tests.contract.test_workflow_contract` until the runner list is approved to include the new module directly.
 
-- job ingest,
-- user verification,
-- proposed operations,
-- partially applied operation sequence,
-- render overflow.
+Each matrix case simulates interruption by driving `createRun` through public `advanceCheckpoint` / `recordCheckpointResult` calls to the target checkpoint, then calling `recoverRun` against persisted run state. Persistence is the interruption boundary; no process-kill machinery is required.
 
-Assertions:
+Five-point interruption matrix:
 
-- run resumes from persisted deterministic state,
-- career DB remains transactionally valid,
-- base resume remains unchanged,
-- already-applied operations are not applied twice,
-- rejected operations stay rejected,
-- final validation reruns after recovery before complete.
+- Job ingest: `test_recovery_matrix_job_ingest_interruption` interrupts at `INGEST_JOB`, expects `required_reruns == []`, verifies `resume_from_checkpoint == "INGEST_JOB"`, verifies career DB/base resume/rejected-operation integrity with evidence, and confirms no question/fact/operation registries are duplicated.
+- User verification: `test_recovery_matrix_user_verification_interruption` interrupts at `RESOLVE_GAPS`, expects `required_reruns == []`, verifies persisted resume state and all integrity checks with evidence, confirms the asked-question registry prevents re-asking the first topic, and confirms duplicate fact writes return typed duplicate results without growing the registry.
+- Proposed operations: `test_recovery_matrix_proposed_operations_interruption` interrupts at `PROPOSE_TAILORING_CHANGES`, expects `required_reruns == []`, verifies persisted resume state and all integrity checks with evidence, confirms question/fact registries remain monotone, and confirms no applied-operation registry exists before application.
+- Partially applied operation sequence: `test_recovery_matrix_partially_applied_operation_sequence_interruption` interrupts at `APPLY_CHANGES`, expects `required_reruns == ["GROUNDING_AUDIT", "FINAL_MATCH"]`, verifies persisted resume state and all integrity checks with evidence, confirms duplicate fact writes and duplicate operation application are typed duplicates, and confirms `assertCanComplete` stays blocked by `recovery_reruns` until fresh post-recovery `GROUNDING_AUDIT` and `FINAL_MATCH` results are recorded.
+- Render overflow: `test_recovery_matrix_render_overflow_interruption` interrupts at `RENDER` after an overflow result, expects `required_reruns == ["RENDER", "RENDER_VALIDATION"]`, verifies persisted render-overflow state and all integrity checks with evidence, confirms duplicate fact writes and duplicate operation application are typed duplicates, and confirms `assertCanComplete` stays blocked by `recovery_reruns` until fresh post-recovery `RENDER` and `RENDER_VALIDATION` results are recorded.
+
+Recovery regressions are covered by `tests/contract/test_workflow_contract.py`: invalid store-double state fails career DB integrity (`test_recover_run_career_db_pending_schema_update_fails_via_store_double`), unknown runs raise `UnknownRunError` (`test_recover_run_unknown_run_raises_unknown_run_error` and `test_recover_run_never_fabricates_payload_for_missing_run_file`), completion remains blocked until required post-recovery reruns (`test_recovery_at_apply_changes_requires_grounding_and_final_match_reruns_before_completion`), and rejected-then-applied operation scans fail recovery (`test_recover_run_rejected_then_applied_operation_fails_and_lists_id`).
 
 ## Smoke Coverage
 
