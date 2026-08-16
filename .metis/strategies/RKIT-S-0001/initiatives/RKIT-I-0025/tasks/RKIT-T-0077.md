@@ -4,14 +4,14 @@ level: task
 title: "Idempotent resumption over resolution/tailoring loop state via dedupe registries"
 short_code: "RKIT-T-0077"
 created_at: 2026-08-16T18:09:42.396807+00:00
-updated_at: 2026-08-16T18:09:42.396807+00:00
+updated_at: 2026-08-16T18:32:17.142110+00:00
 parent: workflow-recovery-and-idempotency
-blocked_by: ["RKIT-T-0074", "RKIT-T-0075", "RKIT-T-0076"]
+blocked_by: [RKIT-T-0074, RKIT-T-0075, RKIT-T-0076]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0025
 ## Objective **[REQUIRED]**
 
 Make the dedupe registries (`already_asked_questions`, `already_written_facts`, `already_applied_operations` — workflow/__init__.py:126-128, 287-289) the ENFORCED recovery input for resumed execution: after recoverRun, resumed loop advancement must consult them before asking, writing, or applying, so no interruption point produces a duplicate question, fact write, or operation application. Today the registries are populated but nothing structurally prevents a resumed driver from re-doing recorded work.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria **[REQUIRED]**
 
@@ -54,4 +56,4 @@ RKIT-T-0074/0075/0076 (contract, integrity, recovery event). Serial chain — sa
 
 ## Status Updates **[REQUIRED]**
 
-*To be added during implementation*
+- 2026-08-16: T-0076 landed and committed (PR 396/smoke/verify green; driver probed RENDER→{RENDER,RENDER_VALIDATION} + latest-recovery-governs end-to-end). Codex launched on this task: enforcement inside existing checkpoint paths (no new public names), typed duplicate detection for ops/facts, askable-set exclusion, loop-state continuity (watermark, render-overflow iteration budget). Note passed to codex: workflow/__init__.py at 1499/1500 guardrail line cap — new logic goes in private modules.

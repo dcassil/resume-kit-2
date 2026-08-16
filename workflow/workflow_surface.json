@@ -155,6 +155,8 @@
           "question_answer_log_refs",
           "validation_refs",
           "render_refs",
+          "fact_results",
+          "operation_results",
           "audit_event"
         ]
       }

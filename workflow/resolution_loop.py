@@ -63,7 +63,7 @@ def resolution_loop_surface(run_state: JsonObject) -> JsonObject:
     loop_state = normalize_resolution_loop_state(run_state.get("resolution_loop_state", {}), run_state)
     return {
         "state": loop_state,
-        "next_topic": _next_open_requirement(loop_state),
+        "next_topic": _next_open_requirement(loop_state, run_state),
         "predicate": {
             "branch": "not_applicable",
             "decision": None,
@@ -89,7 +89,7 @@ def resolution_loop_decision(run_state: JsonObject) -> JsonObject:
     match_result = _last_recorded_match_result(run_state)
     decision = _match_decision(match_result)
     unresolved = _loop_unresolved_requirements(loop_state)
-    next_topic = _next_open_requirement(loop_state)
+    next_topic = _next_open_requirement(loop_state, run_state)
     if decision == "blocked":
         reasons = _dedupe(list(run_state.get("resolution_blocking_reasons", [])) + _match_blocking_reasons(match_result))
         predicate = {
@@ -319,11 +319,32 @@ def _match_unresolved_ids(match_result: JsonObject) -> set[str]:
     return ids
 
 
-def _next_open_requirement(loop_state: JsonObject) -> JsonObject | None:
+def _next_open_requirement(loop_state: JsonObject, run_state: JsonObject | None = None) -> JsonObject | None:
+    already_asked = _already_asked_requirement_ids(loop_state, run_state)
     for entry in ordered_requirement_entries(loop_state.get("open_requirements", [])):
-        if entry["status"] == "open":
+        if entry["status"] == "open" and entry["requirement_id"] not in already_asked:
             return dict(entry)
     return None
+
+
+def _already_asked_requirement_ids(loop_state: JsonObject, run_state: JsonObject | None) -> set[str]:
+    if run_state is None:
+        return set()
+    recovery_refs = {str(value) for value in run_state.get("already_asked_questions", []) if str(value)}
+    if not recovery_refs:
+        return set()
+    requirement_ids: set[str] = set()
+    for record in loop_state.get("asked_questions", []):
+        if not isinstance(record, dict):
+            continue
+        refs = {
+            str(record.get("question_id", "")),
+            str(record.get("interaction_ref", "")),
+            str(record.get("requirement_id", "")),
+        }
+        if refs & recovery_refs and isinstance(record.get("requirement_id"), str):
+            requirement_ids.add(str(record["requirement_id"]))
+    return requirement_ids
 
 
 def _loop_unresolved_requirements(loop_state: JsonObject) -> list[JsonObject]:

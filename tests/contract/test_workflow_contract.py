@@ -137,6 +137,11 @@ class WorkflowSurfaceManifestTests(unittest.TestCase):
             ],
         )
 
+    def test_surface_declares_typed_checkpoint_duplicate_fields(self):
+        record_surface = next(entry for entry in SURFACE["surfaces"] if entry["name"] == "recordCheckpointResult")
+        self.assertIn("fact_results", record_surface["output_contract"]["required_fields"])
+        self.assertIn("operation_results", record_surface["output_contract"]["required_fields"])
+
 
 class WorkflowPublicSurfaceBoundaryTests(unittest.TestCase):
     def test_workflow_exports_only_manifested_non_interactive_public_surface(self):
@@ -1625,25 +1630,145 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         manifest = maybe_await(self.workflow.buildRunManifest(run_state))
         self.assertEqual(manifest["careerDbVersion"], asdict(store.getMigrationState()))
 
-    def test_recovery_does_not_duplicate_questions_facts_or_applied_operations(self):
-        run_state = self.create_run()
-        run_state.update(
-            {
-                "run_id": "run_recover",
-                "current_checkpoint": "APPLY_CHANGES",
-                "already_applied_operations": ["op_1"],
-                "already_asked_questions": ["req_aws"],
-                "already_written_facts": ["fact_aws"],
-                "recovery_markers": [{"after": "partially_applied_operation_sequence"}],
-            }
+    def test_recovered_resolve_gaps_excludes_previously_asked_question_ref_from_next_topic(self):
+        run_state = self.enter_resolve_gaps_with_recorded_match(
+            self.match_result(
+                "resolve_gaps",
+                [
+                    self.requirement_result("req_aws", 8.0, classification="required"),
+                    self.requirement_result("req_gcp", 7.0, classification="required"),
+                ],
+                unresolved=["req_aws", "req_gcp"],
+            )
         )
-        maybe_await(self.workflow.recordCheckpointResult(run_state, "APPLY_CHANGES", {"operations_applied": ["op_1"]}))
-        recovery = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id="run_recover"))
-        self.assertEqual(recovery["status"], "ok")
-        self.assertEqual(recovery["already_applied_operations"].count("op_1"), 1)
-        self.assertEqual(recovery["already_asked_questions"].count("req_aws"), 1)
-        self.assertEqual(recovery["already_written_facts"].count("fact_aws"), 1)
-        self.assertEqual(recovery["required_reruns"], ["GROUNDING_AUDIT", "FINAL_MATCH"])
+        recorded = maybe_await(
+            self.workflow.recordCheckpointResult(
+                run_state,
+                "RESOLVE_GAPS",
+                {
+                    "question_answers": [
+                        {
+                            "question_id": "q_aws",
+                            "requirement_id": "req_aws",
+                            "interaction_ref": "career-store/interactions/int_aws",
+                        }
+                    ]
+                },
+            )
+        )
+        self.assertEqual(recorded["status"], "ok")
+
+        recovery = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=run_state["run_id"]))
+        resumed = {"workspace": str(self.workspace), "run_id": run_state["run_id"], "current_checkpoint": "RESOLVE_GAPS"}
+        decision = maybe_await(self.workflow.getNextCheckpoint(resumed))
+
+        self.assertIn("q_aws", recovery["already_asked_questions"])
+        self.assertEqual(decision["resolution_loop"]["next_topic"]["requirement_id"], "req_gcp")
+        self.assertNotEqual(decision["resolution_loop"]["next_topic"]["requirement_id"], "req_aws")
+
+    def test_recovered_fact_rewrite_is_typed_duplicate_and_registry_unchanged(self):
+        run_state = self.create_run()
+        run_state["current_checkpoint"] = "RESOLVE_GAPS"
+        first = maybe_await(self.workflow.recordCheckpointResult(run_state, "RESOLVE_GAPS", {"facts_verified": ["fact_aws"]}))
+        self.assertEqual(first["status"], "ok")
+        maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=run_state["run_id"]))
+        before = self.persisted_run_state(run_state)["already_written_facts"]
+
+        duplicate = maybe_await(self.workflow.recordCheckpointResult(run_state, "RESOLVE_GAPS", {"facts_verified": ["fact_aws"]}))
+
+        self.assertEqual(duplicate["status"], "ok")
+        self.assertEqual(duplicate["fact_results"], [{"status": "duplicate", "reason": "already_written_fact", "fact_id": "fact_aws"}])
+        self.assertEqual(run_state["facts_verified"], ["fact_aws"])
+        self.assertEqual(self.persisted_run_state(run_state)["already_written_facts"], before)
+
+    def test_recovered_operation_reapplication_is_typed_duplicate_and_not_logged_again(self):
+        run_state = self.create_run()
+        run_state["current_checkpoint"] = "APPLY_CHANGES"
+        first = maybe_await(self.workflow.recordCheckpointResult(run_state, "VALIDATE_CHANGES", {"operations_applied": ["op_1"]}))
+        self.assertEqual(first["status"], "ok")
+        maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=run_state["run_id"]))
+        operation_log = self.workspace / ".workflow" / "runs" / run_state["run_id"] / "operations.jsonl"
+        before_lines = operation_log.read_text(encoding="utf-8").splitlines()
+
+        duplicate = maybe_await(self.workflow.recordCheckpointResult(run_state, "APPLY_CHANGES", {"operations_applied": ["op_1"]}))
+
+        self.assertEqual(duplicate["status"], "ok")
+        self.assertEqual(duplicate["operation_results"], [{"status": "duplicate", "reason": "already_applied_operation", "operation_id": "op_1"}])
+        self.assertEqual(duplicate["operation_log_refs"], [])
+        self.assertEqual(run_state["operations_applied"], ["op_1"])
+        self.assertEqual(operation_log.read_text(encoding="utf-8").splitlines(), before_lines)
+
+    def test_recovered_render_overflow_iteration_count_preserves_remaining_budget(self):
+        self.config = {
+            "schemaVersion": "1.0",
+            "matching": {"requireHardRequirementsResolved": True},
+            "workflow": {"maxRenderOverflowIterations": 1},
+        }
+        run_state = self.enter_resolve_gaps_with_recorded_match(self.match_result("continue"))
+        self.advance_tail_to_render_checkpoint(run_state)
+        first_layout = self.overflow_layout_payload()
+        self.advance_ok(
+            run_state,
+            "RENDER",
+            {
+                "render_output": self.artifact_ref("render/recovered-overflow-first.md", {"status": "rendered"}),
+                "measure_layout": self.artifact_ref("render/recovered-overflow-first-layout.json", first_layout),
+            },
+        )
+        first_recorded = maybe_await(self.workflow.recordCheckpointResult(run_state, "RENDER", first_layout))
+        self.assertEqual(first_recorded["status"], "ok")
+
+        recovery = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=run_state["run_id"]))
+        self.assertEqual(recovery["render_overflow_state"]["iteration_count"], 1)
+        second_layout = self.overflow_layout_payload()
+        second_recorded = maybe_await(self.workflow.recordCheckpointResult(run_state, "RENDER", second_layout))
+
+        self.assertEqual(second_recorded["status"], "blocked")
+        self.assertEqual(second_recorded["render_overflow"]["iteration"], 2)
+        self.assertIn("render_overflow_bound_exhausted", second_recorded["blocking_reasons"])
+
+    def test_recovery_record_cycles_merge_registries_monotonically(self):
+        run_state = self.create_run()
+        run_state["current_checkpoint"] = "RESOLVE_GAPS"
+        first = maybe_await(
+            self.workflow.recordCheckpointResult(
+                run_state,
+                "RESOLVE_GAPS",
+                {
+                    "facts_verified": ["fact_aws"],
+                    "question_answers": [{"question_id": "q_aws", "requirement_id": "req_aws", "interaction_ref": "int_aws"}],
+                    "operations_applied": ["op_1"],
+                },
+            )
+        )
+        self.assertEqual(first["status"], "ok")
+        maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=run_state["run_id"]))
+        stale_resumed = {
+            "workspace": str(self.workspace),
+            "run_id": run_state["run_id"],
+            "current_checkpoint": "RESOLVE_GAPS",
+            "already_applied_operations": [],
+            "already_asked_questions": [],
+            "already_written_facts": [],
+        }
+
+        second = maybe_await(
+            self.workflow.recordCheckpointResult(
+                stale_resumed,
+                "RESOLVE_GAPS",
+                {
+                    "facts_verified": ["fact_gcp"],
+                    "question_answers": [{"question_id": "q_gcp", "requirement_id": "req_gcp", "interaction_ref": "int_gcp"}],
+                    "operations_applied": ["op_2"],
+                },
+            )
+        )
+        persisted = self.persisted_run_state(run_state)
+
+        self.assertEqual(second["status"], "ok")
+        self.assertEqual(persisted["already_written_facts"], ["fact_aws", "fact_gcp"])
+        self.assertEqual(persisted["already_asked_questions"], ["q_aws", "q_gcp"])
+        self.assertEqual(persisted["already_applied_operations"], ["op_1", "op_2"])
 
     def passing_completion_gate_state(self):
         return {

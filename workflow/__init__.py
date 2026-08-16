@@ -25,6 +25,7 @@ from .render_overflow import (
     render_overflow_completion_reason as _render_overflow_completion_reason,
     render_overflow_decision as _render_overflow_decision,
 )
+from .idempotency import apply_checkpoint_idempotency as _apply_checkpoint_idempotency, merge_recovery_registries as _merge_recovery_registries
 from .recovery import recover_run as _recover_run
 from .recovery_gate import checkpoint_result_event as _checkpoint_result_event, next_checkpoint_result_sequence as _next_checkpoint_result_sequence, recovery_reruns_gate_result as _recovery_reruns_gate_result
 from .schemas import RUN_MANIFEST_SCHEMA, SCHEMAS, Checkpoint, RunManifest
@@ -71,7 +72,6 @@ _COMPLETION_ARTIFACT_GATES: dict[str, JsonObject] = {
     "render_validation": {"checkpoint": "RENDER_VALIDATION", "name": "render_validation_report", "state_keys": ["render_validation_report_ref", "render_validation_ref"]},
     "audit_ref": {"checkpoint": "COMPLETE", "name": "audit_ref", "state_keys": ["audit_ref", "audit_manifest_ref"]},
 }
-
 class RunManifestValidationError(ValueError):
     """Raised when an assembled run manifest violates the manifest schema."""
 
@@ -93,7 +93,6 @@ class UnknownRunError(FileNotFoundError):
         self.run_id = run_id
         self.workspace = str(workspace)
         super().__init__(f"Unknown workflow run_id {run_id!r} under workspace {self.workspace!r}.")
-
 
 def createRun(workspace: str | Path, config: JsonObject) -> JsonObject:
     workspace_path = Path(workspace)
@@ -136,7 +135,6 @@ def createRun(workspace: str | Path, config: JsonObject) -> JsonObject:
     _persist_run(run_state)
     _index_run(workspace_path, config_hash, run_id)
     return run_state
-
 
 def getNextCheckpoint(run_state: JsonObject) -> JsonObject:
     working_state = _working_run_state(run_state)
@@ -186,7 +184,6 @@ def getNextCheckpoint(run_state: JsonObject) -> JsonObject:
             }
         ),
     }
-
 
 def advanceCheckpoint(run_state: JsonObject, target_checkpoint: str, evidence: JsonObject, clock: Callable[[], str] | None = None) -> JsonObject:
     working_state = _working_run_state(run_state)
@@ -276,6 +273,7 @@ def recordCheckpointResult(run_state: JsonObject, checkpoint: str, result: JsonO
     checkpoint_result["result_sequence"] = result_sequence
     timestamp = _timestamp(clock)
     operation_records = _operation_status_records(checkpoint_result)
+    checkpoint_result, operation_records, duplicate_response = _apply_checkpoint_idempotency(working_state, checkpoint_result, operation_records)
     question_records = _question_log_records(checkpoint_result)
     _extend_unique(working_state, "facts_verified", checkpoint_result.get("facts_verified", []))
     _extend_unique(working_state, "facts_added", checkpoint_result.get("facts_added", []))
@@ -323,6 +321,7 @@ def recordCheckpointResult(run_state: JsonObject, checkpoint: str, result: JsonO
         "audit_event": event,
         "render_overflow": render_overflow_result,
         "blocking_reasons": list(render_overflow_result.get("blocking_reasons", [])),
+        **duplicate_response,
     }
 
 
@@ -498,6 +497,7 @@ def _working_run_state(run_state: JsonObject) -> JsonObject:
     merged["audit_events"] = _merge_dict_records(persisted.get("audit_events", []), run_state.get("audit_events", []), "event_id")
     merged["recovery_events"] = _merge_dict_records(persisted.get("recovery_events", []), run_state.get("recovery_events", []), "recovery_sequence")
     merged["checkpoint_result_events"] = _merge_dict_records(persisted.get("checkpoint_result_events", []), run_state.get("checkpoint_result_events", []), "result_sequence")
+    _merge_recovery_registries(merged, persisted, run_state)
     merged["verified_evidence"] = _merge_dict_values(persisted.get("verified_evidence", {}), run_state.get("verified_evidence", {}))
     merged["stage_state"] = _merge_dict_values(persisted.get("stage_state", {}), run_state.get("stage_state", {}))
     merged["resolution_loop_state"] = _normalize_resolution_loop_state(merged.get("resolution_loop_state", {}), merged)
