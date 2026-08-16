@@ -277,7 +277,8 @@
             "minProperties": 1
           },
           "evidence_id": {
-            "type": "string"
+            "type": "string",
+            "description": "Required when the requested verification transition is backed by source-document evidence."
           }
         }
       },

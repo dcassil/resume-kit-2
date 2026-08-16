@@ -9,12 +9,14 @@ from pathlib import Path
 from typing import Any
 
 from career_store import (
+    AUTHORITY_SOURCE_DOCUMENT_EVIDENCE,
     DisallowedTransitionError,
     IncompatibleSchemaVersionError,
     InvalidInterpretationProposalError,
     InvalidRelationshipConfirmationError,
     MergeConflictError,
     MigrationFailedError,
+    VERIFICATION_TRANSITION_MATRIX,
 )
 
 
@@ -27,6 +29,16 @@ POLICY_REASON_CODES = {
     "confirmation_required",
     "disallowed_verification_transition",
     "user_verified_without_explicit_confirmation",
+}
+TOOL_ARGUMENTS = {
+    "career.search_facts": {"query", "types", "verification", "limit"},
+    "career.get_fact": {"fact_id", "include_conflicts"},
+    "career.propose_fact": {"type", "text", "source", "evidence", "dedupe_key"},
+    "career.add_evidence": {"fact_id", "evidence"},
+    "career.verify_fact": {"fact_id", "verification_state", "confirmation", "evidence_id"},
+    "career.add_relationship": {"from_fact_id", "to_fact_id", "relationship_type", "evidence", "confirmation"},
+    "career.find_matches": {"requirements"},
+    "career.get_unverified": {"topic", "limit"},
 }
 
 
@@ -55,6 +67,7 @@ class CareerMcpAdapter:
             self._record_audit(name, result)
             return result
         try:
+            _assert_consumed_arguments(name, arguments)
             if name == "career.search_facts":
                 payload = await self._search_facts(arguments)
             elif name == "career.get_fact":
@@ -74,6 +87,8 @@ class CareerMcpAdapter:
             else:
                 payload = {"status": "error", "error": {"type": "unknown_tool", "message": "Unknown career tool."}}
             result = _normalize_tool_result(name, payload)
+        except AssertionError:
+            raise
         except Exception as exc:
             result = _tool_result(name, "error", error={"type": _exception_type(exc), "message": _safe_message(exc)})
         if context is not None and isinstance(result, dict):
@@ -85,23 +100,24 @@ class CareerMcpAdapter:
         if hasattr(self._store, "search_facts"):
             value = await _maybe_await(self._store.search_facts(**arguments))
         else:
-            filters: JsonObject = {}
-            if arguments.get("verification"):
-                filters["verification_state"] = arguments["verification"][0]
-            if arguments.get("types"):
-                filters["type"] = arguments["types"][0]
             value = await _maybe_await(
                 self._store.searchFacts(
                     arguments["query"],
-                    filters=filters,
-                    limit=arguments.get("limit", 10),
+                    filters={},
+                    limit=None,
                     include_evidence=True,
                 )
             )
         facts = value.get("facts", value) if isinstance(value, dict) else value
-        return {"status": "ok", "facts": sorted((_fact_summary(fact) for fact in facts), key=lambda fact: fact["fact_id"])}
+        filtered = _post_filter_facts(facts, arguments)
+        limit = arguments.get("limit", 10)
+        return {
+            "status": "ok",
+            "facts": sorted((_fact_summary(fact) for fact in filtered), key=lambda fact: fact["fact_id"])[:limit],
+        }
 
     async def _get_fact(self, arguments: JsonObject) -> JsonObject:
+        include_conflicts = arguments.get("include_conflicts", True)
         if hasattr(self._store, "get_fact"):
             value = await _maybe_await(self._store.get_fact(**arguments))
         else:
@@ -112,6 +128,12 @@ class CareerMcpAdapter:
         evidence = value.get("evidence", []) if isinstance(value, dict) else fact.get("evidence_summary", [])
         relationships = value.get("relationships", fact.get("relationships", [])) if isinstance(value, dict) else fact.get("relationships", [])
         conflicts = value.get("conflicts", fact.get("conflicts", [])) if isinstance(value, dict) else fact.get("conflicts", [])
+        if include_conflicts and hasattr(self._store, "findConflicts"):
+            conflict_value = await _maybe_await(self._store.findConflicts(fact, scope={"source": "career.get_fact"}))
+            if isinstance(conflict_value, dict) and isinstance(conflict_value.get("conflicts"), list):
+                conflicts = conflict_value["conflicts"]
+        elif not include_conflicts:
+            conflicts = []
         normalized = _fact_detail(fact, evidence, relationships, conflicts)
         return {
             "status": "ok",
@@ -126,15 +148,16 @@ class CareerMcpAdapter:
         if hasattr(self._store, "propose_fact"):
             value = await _maybe_await(self._store.propose_fact(**arguments))
         else:
+            if arguments.get("dedupe_key") is not None and not _method_accepts_argument(self._store.upsertFact, "dedupe_key"):
+                return _validation_error("Unsupported argument for career-store upsertFact: dedupe_key.")
             fact = {"type": arguments["type"], "text": arguments["text"], "verification_state": "unknown"}
-            value = await _maybe_await(
-                self._store.upsertFact(
-                    fact,
-                    arguments.get("evidence"),
-                    source=arguments["source"],
-                    policy={**self._policy, "allow_inferred_final": False},
-                )
-            )
+            kwargs = {
+                "source": arguments["source"],
+                "policy": {**self._policy, "allow_inferred_final": False},
+            }
+            if _method_accepts_argument(self._store.upsertFact, "dedupe_key"):
+                kwargs["dedupe_key"] = arguments.get("dedupe_key")
+            value = await _maybe_await(self._store.upsertFact(fact, arguments.get("evidence"), **kwargs))
         return _mutation(value)
 
     async def _add_evidence(self, arguments: JsonObject) -> JsonObject:
@@ -146,10 +169,12 @@ class CareerMcpAdapter:
         return _mutation(value)
 
     async def _verify_fact(self, arguments: JsonObject) -> JsonObject:
+        if _verification_state_requires_evidence(arguments["verification_state"]) and not arguments.get("evidence_id"):
+            return _validation_error(f"evidence_id is required when verification_state is {arguments['verification_state']}.")
         if hasattr(self._store, "verify_fact"):
             value = await _maybe_await(self._store.verify_fact(**arguments))
         else:
-            confirmation = arguments["confirmation"]
+            confirmation = _confirmation_with_evidence_id(arguments["confirmation"], arguments.get("evidence_id"))
             provenance = confirmation.get("provenance", []) if isinstance(confirmation, dict) else []
             first_provenance = provenance[0] if provenance and isinstance(provenance[0], dict) else {}
             source = str(first_provenance.get("source", first_provenance.get("kind", "mcp_tool")))
@@ -227,6 +252,76 @@ def _load_tools() -> list[JsonObject]:
     surface_path = package_surface_path if package_surface_path.exists() else source_surface_path
     surface = json.loads(surface_path.read_text(encoding="utf-8"))
     return list(surface["tools"])
+
+
+def _assert_consumed_arguments(tool: str, arguments: JsonObject) -> None:
+    consumed = TOOL_ARGUMENTS.get(tool)
+    if consumed is None:
+        raise AssertionError(f"No consumed-arguments entry for {tool}.")
+    dropped = sorted(set(arguments) - consumed)
+    if dropped:
+        raise AssertionError(f"{tool} validated arguments that dispatch does not consume: {', '.join(dropped)}.")
+
+
+def _post_filter_facts(facts: Any, arguments: JsonObject) -> list[JsonObject]:
+    verification = set(arguments.get("verification") or [])
+    types = set(arguments.get("types") or [])
+    filtered = []
+    for fact in facts or []:
+        if not isinstance(fact, dict):
+            continue
+        if verification and fact.get("verification_state") not in verification:
+            continue
+        if types and fact.get("type") not in types:
+            continue
+        filtered.append(fact)
+    return filtered
+
+
+def _validation_error(message: str) -> JsonObject:
+    return {"status": "error", "error": {"type": "validation_error", "message": message}}
+
+
+def _method_accepts_argument(method: Any, argument: str) -> bool:
+    try:
+        signature = inspect.signature(method)
+    except (TypeError, ValueError):
+        return False
+    for parameter in signature.parameters.values():
+        if parameter.kind == inspect.Parameter.VAR_KEYWORD:
+            return True
+    return argument in signature.parameters
+
+
+def _verification_state_requires_evidence(verification_state: str) -> bool:
+    evidence_states = {
+        to_state
+        for (_from_state, to_state), authority in VERIFICATION_TRANSITION_MATRIX.items()
+        if authority == AUTHORITY_SOURCE_DOCUMENT_EVIDENCE
+    }
+    return verification_state in evidence_states
+
+
+def _confirmation_with_evidence_id(confirmation: Any, evidence_id: Any) -> Any:
+    if not evidence_id or not isinstance(confirmation, dict):
+        return confirmation
+    forwarded = dict(confirmation)
+    provenance = forwarded.get("provenance")
+    if not isinstance(provenance, list):
+        return forwarded
+    forwarded_provenance = []
+    for entry in provenance:
+        if not isinstance(entry, dict):
+            forwarded_provenance.append(entry)
+            continue
+        clean_entry = dict(entry)
+        clean_entry.setdefault("source_id", str(evidence_id))
+        metadata = dict(clean_entry.get("metadata", {})) if isinstance(clean_entry.get("metadata"), dict) else {}
+        metadata.setdefault("evidence_id", str(evidence_id))
+        clean_entry["metadata"] = metadata
+        forwarded_provenance.append(clean_entry)
+    forwarded["provenance"] = forwarded_provenance
+    return forwarded
 
 
 def _validate(arguments: JsonObject, schema: JsonObject) -> str | None:

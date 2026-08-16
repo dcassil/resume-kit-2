@@ -300,6 +300,29 @@ class CareerMcpAdapterContractTests(unittest.TestCase):
             self.assertNotIn("contact_data", fact)
             self.assertNotIn("raw_sql", fact)
 
+    def test_search_facts_honors_full_verification_and_type_lists_with_union_semantics(self):
+        result = call_tool(
+            self.adapter,
+            "career.search_facts",
+            {
+                "query": "api",
+                "verification": ["user_verified", "source_stated"],
+                "types": ["skill", "experience"],
+                "limit": 10,
+            },
+        )
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual({fact["fact_id"] for fact in result["facts"]}, {"fact_api", "fact_graphql"})
+        self.assertEqual(
+            {fact["verification_state"] for fact in result["facts"]},
+            {"source_stated", "user_verified"},
+        )
+        self.assertEqual(
+            self.adapter._store.calls[-1][1]["verification"],  # noqa: SLF001
+            ["user_verified", "source_stated"],
+        )
+        self.assertEqual(self.adapter._store.calls[-1][1]["types"], ["skill", "experience"])  # noqa: SLF001
+
     def test_get_fact_returns_fact_context_and_typed_not_found(self):
         result = call_tool(self.adapter, "career.get_fact", {"fact_id": "fact_react"})
         self.assertEqual(result["status"], "ok")
@@ -313,6 +336,20 @@ class CareerMcpAdapterContractTests(unittest.TestCase):
         missing = call_tool(self.adapter, "career.get_fact", {"fact_id": "fact_missing"})
         self.assertEqual(missing["status"], "error")
         self.assertEqual(missing["error"]["type"], "not_found")
+
+    def test_propose_fact_forwards_dedupe_key_when_store_surface_accepts_it(self):
+        result = call_tool(
+            self.adapter,
+            "career.propose_fact",
+            {
+                "type": "skill",
+                "text": "AWS experience",
+                "source": "agent_interpretation",
+                "dedupe_key": "proposal:aws",
+            },
+        )
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(self.adapter._store.calls[-1][1]["dedupe_key"], "proposal:aws")  # noqa: SLF001
 
     def test_propose_fact_never_marks_agent_interpretation_user_verified(self):
         result = call_tool(
@@ -350,6 +387,16 @@ class CareerMcpAdapterContractTests(unittest.TestCase):
         )
         self.assertEqual(verified["verification_state"], "user_verified")
         self.assertFalse(verified["confirmation_required"])
+
+    def test_consumed_arguments_assertion_catches_planted_dropped_argument(self):
+        career_mcp = importlib.import_module("career_mcp")
+        original = career_mcp.TOOL_ARGUMENTS["career.search_facts"]
+        career_mcp.TOOL_ARGUMENTS["career.search_facts"] = original - {"limit"}
+        try:
+            with self.assertRaisesRegex(AssertionError, "validated arguments that dispatch does not consume: limit"):
+                call_tool(self.adapter, "career.search_facts", {"query": "React", "limit": 1})
+        finally:
+            career_mcp.TOOL_ARGUMENTS["career.search_facts"] = original
 
     def test_relationship_creation_preserves_related_vs_equivalent_distinction(self):
         responsive = call_tool(
@@ -442,6 +489,141 @@ class CareerMcpErrorEnvelopeTests(unittest.TestCase):
         self.assertEqual(result["data"]["mutation_status"], "rejected")
         self.assertEqual(result["error"]["type"], "policy_error")
         self.assertIn("message", result["error"])
+
+    def test_real_store_full_list_filters_post_filter_without_silent_narrowing(self):
+        career_mcp = importlib.import_module("career_mcp")
+        career_store = importlib.import_module("career_store")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = career_store.openCareerStore(str(Path(temp_dir) / "career.db"), clock=lambda: "2026-01-01T00:00:00Z")
+            source_stated = store.upsertFact(
+                {"type": "skill", "text": "AWS source stated", "verification_state": "source_stated"},
+                {"source": "resume_source", "source_id": "resume-1", "text": "AWS source stated"},
+                source="resume_source",
+            )
+            user_fact = store.upsertFact(
+                {"type": "experience", "text": "AWS user verified", "verification_state": "unknown"},
+                None,
+                source="resume_source",
+            )
+            store.verifyFact(
+                user_fact["fact_id"],
+                "user_verified",
+                {
+                    "factId": user_fact["fact_id"],
+                    "outcome": "affirmed",
+                    "provenance": [{"source": "user_answer", "text": "Yes, AWS user verified."}],
+                },
+                source="user_answer",
+            )
+            adapter = career_mcp.create_career_mcp(store=store)
+
+            result = call_tool(
+                adapter,
+                "career.search_facts",
+                {
+                    "query": "AWS",
+                    "verification": ["user_verified", "source_stated"],
+                    "types": ["skill", "experience"],
+                    "limit": 10,
+                },
+            )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual({fact["fact_id"] for fact in result["facts"]}, {source_stated["fact_id"], user_fact["fact_id"]})
+        self.assertEqual({fact["verification_state"] for fact in result["facts"]}, {"source_stated", "user_verified"})
+
+    def test_real_store_dedupe_key_is_typed_rejected_when_upsert_fact_cannot_honor_it(self):
+        career_mcp = importlib.import_module("career_mcp")
+        career_store = importlib.import_module("career_store")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = career_store.openCareerStore(str(Path(temp_dir) / "career.db"), clock=lambda: "2026-01-01T00:00:00Z")
+            adapter = career_mcp.create_career_mcp(store=store)
+
+            result = call_tool(
+                adapter,
+                "career.propose_fact",
+                {
+                    "type": "skill",
+                    "text": "Rust",
+                    "source": "agent_interpretation",
+                    "dedupe_key": "proposal:rust",
+                },
+            )
+
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(result["error"]["type"], "validation_error")
+        self.assertIn("dedupe_key", result["error"]["message"])
+
+    def test_real_store_get_fact_include_conflicts_observably_controls_conflict_records(self):
+        career_mcp = importlib.import_module("career_mcp")
+        career_store = importlib.import_module("career_store")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = career_store.openCareerStore(str(Path(temp_dir) / "career.db"), clock=lambda: "2026-01-01T00:00:00Z")
+            six = store.upsertFact(
+                {"type": "skill", "text": "AWS, six years", "verification_state": "unknown"},
+                None,
+                source="resume_source",
+            )
+            ten = store.upsertFact(
+                {"type": "skill", "text": "AWS, ten years", "verification_state": "unknown"},
+                None,
+                source="resume_source",
+            )
+            self.assertTrue(ten["conflicts"])
+            adapter = career_mcp.create_career_mcp(store=store)
+
+            without_conflicts = call_tool(adapter, "career.get_fact", {"fact_id": six["fact_id"], "include_conflicts": False})
+            with_conflicts = call_tool(adapter, "career.get_fact", {"fact_id": six["fact_id"], "include_conflicts": True})
+
+        self.assertEqual(without_conflicts["status"], "ok")
+        self.assertEqual(without_conflicts["conflicts"], [])
+        self.assertEqual(with_conflicts["status"], "ok")
+        self.assertTrue(with_conflicts["conflicts"])
+
+    def test_real_store_verify_fact_requires_and_forwards_evidence_id_for_source_document_state(self):
+        career_mcp = importlib.import_module("career_mcp")
+        career_store = importlib.import_module("career_store")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = career_store.openCareerStore(str(Path(temp_dir) / "career.db"), clock=lambda: "2026-01-01T00:00:00Z")
+            created = store.upsertFact(
+                {"type": "skill", "text": "PostgreSQL", "verification_state": "unknown"},
+                None,
+                source="resume_source",
+            )
+            adapter = career_mcp.create_career_mcp(store=store)
+            confirmation = {
+                "factId": created["fact_id"],
+                "outcome": "affirmed",
+                "provenance": [{"source": "resume_source", "text": "PostgreSQL"}],
+            }
+
+            missing = call_tool(
+                adapter,
+                "career.verify_fact",
+                {
+                    "fact_id": created["fact_id"],
+                    "verification_state": "source_stated",
+                    "confirmation": confirmation,
+                },
+            )
+            verified = call_tool(
+                adapter,
+                "career.verify_fact",
+                {
+                    "fact_id": created["fact_id"],
+                    "verification_state": "source_stated",
+                    "confirmation": confirmation,
+                    "evidence_id": "evidence_resume_pg",
+                },
+            )
+            fetched = store.getFact(created["fact_id"])
+
+        self.assertEqual(missing["status"], "error")
+        self.assertEqual(missing["error"]["type"], "validation_error")
+        self.assertIn("evidence_id", missing["error"]["message"])
+        self.assertEqual(verified["status"], "ok")
+        self.assertEqual(verified["verification_state"], "source_stated")
+        self.assertTrue(any(item.get("source_id") == "evidence_resume_pg" for item in fetched["evidence"]))
 
 
 class CareerMcpNoRawToolTests(unittest.TestCase):

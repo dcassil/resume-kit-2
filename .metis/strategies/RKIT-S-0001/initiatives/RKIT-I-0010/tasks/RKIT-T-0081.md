@@ -4,14 +4,14 @@ level: task
 title: "Typed error envelope + structural classification (R1, R2)"
 short_code: "RKIT-T-0081"
 created_at: 2026-08-16T19:05:18.749033+00:00
-updated_at: 2026-08-16T19:06:33.814232+00:00
+updated_at: 2026-08-16T19:12:53.405416+00:00
 parent: harden-career-mcp-tool-argument
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0010
 ## Objective **[REQUIRED]**
 
 Fix the two audit-confirmed error-path defects in `career-mcp/career_mcp/__init__.py`: (R1) `_mutation` (~312-322) passes store rejections through with `status: rejected|error` but NO `error: {type, message}` object — empirically `career.verify_fact` with `imported` returned status `error` with no `error` key, crashing any agent that checks `result['error']['type']`; (R2) exception→error-type classification keyword-matches message text ('confirmation'→policy_error, 'not found'→not_found at ~359-365) — works only for the fake's exact ValueError wording. Centralize response construction so the invariant `status != "ok" ⇒ well-formed error object` is structurally unbreakable, and classify structurally (typed store rejection reason codes + exception classes), never from message text.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
