@@ -22,10 +22,15 @@ from career_store import (
 
 JsonObject = dict[str, Any]
 
+
+class StoreContractError(Exception):
+    """Raised when career-store returns a value outside the declared surface."""
+
 ERROR_TYPES = {"validation_error", "policy_error", "not_found", "store_error", "unknown_tool"}
 REJECTION_STATUSES = {"error", "rejected"}
 NOT_FOUND_REASON_CODES = {"not_found", "unknown_fact_id"}
 GENERIC_STORE_ERROR_MESSAGE = "Career store operation failed."
+UNVERIFIED_VERIFICATION_STATES = ("unknown", "inferred")
 SQL_IDENTIFIER_PATTERN = r'(?:[A-Za-z_][A-Za-z0-9_]*|"[^"]+"|`[^`]+`|\[[^\]]+\])'
 PERSISTENCE_LEAK_PATTERNS = (
     re.compile(r"\b" + "insert" + r"\s+" + "into" + r"\b", re.IGNORECASE),
@@ -212,23 +217,30 @@ class CareerMcpAdapter:
 
     async def _handle_matching(self, tool: str, arguments: JsonObject) -> JsonObject:
         value = await _maybe_await(self._surface(tool)(arguments["requirements"], policy=self._policy))
-        rows = value.get("matches", value) if isinstance(value, dict) else value
-        matches = [_match(row) for row in rows]
-        if isinstance(value, dict):
-            matches.extend(_unresolved_match(row) for row in value.get("unresolved", []))
+        if isinstance(value, dict) and value.get("status") in REJECTION_STATUSES:
+            return value
+        matches = _coherent_matches(value, arguments["requirements"])
         return {"status": "ok", "matches": sorted(matches, key=lambda item: item["requirement_id"])}
 
     async def _handle_review_queue(self, tool: str, arguments: JsonObject) -> JsonObject:
         query = arguments.get("topic") or ""
-        value = await _maybe_await(
-            self._surface(tool)(
-                query,
-                filters={"verification_state": "unknown"},
-                limit=arguments.get("limit", 10),
-                include_evidence=True,
+        limit = arguments.get("limit", 10)
+        facts_by_id: dict[str, JsonObject] = {}
+        for verification_state in UNVERIFIED_VERIFICATION_STATES:
+            value = await _maybe_await(
+                self._surface(tool)(
+                    query,
+                    filters={"verification_state": verification_state},
+                    limit=limit,
+                    include_evidence=True,
+                )
             )
-        )
-        facts = value.get("facts", [])
+            if isinstance(value, dict) and value.get("status") in REJECTION_STATUSES:
+                return value
+            facts = value.get("facts", value) if isinstance(value, dict) else value
+            for fact in _post_filter_facts(facts, {"verification": list(UNVERIFIED_VERIFICATION_STATES)}):
+                facts_by_id[str(fact.get("fact_id", ""))] = fact
+        facts = sorted(facts_by_id.values(), key=lambda fact: str(fact.get("fact_id", "")))[:limit]
         return {"status": "ok", "facts": [_unverified_fact(fact) for fact in facts]}
 
     def _record_audit(self, name: str, result: JsonObject) -> None:
@@ -251,12 +263,27 @@ async def _maybe_await(value: Any) -> Any:
     return value
 
 
-def _load_tools() -> list[JsonObject]:
+_SURFACE_CACHE: JsonObject | None = None
+
+
+def _load_surface() -> JsonObject:
+    global _SURFACE_CACHE
+    if _SURFACE_CACHE is not None:
+        return _SURFACE_CACHE
     package_surface_path = Path(__file__).with_name("tool_surface.json")
     source_surface_path = Path(__file__).resolve().parents[1] / "tool_surface.json"
     surface_path = package_surface_path if package_surface_path.exists() else source_surface_path
-    surface = json.loads(surface_path.read_text(encoding="utf-8"))
-    return list(surface["tools"])
+    _SURFACE_CACHE = json.loads(surface_path.read_text(encoding="utf-8"))
+    return _SURFACE_CACHE
+
+
+def _load_tools() -> list[JsonObject]:
+    return list(_load_surface()["tools"])
+
+
+def _contract_set(name: str) -> set[str]:
+    values = _load_surface().get(name, [])
+    return {str(value) for value in values}
 
 
 def _assert_consumed_arguments(tool: str, arguments: JsonObject) -> None:
@@ -534,21 +561,46 @@ def _match(row: JsonObject) -> JsonObject:
     fact_ids = row.get("fact_ids")
     if fact_ids is None and row.get("fact_id"):
         fact_ids = [row["fact_id"]]
+    resolution_state = str(row.get("resolution_state", "unknown"))
+    if resolution_state not in _contract_set("resolution_states"):
+        raise StoreContractError(f"career-store returned non-canonical resolution_state: {resolution_state}")
     return {
         "requirement_id": str(row.get("requirement_id", "")),
-        "resolution_state": str(row.get("resolution_state", "unknown")),
+        "resolution_state": resolution_state,
         "fact_ids": list(fact_ids or []),
         "reasoning": str(row.get("reasoning", row.get("match_type", "classified by career-store fact graph"))),
     }
 
 
-def _unresolved_match(row: JsonObject) -> JsonObject:
-    return {
-        "requirement_id": str(row.get("requirement_id", "")),
-        "resolution_state": str(row.get("resolution_state", "unknown")),
-        "fact_ids": [],
-        "reasoning": "No confirmed career fact matched this requirement.",
-    }
+def _coherent_matches(value: Any, requirements: list[JsonObject]) -> list[JsonObject]:
+    rows_by_requirement: dict[str, JsonObject] = {}
+    if isinstance(value, dict):
+        match_rows = value.get("matches", [])
+        unresolved_rows = value.get("unresolved", [])
+    else:
+        match_rows = value or []
+        unresolved_rows = []
+    for row in match_rows or []:
+        if not isinstance(row, dict):
+            continue
+        requirement_id = str(row.get("requirement_id", ""))
+        if requirement_id and requirement_id not in rows_by_requirement:
+            rows_by_requirement[requirement_id] = row
+    for row in unresolved_rows or []:
+        if not isinstance(row, dict):
+            continue
+        requirement_id = str(row.get("requirement_id", ""))
+        if requirement_id and requirement_id not in rows_by_requirement:
+            rows_by_requirement[requirement_id] = row
+    for requirement in requirements:
+        requirement_id = str(requirement.get("requirement_id", requirement.get("id", "")))
+        if requirement_id and requirement_id not in rows_by_requirement:
+            rows_by_requirement[requirement_id] = {
+                "requirement_id": requirement_id,
+                "resolution_state": "unknown",
+                "fact_ids": [],
+            }
+    return [_match(row) for row in rows_by_requirement.values()]
 
 
 def _unverified_fact(fact: JsonObject) -> JsonObject:
@@ -561,6 +613,8 @@ def _unverified_fact(fact: JsonObject) -> JsonObject:
 
 
 def _exception_type(exc: Exception) -> str:
+    if isinstance(exc, StoreContractError):
+        return "store_error"
     if isinstance(exc, DisallowedTransitionError):
         return "policy_error"
     if isinstance(

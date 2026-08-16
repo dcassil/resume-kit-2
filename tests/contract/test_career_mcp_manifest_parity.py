@@ -6,6 +6,7 @@ import importlib
 import inspect
 import json
 import re
+import tempfile
 import unittest
 from copy import deepcopy
 from pathlib import Path
@@ -110,6 +111,16 @@ def assert_manifest_relationship_types_supported(
     )
 
 
+def assert_manifest_enums_match_store_surface(
+    test_case: unittest.TestCase,
+    manifest_surface: JsonObject,
+    store_surface: JsonObject,
+) -> None:
+    for key in ("verification_states", "resolution_states", "relationship_types"):
+        with test_case.subTest(enum=key):
+            test_case.assertEqual(set(manifest_surface.get(key, [])), set(store_surface.get(key, [])))
+
+
 class CareerMcpManifestParityTests(unittest.TestCase):
     def test_package_manifest_matches_runtime_list_tools_names_and_input_schemas(self):
         manifest = load_json(PACKAGE_SURFACE_PATH)
@@ -147,6 +158,46 @@ class CareerMcpManifestParityTests(unittest.TestCase):
             load_json(PACKAGE_SURFACE_PATH),
             load_json(STORE_SURFACE_PATH),
         )
+
+    def test_manifest_declared_enum_sets_match_store_surface_sets(self):
+        assert_manifest_enums_match_store_surface(
+            self,
+            load_json(PACKAGE_SURFACE_PATH),
+            load_json(STORE_SURFACE_PATH),
+        )
+
+    def test_store_accepts_every_declared_relationship_type_behaviorally(self):
+        career_store = importlib.import_module("career_store")
+        declared = set(load_json(STORE_SURFACE_PATH).get("relationship_types", []))
+        accepted: set[str] = set()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = career_store.openCareerStore(f"{temp_dir}/career.db", clock=lambda: "2026-01-01T00:00:00Z")
+            source = store.upsertFact(
+                {"type": "skill", "text": "Frontend systems", "verification_state": "source_stated"},
+                {"source": "resume_source", "source_id": "resume_1", "text": "Frontend systems"},
+                source="resume_source",
+            )
+            target = store.upsertFact(
+                {"type": "skill", "text": "React", "verification_state": "source_stated"},
+                {"source": "resume_source", "source_id": "resume_1", "text": "React"},
+                source="resume_source",
+            )
+            for relationship_type in sorted(declared):
+                result = store.addRelationship(
+                    source["fact_id"],
+                    target["fact_id"],
+                    relationship_type,
+                    evidence_or_rationale={"text": f"{relationship_type} relationship"},
+                    policy={},
+                )
+                if result.get("status") != "error":
+                    accepted.add(relationship_type)
+
+        # parent/child re-advertisement is deferred to Daniel's approval batch:
+        # protected tools/career_store_guardrails.py currently pins the
+        # declared store_surface.json relationship set to these four types.
+        self.assertTrue(accepted >= declared, f"store rejected declared relationship types: {sorted(declared - accepted)}")
 
     def test_parent_relationship_type_fails_store_subset_assertion(self):
         manifest = load_json(PACKAGE_SURFACE_PATH)

@@ -48,7 +48,7 @@ Tests should treat MCP as an adapter with:
 
 - Reject malformed fact IDs.
 - Reject empty searches.
-- Reject invalid verification states.
+- Reject invalid verification states against the real `career-store`; the accepted set is the canonical enum (`source_stated`, `user_verified`, `imported`, `inferred`, `unknown`), and advertised states must not drift from what the store accepts.
 - Reject relationships with unsupported types.
 - Reject missing evidence for verification operations that require evidence; covered by `test_real_store_verify_fact_requires_and_forwards_evidence_id_for_source_document_state`.
 - Return typed errors without leaking SQL details.
@@ -92,9 +92,9 @@ Tests should treat MCP as an adapter with:
 
 ### Match lookup
 
-- `career.find_matches` maps Job A requirements to known facts.
+- `career.find_matches` maps Job A requirements to known facts through a real `career-store` instance; fake-only satisfaction is not sufficient.
 - It returns exact/alias/verified/related/possible/unknown states distinctly.
-- It resolves AWS and GraphQL for Job B using facts learned in Job A.
+- It resolves AWS and GraphQL for Job B using facts learned in Job A through a real `career-store` instance; fake-only satisfaction is not sufficient.
 
 ## Boundary Tests
 

@@ -4,14 +4,14 @@ level: task
 title: "Contract-test rewrite: real-store tier + verified-fake conformance (R2)"
 short_code: "RKIT-T-0085"
 created_at: 2026-08-16T19:25:47.630259+00:00
-updated_at: 2026-08-16T19:31:56.476527+00:00
+updated_at: 2026-08-16T19:38:41.914307+00:00
 parent: align-career-mcp-semantics-with
 blocked_by: [RKIT-T-0084]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0011
 ## Objective **[REQUIRED]**
 
 Rebuild the career-mcp contract-test architecture so the authoritative tier exercises the REAL store (temp SQLite via public `openCareerStore`) — the audit's root finding was that all fake-path tests certified a dialect production never runs. Any remaining fake must be a VERIFIED fake: a conformance test asserts its method signatures and vocabulary against `career-store/store_surface.json`, so it can never drift into a private dialect again.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

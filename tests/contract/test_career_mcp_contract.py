@@ -111,6 +111,15 @@ class FakeCareerStore:
                 "relationships": [],
                 "conflicts": [],
             },
+            "fact_inferred_architecture": {
+                "fact_id": "fact_inferred_architecture",
+                "type": "experience",
+                "text": "inferred architecture experience",
+                "verification_state": "inferred",
+                "evidence_summary": [],
+                "relationships": [],
+                "conflicts": [],
+            },
         }
 
     def searchFacts(self, query: str, filters=None, limit=None, include_evidence=True):
@@ -638,10 +647,80 @@ class CareerMcpAdapterContractTests(unittest.TestCase):
         self.assertTrue(set(states.values()) <= RESOLUTION_STATES)
         self.assertNotRegex(json.dumps(result).lower(), r"\b(official_score|overall_score)\b")
 
+    def test_find_matches_collapses_store_weak_match_unresolved_overlap(self):
+        class OverlappingWeakMatchStore(FakeCareerStore):
+            def findCandidateMatches(self, requirements: list[dict], policy: dict):
+                self.calls.append(("findCandidateMatches", {"requirements": requirements, "policy": policy}))
+                return {
+                    "status": "ok",
+                    "matches": [
+                        {
+                            "requirement_id": "req_kubernetes",
+                            "resolution_state": "possible_match",
+                            "fact_ids": ["fact_candidate"],
+                            "reasoning": "weak candidate retained",
+                        }
+                    ],
+                    "unresolved": [
+                        {
+                            "requirement_id": "req_kubernetes",
+                            "resolution_state": "possible_match",
+                            "fact_ids": ["fact_candidate"],
+                        }
+                    ],
+                }
+
+        career_mcp = importlib.import_module("career_mcp")
+        adapter = career_mcp.create_career_mcp(store=OverlappingWeakMatchStore())
+
+        result = call_tool(
+            adapter,
+            "career.find_matches",
+            {"requirements": [{"requirement_id": "req_kubernetes", "source_text": "Kubernetes", "normalized_terms": ["kubernetes"]}]},
+        )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual([match["requirement_id"] for match in result["matches"]], ["req_kubernetes"])
+        self.assertEqual(result["matches"][0]["resolution_state"], "possible_match")
+        self.assertEqual(result["matches"][0]["fact_ids"], ["fact_candidate"])
+        self.assertEqual(result["matches"][0]["reasoning"], "weak candidate retained")
+        self.assertNotIn("No confirmed career fact matched", json.dumps(result))
+
+    def test_find_matches_store_noncanonical_resolution_state_returns_store_error(self):
+        class NonCanonicalResolutionStore(FakeCareerStore):
+            def findCandidateMatches(self, requirements: list[dict], policy: dict):
+                self.calls.append(("findCandidateMatches", {"requirements": requirements, "policy": policy}))
+                return {
+                    "status": "ok",
+                    "matches": [
+                        {
+                            "requirement_id": "req_conflict",
+                            "resolution_state": "conflicted",
+                            "fact_ids": ["fact_candidate"],
+                        }
+                    ],
+                    "unresolved": [],
+                }
+
+        career_mcp = importlib.import_module("career_mcp")
+        adapter = career_mcp.create_career_mcp(store=NonCanonicalResolutionStore())
+
+        result = call_tool(
+            adapter,
+            "career.find_matches",
+            {"requirements": [{"requirement_id": "req_conflict", "source_text": "Conflict", "normalized_terms": ["conflict"]}]},
+        )
+
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(result["error"]["type"], "store_error")
+        self.assertIn("conflicted", result["error"]["message"])
+        self.assertNotEqual(result.get("data", {}).get("matches"), [{"resolution_state": "conflicted"}])
+
     def test_get_unverified_clearly_marks_unconfirmed_facts(self):
         result = call_tool(self.adapter, "career.get_unverified", {"topic": "architecture", "limit": 5})
         self.assertEqual(result["status"], "ok")
         self.assertTrue(result["facts"])
+        self.assertIn("inferred", {fact["verification_state"] for fact in result["facts"]})
         for fact in result["facts"]:
             self.assertNotEqual(fact.get("verification_state"), "user_verified")
             self.assertTrue(fact.get("confirmation_required"))
@@ -667,6 +746,25 @@ class CareerMcpRealStoreContractTests(unittest.TestCase):
         self.assertEqual({fact["fact_id"] for fact in result["facts"]}, {experience["fact_id"]})
         self.assertNotIn(skill["fact_id"], {fact["fact_id"] for fact in result["facts"]})
         self.assertTrue(all(fact["type"] == "experience" for fact in result["facts"]))
+
+    def test_real_store_search_facts_verification_filter_excludes_nonmatching_facts(self):
+        store, adapter = real_store_adapter(self)
+        unknown = store.upsertFact(
+            {"type": "skill", "text": "Terraform automation", "verification_state": "unknown"},
+            None,
+            source="resume_source",
+        )
+        source_stated = store.upsertFact(
+            {"type": "skill", "text": "Terraform modules", "verification_state": "source_stated"},
+            {"source": "resume_source", "source_id": "resume_1", "text": "Terraform modules"},
+            source="resume_source",
+        )
+
+        result = call_tool(adapter, "career.search_facts", {"query": "Terraform", "verification": ["source_stated"], "limit": 10})
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual({fact["fact_id"] for fact in result["facts"]}, {source_stated["fact_id"]})
+        self.assertNotIn(unknown["fact_id"], {fact["fact_id"] for fact in result["facts"]})
 
     def test_real_store_get_fact_ok_path_returns_context(self):
         store, adapter = real_store_adapter(self)
@@ -869,6 +967,26 @@ class CareerMcpRealStoreContractTests(unittest.TestCase):
         self.assertEqual(result["status"], "ok")
         self.assertIn(created["fact_id"], {fact["fact_id"] for fact in result["facts"]})
         self.assertTrue(all(fact["confirmation_required"] for fact in result["facts"]))
+
+    def test_real_store_get_unverified_returns_inferred_facts(self):
+        store, adapter = real_store_adapter(self)
+        created = store.upsertFact(
+            {"type": "experience", "text": "Inferred Kubernetes operations", "verification_state": "unknown"},
+            None,
+            source="resume_source",
+        )
+        store.verifyFact(
+            created["fact_id"],
+            "inferred",
+            confirmation_for_state(created["fact_id"], "inferred"),
+            source="agent_interpretation",
+        )
+
+        result = call_tool(adapter, "career.get_unverified", {"topic": "Kubernetes", "limit": 5})
+
+        self.assertEqual(result["status"], "ok")
+        self.assertIn(created["fact_id"], {fact["fact_id"] for fact in result["facts"]})
+        self.assertIn("inferred", {fact["verification_state"] for fact in result["facts"]})
 
 
 class CareerMcpErrorEnvelopeTests(unittest.TestCase):
