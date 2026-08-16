@@ -4,14 +4,14 @@ level: task
 title: "Manifest/runtime parity + store-contract enum subset tests; smoke registry expectation; guardrail re-path patch for approval batch"
 short_code: "RKIT-T-0080"
 created_at: 2026-08-16T18:48:24.187029+00:00
-updated_at: 2026-08-16T18:55:34.388044+00:00
+updated_at: 2026-08-16T19:04:16.291400+00:00
 parent: make-career-mcp-importable-and
 blocked_by: [RKIT-T-0079]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0009
 ## Objective **[REQUIRED]**
 
 Prove the canonical manifest cannot silently drift from either the runtime or the store contract: (1) a parity contract test — every advertised tool is callable and every callable tool advertised (names AND schemas one-to-one against `list_tools()`); (2) an enum-subset assertion — every relationship-type value the manifest advertises is in career-store's `store_surface.json` `relationship_types` (today NOTHING fails when the manifest advertises capability the store rejects — the audit-confirmed gap); (3) a root/package byte-identity test so generated-copy drift fails loudly; (4) the verbatim `tools/career_mcp_guardrails.py` re-path patch authored for Daniel's approval batch. Initiative close-out.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
