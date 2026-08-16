@@ -4,14 +4,14 @@ level: initiative
 title: "Make Career-MCP Importable and Contract-Loadable"
 short_code: "RKIT-I-0009"
 created_at: 2026-08-13T20:41:37.010123+00:00
-updated_at: 2026-08-16T18:48:20.378141+00:00
+updated_at: 2026-08-16T18:49:20.713601+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: []
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/decompose"
+  - "#phase/active"
 
 
 exit_criteria_met: false

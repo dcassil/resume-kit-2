@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SURFACE = json.loads((ROOT / "career-mcp" / "tool_surface.json").read_text(encoding="utf-8"))
+SURFACE = json.loads((ROOT / "career-mcp" / "career_mcp" / "tool_surface.json").read_text(encoding="utf-8"))
 
 ALLOWED_TOOLS = tuple(tool["name"] for tool in SURFACE["tools"])
 WRITE_TOOLS = tuple(tool["name"] for tool in SURFACE["tools"] if tool.get("mutates") is True)
@@ -272,6 +272,22 @@ class CareerMcpAdapterContractTests(unittest.TestCase):
                 self.assertEqual(result["status"], "error")
                 self.assertIn(result["error"]["type"], {"validation_error", "not_found", "policy_error"})
                 self.assertNotRegex(json.dumps(result).lower(), r"\b(sqlite|select|insert|update|delete|traceback)\b")
+
+    def test_child_parent_relationship_types_fail_at_schema_validation(self):
+        for relationship_type in ("child", "parent"):
+            with self.subTest(relationship_type=relationship_type):
+                result = call_tool(
+                    self.adapter,
+                    "career.add_relationship",
+                    {
+                        "from_fact_id": "fact_aws",
+                        "to_fact_id": "fact_azure",
+                        "relationship_type": relationship_type,
+                    },
+                )
+                self.assertEqual(result["status"], "error")
+                self.assertEqual(result["error"]["type"], "validation_error")
+                self.assertEqual(result["error"]["message"], "relationship_type is not supported.")
 
     def test_search_facts_returns_deterministic_minimum_evidence_without_sensitive_fields(self):
         result = call_tool(self.adapter, "career.search_facts", {"query": "React", "verification": ["source_stated"]})
