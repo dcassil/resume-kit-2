@@ -56,6 +56,17 @@ def contains_value(value: object, expected: object) -> bool:
     return False
 
 
+class CareerStoreDouble:
+    def __init__(self, state):
+        self.state = dict(state)
+        self.calls = 0
+        self.getMigrationState = self.read_state
+
+    def read_state(self):
+        self.calls += 1
+        return dict(self.state)
+
+
 class WorkflowSurfaceManifestTests(unittest.TestCase):
     def test_manifest_declares_exact_public_functions(self):
         self.assertEqual(PUBLIC_FUNCTIONS, (
@@ -188,6 +199,51 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
 
     def create_run(self):
         return maybe_await(self.workflow.createRun(workspace=self.workspace, config=self.config))
+
+    def persist_run_state(self, run_state):
+        path = self.workspace / ".workflow" / "runs" / f"{run_state['run_id']}.json"
+        path.write_text(json.dumps(run_state, sort_keys=True, indent=2), encoding="utf-8")
+
+    def store_state(self, *, schema_version=None, status="ok", pending=None):
+        import career_store
+
+        return {
+            "schema_version": schema_version or career_store.CAREER_STORE_SCHEMA_VERSION,
+            "database_path": str(self.workspace / "data" / "career.db"),
+            "applied_migrations": ["001_initial"],
+            "pending_migrations": list(pending or []),
+            "status": status,
+            "metadata": {"source": "test-double"},
+        }
+
+    def run_with_verified_base_and_career_db(self, *, recorded_schema_version=None):
+        run_state = self.create_run()
+        base_ref = self.artifact_ref("resume/base.json", {"resume_id": "base_1", "summary": "Built React systems."})
+        schema_version = recorded_schema_version or self.store_state()["schema_version"]
+        run_state.update(
+            {
+                "base_resume_id": "base_1",
+                "base_resume_hash": base_ref["sha256"],
+                "careerDbVersion": {
+                    "schema_version": schema_version,
+                    "database_path": str(self.workspace / "data" / "career.db"),
+                    "applied_migrations": ["001_initial"],
+                    "pending_migrations": [],
+                    "status": "ok",
+                    "metadata": {"source": "recorded"},
+                },
+                "stage_state": {
+                    **run_state.get("stage_state", {}),
+                    "VALIDATE_BASE": {"canonical_resume_exists": dict(base_ref)},
+                },
+                "verified_evidence": {
+                    **run_state.get("verified_evidence", {}),
+                    "VALIDATE_BASE": {"canonical_resume_exists": dict(base_ref)},
+                },
+            }
+        )
+        self.persist_run_state(run_state)
+        return run_state, base_ref
 
     def dto_ref(self, schema_id, payload=None):
         return {"kind": "dto", "schema_id": schema_id, "payload": payload or {"status": "passed"}}
@@ -447,34 +503,100 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
 
         self.assertFalse(missing_path.exists())
 
-    def test_recover_run_returns_structured_unverified_integrity(self):
+    def test_recover_run_returns_real_structured_integrity_results(self):
         run_state = self.create_run()
 
         recovery = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=run_state["run_id"]))
 
         self.assertNotIn("transactional_integrity", recovery)
-        self.assertTrue(recovery["resumable"])
+        self.assertFalse(recovery["resumable"])
         self.assertEqual(set(recovery["integrity"]), {"career_db", "base_resume", "rejected_operations"})
         for check in recovery["integrity"].values():
             self.assertIsInstance(check, dict)
-            self.assertEqual(check["status"], "unverified")
-            self.assertIsNone(check["evidence_ref"])
-            self.assertEqual(check["reason"], "verification_not_implemented")
+            self.assertIn("status", check)
+            self.assertIn("evidence_ref", check)
+            self.assertIn("reason", check)
+        self.assertEqual(recovery["integrity"]["career_db"]["status"], "unverified")
+        self.assertEqual(recovery["integrity"]["career_db"]["reason"], "career_db_not_configured")
+        self.assertEqual(recovery["integrity"]["base_resume"]["status"], "failed")
+        self.assertEqual(recovery["integrity"]["base_resume"]["reason"], "base_resume_hash_not_recorded")
+        self.assertEqual(recovery["integrity"]["rejected_operations"]["status"], "verified")
+        self.assertEqual(recovery["integrity"]["rejected_operations"]["reason"], "no_operations_recorded")
 
-    def test_recover_run_marks_not_resumable_when_integrity_check_fails(self):
-        run_state = self.create_run()
-        recovery_module = importlib.import_module("workflow.recovery")
+    def test_recover_run_career_db_pending_schema_update_fails_via_store_double(self):
+        run_state, _ = self.run_with_verified_base_and_career_db()
+        store = CareerStoreDouble(self.store_state(status="pending", pending=["002_pending"]))
 
-        def fake_check(name, run_state):
-            if name == "base_resume":
-                return {"status": "failed", "evidence_ref": {"path": "resume/base.json"}, "reason": "hash_mismatch"}
-            return {"status": "unverified", "evidence_ref": None, "reason": "verification_not_implemented"}
+        recovery = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=run_state["run_id"], career_store=store))
 
-        with mock.patch.object(recovery_module, "_recovery_integrity_check", side_effect=fake_check):
-            recovery = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=run_state["run_id"]))
+        self.assertEqual(store.calls, 1)
+        self.assertEqual(recovery["integrity"]["career_db"]["status"], "failed")
+        self.assertIn("status_not_ok:pending", recovery["integrity"]["career_db"]["reason"])
+        self.assertIn("pending_migrations:002_pending", recovery["integrity"]["career_db"]["reason"])
+        self.assertEqual(recovery["integrity"]["career_db"]["evidence_ref"]["state"]["pending_migrations"], ["002_pending"])
+
+    def test_recover_run_career_db_version_mismatch_fails(self):
+        run_state, _ = self.run_with_verified_base_and_career_db(recorded_schema_version="career-store.v0")
+        store = CareerStoreDouble(self.store_state(schema_version="career-store.v1"))
+
+        recovery = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=run_state["run_id"], career_store=store))
+
+        self.assertEqual(recovery["integrity"]["career_db"]["status"], "failed")
+        self.assertIn("schema_version_mismatch", recovery["integrity"]["career_db"]["reason"])
+        self.assertIn("recorded=career-store.v0", recovery["integrity"]["career_db"]["reason"])
+        self.assertIn("consulted=career-store.v1", recovery["integrity"]["career_db"]["reason"])
+
+    def test_recover_run_tampered_base_resume_fails_with_hash_mismatch(self):
+        run_state, _ = self.run_with_verified_base_and_career_db()
+        (self.workspace / "resume" / "base.json").write_text(json.dumps({"resume_id": "base_1", "summary": "tampered"}), encoding="utf-8")
+
+        recovery = maybe_await(
+            self.workflow.recoverRun(
+                workspace=self.workspace,
+                run_id=run_state["run_id"],
+                career_store=CareerStoreDouble(self.store_state()),
+            )
+        )
 
         self.assertFalse(recovery["resumable"])
         self.assertEqual(recovery["integrity"]["base_resume"]["status"], "failed")
+        self.assertIn("base_resume_hash_mismatch", recovery["integrity"]["base_resume"]["reason"])
+        self.assertEqual(recovery["integrity"]["base_resume"]["evidence_ref"]["path"], "resume/base.json")
+
+    def test_recover_run_rejected_then_applied_operation_fails_and_lists_id(self):
+        run_state, _ = self.run_with_verified_base_and_career_db()
+        maybe_await(self.workflow.recordCheckpointResult(run_state, "VALIDATE_CHANGES", {"operations_rejected": ["op_bad"]}))
+        maybe_await(self.workflow.recordCheckpointResult(run_state, "APPLY_CHANGES", {"operations_applied": ["op_bad"]}))
+
+        recovery = maybe_await(
+            self.workflow.recoverRun(
+                workspace=self.workspace,
+                run_id=run_state["run_id"],
+                career_store=CareerStoreDouble(self.store_state()),
+            )
+        )
+
+        self.assertFalse(recovery["resumable"])
+        self.assertEqual(recovery["integrity"]["rejected_operations"]["status"], "failed")
+        self.assertIn("rejected_operation_applied_later:op_bad", recovery["integrity"]["rejected_operations"]["reason"])
+        self.assertEqual(recovery["integrity"]["rejected_operations"]["evidence_ref"]["offending_operation_ids"], ["op_bad"])
+
+    def test_recover_run_clean_full_run_verifies_all_integrity_checks_with_evidence(self):
+        run_state, base_ref = self.run_with_verified_base_and_career_db()
+        maybe_await(self.workflow.recordCheckpointResult(run_state, "VALIDATE_CHANGES", {"operations_rejected": ["op_rejected"]}))
+        store = CareerStoreDouble(self.store_state())
+
+        recovery = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=run_state["run_id"], career_store=store))
+
+        self.assertTrue(recovery["resumable"])
+        self.assertEqual(store.calls, 1)
+        for name, check in recovery["integrity"].items():
+            with self.subTest(name=name):
+                self.assertEqual(check["status"], "verified")
+                self.assertIsInstance(check["evidence_ref"], dict)
+        self.assertEqual(recovery["integrity"]["career_db"]["evidence_ref"]["state"]["schema_version"], self.store_state()["schema_version"])
+        self.assertEqual(recovery["integrity"]["base_resume"]["evidence_ref"]["sha256"], base_ref["sha256"])
+        self.assertEqual(recovery["integrity"]["rejected_operations"]["evidence_ref"]["rejected_operation_ids"], ["op_rejected"])
 
     def test_create_run_tolerates_malformed_workspace_index(self):
         runs_dir = self.workspace / ".workflow" / "runs"

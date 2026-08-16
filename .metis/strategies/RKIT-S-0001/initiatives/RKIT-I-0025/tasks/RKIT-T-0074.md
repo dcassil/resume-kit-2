@@ -4,14 +4,14 @@ level: task
 title: "Typed recoverRun contract: RunNotFound, structured integrity result, no invented state"
 short_code: "RKIT-T-0074"
 created_at: 2026-08-16T18:09:42.222770+00:00
-updated_at: 2026-08-16T18:14:09.529913+00:00
+updated_at: 2026-08-16T18:19:07.812394+00:00
 parent: workflow-recovery-and-idempotency
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0025
 ## Objective **[REQUIRED]**
 
 Convert `recoverRun` (workflow/__init__.py:383-402) from a fabricating, literal-returning stub into a typed recovery contract: unknown run ids raise the existing typed `UnknownRunError` (never fabricated `{'run_id', 'current_checkpoint': 'INIT'}` state — line 385 regression), and the result gains a structured `integrity` object with per-check `{status, evidence_ref}` entries replacing the bare `"transactional_integrity": "valid"` literal (line 401). This task delivers the CONTRACT SHAPE; the real verification logic behind each integrity check lands in RKIT-T-0075 — here each check may return `status: "unverified"` with an honest reason, never `"verified"` without proof.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

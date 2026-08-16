@@ -4,14 +4,14 @@ level: task
 title: "Integrity verification: career-store surfaces, base-hash comparison, rejected-operation scan"
 short_code: "RKIT-T-0075"
 created_at: 2026-08-16T18:09:42.282493+00:00
-updated_at: 2026-08-16T18:09:42.282493+00:00
+updated_at: 2026-08-16T18:19:08.264295+00:00
 parent: workflow-recovery-and-idempotency
-blocked_by: ["RKIT-T-0074"]
+blocked_by: [RKIT-T-0074]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0025
 ## Objective **[REQUIRED]**
 
 Implement the three real integrity verifications behind the structured contract RKIT-T-0074 introduced, so recovery PROVES the TEST_SPEC recovery assertions ("career DB remains transactionally valid", "base resume remains unchanged", "rejected operations stay rejected") instead of declaring them. After this task no integrity check returns `unverified` in the normal path.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria **[REQUIRED]**
 
@@ -56,4 +58,4 @@ RKIT-T-0074 (structured integrity contract). Serial with all I-0025 tasks (same 
 
 ## Status Updates **[REQUIRED]**
 
-*To be added during implementation*
+- 2026-08-16: T-0074 landed (workflow/recovery.py delegation, structured integrity placeholders, UnknownRunError; committed, gates 387/smoke green). Codex launched on this task: real career_db (getMigrationState via injectable seam mirroring versions.py), base_resume sha256 vs recorded base_resume_hash, rejected-then-applied scan over operations.jsonl. career_db_not_configured runs report unverified honestly, never verified.

@@ -380,8 +380,19 @@ def reconstructRunManifest(run_id: str, workspace: str | Path = ".") -> JsonObje
     return manifest
 
 
-def recoverRun(workspace: str | Path, run_id: str) -> JsonObject:
-    return _recover_run(workspace, run_id, _run_path, UnknownRunError, RunManifestValidationError, _issue, _dedupe, _normalize_resolution_loop_state, _normalize_render_overflow_state)
+def recoverRun(workspace: str | Path, run_id: str, career_store: Any | None = None) -> JsonObject:
+    return _recover_run(
+        workspace,
+        run_id,
+        _run_path,
+        UnknownRunError,
+        RunManifestValidationError,
+        _issue,
+        _dedupe,
+        _normalize_resolution_loop_state,
+        _normalize_render_overflow_state,
+        career_store=career_store,
+    )
 
 
 def assertCanComplete(run_state: JsonObject) -> JsonObject:
