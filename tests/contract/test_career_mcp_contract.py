@@ -453,6 +453,45 @@ class CareerMcpErrorEnvelopeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "require an error object"):
             career_mcp._tool_result("career.get_fact", "error")  # noqa: SLF001
 
+    def test_raw_sql_fragment_in_envelope_message_is_redacted_without_touching_type_or_data(self):
+        career_mcp = importlib.import_module("career_mcp")
+        leaked = "INSERT INTO facts (fact_id, text) VALUES ('fact_1', 'secret')"
+
+        result = career_mcp._tool_result(  # noqa: SLF001
+            "career.get_fact",
+            "error",
+            data={"store_diagnostic": leaked},
+            error={"type": "store_error", "message": leaked},
+        )
+
+        self.assertEqual(result["error"]["type"], "store_error")
+        self.assertEqual(result["error"]["message"], "Career store operation failed.")
+        self.assertEqual(result["data"]["store_diagnostic"], leaked)
+
+    def test_validation_message_with_plain_update_survives_scrub_verbatim(self):
+        career_mcp = importlib.import_module("career_mcp")
+        message = "cannot update verification state without evidence"
+
+        result = career_mcp._tool_result(  # noqa: SLF001
+            "career.verify_fact",
+            "error",
+            error={"type": "validation_error", "message": message},
+        )
+
+        self.assertEqual(result["error"]["type"], "validation_error")
+        self.assertEqual(result["error"]["message"], message)
+
+    def test_sqlite_error_signature_in_envelope_message_is_redacted(self):
+        career_mcp = importlib.import_module("career_mcp")
+
+        result = career_mcp._tool_result(  # noqa: SLF001
+            "career.get_fact",
+            "error",
+            error={"type": "store_error", "message": "UNIQUE constraint failed: facts.fact_id"},
+        )
+
+        self.assertEqual(result["error"]["message"], "Career store operation failed.")
+
     def test_exception_classification_is_independent_of_message_wording(self):
         career_mcp = importlib.import_module("career_mcp")
         self.assertEqual(career_mcp._exception_type(ValueError("not found")), "validation_error")  # noqa: SLF001

@@ -4,14 +4,14 @@ level: task
 title: "Full-list filter mapping + argument fidelity: dedupe_key, include_conflicts, evidence_id (R3-R5)"
 short_code: "RKIT-T-0082"
 created_at: 2026-08-16T19:05:18.808731+00:00
-updated_at: 2026-08-16T19:12:53.747783+00:00
+updated_at: 2026-08-16T19:19:07.272203+00:00
 parent: harden-career-mcp-tool-argument
 blocked_by: [RKIT-T-0081]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0010
 ## Objective **[REQUIRED]**
 
 Kill the silent-data-loss paths in `career-mcp/career_mcp/__init__.py`: (R3) `search_facts` keeps only `arguments['verification'][0]` / `arguments['types'][0]` (~66-69) — a search for `['user_verified','source_stated']` empirically drops all source_stated facts; (R4) `dedupe_key` (~106-114) and `include_conflicts` (get_fact fallback ~85) are schema-accepted but silently discarded; (R5) `evidence_id` is optional and dropped (~129-133) though TEST_SPEC.md:53 requires rejecting missing evidence for verification operations that require it. Add the consumed-arguments assertion so future silently-dropped-argument bugs become test failures.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

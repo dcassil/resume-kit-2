@@ -50,14 +50,18 @@ Tests should treat MCP as an adapter with:
 - Reject empty searches.
 - Reject invalid verification states.
 - Reject relationships with unsupported types.
-- Reject missing evidence for verification operations that require evidence.
+- Reject missing evidence for verification operations that require evidence; covered by `test_real_store_verify_fact_requires_and_forwards_evidence_id_for_source_document_state`.
 - Return typed errors without leaking SQL details.
+- Every non-ok result must carry a typed `error: {type, message}` envelope; covered by `test_envelope_helper_refuses_non_ok_without_error_object` and `test_real_store_verify_fact_rejected_dict_has_typed_error_envelope`.
+- Schema-accepted arguments must never be silently dropped by dispatch; covered by `test_consumed_arguments_assertion_catches_planted_dropped_argument`, `test_propose_fact_forwards_dedupe_key_when_store_surface_accepts_it`, `test_real_store_dedupe_key_is_typed_rejected_when_upsert_fact_cannot_honor_it`, `test_real_store_get_fact_include_conflicts_observably_controls_conflict_records`, and `test_real_store_verify_fact_requires_and_forwards_evidence_id_for_source_document_state`.
+- Persistence details in envelope messages must be redacted while ordinary validation messages pass verbatim; covered by `test_raw_sql_fragment_in_envelope_message_is_redacted_without_touching_type_or_data`, `test_sqlite_error_signature_in_envelope_message_is_redacted`, and `test_validation_message_with_plain_update_survives_scrub_verbatim`.
 
 ### Search behavior
 
 - `career.search_facts` returns matching facts for React/API/responsive terms.
 - Search responses include minimum necessary evidence.
 - Search ordering is deterministic.
+- Multi-value `verification` and `types` filters have union semantics rather than first-element-only narrowing; covered by `test_search_facts_honors_full_verification_and_type_lists_with_union_semantics` and `test_real_store_full_list_filters_post_filter_without_silent_narrowing`.
 - Sensitive fields such as contact data are omitted unless explicitly required.
 
 ### Fact retrieval
@@ -116,4 +120,3 @@ The E2E fixture must prove:
 - MCP supports targeted gap resolution,
 - verified facts learned through user answers are reusable,
 - audit can identify which MCP operations changed career knowledge.
-

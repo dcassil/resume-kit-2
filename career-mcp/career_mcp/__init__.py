@@ -25,6 +25,28 @@ JsonObject = dict[str, Any]
 ERROR_TYPES = {"validation_error", "policy_error", "not_found", "store_error", "unknown_tool"}
 REJECTION_STATUSES = {"error", "rejected"}
 NOT_FOUND_REASON_CODES = {"not_found", "unknown_fact_id"}
+GENERIC_STORE_ERROR_MESSAGE = "Career store operation failed."
+SQL_IDENTIFIER_PATTERN = r'(?:[A-Za-z_][A-Za-z0-9_]*|"[^"]+"|`[^`]+`|\[[^\]]+\])'
+PERSISTENCE_LEAK_PATTERNS = (
+    re.compile(r"\b" + "insert" + r"\s+" + "into" + r"\b", re.IGNORECASE),
+    re.compile(r"\b" + "update" + r"\s+" + SQL_IDENTIFIER_PATTERN + r"\s+" + "set" + r"\b", re.IGNORECASE),
+    re.compile(r"\b" + "delete" + r"\s+" + "from" + r"\b", re.IGNORECASE),
+    re.compile(r"\b" + "select" + r"\b[\s\S]{0,240}?\b" + "from" + r"\b", re.IGNORECASE),
+    re.compile(r"\bsqlite3\.[A-Za-z_][A-Za-z0-9_.]*", re.IGNORECASE),
+    re.compile(r"\bsqlite(?:3)?\s+(?:OperationalError|IntegrityError|DatabaseError|ProgrammingError|Error)\b", re.IGNORECASE),
+    re.compile(r"\b(?:UNIQUE|FOREIGN\s+KEY|CHECK|NOT\s+NULL)\s+constraint\s+failed\b", re.IGNORECASE),
+    re.compile(r"\bno\s+such\s+(?:table|column)\b", re.IGNORECASE),
+    re.compile(
+        r"\b(?:facts|evidence|relationships|conflicts|interactions|migrations)\."
+        r"(?:[A-Za-z_][A-Za-z0-9_]*)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:sqlite_schema|schema_migrations|fact_merges|job_matches|raw_sql|transaction_result|"
+        r"normalized_terms_json|metadata_json|evidence_json|fact_ids_json|evidence_ids_json|merged_into_fact_id)\b",
+        re.IGNORECASE,
+    ),
+)
 POLICY_REASON_CODES = {
     "confirmation_required",
     "disallowed_verification_transition",
@@ -476,7 +498,8 @@ def _normalize_error(error: JsonObject | None) -> JsonObject:
     error_type = str(error.get("type", "store_error"))
     if error_type not in ERROR_TYPES:
         error_type = "store_error"
-    return {"type": error_type, "message": str(error.get("message") or "Career tool call failed.")}
+    message = _safe_text_message(str(error.get("message") or GENERIC_STORE_ERROR_MESSAGE))
+    return {"type": error_type, "message": message}
 
 
 def _store_rejection_error(value: JsonObject) -> JsonObject:
@@ -579,14 +602,13 @@ def _exception_type(exc: Exception) -> str:
 
 
 def _safe_text_message(text: str) -> str:
-    blocked = ("traceback", "sqlite", "select", "insert", "update", "delete")
-    if any(word in text.casefold() for word in blocked):
-        return "Tool call failed validation."
+    if any(pattern.search(text) for pattern in PERSISTENCE_LEAK_PATTERNS):
+        return GENERIC_STORE_ERROR_MESSAGE
     return text
 
 
 def _safe_message(exc: Exception) -> str:
-    text = str(exc) or "Tool call failed validation."
+    text = str(exc) or GENERIC_STORE_ERROR_MESSAGE
     return _safe_text_message(text)
 
 

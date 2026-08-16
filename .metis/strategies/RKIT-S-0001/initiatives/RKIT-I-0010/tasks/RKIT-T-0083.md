@@ -4,14 +4,14 @@ level: task
 title: "Precise persistence-leak scrubbing + TEST_SPEC strengthening (R6) — close-out"
 short_code: "RKIT-T-0083"
 created_at: 2026-08-16T19:05:18.867056+00:00
-updated_at: 2026-08-16T19:05:18.867056+00:00
+updated_at: 2026-08-16T19:19:07.674225+00:00
 parent: harden-career-mcp-tool-argument
-blocked_by: ["RKIT-T-0081", "RKIT-T-0082"]
+blocked_by: [RKIT-T-0081, RKIT-T-0082]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0010
 ## Objective **[REQUIRED]**
 
 Replace the blunt substring blocklist scrub in `career-mcp/career_mcp/__init__.py` (~368-373) — which masks ANY message containing "update" or "delete", including legitimate validation messages — with targeted redaction of persistence artifacts (SQL statement shapes, store-internal identifiers) applied to `message` only. Strengthen `career-mcp/TEST_SPEC.md` (unprotected) with the envelope and argument-fidelity requirements whose absence certified the shallow paths as done. Initiative close-out: mutation probes, version bump handled by driver.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria **[REQUIRED]**
 
@@ -52,4 +54,4 @@ RKIT-T-0081/0082. Final task; after it: initiative → completed, bump 0.16.0, p
 
 ## Status Updates **[REQUIRED]**
 
-*To be added during implementation*
+- 2026-08-16: T-0082 committed (gates 424/smoke/verify green; driver probed union search, dedupe_key typed rejection, include_conflicts on real store; store gaps for I-0011 recorded in T-0082 report: searchFacts single-value filters, upsertFact no dedupe_key, verifyFact no evidence_id param, getFact no include_conflicts). Codex launched on scrub precision + TEST_SPEC close-out.
