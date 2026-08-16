@@ -511,11 +511,16 @@ class CareerStore:
                     }
                 else:
                     try:
-                        authority = user_affirmed_proposal_authority(proposal)
                         if current_state == "user_verified" and requested_state != current_state:
                             authority = explicit_user_correction_authority(proposal)
                         elif requested_state == "source_stated":
                             authority = self._source_document_authority_from_refs(proposal.provenance)
+                        elif requested_state == "imported":
+                            authority = self._import_authority_from_refs(proposal.provenance)
+                        elif requested_state == "inferred":
+                            authority = self._agent_inference_authority_from_refs(proposal.provenance)
+                        else:
+                            authority = user_affirmed_proposal_authority(proposal)
                         transition = evaluate_verification_transition(
                             fact_id,
                             current_state,
@@ -1235,6 +1240,20 @@ class CareerStore:
             if authority.authorityKind == "source_document_evidence":
                 return authority
         return source_document_evidence_authority(refs[0] if refs else {})
+
+    def _import_authority_from_refs(self, refs: list[JsonObject]):
+        for ref in refs:
+            authority = import_provenance_authority(ref)
+            if authority.authorityKind == "import_provenance":
+                return authority
+        return import_provenance_authority(refs[0] if refs else {})
+
+    def _agent_inference_authority_from_refs(self, refs: list[JsonObject]):
+        for ref in refs:
+            authority = agent_inference_provenance_authority(ref)
+            if authority.authorityKind == "agent_inference_provenance":
+                return authority
+        return agent_inference_provenance_authority(refs[0] if refs else {})
 
     def _insert_transition_evidence(self, conn: sqlite3.Connection, transition: Any, now: str) -> str:
         transition_evidence = transition_evidence_row(transition)

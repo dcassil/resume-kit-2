@@ -14,6 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SURFACE = json.loads((ROOT / "career-mcp" / "career_mcp" / "tool_surface.json").read_text(encoding="utf-8"))
+STORE_SURFACE = json.loads((ROOT / "career-store" / "store_surface.json").read_text(encoding="utf-8"))
 
 ALLOWED_TOOLS = tuple(tool["name"] for tool in SURFACE["tools"])
 WRITE_TOOLS = tuple(tool["name"] for tool in SURFACE["tools"] if tool.get("mutates") is True)
@@ -21,10 +22,36 @@ FORBIDDEN_TOOLS = tuple(SURFACE["forbidden_tools"])
 VERIFICATION_STATES = set(SURFACE["verification_states"])
 RELATIONSHIP_TYPES = set(SURFACE["relationship_types"])
 RESOLUTION_STATES = set(SURFACE["resolution_states"])
+STORE_VERIFICATION_STATES = set(STORE_SURFACE["verification_states"])
+STORE_RELATIONSHIP_TYPES = set(STORE_SURFACE["relationship_types"])
+STORE_RESOLUTION_STATES = set(STORE_SURFACE["resolution_states"])
+STORE_SURFACE_NAMES = {surface["name"] for surface in STORE_SURFACE["surfaces"]}
+FIXED_TIME = "2026-01-01T00:00:00Z"
+
+
+def store_rejection(operation: str, fact_id: str, code: str, field_path: str, allowed_values: set[str] | None = None):
+    error = {"code": code, "field_path": field_path, "message": code.replace("_", " ")}
+    if allowed_values is not None:
+        error["allowed_values"] = sorted(allowed_values)
+    return {
+        "schema_version": "career-store.v1",
+        "status": "error",
+        "mutation_status": "rejected",
+        "fact_id": fact_id,
+        "verification_state": "unknown",
+        "conflicts": [],
+        "confirmation_required": True,
+        "errors": [error],
+        "audit": {"operation": operation, "mutated": False, "reason": code},
+    }
 
 
 class FakeCareerStore:
     """Small deterministic store double that future MCP code should call."""
+
+    ACCEPTED_VERIFICATION_STATES = STORE_VERIFICATION_STATES
+    ACCEPTED_RELATIONSHIP_TYPES = STORE_RELATIONSHIP_TYPES
+    ACCEPTED_RESOLUTION_STATES = STORE_RESOLUTION_STATES
 
     def __init__(self) -> None:
         self.calls: list[tuple[str, dict]] = []
@@ -165,12 +192,14 @@ class FakeCareerStore:
                 },
             )
         )
+        if verification_state not in self.ACCEPTED_VERIFICATION_STATES:
+            return store_rejection("verifyFact", fact_id, "invalid_verification_state", "verification_state", self.ACCEPTED_VERIFICATION_STATES)
         if verification_state == "user_verified" and (
             not isinstance(confirmation, dict)
             or confirmation.get("outcome") != "affirmed"
             or not confirmation.get("provenance")
         ):
-            raise ValueError("affirmed interpretation proposal required")
+            return store_rejection("verifyFact", fact_id, "user_verified_without_explicit_confirmation", "confirmation")
         return {
             "mutation_status": "updated",
             "fact_id": fact_id,
@@ -200,8 +229,8 @@ class FakeCareerStore:
                 },
             )
         )
-        if relationship_type not in RELATIONSHIP_TYPES:
-            raise ValueError("unsupported relationship type")
+        if relationship_type not in self.ACCEPTED_RELATIONSHIP_TYPES:
+            return store_rejection("addRelationship", from_fact_id, "invalid_relationship_type", "relationship_type", self.ACCEPTED_RELATIONSHIP_TYPES)
         return {
             "mutation_status": "created",
             "fact_id": from_fact_id,
@@ -231,7 +260,6 @@ class FakeCareerStore:
             }
             for req in requirements
         ]
-        return {"matches": matches, "unresolved": []}
 
     def findConflicts(self, fact_or_claim: dict, scope=None):
         self.calls.append(("findConflicts", {"fact_or_claim": fact_or_claim, "scope": scope}))
@@ -268,6 +296,74 @@ def call_tool(adapter, name: str, arguments: dict):
     return maybe_await(adapter.call_tool(name, arguments))
 
 
+def load_career_modules(test_case: unittest.TestCase):
+    try:
+        career_mcp = importlib.import_module("career_mcp")
+        career_store = importlib.import_module("career_store")
+    except ModuleNotFoundError as exc:
+        test_case.fail("Expected importable career_mcp and career_store packages for real-store MCP contract tests.")
+        raise exc
+    return career_mcp, career_store
+
+
+def open_real_store(test_case: unittest.TestCase):
+    _career_mcp, career_store = load_career_modules(test_case)
+    directory = tempfile.TemporaryDirectory()
+    test_case.addCleanup(directory.cleanup)
+    return career_store.openCareerStore(str(Path(directory.name) / "career.db"), clock=lambda: FIXED_TIME)
+
+
+def real_store_adapter(test_case: unittest.TestCase):
+    career_mcp, _career_store = load_career_modules(test_case)
+    store = open_real_store(test_case)
+    return store, career_mcp.create_career_mcp(store=store)
+
+
+def confirmation_for_state(fact_id: str, verification_state: str) -> dict:
+    if verification_state == "imported":
+        return {
+            "factId": fact_id,
+            "outcome": "affirmed",
+            "provenance": [
+                {
+                    "source": "external_system",
+                    "source_id": "import_1",
+                    "text": "Imported from durable profile.",
+                    "metadata": {"import_id": "import_1", "external_id": fact_id},
+                }
+            ],
+        }
+    if verification_state == "inferred":
+        return {
+            "factId": fact_id,
+            "outcome": "affirmed",
+            "provenance": [
+                {
+                    "source": "agent_interpretation",
+                    "text": "Agent inferred this career fact from matching context.",
+                    "metadata": {"inference_id": "inference_1", "rationale": "semantic overlap"},
+                }
+            ],
+        }
+    if verification_state == "source_stated":
+        return {
+            "factId": fact_id,
+            "outcome": "affirmed",
+            "provenance": [{"source": "resume_source", "source_id": "resume_1", "text": "Resume states this fact."}],
+        }
+    return {
+        "factId": fact_id,
+        "outcome": "affirmed",
+        "provenance": [{"source": "user_answer", "text": "Yes, confirmed."}],
+    }
+
+
+def assert_typed_error(test_case: unittest.TestCase, result: dict, error_type: str):
+    test_case.assertEqual(result["status"], "error")
+    test_case.assertEqual(result["error"]["type"], error_type)
+    test_case.assertNotRegex(json.dumps(result).lower(), r"\b(sqlite|select|insert|update|delete|traceback)\b")
+
+
 class ToolSurfaceManifestTests(unittest.TestCase):
     def test_manifest_declares_exact_allowed_tools(self):
         self.assertEqual(tuple(ALLOWED_TOOLS), (
@@ -298,6 +394,46 @@ class ToolSurfaceManifestTests(unittest.TestCase):
                 with self.subTest(tool=tool["name"]):
                     response_fields = set(tool["response_contract"]["required_fields"])
                     self.assertTrue(required <= response_fields)
+
+
+class VerifiedFakeCareerStoreConformanceTests(unittest.TestCase):
+    def test_fake_methods_are_exactly_the_adapter_called_store_surface(self):
+        career_mcp = importlib.import_module("career_mcp")
+        adapter_methods = set(career_mcp.STORE_METHOD_BY_TOOL.values())
+        fake_methods = {
+            name
+            for name, value in inspect.getmembers(FakeCareerStore, predicate=inspect.isfunction)
+            if not name.startswith("_") and name != "__init__"
+        }
+
+        self.assertTrue(adapter_methods <= STORE_SURFACE_NAMES)
+        self.assertEqual(fake_methods, adapter_methods | {"findConflicts"})
+        self.assertTrue(fake_methods <= STORE_SURFACE_NAMES | {"findConflicts"})
+
+    def test_fake_enum_vocabulary_matches_store_surface_sets(self):
+        self.assertEqual(FakeCareerStore.ACCEPTED_VERIFICATION_STATES, STORE_VERIFICATION_STATES)
+        self.assertEqual(FakeCareerStore.ACCEPTED_RELATIONSHIP_TYPES, STORE_RELATIONSHIP_TYPES)
+        self.assertEqual(FakeCareerStore.ACCEPTED_RESOLUTION_STATES, STORE_RESOLUTION_STATES)
+
+    def test_fake_rejections_are_store_shaped_dicts_not_free_form_exceptions(self):
+        fake = FakeCareerStore()
+        rejected_state = fake.verifyFact("fact_aws", "made_up", confirmation={}, source="mcp_tool")
+        rejected_relation = fake.addRelationship("fact_aws", "fact_azure", "made_up", {}, {})
+        rejected_confirmation = fake.verifyFact(
+            "fact_aws",
+            "user_verified",
+            confirmation={"outcome": "affirmed"},
+            source="mcp_tool",
+        )
+
+        for result in (rejected_state, rejected_relation, rejected_confirmation):
+            with self.subTest(result=result):
+                self.assertIsInstance(result, dict)
+                self.assertEqual(result["status"], "error")
+                self.assertEqual(result["mutation_status"], "rejected")
+                self.assertIsInstance(result.get("errors"), list)
+                self.assertIsInstance(result["errors"][0].get("code"), str)
+                self.assertIn("audit", result)
 
 
 class CareerMcpAdapterContractTests(unittest.TestCase):
@@ -509,6 +645,230 @@ class CareerMcpAdapterContractTests(unittest.TestCase):
         for fact in result["facts"]:
             self.assertNotEqual(fact.get("verification_state"), "user_verified")
             self.assertTrue(fact.get("confirmation_required"))
+
+
+class CareerMcpRealStoreContractTests(unittest.TestCase):
+    def test_real_store_search_facts_types_experience_excludes_skill_facts(self):
+        store, adapter = real_store_adapter(self)
+        skill = store.upsertFact(
+            {"type": "skill", "text": "AWS skill capability", "verification_state": "source_stated"},
+            {"source": "resume_source", "source_id": "resume_1", "text": "AWS skill capability"},
+            source="resume_source",
+        )
+        experience = store.upsertFact(
+            {"type": "experience", "text": "AWS migration experience", "verification_state": "source_stated"},
+            {"source": "resume_source", "source_id": "resume_1", "text": "AWS migration experience"},
+            source="resume_source",
+        )
+
+        result = call_tool(adapter, "career.search_facts", {"query": "AWS", "types": ["experience"], "limit": 10})
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual({fact["fact_id"] for fact in result["facts"]}, {experience["fact_id"]})
+        self.assertNotIn(skill["fact_id"], {fact["fact_id"] for fact in result["facts"]})
+        self.assertTrue(all(fact["type"] == "experience" for fact in result["facts"]))
+
+    def test_real_store_get_fact_ok_path_returns_context(self):
+        store, adapter = real_store_adapter(self)
+        created = store.upsertFact(
+            {"type": "skill", "text": "React", "verification_state": "source_stated"},
+            {"source": "resume_source", "source_id": "resume_1", "text": "React"},
+            source="resume_source",
+        )
+
+        result = call_tool(adapter, "career.get_fact", {"fact_id": created["fact_id"]})
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["fact"]["fact_id"], created["fact_id"])
+        self.assertIn("evidence_summary", result)
+        self.assertIn("relationships", result)
+        self.assertIn("conflicts", result)
+
+    def test_real_store_propose_fact_ok_path_and_dedupe_key_rejection(self):
+        _store, adapter = real_store_adapter(self)
+
+        created = call_tool(
+            adapter,
+            "career.propose_fact",
+            {"type": "skill", "text": "Rust", "source": "agent_interpretation"},
+        )
+        rejected = call_tool(
+            adapter,
+            "career.propose_fact",
+            {
+                "type": "skill",
+                "text": "Rust",
+                "source": "agent_interpretation",
+                "dedupe_key": "proposal:rust",
+            },
+        )
+
+        self.assertEqual(created["status"], "ok")
+        self.assertIn(created["mutation_status"], {"created", "updated", "deduped", "noop"})
+        self.assertNotEqual(created["verification_state"], "user_verified")
+        assert_typed_error(self, rejected, "validation_error")
+        self.assertIn("dedupe_key", rejected["error"]["message"])
+
+    def test_real_store_add_evidence_ok_path_and_missing_fact_rejection(self):
+        store, adapter = real_store_adapter(self)
+        created = store.upsertFact(
+            {"type": "skill", "text": "PostgreSQL", "verification_state": "unknown"},
+            None,
+            source="resume_source",
+        )
+
+        added = call_tool(
+            adapter,
+            "career.add_evidence",
+            {"fact_id": created["fact_id"], "evidence": {"source": "user_answer", "text": "I use PostgreSQL."}},
+        )
+        missing = call_tool(
+            adapter,
+            "career.add_evidence",
+            {"fact_id": "fact_missing", "evidence": {"source": "user_answer", "text": "Missing fact."}},
+        )
+
+        self.assertEqual(added["status"], "ok")
+        self.assertIn(added["mutation_status"], {"created", "updated"})
+        assert_typed_error(self, missing, "not_found")
+
+    def test_real_store_verify_fact_imported_end_to_end_through_mcp(self):
+        store, adapter = real_store_adapter(self)
+        created = store.upsertFact(
+            {"type": "skill", "text": "Go", "verification_state": "unknown"},
+            None,
+            source="resume_source",
+        )
+
+        result = call_tool(
+            adapter,
+            "career.verify_fact",
+            {
+                "fact_id": created["fact_id"],
+                "verification_state": "imported",
+                "confirmation": confirmation_for_state(created["fact_id"], "imported"),
+            },
+        )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["verification_state"], "imported")
+        self.assertEqual(store.getFact(created["fact_id"])["fact"]["verification_state"], "imported")
+
+    def test_real_store_manifest_advertised_verification_states_are_accepted_through_mcp(self):
+        for verification_state in sorted(VERIFICATION_STATES):
+            with self.subTest(verification_state=verification_state):
+                store, adapter = real_store_adapter(self)
+                created = store.upsertFact(
+                    {"type": "skill", "text": f"{verification_state} proof", "verification_state": "unknown"},
+                    None,
+                    source="resume_source",
+                )
+                arguments = {
+                    "fact_id": created["fact_id"],
+                    "verification_state": verification_state,
+                    "confirmation": confirmation_for_state(created["fact_id"], verification_state),
+                }
+                if verification_state == "source_stated":
+                    arguments["evidence_id"] = f"evidence_{verification_state}"
+
+                result = call_tool(adapter, "career.verify_fact", arguments)
+
+                self.assertEqual(result["status"], "ok", result)
+                self.assertNotEqual(result.get("error", {}).get("message"), "invalid verification state")
+
+    def test_real_store_verify_fact_rejection_has_typed_envelope(self):
+        store, adapter = real_store_adapter(self)
+        created = store.upsertFact(
+            {"type": "skill", "text": "PostgreSQL", "verification_state": "unknown"},
+            None,
+            source="resume_source",
+        )
+        confirmation = confirmation_for_state(created["fact_id"], "source_stated")
+
+        result = call_tool(
+            adapter,
+            "career.verify_fact",
+            {
+                "fact_id": created["fact_id"],
+                "verification_state": "source_stated",
+                "confirmation": confirmation,
+            },
+        )
+
+        assert_typed_error(self, result, "validation_error")
+        self.assertIn("evidence_id", result["error"]["message"])
+
+    def test_real_store_add_relationship_ok_path_and_missing_fact_rejection(self):
+        store, adapter = real_store_adapter(self)
+        frontend = store.upsertFact(
+            {"type": "skill", "text": "Frontend architecture", "verification_state": "source_stated"},
+            {"source": "resume_source", "source_id": "resume_1", "text": "Frontend architecture"},
+            source="resume_source",
+        )
+        react = store.upsertFact(
+            {"type": "skill", "text": "React", "verification_state": "source_stated"},
+            {"source": "resume_source", "source_id": "resume_1", "text": "React"},
+            source="resume_source",
+        )
+
+        created = call_tool(
+            adapter,
+            "career.add_relationship",
+            {
+                "from_fact_id": frontend["fact_id"],
+                "to_fact_id": react["fact_id"],
+                "relationship_type": "related",
+                "evidence": {"text": "React supports frontend architecture."},
+            },
+        )
+        missing = call_tool(
+            adapter,
+            "career.add_relationship",
+            {
+                "from_fact_id": "fact_missing",
+                "to_fact_id": react["fact_id"],
+                "relationship_type": "related",
+                "evidence": {"text": "Missing source fact."},
+            },
+        )
+
+        self.assertEqual(created["status"], "ok")
+        self.assertIn(created["mutation_status"], {"created", "updated"})
+        assert_typed_error(self, missing, "not_found")
+
+    def test_real_store_find_matches_ok_path_returns_canonical_resolution(self):
+        store, adapter = real_store_adapter(self)
+        created = store.upsertFact(
+            {"type": "skill", "text": "React", "normalized_terms": ["react"], "verification_state": "source_stated"},
+            {"source": "resume_source", "source_id": "resume_1", "text": "React"},
+            source="resume_source",
+        )
+
+        result = call_tool(
+            adapter,
+            "career.find_matches",
+            {"requirements": [{"requirement_id": "req_react", "source_text": "React", "normalized_terms": ["react"]}]},
+        )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual([match["requirement_id"] for match in result["matches"]], ["req_react"])
+        self.assertIn(created["fact_id"], result["matches"][0]["fact_ids"])
+        self.assertIn(result["matches"][0]["resolution_state"], RESOLUTION_STATES)
+        self.assertNotRegex(json.dumps(result).lower(), r"\b(official_score|overall_score)\b")
+
+    def test_real_store_get_unverified_ok_path_marks_unknown_fact_for_confirmation(self):
+        store, adapter = real_store_adapter(self)
+        created = store.upsertFact(
+            {"type": "experience", "text": "Architecture review work", "verification_state": "unknown"},
+            None,
+            source="resume_source",
+        )
+
+        result = call_tool(adapter, "career.get_unverified", {"topic": "architecture", "limit": 5})
+
+        self.assertEqual(result["status"], "ok")
+        self.assertIn(created["fact_id"], {fact["fact_id"] for fact in result["facts"]})
+        self.assertTrue(all(fact["confirmation_required"] for fact in result["facts"]))
 
 
 class CareerMcpErrorEnvelopeTests(unittest.TestCase):
