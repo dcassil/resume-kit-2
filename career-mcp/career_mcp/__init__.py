@@ -8,8 +8,26 @@ import re
 from pathlib import Path
 from typing import Any
 
+from career_store import (
+    DisallowedTransitionError,
+    IncompatibleSchemaVersionError,
+    InvalidInterpretationProposalError,
+    InvalidRelationshipConfirmationError,
+    MergeConflictError,
+    MigrationFailedError,
+)
+
 
 JsonObject = dict[str, Any]
+
+ERROR_TYPES = {"validation_error", "policy_error", "not_found", "store_error", "unknown_tool"}
+REJECTION_STATUSES = {"error", "rejected"}
+NOT_FOUND_REASON_CODES = {"not_found", "unknown_fact_id"}
+POLICY_REASON_CODES = {
+    "confirmation_required",
+    "disallowed_verification_transition",
+    "user_verified_without_explicit_confirmation",
+}
 
 
 class CareerMcpAdapter:
@@ -27,32 +45,37 @@ class CareerMcpAdapter:
 
     async def call_tool(self, name: str, arguments: JsonObject | None, context: JsonObject | None = None) -> JsonObject:
         if name not in self._tool_by_name:
-            return _error("unknown_tool", "Unknown career tool.")
+            result = _tool_result(name, "error", error={"type": "unknown_tool", "message": "Unknown career tool."})
+            self._record_audit(name, result)
+            return result
         arguments = arguments or {}
         validation_error = _validate(arguments, self._tool_by_name[name]["input_schema"])
         if validation_error:
-            return _error("validation_error", validation_error)
+            result = _tool_result(name, "error", error={"type": "validation_error", "message": validation_error})
+            self._record_audit(name, result)
+            return result
         try:
             if name == "career.search_facts":
-                result = await self._search_facts(arguments)
+                payload = await self._search_facts(arguments)
             elif name == "career.get_fact":
-                result = await self._get_fact(arguments)
+                payload = await self._get_fact(arguments)
             elif name == "career.propose_fact":
-                result = await self._propose_fact(arguments)
+                payload = await self._propose_fact(arguments)
             elif name == "career.add_evidence":
-                result = await self._add_evidence(arguments)
+                payload = await self._add_evidence(arguments)
             elif name == "career.verify_fact":
-                result = await self._verify_fact(arguments)
+                payload = await self._verify_fact(arguments)
             elif name == "career.add_relationship":
-                result = await self._add_relationship(arguments)
+                payload = await self._add_relationship(arguments)
             elif name == "career.find_matches":
-                result = await self._find_matches(arguments)
+                payload = await self._find_matches(arguments)
             elif name == "career.get_unverified":
-                result = await self._get_unverified(arguments)
+                payload = await self._get_unverified(arguments)
             else:
-                result = _error("unknown_tool", "Unknown career tool.")
-        except (KeyError, TypeError, ValueError) as exc:
-            result = _error(_exception_type(exc), _safe_message(exc))
+                payload = {"status": "error", "error": {"type": "unknown_tool", "message": "Unknown career tool."}}
+            result = _normalize_tool_result(name, payload)
+        except Exception as exc:
+            result = _tool_result(name, "error", error={"type": _exception_type(exc), "message": _safe_message(exc)})
         if context is not None and isinstance(result, dict):
             result.setdefault("context", context)
         self._record_audit(name, result)
@@ -85,7 +108,7 @@ class CareerMcpAdapter:
             value = await _maybe_await(self._store.getFact(arguments["fact_id"]))
         fact = _extract_fact(value)
         if not fact:
-            return _error("not_found", "Career fact not found.")
+            return {"status": "error", "error": {"type": "not_found", "message": "Career fact not found."}}
         evidence = value.get("evidence", []) if isinstance(value, dict) else fact.get("evidence_summary", [])
         relationships = value.get("relationships", fact.get("relationships", [])) if isinstance(value, dict) else fact.get("relationships", [])
         conflicts = value.get("conflicts", fact.get("conflicts", [])) if isinstance(value, dict) else fact.get("conflicts", [])
@@ -313,8 +336,10 @@ def _evidence_summary(fact: JsonObject) -> list[JsonObject]:
 
 def _mutation(value: Any) -> JsonObject:
     value = dict(value or {})
-    return {
-        "status": "ok" if value.get("status") not in {"error", "rejected"} else value.get("status"),
+    status = "ok" if value.get("status") not in REJECTION_STATUSES else str(value.get("status"))
+    error = _store_rejection_error(value) if status != "ok" else None
+    payload = {
+        "status": status,
         "mutation_status": value.get("mutation_status", value.get("status", "noop")),
         "fact_id": value.get("fact_id", ""),
         "verification_state": value.get("verification_state", "unknown"),
@@ -322,6 +347,86 @@ def _mutation(value: Any) -> JsonObject:
         "confirmation_required": bool(value.get("confirmation_required", False)),
         "audit": value.get("audit", {}),
     }
+    if error is not None:
+        payload["error"] = error
+    return payload
+
+
+def _normalize_tool_result(tool: str, payload: JsonObject) -> JsonObject:
+    status = "ok" if payload.get("status") not in REJECTION_STATUSES else str(payload.get("status"))
+    data = {key: value for key, value in payload.items() if key not in {"status", "tool", "data", "error", "errors"}}
+    error = payload.get("error")
+    if status != "ok" and not isinstance(error, dict):
+        error = _store_rejection_error(payload)
+    return _tool_result(tool, status, data=data, error=error)
+
+
+def _tool_result(tool: str, status: str, data: JsonObject | None = None, error: JsonObject | None = None) -> JsonObject:
+    if status not in {"ok", "rejected", "error"}:
+        raise ValueError(f"Unsupported tool result status: {status}.")
+    if status != "ok" and not isinstance(error, dict):
+        raise ValueError("Non-ok career tool results require an error object.")
+    result: JsonObject = {"tool": tool, "status": status}
+    if data is not None:
+        result["data"] = data
+        result.update(data)
+    if status != "ok":
+        result["error"] = _normalize_error(error)
+    return result
+
+
+def _normalize_error(error: JsonObject | None) -> JsonObject:
+    if not isinstance(error, dict):
+        raise ValueError("Career tool error must be an object.")
+    error_type = str(error.get("type", "store_error"))
+    if error_type not in ERROR_TYPES:
+        error_type = "store_error"
+    return {"type": error_type, "message": str(error.get("message") or "Career tool call failed.")}
+
+
+def _store_rejection_error(value: JsonObject) -> JsonObject:
+    error = _first_store_error(value)
+    reason_code = _store_reason_code(value, error)
+    message = _safe_text_message(_store_error_message(reason_code, error))
+    return {
+        "type": _reason_code_type(reason_code),
+        "message": message,
+    }
+
+
+def _first_store_error(value: JsonObject) -> JsonObject:
+    errors = value.get("errors")
+    if isinstance(errors, list) and errors and isinstance(errors[0], dict):
+        return errors[0]
+    return {}
+
+
+def _store_reason_code(value: JsonObject, error: JsonObject) -> str:
+    code = error.get("code")
+    if isinstance(code, str) and code.strip():
+        return code
+    audit = value.get("audit")
+    if isinstance(audit, dict) and isinstance(audit.get("reason"), str) and audit["reason"].strip():
+        return audit["reason"]
+    status = value.get("status")
+    return str(status or "store_error")
+
+
+def _store_error_message(reason_code: str, error: JsonObject) -> str:
+    message = error.get("message")
+    if isinstance(message, str) and message.strip():
+        return message
+    return reason_code.replace("_", " ")
+
+
+def _reason_code_type(reason_code: str) -> str:
+    if reason_code in NOT_FOUND_REASON_CODES or reason_code.endswith("_not_found"):
+        return "not_found"
+    if reason_code in POLICY_REASON_CODES:
+        return "policy_error"
+    if reason_code.startswith(("invalid_", "malformed_", "missing_", "unknown_")) or reason_code == "fact_id_mismatch":
+        return "validation_error"
+    return "store_error"
 
 
 def _match(row: JsonObject) -> JsonObject:
@@ -354,25 +459,40 @@ def _unverified_fact(fact: JsonObject) -> JsonObject:
     }
 
 
-def _error(error_type: str, message: str) -> JsonObject:
-    return {"status": "error", "error": {"type": error_type, "message": message}}
-
-
 def _exception_type(exc: Exception) -> str:
-    text = str(exc).casefold()
-    if "confirmation" in text:
+    if isinstance(exc, DisallowedTransitionError):
         return "policy_error"
-    if "not found" in text or "not_found" in text:
+    if isinstance(
+        exc,
+        (
+            InvalidInterpretationProposalError,
+            InvalidRelationshipConfirmationError,
+            MergeConflictError,
+            TypeError,
+            ValueError,
+        ),
+    ):
+        return "validation_error"
+    if isinstance(exc, KeyError):
         return "not_found"
-    return "validation_error"
+    if isinstance(exc, (IncompatibleSchemaVersionError, MigrationFailedError)):
+        return "store_error"
+    transaction_result = getattr(exc, "transaction_result", None)
+    if transaction_result is not None:
+        return "store_error"
+    return "store_error"
 
 
-def _safe_message(exc: Exception) -> str:
-    text = str(exc) or "Tool call failed validation."
+def _safe_text_message(text: str) -> str:
     blocked = ("traceback", "sqlite", "select", "insert", "update", "delete")
     if any(word in text.casefold() for word in blocked):
         return "Tool call failed validation."
     return text
+
+
+def _safe_message(exc: Exception) -> str:
+    text = str(exc) or "Tool call failed validation."
+    return _safe_text_message(text)
 
 
 __all__ = ["CareerMcpAdapter", "create_career_mcp"]

@@ -4,14 +4,14 @@ level: initiative
 title: "Harden Career-MCP Tool Argument Validation and Response Normalization"
 short_code: "RKIT-I-0010"
 created_at: 2026-08-13T20:41:37.034250+00:00
-updated_at: 2026-08-16T19:05:14.212099+00:00
+updated_at: 2026-08-16T19:06:33.436472+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: []
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/decompose"
+  - "#phase/active"
 
 
 exit_criteria_met: false

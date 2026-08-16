@@ -7,6 +7,7 @@ import importlib
 import inspect
 import json
 import re
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -397,6 +398,50 @@ class CareerMcpAdapterContractTests(unittest.TestCase):
         for fact in result["facts"]:
             self.assertNotEqual(fact.get("verification_state"), "user_verified")
             self.assertTrue(fact.get("confirmation_required"))
+
+
+class CareerMcpErrorEnvelopeTests(unittest.TestCase):
+    def test_envelope_helper_refuses_non_ok_without_error_object(self):
+        career_mcp = importlib.import_module("career_mcp")
+        with self.assertRaisesRegex(ValueError, "require an error object"):
+            career_mcp._tool_result("career.get_fact", "error")  # noqa: SLF001
+
+    def test_exception_classification_is_independent_of_message_wording(self):
+        career_mcp = importlib.import_module("career_mcp")
+        self.assertEqual(career_mcp._exception_type(ValueError("not found")), "validation_error")  # noqa: SLF001
+        self.assertEqual(career_mcp._exception_type(ValueError("confirmation required")), "validation_error")  # noqa: SLF001
+
+    def test_real_store_verify_fact_rejected_dict_has_typed_error_envelope(self):
+        career_mcp = importlib.import_module("career_mcp")
+        career_store = importlib.import_module("career_store")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = career_store.openCareerStore(str(Path(temp_dir) / "career.db"), clock=lambda: "2026-01-01T00:00:00Z")
+            created = store.upsertFact(
+                {"type": "skill", "text": "Rust", "verification_state": "unknown"},
+                None,
+                source="resume_source",
+            )
+            adapter = career_mcp.create_career_mcp(store=store)
+
+            result = call_tool(
+                adapter,
+                "career.verify_fact",
+                {
+                    "fact_id": created["fact_id"],
+                    "verification_state": "imported",
+                    "confirmation": {
+                        "factId": created["fact_id"],
+                        "outcome": "affirmed",
+                        "provenance": [{"source": "user_answer", "text": "Yes."}],
+                    },
+                },
+            )
+
+        self.assertEqual(result["tool"], "career.verify_fact")
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(result["data"]["mutation_status"], "rejected")
+        self.assertEqual(result["error"]["type"], "policy_error")
+        self.assertIn("message", result["error"])
 
 
 class CareerMcpNoRawToolTests(unittest.TestCase):
