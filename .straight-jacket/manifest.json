@@ -139,9 +139,9 @@
     {
       "path": "tools/pre-commit-resume-cli-guardrails.sh",
       "name": "pre-commit-resume-cli-guardrails.sh",
-      "checksum": "sha256:c84c9d1f4f755960723b6470264f1b9c91b8d1bb14d54c5b60a2e6552b4764f5",
-      "size": 353,
-      "registeredAt": "2026-08-13T17:03:05.349Z"
+      "checksum": "sha256:3ea18df8697e9447e736255d6137e39665e11a252208d107af4202beb39415b0",
+      "size": 359,
+      "registeredAt": "2026-08-16T18:07:20.156Z"
     },
     {
       "path": "tools/pre-commit-resume-core-guardrails.sh",
@@ -230,23 +230,23 @@
     {
       "path": "tools/run_smoke.py",
       "name": "run_smoke.py",
-      "checksum": "sha256:01e603bb19f95d39da60601735ebcc9fb92e48a494c9e04cd9dfc871e486c5fb",
-      "size": 16981,
-      "registeredAt": "2026-08-14T17:56:52.472Z"
+      "checksum": "sha256:06721452093588c733b0b9dc7eaf3c363d56fd7cd9116fa939e4c270466c30cb",
+      "size": 19721,
+      "registeredAt": "2026-08-16T18:07:20.157Z"
     },
     {
       "path": "tools/run_tests.py",
       "name": "run_tests.py",
-      "checksum": "sha256:89bf1624c06c7ee2fe5d52689390921af89bc03933868586c1a09ba494b9e3eb",
-      "size": 4538,
-      "registeredAt": "2026-08-14T17:56:52.472Z"
+      "checksum": "sha256:105f8929b19b9f0c7bd03faf2adca5e2d764bc5bda971073a982c094162c55e8",
+      "size": 5314,
+      "registeredAt": "2026-08-16T18:07:20.157Z"
     },
     {
       "path": "tools/TEST_SPEC.md",
       "name": "TEST_SPEC.md",
-      "checksum": "sha256:63a5ac683f92424497aad67d26a58cc8b474a7999e59f77e209c316a1505d03a",
-      "size": 2786,
-      "registeredAt": "2026-08-14T17:56:52.472Z"
+      "checksum": "sha256:3d153fddd3196a7357c0f9a9eaa59e4d1f178a233e6f553754cd0a5840beeb8d",
+      "size": 3231,
+      "registeredAt": "2026-08-16T18:07:20.157Z"
     },
     {
       "path": "tools/tests_guardrails.py",
