@@ -413,5 +413,10 @@ class CareerMcpNoRawToolTests(unittest.TestCase):
                     self.assertNotRegex(json.dumps(result).lower(), r"\bselect \*|sqlite|traceback\b")
 
 
+# Bridge the career-mcp manifest parity tests into the current static PR/future
+# gate module list until tools/run_tests.py is approved to include it directly.
+from tests.contract.test_career_mcp_manifest_parity import CareerMcpManifestParityTests  # noqa: E402,F401
+
+
 if __name__ == "__main__":
     unittest.main()

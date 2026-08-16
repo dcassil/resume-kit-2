@@ -4,14 +4,14 @@ level: task
 title: "Canonicalize tool_surface.json to package copy + honesty edits (scope-policy claim, child/parent removal)"
 short_code: "RKIT-T-0079"
 created_at: 2026-08-16T18:48:24.127521+00:00
-updated_at: 2026-08-16T18:49:21.033543+00:00
+updated_at: 2026-08-16T18:55:34.255938+00:00
 parent: make-career-mcp-importable-and
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0009
 ## Objective **[REQUIRED]**
 
 Make `career-mcp/career_mcp/tool_surface.json` the single canonical career-mcp manifest (RKIT-A-0002 item 4) and apply the two authorized honesty edits: remove the false `tools/call` "enforces scope policy" claim (`career_mcp/__init__.py:56-57` merely echoes context — RKIT-A-0002 item 2) and remove the `child`/`parent` relationship-type advertisements the store rejects at runtime (career-store `store_surface.json` relationship_types = alias/equivalent/related/contradicts). Because `tools/career_mcp_guardrails.py` is PROTECTED and validates the ROOT copy, the root copy is retained this task as a byte-identical generated artifact of the package copy; the guardrail re-path (and root-copy deletion) is deferred to Daniel's approval batch (RKIT-T-0080 authors the patch).
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
