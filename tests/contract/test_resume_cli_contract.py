@@ -212,6 +212,19 @@ class ResumeCliCommandContractTests(unittest.TestCase):
         self.assertIn("render_validation", serialized)
         self.assertNotIn("truncated", serialized)
 
+    def test_pdf_export_skips_with_notice_without_fabricated_artifact_or_pipeline_error(self):
+        run_cli(self.cli, ["init"], self.workspace)
+        run_cli(self.cli, ["ingest", str(self.resume_file)], self.workspace)
+        result = normalize_result(run_cli(self.cli, ["export", "--format", "pdf"], self.workspace))
+        self.assertEqual(result.get("status"), "unsupported")
+        self.assertEqual(result.get("exit_code"), 0)
+        self.assertEqual(result.get("reason"), "not_in_format_targets")
+        self.assertNotIn("artifact", result)
+        self.assertIn("skipped", result.get("notice", "").lower())
+        self.assertEqual(result.get("render_validation", {}).get("status"), "unsupported")
+        self.assertTrue((self.workspace / "output" / "resume.md").exists())
+        self.assertTrue((self.workspace / "output" / "resume.docx.json").exists())
+
     def test_run_uses_same_checkpoint_contract_and_outputs_as_sequence(self):
         sequence_workspace = self.workspace / "sequence"
         run_workspace = self.workspace / "run"

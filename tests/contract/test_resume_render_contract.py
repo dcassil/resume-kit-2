@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import importlib
 import inspect
 import json
@@ -94,6 +96,22 @@ def assert_render_result(test_case: unittest.TestCase, result: dict, expected_fo
     test_case.assertNotRegex(text, r"\b(official_score|overall_score|sqlite|traceback)\b")
 
 
+def pdf_artifact_bytes(result: dict) -> bytes:
+    artifact = result.get("artifact")
+    if not isinstance(artifact, dict):
+        return b""
+    raw_bytes = artifact.get("bytes")
+    if isinstance(raw_bytes, bytes):
+        return raw_bytes
+    encoded = artifact.get("content_base64")
+    if isinstance(encoded, str):
+        try:
+            return base64.b64decode(encoded, validate=True)
+        except (binascii.Error, ValueError):
+            return b""
+    return b""
+
+
 class ResumeRenderSurfaceManifestTests(unittest.TestCase):
     def test_manifest_declares_exact_public_functions(self):
         self.assertEqual(PUBLIC_FUNCTIONS, (
@@ -112,6 +130,23 @@ class ResumeRenderSurfaceManifestTests(unittest.TestCase):
                 self.assertIn("input_contract", surface)
                 self.assertIn("output_contract", surface)
                 self.assertTrue(surface["output_contract"]["required_fields"])
+
+    def test_manifest_enumerates_pdf_unsupported_reasons(self):
+        surfaces = {surface["name"]: surface for surface in SURFACE["surfaces"]}
+        output_contract = surfaces["renderPdf"]["output_contract"]
+        self.assertEqual(
+            output_contract.get("unsupported_reasons"),
+            [
+                "format_targets_missing",
+                "not_in_format_targets",
+                "pdf_not_supported_in_mvp",
+            ],
+        )
+        self.assertEqual(
+            output_contract.get("unsupported_required_fields"),
+            ["status", "reason", "format", "template_version"],
+        )
+        self.assertIn("artifact", output_contract.get("unsupported_must_not_include", []))
 
 
 class ResumeRenderContractTests(unittest.TestCase):
@@ -163,14 +198,41 @@ class ResumeRenderContractTests(unittest.TestCase):
         self.assertIn("react", text)
         self.assertNotIn("internal_provenance", text)
 
-    def test_pdf_render_is_explicitly_ok_unsupported_or_error_without_breaking_other_formats(self):
-        result = maybe_await(self.renderer.renderPdf(CANONICAL_RESUME, TEMPLATE))
-        assert_render_result(self, result, "pdf")
-        self.assertIn(result["status"], {"ok", "unsupported", "error"})
-        if result["status"] == "ok":
-            self.assertIn("artifact", result)
-            text = serialized(result)
-            self.assertIn("software engineer", text)
+    def test_pdf_render_policy_contracts_return_exact_unsupported_reasons_without_artifacts(self):
+        missing_targets = {key: value for key, value in TEMPLATE.items() if key != "format_targets"}
+        cases = [
+            ("missing targets", missing_targets, "format_targets_missing"),
+            ("pdf excluded", TEMPLATE, "not_in_format_targets"),
+            ("pdf included", {**TEMPLATE, "format_targets": ["markdown", "docx", "pdf"]}, "pdf_not_supported_in_mvp"),
+        ]
+        for label, template, reason in cases:
+            with self.subTest(label=label):
+                result = maybe_await(self.renderer.renderPdf(CANONICAL_RESUME, template))
+                self.assertEqual(
+                    result,
+                    {
+                        "status": "unsupported",
+                        "reason": reason,
+                        "format": "pdf",
+                        "template_version": template["template_version"],
+                    },
+                )
+
+    def test_pdf_render_status_artifact_invariant(self):
+        templates = [
+            {key: value for key, value in TEMPLATE.items() if key != "format_targets"},
+            TEMPLATE,
+            {**TEMPLATE, "format_targets": ["markdown", "docx", "pdf"]},
+        ]
+        for template in templates:
+            result = maybe_await(self.renderer.renderPdf(CANONICAL_RESUME, template))
+            if result.get("status") != "ok":
+                self.assertNotIn("artifact", result)
+                continue
+            self.assertTrue(
+                pdf_artifact_bytes(result).startswith(b"%PDF"),
+                "ok PDF render results must include real PDF bytes.",
+            )
 
     def test_layout_measurement_reports_overflow_constraints_without_shortening_content(self):
         long_resume = json.loads(json.dumps(CANONICAL_RESUME))

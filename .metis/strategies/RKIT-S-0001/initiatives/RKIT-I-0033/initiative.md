@@ -1,23 +1,23 @@
 ---
-id: production-pdf-rendering-and-parse
+id: pdf-support-policy-honest
 level: initiative
 title: "PDF Support Policy: Honest Unsupported Status (Runtime Deferred per RKIT-A-0004)"
 short_code: "RKIT-I-0033"
 created_at: 2026-08-13T20:41:37.697247+00:00
-updated_at: 2026-08-13T20:41:37.697247+00:00
+updated_at: 2026-08-17T20:05:36.427258+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: []
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/discovery"
+  - "#phase/active"
 
 
 exit_criteria_met: false
 estimated_complexity: S
 strategy_id: RKIT-S-0001
-initiative_id: NULL
+initiative_id: pdf-support-policy-honest
 ---
 
 # PDF Support Policy: Honest Unsupported Status (Runtime Deferred per RKIT-A-0004)

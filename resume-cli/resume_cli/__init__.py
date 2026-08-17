@@ -13,7 +13,7 @@ from typing import Any
 from career_store import openCareerStore
 from resume_agent import extractJobSemantics, extractResumeSemantics, generateClarificationQuestion, interpretUserAnswer, proposeRewrite, resolve_agent_config
 from resume_core import applyChange, normalizeJobModel, normalizeResume, rankResumeContent, sanitizeText, scoreMatch, validateChange, validateFinalResume, validateGrounding, validateResume
-from resume_render import renderDocx, renderMarkdown, validateRenderedOutput
+from resume_render import renderDocx, renderMarkdown, renderPdf, validateRenderedOutput
 from workflow import CHECKPOINT_ORDER, UnknownRunError, createRun, reconstructRunManifest, recordCheckpointResult
 
 
@@ -348,7 +348,33 @@ def _export(workspace: Path, fmt: str) -> JsonObject:
     _write_text(paths["output_dir"] / "resume.md", markdown.get("content", ""))
     docx_path = _write_docx_artifact(paths["output_dir"] / "resume.docx", docx)
     _write_json(paths["output_dir"] / "resume.docx.json", docx)
-    selected = docx if fmt == "docx" else markdown
+    if fmt == "docx":
+        selected = docx
+    elif fmt == "markdown":
+        selected = markdown
+    elif fmt == "pdf":
+        selected = renderPdf(resume, template)
+    else:
+        return _error("validation_error", f"unsupported export format: {fmt}")
+    if selected.get("status") == "unsupported":
+        result = {
+            "status": "unsupported",
+            "exit_code": 0,
+            "format": fmt,
+            "reason": selected.get("reason", "unsupported_format"),
+            "notice": f"{fmt.upper()} export skipped: {selected.get('reason', 'unsupported_format')}.",
+            "artifacts": {
+                "markdown": str(paths["output_dir"] / "resume.md"),
+                "docx": str(docx_path) if docx_path else str(paths["output_dir"] / "resume.docx.json"),
+                "docx_metadata": str(paths["output_dir"] / "resume.docx.json"),
+            },
+            "template_version": selected.get("template_version", template["template_version"]),
+            "render_validation": {"status": "unsupported", "format": fmt, "reason": selected.get("reason", "unsupported_format")},
+            "warnings": [f"{fmt.upper()} export skipped: {selected.get('reason', 'unsupported_format')}."],
+        }
+        _write_json(paths["reports_dir"] / "export.json", result)
+        _record_latest_run_snapshot(workspace, "RENDER", {"output_artifact_paths": result["artifacts"]})
+        return result
     render_validation = validateRenderedOutput({**selected, "expected_resume": resume}) if isinstance(selected, dict) else {}
     result = {
         "status": "ok",

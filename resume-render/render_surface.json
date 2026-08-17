@@ -158,6 +158,20 @@
           "unsupported",
           "error"
         ],
+        "unsupported_reasons": [
+          "format_targets_missing",
+          "not_in_format_targets",
+          "pdf_not_supported_in_mvp"
+        ],
+        "unsupported_required_fields": [
+          "status",
+          "reason",
+          "format",
+          "template_version"
+        ],
+        "unsupported_must_not_include": [
+          "artifact"
+        ],
         "must_not_include": [
           "semantic_rewrite",
           "official_score"

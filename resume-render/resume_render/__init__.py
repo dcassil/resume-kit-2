@@ -278,6 +278,15 @@ def _base_result(fmt: str, template: dict[str, Any], content: str) -> RenderDict
     }
 
 
+def _unsupported_pdf_result(template: dict[str, Any], reason: str) -> RenderDict:
+    return {
+        "status": "unsupported",
+        "reason": reason,
+        "format": "pdf",
+        "template_version": _template_version(template),
+    }
+
+
 def _docx_paragraph(line: str) -> str:
     stripped = line.strip()
     if not stripped:
@@ -359,33 +368,22 @@ def renderDocx(resume: Any, template: Any) -> RenderDict:
 
 
 def renderPdf(resume: Any, template: Any) -> RenderDict:
-    """Render a PDF artifact when the template declares PDF support."""
+    """Report PDF output as unsupported until a real PDF runtime exists."""
 
     if error := _validate_resume(resume):
         return _typed_error("validation_error", error, "pdf")
     if error := _validate_template(template):
         return _typed_error("validation_error", error, "pdf")
 
-    content, sections = _render_markdown_text(resume, template)
-    result = _base_result("pdf", template, content)
-    targets = template.get("format_targets")
-    if isinstance(targets, list) and "pdf" not in {str(target).lower() for target in targets}:
-        result["status"] = "unsupported"
-        result["warnings"] = ["Template does not declare PDF as a format target."]
-        result["sections"] = sections
-        return result
+    if "format_targets" not in template:
+        return _unsupported_pdf_result(template, "format_targets_missing")
 
-    result.update(
-        {
-            "artifact": {
-                "kind": "pdf",
-                "media_type": "application/pdf",
-                "text": content,
-            },
-            "sections": sections,
-        }
-    )
-    return result
+    targets = template.get("format_targets")
+    target_names = {str(target).lower() for target in targets} if isinstance(targets, list) else set()
+    if "pdf" not in target_names:
+        return _unsupported_pdf_result(template, "not_in_format_targets")
+
+    return _unsupported_pdf_result(template, "pdf_not_supported_in_mvp")
 
 
 def measureLayout(resume: Any, template: Any) -> RenderDict:

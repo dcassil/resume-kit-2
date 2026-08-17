@@ -55,10 +55,11 @@ Tests should expect renderer internals around:
 
 ### PDF rendering, where supported
 
-- Produce PDF only when supported by environment/template.
+- Producing a PDF means emitting actual PDF bytes; an `ok` PDF result must carry bytes beginning with `%PDF`.
+- Produce PDF only when supported by environment/template and runtime policy.
 - Validate text extraction from PDF.
 - Detect rendering failures or missing text.
-- Report PDF as unsupported without failing non-PDF release targets when policy allows.
+- Report PDF as unsupported without failing non-PDF release targets when policy allows; covered by `test_pdf_render_policy_contracts_return_exact_unsupported_reasons_without_artifacts`, `test_pdf_render_status_artifact_invariant`, and `test_pdf_export_skips_with_notice_without_fabricated_artifact_or_pipeline_error`.
 
 ### Layout measurement
 
@@ -101,4 +102,3 @@ The E2E fixture must prove:
 - page/layout status is reported,
 - overflow causes orchestration to re-run content reduction and final validation,
 - final artifacts are included in audit reports.
-
