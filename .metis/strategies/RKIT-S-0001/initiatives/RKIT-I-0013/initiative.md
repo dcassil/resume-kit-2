@@ -4,14 +4,14 @@ level: initiative
 title: "Implement Career-MCP Mutation Audit and Operation Traceability"
 short_code: "RKIT-I-0013"
 created_at: 2026-08-13T20:41:37.110612+00:00
-updated_at: 2026-08-17T19:47:36.297608+00:00
+updated_at: 2026-08-17T20:03:25.524184+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0010]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -58,6 +58,10 @@ Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
 
 ### Blocked Status
 - Yes (blocked_by: ["RKIT-I-0010"]).
+
+## Status Updates
+
+- 2026-08-17: COMPLETE. T-0108 (7f49453): full RKIT-A-0002 item 5 AuditEvent from single call_tool emit site (success/policy-rejection/validation-error/store-error converge; policy-rejected mutation emits full event — independently probed); is_mutation reuses policy.py manifest classification; envelope-fed metadata, no store re-query; shared-scrubber redaction w/ regression pair; injectable uuid/clock seams; reads stay exactly {tool,status}. T-0109 (a56ded2): callable append-only JsonlAuditSink; reconstruction E2E from audit stream alone (+ JSONL disk round-trip) making TEST_SPEC :111-118 executable; driver added the gate bridge import codex missed. Manifest audit slot deferred (no natural slot). Zero protected edits; gates green (PR 581); version 0.25.0.
 
 ## Detailed Design **[REQUIRED]**
 

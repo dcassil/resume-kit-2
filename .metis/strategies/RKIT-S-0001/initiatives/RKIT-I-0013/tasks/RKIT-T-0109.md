@@ -4,14 +4,14 @@ level: task
 title: "JSONL sink option, sink contract docs, audit reconstruction E2E, TEST_SPEC coverage"
 short_code: "RKIT-T-0109"
 created_at: 2026-08-17T19:46:33.860201+00:00
-updated_at: 2026-08-17T19:56:25.397434+00:00
+updated_at: 2026-08-17T20:03:14.072887+00:00
 parent: implement-career-mcp-mutation
 blocked_by: [RKIT-T-0108]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0013
 ## Objective
 
 Finish RKIT-I-0013 (R5/R6): an append-only JSONL sink option for CLI/host use, the sink contract documented as package surface for workflow's run-manifest consumption, and the executable reconstruction proof — from the audit stream ALONE, determine which facts changed and their resulting verification states — making TEST_SPEC.md:111-118's audit E2E line executable for the first time.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
