@@ -1,0 +1,743 @@
+{
+  "fixture_id": "resume-agent-extraction-smoke-resume-main",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Smoke ingest passes ATS-sanitized fixtures/resumes/resume-main.txt with source_id resume-main.txt.",
+    "Payload covers title, skills, experience, education, and employment through the adapter path."
+  ],
+  "comment": "RKIT-T-0092 public extraction fixture. The file name is the sha256 key for the request tuple.",
+  "data": {
+    "key": {
+      "sha256": "58318b0cffca3a688e45b210f34988b16fa34a98d9d55a49030db99a5e21fd4e",
+      "prompt_template_id": "resume-agent.resume-extraction@v1",
+      "output_schema_id": "resume-agent.resume-extraction.v1",
+      "canonical_input_json": "{\"resume_text\":\"Daniel Candidate\\nSenior Software Developer\\n\\nSummary\\nSenior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \\\"clean, reliable\\\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps.\\n\\nExperience\\nExample SaaS Co. - Senior Software Developer\\nJan 2018 - Present\\n* Built React and TypeScript interfaces for multi-tenant SaaS workflows used by operations teams.\\n* Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting.\\n- Led a small team of three developers through delivery planning, code review, and release coordination.\\n* Improved front-end reliability for responsive web apps across desktop and mobile browsers.\\n\\nAutomationWorks - Software Developer\\n2013 to Dec 2017\\n* Built Node.js services backed by PostgreSQL for workflow automation and data-processing tools.\\n* Integrated Azure services for deployment, monitoring, and application operations.\\n* Partnered with product and support teams to simplify internal processes and reduce manual handoffs.\\n\\nSkills\\nReact, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, SaaS, workflow automation, responsive web apps, team leadership\\n\\nEducation\\nB.S. Computer Science\\n\",\"schema_id\":\"resume-agent.resume-extraction.v1\",\"source\":{\"kind\":\"raw_text\",\"sha256\":\"ff074121edd49377fb19b5836bce8dd835087d28a24c687b271e312ddc3b2b93\",\"source_id\":\"resume-main.txt\"}}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.resume-extraction.v1",
+      "proposal_type": "resume_extraction",
+      "requires_validation": true,
+      "resume_id": "smoke_resume_main",
+      "source": {
+        "kind": "raw_text",
+        "source_id": "resume-main.txt",
+        "sha256": "ff074121edd49377fb19b5836bce8dd835087d28a24c687b271e312ddc3b2b93"
+      },
+      "basics": {
+        "title": {
+          "value": "Senior Software Developer",
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_title",
+              "source_text": "Senior Software Developer",
+              "span": {
+                "start": 17,
+                "end": 42
+              },
+              "lines": {
+                "start": 2,
+                "end": 2
+              }
+            }
+          ],
+          "confidence": 0.97,
+          "normalized": "senior software developer"
+        }
+      },
+      "skills": [
+        {
+          "name": "React",
+          "category": "framework",
+          "normalized_terms": [
+            "react"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_skills",
+              "source_text": "React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, SaaS, workflow automation, responsive web apps, team leadership",
+              "span": {
+                "start": 1199,
+                "end": 1320
+              },
+              "lines": {
+                "start": 22,
+                "end": 22
+              }
+            }
+          ],
+          "confidence": 0.96
+        },
+        {
+          "name": "TypeScript",
+          "category": "language",
+          "normalized_terms": [
+            "typescript"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_skills",
+              "source_text": "React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, SaaS, workflow automation, responsive web apps, team leadership",
+              "span": {
+                "start": 1199,
+                "end": 1320
+              },
+              "lines": {
+                "start": 22,
+                "end": 22
+              }
+            }
+          ],
+          "confidence": 0.96
+        },
+        {
+          "name": "Node.js",
+          "category": "runtime",
+          "normalized_terms": [
+            "node.js",
+            "node"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_skills",
+              "source_text": "React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, SaaS, workflow automation, responsive web apps, team leadership",
+              "span": {
+                "start": 1199,
+                "end": 1320
+              },
+              "lines": {
+                "start": 22,
+                "end": 22
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "name": "PostgreSQL",
+          "category": "database",
+          "normalized_terms": [
+            "postgresql"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_skills",
+              "source_text": "React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, SaaS, workflow automation, responsive web apps, team leadership",
+              "span": {
+                "start": 1199,
+                "end": 1320
+              },
+              "lines": {
+                "start": 22,
+                "end": 22
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "name": "Azure",
+          "category": "cloud",
+          "normalized_terms": [
+            "azure"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_skills",
+              "source_text": "React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, SaaS, workflow automation, responsive web apps, team leadership",
+              "span": {
+                "start": 1199,
+                "end": 1320
+              },
+              "lines": {
+                "start": 22,
+                "end": 22
+              }
+            }
+          ],
+          "confidence": 0.92
+        },
+        {
+          "name": "REST APIs",
+          "category": "api",
+          "normalized_terms": [
+            "rest api",
+            "api"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_skills",
+              "source_text": "React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, SaaS, workflow automation, responsive web apps, team leadership",
+              "span": {
+                "start": 1199,
+                "end": 1320
+              },
+              "lines": {
+                "start": 22,
+                "end": 22
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "name": "SaaS",
+          "category": "domain",
+          "normalized_terms": [
+            "saas"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_skills",
+              "source_text": "React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, SaaS, workflow automation, responsive web apps, team leadership",
+              "span": {
+                "start": 1199,
+                "end": 1320
+              },
+              "lines": {
+                "start": 22,
+                "end": 22
+              }
+            }
+          ],
+          "confidence": 0.91
+        },
+        {
+          "name": "workflow automation",
+          "category": "domain",
+          "normalized_terms": [
+            "workflow automation"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_skills",
+              "source_text": "React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, SaaS, workflow automation, responsive web apps, team leadership",
+              "span": {
+                "start": 1199,
+                "end": 1320
+              },
+              "lines": {
+                "start": 22,
+                "end": 22
+              }
+            }
+          ],
+          "confidence": 0.9
+        },
+        {
+          "name": "responsive web apps",
+          "category": "frontend",
+          "normalized_terms": [
+            "responsive web apps",
+            "responsive design"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_skills",
+              "source_text": "React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, SaaS, workflow automation, responsive web apps, team leadership",
+              "span": {
+                "start": 1199,
+                "end": 1320
+              },
+              "lines": {
+                "start": 22,
+                "end": 22
+              }
+            }
+          ],
+          "confidence": 0.91
+        },
+        {
+          "name": "team leadership",
+          "category": "leadership",
+          "normalized_terms": [
+            "team leadership"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_skills",
+              "source_text": "React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, SaaS, workflow automation, responsive web apps, team leadership",
+              "span": {
+                "start": 1199,
+                "end": 1320
+              },
+              "lines": {
+                "start": 22,
+                "end": 22
+              }
+            }
+          ],
+          "confidence": 0.9
+        }
+      ],
+      "experience": [
+        {
+          "role": "Senior Software Developer",
+          "organization": "Example SaaS Co.",
+          "employment": {
+            "organization": "Example SaaS Co.",
+            "role": "Senior Software Developer",
+            "start_date": "2018-01",
+            "end_date": null,
+            "current": true,
+            "evidence": [
+              {
+                "evidence_id": "ev_smoke_exp1",
+                "source_text": "Example SaaS Co. - Senior Software Developer",
+                "span": {
+                  "start": 386,
+                  "end": 430
+                },
+                "lines": {
+                  "start": 8,
+                  "end": 8
+                }
+              }
+            ],
+            "confidence": 0.93
+          },
+          "location": null,
+          "highlights": [
+            {
+              "text": "Built React and TypeScript interfaces for multi-tenant SaaS workflows used by operations teams.",
+              "normalized_terms": [
+                "react",
+                "typescript",
+                "saas"
+              ],
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_b1",
+                  "source_text": "Built React and TypeScript interfaces for multi-tenant SaaS workflows used by operations teams.",
+                  "span": {
+                    "start": 452,
+                    "end": 547
+                  },
+                  "lines": {
+                    "start": 10,
+                    "end": 10
+                  }
+                }
+              ],
+              "confidence": 0.91
+            },
+            {
+              "text": "Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting.",
+              "normalized_terms": [
+                "rest api",
+                "integration patterns",
+                "workflow automation"
+              ],
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_b2",
+                  "source_text": "Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting.",
+                  "span": {
+                    "start": 550,
+                    "end": 654
+                  },
+                  "lines": {
+                    "start": 11,
+                    "end": 11
+                  }
+                }
+              ],
+              "confidence": 0.91
+            },
+            {
+              "text": "Led a small team of three developers through delivery planning, code review, and release coordination.",
+              "normalized_terms": [
+                "team leadership",
+                "delivery planning",
+                "code review"
+              ],
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_b3",
+                  "source_text": "Led a small team of three developers through delivery planning, code review, and release coordination.",
+                  "span": {
+                    "start": 657,
+                    "end": 759
+                  },
+                  "lines": {
+                    "start": 12,
+                    "end": 12
+                  }
+                }
+              ],
+              "confidence": 0.9
+            },
+            {
+              "text": "Improved front-end reliability for responsive web apps across desktop and mobile browsers.",
+              "normalized_terms": [
+                "responsive web apps"
+              ],
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_b4",
+                  "source_text": "Improved front-end reliability for responsive web apps across desktop and mobile browsers.",
+                  "span": {
+                    "start": 762,
+                    "end": 852
+                  },
+                  "lines": {
+                    "start": 13,
+                    "end": 13
+                  }
+                }
+              ],
+              "confidence": 0.9
+            }
+          ],
+          "skills": [
+            "React",
+            "TypeScript",
+            "REST APIs",
+            "SaaS",
+            "workflow automation",
+            "responsive web apps",
+            "team leadership"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_exp1",
+              "source_text": "Example SaaS Co. - Senior Software Developer",
+              "span": {
+                "start": 386,
+                "end": 430
+              },
+              "lines": {
+                "start": 8,
+                "end": 8
+              }
+            }
+          ],
+          "confidence": 0.93
+        },
+        {
+          "role": "Software Developer",
+          "organization": "AutomationWorks",
+          "employment": {
+            "organization": "AutomationWorks",
+            "role": "Software Developer",
+            "start_date": "2013",
+            "end_date": "2017-12",
+            "current": false,
+            "evidence": [
+              {
+                "evidence_id": "ev_smoke_exp2",
+                "source_text": "AutomationWorks - Software Developer",
+                "span": {
+                  "start": 854,
+                  "end": 890
+                },
+                "lines": {
+                  "start": 15,
+                  "end": 15
+                }
+              }
+            ],
+            "confidence": 0.91
+          },
+          "location": null,
+          "highlights": [
+            {
+              "text": "Built Node.js services backed by PostgreSQL for workflow automation and data-processing tools.",
+              "normalized_terms": [
+                "node.js",
+                "postgresql",
+                "workflow automation"
+              ],
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_b5",
+                  "source_text": "Built Node.js services backed by PostgreSQL for workflow automation and data-processing tools.",
+                  "span": {
+                    "start": 910,
+                    "end": 1004
+                  },
+                  "lines": {
+                    "start": 17,
+                    "end": 17
+                  }
+                }
+              ],
+              "confidence": 0.9
+            },
+            {
+              "text": "Integrated Azure services for deployment, monitoring, and application operations.",
+              "normalized_terms": [
+                "azure",
+                "monitoring",
+                "deployment"
+              ],
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_b6",
+                  "source_text": "Integrated Azure services for deployment, monitoring, and application operations.",
+                  "span": {
+                    "start": 1007,
+                    "end": 1088
+                  },
+                  "lines": {
+                    "start": 18,
+                    "end": 18
+                  }
+                }
+              ],
+              "confidence": 0.88
+            }
+          ],
+          "skills": [
+            "Node.js",
+            "PostgreSQL",
+            "Azure",
+            "workflow automation"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_exp2",
+              "source_text": "AutomationWorks - Software Developer",
+              "span": {
+                "start": 854,
+                "end": 890
+              },
+              "lines": {
+                "start": 15,
+                "end": 15
+              }
+            }
+          ],
+          "confidence": 0.91
+        }
+      ],
+      "education": [
+        {
+          "institution": "Unspecified institution",
+          "degree": "B.S.",
+          "field": "Computer Science",
+          "graduation_date": null,
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_edu",
+              "source_text": "B.S. Computer Science",
+              "span": {
+                "start": 1332,
+                "end": 1353
+              },
+              "lines": {
+                "start": 25,
+                "end": 25
+              }
+            }
+          ],
+          "confidence": 0.86
+        }
+      ],
+      "certifications": [],
+      "projects": [],
+      "employment": [
+        {
+          "organization": "Example SaaS Co.",
+          "role": "Senior Software Developer",
+          "start_date": "2018-01",
+          "end_date": null,
+          "current": true,
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_exp1",
+              "source_text": "Example SaaS Co. - Senior Software Developer",
+              "span": {
+                "start": 386,
+                "end": 430
+              },
+              "lines": {
+                "start": 8,
+                "end": 8
+              }
+            }
+          ],
+          "confidence": 0.93
+        },
+        {
+          "organization": "AutomationWorks",
+          "role": "Software Developer",
+          "start_date": "2013",
+          "end_date": "2017-12",
+          "current": false,
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_exp2",
+              "source_text": "AutomationWorks - Software Developer",
+              "span": {
+                "start": 854,
+                "end": 890
+              },
+              "lines": {
+                "start": 15,
+                "end": 15
+              }
+            }
+          ],
+          "confidence": 0.91
+        }
+      ],
+      "source_evidence": [
+        {
+          "evidence_id": "ev_smoke_title",
+          "source_text": "Senior Software Developer",
+          "span": {
+            "start": 17,
+            "end": 42
+          },
+          "lines": {
+            "start": 2,
+            "end": 2
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_summary",
+          "source_text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps.",
+          "span": {
+            "start": 52,
+            "end": 373
+          },
+          "lines": {
+            "start": 5,
+            "end": 5
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_exp1",
+          "source_text": "Example SaaS Co. - Senior Software Developer",
+          "span": {
+            "start": 386,
+            "end": 430
+          },
+          "lines": {
+            "start": 8,
+            "end": 8
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_b1",
+          "source_text": "Built React and TypeScript interfaces for multi-tenant SaaS workflows used by operations teams.",
+          "span": {
+            "start": 452,
+            "end": 547
+          },
+          "lines": {
+            "start": 10,
+            "end": 10
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_b2",
+          "source_text": "Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting.",
+          "span": {
+            "start": 550,
+            "end": 654
+          },
+          "lines": {
+            "start": 11,
+            "end": 11
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_b3",
+          "source_text": "Led a small team of three developers through delivery planning, code review, and release coordination.",
+          "span": {
+            "start": 657,
+            "end": 759
+          },
+          "lines": {
+            "start": 12,
+            "end": 12
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_b4",
+          "source_text": "Improved front-end reliability for responsive web apps across desktop and mobile browsers.",
+          "span": {
+            "start": 762,
+            "end": 852
+          },
+          "lines": {
+            "start": 13,
+            "end": 13
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_exp2",
+          "source_text": "AutomationWorks - Software Developer",
+          "span": {
+            "start": 854,
+            "end": 890
+          },
+          "lines": {
+            "start": 15,
+            "end": 15
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_b5",
+          "source_text": "Built Node.js services backed by PostgreSQL for workflow automation and data-processing tools.",
+          "span": {
+            "start": 910,
+            "end": 1004
+          },
+          "lines": {
+            "start": 17,
+            "end": 17
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_b6",
+          "source_text": "Integrated Azure services for deployment, monitoring, and application operations.",
+          "span": {
+            "start": 1007,
+            "end": 1088
+          },
+          "lines": {
+            "start": 18,
+            "end": 18
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_edu",
+          "source_text": "B.S. Computer Science",
+          "span": {
+            "start": 1332,
+            "end": 1353
+          },
+          "lines": {
+            "start": 25,
+            "end": 25
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_skills",
+          "source_text": "React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, SaaS, workflow automation, responsive web apps, team leadership",
+          "span": {
+            "start": 1199,
+            "end": 1320
+          },
+          "lines": {
+            "start": 22,
+            "end": 22
+          }
+        }
+      ],
+      "uncertainty": [
+        {
+          "type": "education_institution_missing",
+          "message": "Education line names the degree and field but not the institution."
+        }
+      ],
+      "metadata": {
+        "fixture_source_id": "resume-main.txt"
+      }
+    }
+  }
+}

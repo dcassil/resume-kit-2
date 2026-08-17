@@ -1,0 +1,381 @@
+{
+  "fixture_id": "resume-agent-extraction-inline-legacy-resume",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "No-context public extractResumeSemantics path uses the T-0091 legacy resume payload.",
+    "Schema-grounded fixture replaces previous token-regex assertions."
+  ],
+  "comment": "RKIT-T-0092 public extraction fixture. The file name is the sha256 key for the request tuple.",
+  "data": {
+    "key": {
+      "sha256": "fa06b533b21850aa4c7de7b8eded83d62ab1f537228161a1f57fea50d08ecf69",
+      "prompt_template_id": "resume-agent.resume-extraction@v1",
+      "output_schema_id": "resume-agent.resume-extraction.v1",
+      "canonical_input_json": "{\"resume_text\":\"\\nDaniel Candidate\\nSoftware Engineer\\n\\nExperience building React and TypeScript front ends, REST APIs, and responsive web applications.\\nDesigned API architecture for customer-facing SaaS products.\\n\",\"schema_id\":\"resume-agent.resume-extraction.v1\",\"source\":{\"kind\":\"raw_text\",\"sha256\":\"ec2f37cca1a8fd0686b89fb36df273c7e0e680bb3aaf98f71dc5388633a51cba\",\"source_id\":\"inline\"}}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.resume-extraction.v1",
+      "proposal_type": "resume_extraction",
+      "requires_validation": true,
+      "resume_id": "inline_legacy_resume_fixture",
+      "source": {
+        "kind": "raw_text",
+        "source_id": "inline",
+        "sha256": "ec2f37cca1a8fd0686b89fb36df273c7e0e680bb3aaf98f71dc5388633a51cba"
+      },
+      "basics": {
+        "title": {
+          "value": "Software Engineer",
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_resume_title",
+              "source_text": "Software Engineer",
+              "span": {
+                "start": 18,
+                "end": 35
+              },
+              "lines": {
+                "start": 3,
+                "end": 3
+              }
+            }
+          ],
+          "confidence": 0.96,
+          "normalized": "software engineer"
+        }
+      },
+      "skills": [
+        {
+          "name": "React",
+          "category": "framework",
+          "normalized_terms": [
+            "react"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_resume_skills",
+              "source_text": "Experience building React and TypeScript front ends, REST APIs, and responsive web applications.",
+              "span": {
+                "start": 37,
+                "end": 133
+              },
+              "lines": {
+                "start": 5,
+                "end": 5
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "name": "TypeScript",
+          "category": "language",
+          "normalized_terms": [
+            "typescript"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_resume_skills",
+              "source_text": "Experience building React and TypeScript front ends, REST APIs, and responsive web applications.",
+              "span": {
+                "start": 37,
+                "end": 133
+              },
+              "lines": {
+                "start": 5,
+                "end": 5
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "name": "REST APIs",
+          "category": "backend",
+          "normalized_terms": [
+            "rest",
+            "api"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_resume_skills",
+              "source_text": "Experience building React and TypeScript front ends, REST APIs, and responsive web applications.",
+              "span": {
+                "start": 37,
+                "end": 133
+              },
+              "lines": {
+                "start": 5,
+                "end": 5
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "name": "Responsive web applications",
+          "category": "frontend",
+          "normalized_terms": [
+            "responsive design",
+            "responsive web applications"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_resume_skills",
+              "source_text": "Experience building React and TypeScript front ends, REST APIs, and responsive web applications.",
+              "span": {
+                "start": 37,
+                "end": 133
+              },
+              "lines": {
+                "start": 5,
+                "end": 5
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "name": "API architecture",
+          "category": "architecture",
+          "normalized_terms": [
+            "api architecture",
+            "api design"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_resume_api",
+              "source_text": "Designed API architecture for customer-facing SaaS products.",
+              "span": {
+                "start": 134,
+                "end": 194
+              },
+              "lines": {
+                "start": 6,
+                "end": 6
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "name": "SaaS products",
+          "category": "domain",
+          "normalized_terms": [
+            "saas"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_resume_api",
+              "source_text": "Designed API architecture for customer-facing SaaS products.",
+              "span": {
+                "start": 134,
+                "end": 194
+              },
+              "lines": {
+                "start": 6,
+                "end": 6
+              }
+            }
+          ],
+          "confidence": 0.94
+        }
+      ],
+      "experience": [
+        {
+          "role": "Software Engineer",
+          "organization": "Unknown",
+          "employment": {
+            "organization": "Unknown",
+            "role": "Software Engineer",
+            "start_date": null,
+            "end_date": null,
+            "current": false,
+            "evidence": [
+              {
+                "evidence_id": "ev_legacy_resume_title",
+                "source_text": "Software Engineer",
+                "span": {
+                  "start": 18,
+                  "end": 35
+                },
+                "lines": {
+                  "start": 3,
+                  "end": 3
+                }
+              }
+            ],
+            "confidence": 0.68
+          },
+          "location": null,
+          "highlights": [
+            {
+              "text": "Experience building React and TypeScript front ends, REST APIs, and responsive web applications.",
+              "normalized_terms": [
+                "react",
+                "typescript",
+                "rest api",
+                "responsive design"
+              ],
+              "evidence": [
+                {
+                  "evidence_id": "ev_legacy_resume_skills",
+                  "source_text": "Experience building React and TypeScript front ends, REST APIs, and responsive web applications.",
+                  "span": {
+                    "start": 37,
+                    "end": 133
+                  },
+                  "lines": {
+                    "start": 5,
+                    "end": 5
+                  }
+                }
+              ],
+              "confidence": 0.93
+            },
+            {
+              "text": "Designed API architecture for customer-facing SaaS products.",
+              "normalized_terms": [
+                "api architecture",
+                "saas"
+              ],
+              "evidence": [
+                {
+                  "evidence_id": "ev_legacy_resume_api",
+                  "source_text": "Designed API architecture for customer-facing SaaS products.",
+                  "span": {
+                    "start": 134,
+                    "end": 194
+                  },
+                  "lines": {
+                    "start": 6,
+                    "end": 6
+                  }
+                }
+              ],
+              "confidence": 0.93
+            }
+          ],
+          "skills": [
+            "React",
+            "TypeScript",
+            "REST APIs",
+            "responsive design",
+            "API architecture",
+            "SaaS"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_resume_title",
+              "source_text": "Software Engineer",
+              "span": {
+                "start": 18,
+                "end": 35
+              },
+              "lines": {
+                "start": 3,
+                "end": 3
+              }
+            },
+            {
+              "evidence_id": "ev_legacy_resume_skills",
+              "source_text": "Experience building React and TypeScript front ends, REST APIs, and responsive web applications.",
+              "span": {
+                "start": 37,
+                "end": 133
+              },
+              "lines": {
+                "start": 5,
+                "end": 5
+              }
+            },
+            {
+              "evidence_id": "ev_legacy_resume_api",
+              "source_text": "Designed API architecture for customer-facing SaaS products.",
+              "span": {
+                "start": 134,
+                "end": 194
+              },
+              "lines": {
+                "start": 6,
+                "end": 6
+              }
+            }
+          ],
+          "confidence": 0.82
+        }
+      ],
+      "education": [],
+      "certifications": [],
+      "projects": [],
+      "employment": [
+        {
+          "organization": "Unknown",
+          "role": "Software Engineer",
+          "start_date": null,
+          "end_date": null,
+          "current": false,
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_resume_title",
+              "source_text": "Software Engineer",
+              "span": {
+                "start": 18,
+                "end": 35
+              },
+              "lines": {
+                "start": 3,
+                "end": 3
+              }
+            }
+          ],
+          "confidence": 0.68
+        }
+      ],
+      "source_evidence": [
+        {
+          "evidence_id": "ev_legacy_resume_title",
+          "source_text": "Software Engineer",
+          "span": {
+            "start": 18,
+            "end": 35
+          },
+          "lines": {
+            "start": 3,
+            "end": 3
+          }
+        },
+        {
+          "evidence_id": "ev_legacy_resume_skills",
+          "source_text": "Experience building React and TypeScript front ends, REST APIs, and responsive web applications.",
+          "span": {
+            "start": 37,
+            "end": 133
+          },
+          "lines": {
+            "start": 5,
+            "end": 5
+          }
+        },
+        {
+          "evidence_id": "ev_legacy_resume_api",
+          "source_text": "Designed API architecture for customer-facing SaaS products.",
+          "span": {
+            "start": 134,
+            "end": 194
+          },
+          "lines": {
+            "start": 6,
+            "end": 6
+          }
+        }
+      ],
+      "uncertainty": [],
+      "metadata": {
+        "fixture_source_id": "inline"
+      }
+    }
+  }
+}

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import re
+from pathlib import Path
 from typing import Any
 
+from ._adapters import ModelAdapter
 from ._agent_config import (
     AGENT_CONFIG_DEFAULTS,
     AGENT_CONFIG_SCHEMA,
@@ -16,6 +18,8 @@ from ._agent_config import (
     resolve_agent_config,
     stable_agent_config_hash,
 )
+from ._extraction_requests import build_resume_extraction_request
+from ._fake_adapter import DeterministicFakeAdapter
 
 
 SCHEMA_VERSION = "resume-agent.proposal.v1"
@@ -130,39 +134,6 @@ def _proposal_fact(
     return proposal
 
 
-def _split_items(text: str) -> list[str]:
-    parts = re.split(r",|\band\b", text)
-    return [_clean_text(part.strip(" .;:")) for part in parts if _clean_text(part.strip(" .;:"))]
-
-
-def _terms_for(text: str) -> list[str]:
-    lowered = text.lower()
-    terms: list[str] = []
-    years = re.search(r"\b\d+\s*\+?\s*years?\b", text, re.IGNORECASE)
-    if years:
-        terms.append(_clean_text(years.group(0)))
-    checks = [
-        ("software engineering", r"\bsoftware engineering\b"),
-        ("react", r"\breact\b"),
-        ("typescript", r"\btypescript\b"),
-        ("node.js", r"\bnode(?:\.js|js)?\b"),
-        ("postgresql", r"\bpostgres(?:ql)?\b"),
-        ("api", r"\bapis?\b|\bapi\b"),
-        ("api architecture", r"\bapi architecture\b|\barchitecture/design\b"),
-        ("api design", r"\bapi design\b|\barchitecture/design\b|\bdesign\b"),
-        ("responsive design", r"\bresponsive\b"),
-        ("responsive web applications", r"\bresponsive\b.*\bweb\b|\bweb\b.*\bresponsive\b"),
-        ("saas", r"\bsaas\b"),
-        ("aws", r"\baws\b"),
-        ("graphql", r"\bgraphql\b"),
-        ("technical leadership", r"\btechnical leadership\b|\bleadership\b"),
-    ]
-    for term, pattern in checks:
-        if re.search(pattern, lowered, re.IGNORECASE):
-            terms.append(term)
-    return terms or [_clean_text(text).lower()]
-
-
 def _unique(values: list[str]) -> list[str]:
     seen: set[str] = set()
     unique_values: list[str] = []
@@ -195,36 +166,6 @@ def _evidence_from_span(text: str, snippet: str, start: int, end: int, prefix: s
         "snippet": snippet,
         "span": {"start": start, "end": end},
     }
-
-
-def _add_resume_fact(
-    raw_text: str,
-    facts: list[dict[str, Any]],
-    evidence: list[dict[str, Any]],
-    category: str,
-    label: str,
-    pattern: str,
-    terms: list[str],
-    confidence: str = "high",
-    extra: dict[str, Any] | None = None,
-) -> None:
-    match = re.search(pattern, raw_text, re.IGNORECASE | re.MULTILINE)
-    if not match:
-        return
-    snippet = _clean_text(match.group(0))
-    source = _evidence(raw_text, snippet, "resume_ev")
-    evidence.append(source)
-    facts.append(_proposal_fact(label, category, terms, source["evidence_id"], confidence, extra))
-
-
-def _looks_like_title(line: str) -> bool:
-    return bool(
-        re.search(
-            r"\b(software|engineer|developer|architect|lead|principal|senior|full[- ]stack)\b",
-            line,
-            re.IGNORECASE,
-        )
-    )
 
 
 def _is_section_heading(line: str) -> bool:
@@ -304,7 +245,7 @@ def _requirement_concepts(source_text: str) -> list[tuple[str, list[str]]]:
     if any(requirement_id == "req_graphql" for requirement_id, _ in concepts):
         concepts = [(requirement_id, terms) for requirement_id, terms in concepts if requirement_id != "req_api"]
     if not concepts:
-        concepts.append((_stable_id("req", source_text), _terms_for(source_text)))
+        concepts.append((_stable_id("req", source_text), [_clean_text(source_text).lower()]))
     return concepts
 
 
@@ -317,15 +258,6 @@ def _selected_ids(context: dict[str, Any]) -> list[str]:
     if not isinstance(selected, list):
         return []
     return [str(item) for item in selected if _clean_text(str(item))]
-
-
-def _years_phrase(answer: str) -> str | None:
-    match = re.search(
-        r"\b(?:about|around|more than|over|nearly|approximately)?\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:\+)?\s+years?\b",
-        answer,
-        re.IGNORECASE,
-    )
-    return _clean_text(match.group(0)) if match else None
 
 
 def _mentioned_terms(text: str, terms: list[str]) -> list[str]:
@@ -344,120 +276,199 @@ def _is_blocked(value: str, blocked: list[str]) -> bool:
 def extractResumeSemantics(rawText: str, context: dict[str, Any] | None = None) -> dict[str, Any]:
     """Extract source-backed semantic proposals from plain resume text."""
 
-    del context
     if not _clean_text(rawText):
         return _error("validation_error", "rawText must be a non-empty string.")
 
+    ctx = context if isinstance(context, dict) else {}
+    try:
+        adapter = _resume_extraction_adapter(ctx)
+        request = build_resume_extraction_request(rawText, source_id=_resume_source_id(ctx))
+    except AgentConfigValidationError as exc:
+        return {"status": "error", "error": {"type": "schema_error", "message": str(exc), "violations": exc.errors}}
+
+    completion = adapter.complete(request)
+    if completion.status != "ok":
+        return _adapter_error(completion)
+    payload = completion.payload or {}
+    return _resume_extraction_payload_to_proposals(payload)
+
+
+def _resume_extraction_adapter(context: dict[str, Any]) -> ModelAdapter:
+    injected = context.get("_adapter")
+    if injected is not None:
+        return injected
+    return DeterministicFakeAdapter(agent_config=require_agent_config(context))
+
+
+def _resume_source_id(context: dict[str, Any]) -> str:
+    explicit = _clean_text(context.get("source_id"))
+    if explicit:
+        return explicit
+    source_path = _clean_text(context.get("source_path"))
+    if source_path:
+        return Path(source_path).name or "inline"
+    return "inline"
+
+
+def _adapter_error(completion: Any) -> dict[str, Any]:
+    error = completion.error.to_error() if getattr(completion, "error", None) is not None else {
+        "type": "provider_error",
+        "message": "Adapter failed without a structured error.",
+    }
+    result = {"status": "error", "error": error}
+    for field in ["adapter_id", "adapter_version", "model_id", "runtime_config", "retries", "usage"]:
+        if hasattr(completion, field):
+            result[field] = getattr(completion, field)
+    return result
+
+
+def _resume_extraction_payload_to_proposals(payload: dict[str, Any]) -> dict[str, Any]:
     result = _base("resume_semantic_extraction")
-    evidence: list[dict[str, Any]] = []
+    source_evidence = _dedupe_evidence([_model_evidence_to_source(item) for item in payload.get("source_evidence", [])])
     facts: list[dict[str, Any]] = []
 
-    lines = _line_records(rawText)
-    possible_titles = [
-        line
-        for line in lines[:4]
-        if _looks_like_title(str(line["text"])) and not _is_section_heading(str(line["text"]))
-    ]
-    if possible_titles:
-        title = possible_titles[0]
-        source = _evidence_from_span(rawText, str(title["text"]), int(title["start"]), int(title["end"]), "resume_ev")
-        evidence.append(source)
-        facts.append(
-            _proposal_fact(
-                str(title["text"]),
-                "title",
-                [str(title["text"]).lower()],
-                source["evidence_id"],
-                "high",
+    for key, item in (payload.get("basics") or {}).items():
+        if isinstance(item, dict):
+            _append_model_fact(facts, str(key), _clean_text(item.get("value")), [_clean_text(item.get("normalized"))], item)
+
+    for item in payload.get("skills", []):
+        if isinstance(item, dict):
+            terms = [str(term) for term in item.get("normalized_terms", []) if _clean_text(term)]
+            _append_model_fact(facts, "skill", _clean_text(item.get("name")), terms, item, {"skill_category": item.get("category")})
+
+    for item in payload.get("experience", []):
+        if not isinstance(item, dict):
+            continue
+        role = _clean_text(item.get("role"))
+        organization = _clean_text(item.get("organization"))
+        text = " at ".join(part for part in [role, organization] if part)
+        _append_model_fact(
+            facts,
+            "experience",
+            text,
+            [role, organization, *[str(skill) for skill in item.get("skills", []) if _clean_text(skill)]],
+            item,
+            {"employment": item.get("employment")},
+        )
+        for highlight in item.get("highlights", []):
+            if isinstance(highlight, dict):
+                _append_model_fact(
+                    facts,
+                    "experience_highlight",
+                    _clean_text(highlight.get("text")),
+                    [str(term) for term in highlight.get("normalized_terms", []) if _clean_text(term)],
+                    highlight,
+                )
+
+    for item in payload.get("education", []):
+        if isinstance(item, dict):
+            text = ", ".join(_clean_text(item.get(key)) for key in ["degree", "field", "institution"] if _clean_text(item.get(key)))
+            _append_model_fact(facts, "education", text, [_clean_text(item.get("degree")), _clean_text(item.get("field"))], item)
+
+    for item in payload.get("certifications", []):
+        if isinstance(item, dict):
+            text = ", ".join(_clean_text(item.get(key)) for key in ["name", "issuer"] if _clean_text(item.get(key)))
+            _append_model_fact(facts, "certification", text, [_clean_text(item.get("name")), _clean_text(item.get("issuer"))], item)
+
+    for item in payload.get("projects", []):
+        if isinstance(item, dict):
+            text = ": ".join(part for part in [_clean_text(item.get("name")), _clean_text(item.get("description"))] if part)
+            _append_model_fact(
+                facts,
+                "project",
+                text,
+                [str(skill) for skill in item.get("skills", []) if _clean_text(skill)],
+                item,
             )
-        )
 
-    years_match = re.search(
-        r"\b\d+\s*\+?\s+years?\s+of\s+(?:full[- ]stack\s+)?software development experience\b",
-        rawText,
-        re.IGNORECASE,
-    )
-    if years_match:
-        snippet = _clean_text(years_match.group(0))
-        source = _evidence(rawText, snippet, "resume_ev")
-        evidence.append(source)
-        terms = _terms_for(snippet)
-        if "full-stack" not in terms and re.search(r"full[- ]stack", snippet, re.IGNORECASE):
-            terms.append("full-stack")
-        if "software development" not in terms:
-            terms.append("software development")
-        facts.append(
-            _proposal_fact(
-                snippet,
-                "experience",
-                _unique(terms),
-                source["evidence_id"],
-                "high",
-                {"years": _years_detail(snippet)},
+    for item in payload.get("employment", []):
+        if isinstance(item, dict):
+            text = " at ".join(_clean_text(item.get(key)) for key in ["role", "organization"] if _clean_text(item.get(key)))
+            _append_model_fact(
+                facts,
+                "employment",
+                text,
+                [_clean_text(item.get("role")), _clean_text(item.get("organization"))],
+                item,
+                {
+                    "start_date": item.get("start_date"),
+                    "end_date": item.get("end_date"),
+                    "current": item.get("current"),
+                },
             )
-        )
 
-    resume_patterns = [
-        ("domain", "SaaS products", r"\bmulti-tenant\s+SaaS products?\b|\bSaaS products?\b|\bSaaS\b", ["saas"]),
-        ("skill", "React", r"\bReact\b", ["react"]),
-        ("skill", "TypeScript", r"\bTypeScript\b", ["typescript"]),
-        ("skill", "Node.js", r"\bNode\.js\b|\bNodeJS\b", ["node.js"]),
-        ("skill", "PostgreSQL", r"\bPostgreSQL\b|\bPostgres\b", ["postgresql"]),
-        ("skill", "Azure", r"\bAzure\b", ["azure"]),
-        ("skill", "REST APIs", r"\bREST APIs?\b", ["rest", "api"]),
-        (
-            "experience",
-            "API design and integration work",
-            r"\bDesigned\s+REST APIs?\b|\bREST APIs?\b|\bAPI architecture\b|\bAPI design\b|\bintegration patterns\b",
-            ["rest", "api", "api design"],
-        ),
-        (
-            "experience",
-            "responsive web apps",
-            r"\bresponsive web apps?\b|\bresponsive web applications?\b",
-            ["responsive design", "responsive web applications"],
-        ),
-        (
-            "experience",
-            "workflow automation",
-            r"\bworkflow automation\b",
-            ["workflow automation"],
-        ),
-        (
-            "leadership",
-            "team leadership",
-            r"\bLed a small team of three developers\b|\bteam leadership\b|\bdelivery planning\b|\bcode review\b|\brelease coordination\b",
-            ["team leadership", "delivery planning", "code review", "release coordination"],
-        ),
-    ]
-
-    seen_facts = {fact["fact_id"] for fact in facts}
-    for category, label, pattern, terms in resume_patterns:
-        before = len(facts)
-        _add_resume_fact(rawText, facts, evidence, category, label, pattern, terms)
-        if len(facts) > before and facts[-1]["fact_id"] in seen_facts:
-            facts.pop()
-            evidence.pop()
-        elif len(facts) > before:
-            seen_facts.add(facts[-1]["fact_id"])
-
-    text = _clean_text(rawText)
-    if _contains(text, r"\bambiguous\b|\bvarious\b|\bseveral\b"):
-        result["uncertainty"].append(
-            {
-                "type": "ambiguous_source",
-                "message": "Some source wording is broad and should be reviewed before use.",
-            }
-        )
+    for fact in facts:
+        source_evidence.extend(_model_evidence_to_source(item) for item in fact.get("evidence", []))
+    source_evidence = _dedupe_evidence(source_evidence)
 
     result.update(
         {
             "proposals": facts,
             "fact_proposals": facts,
-            "source_evidence": evidence,
+            "source_evidence": source_evidence,
+            "uncertainty": payload.get("uncertainty", []),
+            "model_metadata": payload.get("metadata", {}),
         }
     )
     return result
+
+
+def _append_model_fact(
+    facts: list[dict[str, Any]],
+    category: str,
+    text: str,
+    terms: list[str],
+    item: dict[str, Any],
+    extra: dict[str, Any] | None = None,
+) -> None:
+    cleaned = _clean_text(text)
+    evidence = [_model_evidence_to_source(entry) for entry in item.get("evidence", []) if isinstance(entry, dict)]
+    evidence = [entry for entry in evidence if _clean_text(entry.get("evidence_id"))]
+    if not cleaned or not evidence:
+        return
+    confidence = item.get("confidence")
+    proposal = {
+        "fact_id": _stable_id("fact", f"{category}:{cleaned}"),
+        "category": category,
+        "text": cleaned,
+        "normalized_terms": _unique([term for term in terms if _clean_text(term)] or [cleaned.lower()]),
+        "source_evidence_ids": [str(entry["evidence_id"]) for entry in evidence],
+        "evidence": evidence,
+        "verification_state": "inferred",
+        "confidence": confidence,
+        "model_confidence": confidence,
+        "review_required": True,
+    }
+    if extra:
+        proposal.update({key: value for key, value in extra.items() if value is not None})
+    facts.append(proposal)
+
+
+def _model_evidence_to_source(item: Any) -> dict[str, Any]:
+    if not isinstance(item, dict):
+        return {}
+    source_text = _clean_text(item.get("source_text") or item.get("text") or item.get("snippet"))
+    evidence_id = _clean_text(item.get("evidence_id"))
+    return {
+        "evidence_id": evidence_id,
+        "text": source_text,
+        "snippet": source_text,
+        "source_text": source_text,
+        "span": item.get("span"),
+        "lines": item.get("lines"),
+    }
+
+
+def _dedupe_evidence(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen: set[str] = set()
+    deduped: list[dict[str, Any]] = []
+    for item in items:
+        evidence_id = _clean_text(item.get("evidence_id"))
+        if not evidence_id or evidence_id in seen:
+            continue
+        seen.add(evidence_id)
+        deduped.append(item)
+    return deduped
 
 
 def extractJobSemantics(rawJobText: str, context: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -499,7 +510,7 @@ def extractJobSemantics(rawJobText: str, context: dict[str, Any] | None = None) 
             if key in seen_requirements:
                 continue
             seen_requirements.add(key)
-            terms = _unique([*concept_terms, *_terms_for(cleaned)])
+            terms = _unique([*concept_terms, cleaned.lower()])
             terminology.extend(term for term in terms if term not in terminology)
             requirement: dict[str, Any] = {
                 "requirement_id": requirement_id,
@@ -613,7 +624,6 @@ def interpretUserAnswer(answer: str, context: dict[str, Any]) -> dict[str, Any]:
 
     result = _base("answer_interpretation")
     evidence_id = _stable_id("answer_ev", text)
-    years = _years_phrase(text)
     topic_lower = topic.lower()
 
     evidence = [
@@ -632,8 +642,6 @@ def interpretUserAnswer(answer: str, context: dict[str, Any]) -> dict[str, Any]:
     if "aws" in topic_lower:
         services = _mentioned_terms(text, ["EC2", "S3", "Lambda", "RDS", "IAM", "CloudFront", "DynamoDB"])
         fact_text = "AWS experience"
-        if years:
-            fact_text = f"{fact_text}, {years}"
         if services:
             fact_text = f"{fact_text}, including {', '.join(services)}"
         facts.append(_proposal_fact(fact_text, "skill", ["aws", *[service.lower() for service in services]], evidence_id))
@@ -642,8 +650,6 @@ def interpretUserAnswer(answer: str, context: dict[str, Any]) -> dict[str, Any]:
         if _contains(text, r"\bproduction\b"):
             terms.append("production")
         fact_text = "GraphQL API experience"
-        if years:
-            fact_text = f"{fact_text}, {years}"
         if "production" in terms:
             fact_text = f"{fact_text}, production context"
         facts.append(_proposal_fact(fact_text, "skill", terms, evidence_id))
@@ -654,8 +660,6 @@ def interpretUserAnswer(answer: str, context: dict[str, Any]) -> dict[str, Any]:
         fact_text = "Architecture experience"
         if "api" in terms:
             fact_text = "API and application architecture experience"
-        if years:
-            fact_text = f"{fact_text}, {years}"
         facts.append(_proposal_fact(fact_text, "experience", terms, evidence_id))
 
     if _contains(text, r"\bnot\b|\bhaven't\b|\bhave not\b|\bno\b"):

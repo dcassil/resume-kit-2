@@ -7,6 +7,7 @@ import importlib
 import inspect
 import json
 import re
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -28,6 +29,23 @@ JOB_FIXTURE = """
 Senior Software Engineer, Example SaaS Co.
 Required: 8+ years of software engineering experience, React, TypeScript, API architecture/design, responsive design.
 Preferred: AWS, GraphQL, SaaS experience, and technical leadership.
+"""
+
+ML_ENGINEER_RESUME = """Maya Patel
+Machine Learning Engineer
+
+Skills: Python, TensorFlow, Kubernetes, Google Cloud Platform (GCP), Go, Spark, MLOps.
+Experience
+Senior ML Engineer, CloudScale AI, 2021-Present
+Built TensorFlow training pipelines in Python and deployed model serving workloads on Kubernetes and GCP.
+Machine Learning Engineer, DataWorks, 2018-2021
+Developed Go services for feature ingestion and batch prediction.
+Education
+PhD in Computer Science, University of Illinois, 2018
+Certifications
+Google Professional Machine Learning Engineer, Google Cloud, 2022
+Projects
+Realtime Fraud Detection: Python and TensorFlow system with Kubernetes inference services.
 """
 
 
@@ -75,6 +93,17 @@ def assert_fact_proposals_have_verification_state(test_case: unittest.TestCase, 
             test_case.assertEqual(fact["verification_state"], "inferred")
 
 
+def assert_resume_fact_proposals_have_model_evidence(test_case: unittest.TestCase, result: dict) -> None:
+    evidence_ids = {item.get("evidence_id") for item in result.get("source_evidence", [])}
+    for fact in result.get("fact_proposals", []):
+        with test_case.subTest(fact=fact.get("fact_id")):
+            test_case.assertTrue(fact.get("source_evidence_ids"))
+            test_case.assertTrue(set(fact["source_evidence_ids"]) <= evidence_ids)
+            test_case.assertTrue(fact.get("evidence"))
+            test_case.assertIsInstance(fact.get("model_confidence"), (int, float))
+            test_case.assertEqual(fact.get("confidence"), fact.get("model_confidence"))
+
+
 class ResumeAgentSurfaceManifestTests(unittest.TestCase):
     def test_manifest_declares_exact_public_functions(self):
         self.assertEqual(PUBLIC_FUNCTIONS, (
@@ -109,6 +138,7 @@ class ResumeAgentProposalContractTests(unittest.TestCase):
         self.assertIn("fact_proposals", result)
         self.assertIn("source_evidence", result)
         assert_fact_proposals_have_verification_state(self, result)
+        assert_resume_fact_proposals_have_model_evidence(self, result)
         serialized = json.dumps(result, sort_keys=True).lower()
         self.assertIn("react", serialized)
         self.assertIn("api", serialized)
@@ -116,6 +146,77 @@ class ResumeAgentProposalContractTests(unittest.TestCase):
         self.assertNotIn("graphql", serialized)
         self.assertNotIn("staff software engineer", serialized)
         self.assertNotRegex(serialized, r"\b20 million\b|\b30 engineers\b")
+
+    def test_ml_engineer_resume_public_extraction_covers_every_populated_section(self):
+        result = maybe_await(
+            self.agent.extractResumeSemantics(ML_ENGINEER_RESUME, {"source_id": "ml-engineer-golden-resume"})
+        )
+        assert_proposal_handoff(self, result, "resume_semantic_extraction")
+        assert_fact_proposals_have_verification_state(self, result)
+        assert_resume_fact_proposals_have_model_evidence(self, result)
+
+        categories = {proposal.get("category") for proposal in result.get("fact_proposals", [])}
+        for category in ["skill", "experience", "education", "certification", "project", "employment"]:
+            with self.subTest(category=category):
+                self.assertIn(category, categories)
+
+        serialized = json.dumps(result, sort_keys=True).lower()
+        for expected in ["python", "tensorflow", "kubernetes", "gcp", "go", "phd"]:
+            self.assertIn(expected, serialized)
+
+    def test_resume_extraction_adapter_missing_fixture_returns_typed_error_without_partial_proposals(self):
+        from resume_agent._fake_adapter import DeterministicFakeAdapter
+
+        with tempfile.TemporaryDirectory(prefix="resume-agent-missing-fixture-") as temp:
+            result = maybe_await(
+                self.agent.extractResumeSemantics(RESUME_FIXTURE, {"_adapter": DeterministicFakeAdapter(fixture_dir=Path(temp))})
+            )
+
+        self.assertEqual(result.get("status"), "error")
+        self.assertEqual(result.get("error", {}).get("type"), "provider_error")
+        self.assertNotIn("fact_proposals", result)
+        self.assertNotIn("proposals", result)
+
+    def test_resume_extraction_adapter_schema_invalid_returns_typed_error_without_partial_proposals(self):
+        from resume_agent._extraction_requests import build_resume_extraction_request
+        from resume_agent._fake_adapter import DeterministicFakeAdapter, deterministic_fake_key
+
+        with tempfile.TemporaryDirectory(prefix="resume-agent-broken-fixture-") as temp:
+            fixture_dir = Path(temp)
+            request = build_resume_extraction_request(RESUME_FIXTURE, source_id="inline")
+            key_hash = deterministic_fake_key(request.prompt_template_id, request.output_schema_id, request.input_payload)
+            fixture = {
+                "fixture_id": "resume-agent-public-broken-schema-invalid",
+                "schema_version": "resume-agent.fake-adapter-fixture.v1",
+                "config_hash": "fixture-config-v1",
+                "reviewed": True,
+                "expected_observations": ["Deliberately malformed extraction payload for public error mapping."],
+                "comment": "Temporary in-test fixture.",
+                "data": {
+                    "key": {
+                        "sha256": key_hash,
+                        "prompt_template_id": request.prompt_template_id,
+                        "output_schema_id": request.output_schema_id,
+                        "canonical_input_json": json.dumps(
+                            request.input_payload,
+                            sort_keys=True,
+                            separators=(",", ":"),
+                            ensure_ascii=False,
+                        ),
+                    },
+                    "payload": {"schema_version": request.output_schema_id},
+                },
+            }
+            (fixture_dir / f"{key_hash}.json").write_text(json.dumps(fixture), encoding="utf-8")
+            result = maybe_await(
+                self.agent.extractResumeSemantics(RESUME_FIXTURE, {"_adapter": DeterministicFakeAdapter(fixture_dir=fixture_dir)})
+            )
+
+        self.assertEqual(result.get("status"), "error")
+        self.assertEqual(result.get("error", {}).get("type"), "schema_invalid")
+        self.assertTrue(result.get("error", {}).get("violations"))
+        self.assertNotIn("fact_proposals", result)
+        self.assertNotIn("proposals", result)
 
     def test_job_semantic_extraction_preserves_requirement_source_and_classification(self):
         result = maybe_await(self.agent.extractJobSemantics(JOB_FIXTURE))

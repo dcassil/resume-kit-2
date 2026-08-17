@@ -1,0 +1,178 @@
+{
+  "fixture_id": "resume-agent-extraction-cli-contract-resume-txt",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "resume-cli contract ingest uses a temporary resume.txt source path.",
+    "Payload is pinned for the public adapter path without special-casing the CLI."
+  ],
+  "comment": "RKIT-T-0092 public extraction fixture. The file name is the sha256 key for the request tuple.",
+  "data": {
+    "key": {
+      "sha256": "d8669eb18a799bf53ba2b84b733b8493b1d256227b22b4af0a3a4a6df2aec486",
+      "prompt_template_id": "resume-agent.resume-extraction@v1",
+      "output_schema_id": "resume-agent.resume-extraction.v1",
+      "canonical_input_json": "{\"resume_text\":\"\\nDaniel Candidate\\nSoftware Engineer\\nBuilt React and TypeScript applications, REST APIs, and responsive web apps.\\n\",\"schema_id\":\"resume-agent.resume-extraction.v1\",\"source\":{\"kind\":\"raw_text\",\"sha256\":\"30e66c8e4202a2a78a4417bfb4b294f6d43761be42fdce697685089618a0292a\",\"source_id\":\"resume.txt\"}}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.resume-extraction.v1",
+      "proposal_type": "resume_extraction",
+      "requires_validation": true,
+      "resume_id": "cli_contract_resume_txt",
+      "source": {
+        "kind": "raw_text",
+        "source_id": "resume.txt",
+        "sha256": "30e66c8e4202a2a78a4417bfb4b294f6d43761be42fdce697685089618a0292a"
+      },
+      "basics": {
+        "title": {
+          "value": "Software Engineer",
+          "evidence": [
+            {
+              "evidence_id": "ev_cli_resume_title",
+              "source_text": "Software Engineer",
+              "span": {
+                "start": 18,
+                "end": 35
+              },
+              "lines": {
+                "start": 3,
+                "end": 3
+              }
+            }
+          ],
+          "confidence": 0.96,
+          "normalized": "software engineer"
+        }
+      },
+      "skills": [
+        {
+          "name": "React",
+          "category": "framework",
+          "normalized_terms": [
+            "react"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_cli_resume_skills",
+              "source_text": "Built React and TypeScript applications, REST APIs, and responsive web apps.",
+              "span": {
+                "start": 36,
+                "end": 112
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.95
+        },
+        {
+          "name": "TypeScript",
+          "category": "language",
+          "normalized_terms": [
+            "typescript"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_cli_resume_skills",
+              "source_text": "Built React and TypeScript applications, REST APIs, and responsive web apps.",
+              "span": {
+                "start": 36,
+                "end": 112
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.95
+        },
+        {
+          "name": "REST APIs",
+          "category": "api",
+          "normalized_terms": [
+            "rest api",
+            "api"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_cli_resume_skills",
+              "source_text": "Built React and TypeScript applications, REST APIs, and responsive web apps.",
+              "span": {
+                "start": 36,
+                "end": 112
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.93
+        },
+        {
+          "name": "responsive web apps",
+          "category": "frontend",
+          "normalized_terms": [
+            "responsive web apps",
+            "responsive design"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_cli_resume_skills",
+              "source_text": "Built React and TypeScript applications, REST APIs, and responsive web apps.",
+              "span": {
+                "start": 36,
+                "end": 112
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.91
+        }
+      ],
+      "experience": [],
+      "education": [],
+      "certifications": [],
+      "projects": [],
+      "employment": [],
+      "source_evidence": [
+        {
+          "evidence_id": "ev_cli_resume_title",
+          "source_text": "Software Engineer",
+          "span": {
+            "start": 18,
+            "end": 35
+          },
+          "lines": {
+            "start": 3,
+            "end": 3
+          }
+        },
+        {
+          "evidence_id": "ev_cli_resume_skills",
+          "source_text": "Built React and TypeScript applications, REST APIs, and responsive web apps.",
+          "span": {
+            "start": 36,
+            "end": 112
+          },
+          "lines": {
+            "start": 4,
+            "end": 4
+          }
+        }
+      ],
+      "uncertainty": [],
+      "metadata": {
+        "fixture_source_id": "resume.txt"
+      }
+    }
+  }
+}
