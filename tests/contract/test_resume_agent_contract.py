@@ -48,6 +48,24 @@ Projects
 Realtime Fraud Detection: Python and TensorFlow system with Kubernetes inference services.
 """
 
+PYTHON_SPARK_JOB = """Senior Data Platform Engineer
+DataLake Systems
+Requirements:
+- 5+ years with Python, Spark, and distributed data processing.
+- Build production ETL pipelines on cloud infrastructure.
+Preferred:
+- Kubernetes experience.
+"""
+
+GRAPHQL_API_JOB = """Backend Platform Engineer
+API Studio
+Required:
+- Design GraphQL APIs for customer-facing products.
+- Lead REST API design and versioning for partner integrations.
+Preferred:
+- TypeScript experience.
+"""
+
 
 def maybe_await(value):
     if inspect.isawaitable(value):
@@ -102,6 +120,21 @@ def assert_resume_fact_proposals_have_model_evidence(test_case: unittest.TestCas
             test_case.assertTrue(fact.get("evidence"))
             test_case.assertIsInstance(fact.get("model_confidence"), (int, float))
             test_case.assertEqual(fact.get("confidence"), fact.get("model_confidence"))
+
+
+def assert_job_requirement_proposals_have_model_evidence(test_case: unittest.TestCase, result: dict) -> None:
+    evidence_ids = {item.get("evidence_id") for item in result.get("source_evidence", [])}
+    requirements = result.get("requirement_proposals", [])
+    test_case.assertTrue(requirements)
+    for requirement in requirements:
+        with test_case.subTest(requirement=requirement.get("requirement_id")):
+            test_case.assertTrue(requirement.get("source_evidence_ids"))
+            test_case.assertTrue(set(requirement["source_evidence_ids"]) <= evidence_ids)
+            test_case.assertTrue(requirement.get("evidence"))
+            test_case.assertIsInstance(requirement.get("model_confidence"), (int, float))
+            test_case.assertEqual(requirement.get("confidence"), requirement.get("model_confidence"))
+            for field in ["classification", "seniority", "industries", "domains"]:
+                test_case.assertIn(field, requirement)
 
 
 class ResumeAgentSurfaceManifestTests(unittest.TestCase):
@@ -221,16 +254,98 @@ class ResumeAgentProposalContractTests(unittest.TestCase):
     def test_job_semantic_extraction_preserves_requirement_source_and_classification(self):
         result = maybe_await(self.agent.extractJobSemantics(JOB_FIXTURE))
         assert_proposal_handoff(self, result, "job_semantic_extraction")
-        requirements = result.get("requirements", [])
+        requirements = result.get("requirement_proposals", [])
         self.assertTrue(requirements)
         serialized = json.dumps(result, sort_keys=True).lower()
         for expected in ["8+ years", "react", "typescript", "api", "responsive", "saas", "aws", "graphql"]:
             self.assertIn(expected, serialized)
         classifications = {requirement.get("classification") for requirement in requirements}
         self.assertTrue({"required", "preferred"} <= classifications)
+        self.assertTrue(result.get("requirement_classification_proposals"))
+        assert_job_requirement_proposals_have_model_evidence(self, result)
         for requirement in requirements:
             self.assertIn("source_text", requirement)
             self.assertIn("normalized_terms", requirement)
+
+    def test_job_extraction_public_goldens_keep_all_named_skills(self):
+        cases = [
+            (PYTHON_SPARK_JOB, "python-spark-golden-job", ["python", "spark", "kubernetes"]),
+            (GRAPHQL_API_JOB, "graphql-api-design-golden-job", ["graphql", "api design", "typescript"]),
+        ]
+
+        for job_text, source_id, expected_skills in cases:
+            result = maybe_await(self.agent.extractJobSemantics(job_text, {"source_id": source_id}))
+            assert_proposal_handoff(self, result, "job_semantic_extraction")
+            assert_job_requirement_proposals_have_model_evidence(self, result)
+            requirement_text = json.dumps(result.get("requirement_proposals", []), sort_keys=True).lower()
+            for skill_name in expected_skills:
+                with self.subTest(source_id=source_id, skill=skill_name):
+                    self.assertIn(skill_name, requirement_text)
+
+    def test_job_extraction_public_goldens_preserve_co_required_concepts(self):
+        python_spark = maybe_await(self.agent.extractJobSemantics(PYTHON_SPARK_JOB, {"source_id": "python-spark-golden-job"}))
+        python_spark_text = json.dumps(python_spark.get("requirement_proposals", []), sort_keys=True).lower()
+        self.assertIn("python", python_spark_text)
+        self.assertIn("spark", python_spark_text)
+
+        graphql_api = maybe_await(self.agent.extractJobSemantics(GRAPHQL_API_JOB, {"source_id": "graphql-api-design-golden-job"}))
+        concepts = {requirement.get("concept") for requirement in graphql_api.get("requirement_proposals", [])}
+        self.assertIn("GraphQL APIs", concepts)
+        self.assertIn("REST API design", concepts)
+
+    def test_job_extraction_adapter_missing_fixture_returns_typed_error_without_partial_proposals(self):
+        from resume_agent._fake_adapter import DeterministicFakeAdapter
+
+        with tempfile.TemporaryDirectory(prefix="resume-agent-job-missing-fixture-") as temp:
+            result = maybe_await(
+                self.agent.extractJobSemantics(JOB_FIXTURE, {"_adapter": DeterministicFakeAdapter(fixture_dir=Path(temp))})
+            )
+
+        self.assertEqual(result.get("status"), "error")
+        self.assertEqual(result.get("error", {}).get("type"), "provider_error")
+        self.assertNotIn("requirement_proposals", result)
+        self.assertNotIn("proposals", result)
+
+    def test_job_extraction_adapter_schema_invalid_returns_typed_error_without_partial_proposals(self):
+        from resume_agent._extraction_requests import build_job_extraction_request
+        from resume_agent._fake_adapter import DeterministicFakeAdapter, deterministic_fake_key
+
+        with tempfile.TemporaryDirectory(prefix="resume-agent-job-broken-fixture-") as temp:
+            fixture_dir = Path(temp)
+            request = build_job_extraction_request(JOB_FIXTURE, source_id="inline")
+            key_hash = deterministic_fake_key(request.prompt_template_id, request.output_schema_id, request.input_payload)
+            fixture = {
+                "fixture_id": "resume-agent-public-job-broken-schema-invalid",
+                "schema_version": "resume-agent.fake-adapter-fixture.v1",
+                "config_hash": "fixture-config-v1",
+                "reviewed": True,
+                "expected_observations": ["Deliberately malformed job extraction payload for public error mapping."],
+                "comment": "Temporary in-test fixture.",
+                "data": {
+                    "key": {
+                        "sha256": key_hash,
+                        "prompt_template_id": request.prompt_template_id,
+                        "output_schema_id": request.output_schema_id,
+                        "canonical_input_json": json.dumps(
+                            request.input_payload,
+                            sort_keys=True,
+                            separators=(",", ":"),
+                            ensure_ascii=False,
+                        ),
+                    },
+                    "payload": {"schema_version": request.output_schema_id},
+                },
+            }
+            (fixture_dir / f"{key_hash}.json").write_text(json.dumps(fixture), encoding="utf-8")
+            result = maybe_await(
+                self.agent.extractJobSemantics(JOB_FIXTURE, {"_adapter": DeterministicFakeAdapter(fixture_dir=fixture_dir)})
+            )
+
+        self.assertEqual(result.get("status"), "error")
+        self.assertEqual(result.get("error", {}).get("type"), "schema_invalid")
+        self.assertTrue(result.get("error", {}).get("violations"))
+        self.assertNotIn("requirement_proposals", result)
+        self.assertNotIn("proposals", result)
 
     def test_clarification_question_phrases_only_code_selected_topic(self):
         context = {

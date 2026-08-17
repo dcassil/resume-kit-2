@@ -1,0 +1,943 @@
+{
+  "fixture_id": "resume-agent-extraction-smoke-job-a-staff-software-engineer",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Smoke job A extraction is pinned for CLI ingest through extractJobSemantics."
+  ],
+  "comment": "RKIT-T-0093 smoke fixture for fixtures/jobs/job-a-staff-software-engineer.txt.",
+  "data": {
+    "key": {
+      "sha256": "766d82c62bf9ab222b4257892157f710110e72257e27b107a03a2d88b7398eba",
+      "prompt_template_id": "resume-agent.job-extraction@v1",
+      "output_schema_id": "resume-agent.job-extraction.v1",
+      "canonical_input_json": "{\"job_text\":\"Staff Software Engineer\\nExample Product Platform\\n\\nRequired qualifications:\\n- 8+ years of software engineering experience building production applications.\\n- Strong React and TypeScript experience.\\n- Experience with API architecture/design for distributed product systems.\\n- Experience delivering responsive design across desktop and mobile surfaces.\\n- Background building or operating SaaS products.\\n\\nPreferred qualifications:\\n- AWS experience.\\n- GraphQL API experience.\\n- Technical leadership through mentoring, design review, or cross-team architecture work.\\n\",\"schema_id\":\"resume-agent.job-extraction.v1\",\"source\":{\"kind\":\"raw_text\",\"sha256\":\"5c23aa5e52dd3f58095212709340cf89ae17b29ef49466436902cbc46406bced\",\"source_id\":\"job-a-staff-software-engineer.txt\"}}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.job-extraction.v1",
+      "proposal_type": "job_extraction",
+      "requires_validation": true,
+      "job_id": "smoke_job_a_staff_software_engineer",
+      "source": {
+        "kind": "raw_text",
+        "source_id": "job-a-staff-software-engineer.txt",
+        "sha256": "5c23aa5e52dd3f58095212709340cf89ae17b29ef49466436902cbc46406bced"
+      },
+      "title": {
+        "value": "Staff Software Engineer",
+        "evidence": [
+          {
+            "evidence_id": "ev_smoke_job_a_title",
+            "source_text": "Staff Software Engineer",
+            "span": {
+              "start": 0,
+              "end": 23
+            },
+            "lines": {
+              "start": 1,
+              "end": 1
+            }
+          }
+        ],
+        "confidence": 0.96,
+        "normalized": "staff software engineer"
+      },
+      "company": {
+        "value": "Example Product Platform",
+        "evidence": [
+          {
+            "evidence_id": "ev_smoke_job_a_company",
+            "source_text": "Example Product Platform",
+            "span": {
+              "start": 24,
+              "end": 48
+            },
+            "lines": {
+              "start": 2,
+              "end": 2
+            }
+          }
+        ],
+        "confidence": 0.92
+      },
+      "seniority": [
+        {
+          "value": "Staff",
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_a_title",
+              "source_text": "Staff Software Engineer",
+              "span": {
+                "start": 0,
+                "end": 23
+              },
+              "lines": {
+                "start": 1,
+                "end": 1
+              }
+            }
+          ],
+          "confidence": 0.96,
+          "normalized": "staff"
+        }
+      ],
+      "industries": [
+        {
+          "value": "SaaS",
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_a_saas",
+              "source_text": "Background building or operating SaaS products.",
+              "span": {
+                "start": 352,
+                "end": 399
+              },
+              "lines": {
+                "start": 9,
+                "end": 9
+              }
+            }
+          ],
+          "confidence": 0.9,
+          "normalized": "saas"
+        }
+      ],
+      "domains": [
+        {
+          "value": "product platform",
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_a_company",
+              "source_text": "Example Product Platform",
+              "span": {
+                "start": 24,
+                "end": 48
+              },
+              "lines": {
+                "start": 2,
+                "end": 2
+              }
+            }
+          ],
+          "confidence": 0.88,
+          "normalized": "product platform"
+        },
+        {
+          "value": "API architecture",
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_a_api",
+              "source_text": "Experience with API architecture/design for distributed product systems.",
+              "span": {
+                "start": 199,
+                "end": 271
+              },
+              "lines": {
+                "start": 7,
+                "end": 7
+              }
+            }
+          ],
+          "confidence": 0.9,
+          "normalized": "api architecture"
+        },
+        {
+          "value": "responsive design",
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_a_responsive",
+              "source_text": "Experience delivering responsive design across desktop and mobile surfaces.",
+              "span": {
+                "start": 274,
+                "end": 349
+              },
+              "lines": {
+                "start": 8,
+                "end": 8
+              }
+            }
+          ],
+          "confidence": 0.9,
+          "normalized": "responsive design"
+        }
+      ],
+      "requirements": [
+        {
+          "requirement_id": "req_smoke_a_years",
+          "classification": "required",
+          "concept": "software engineering experience",
+          "importance": "high",
+          "weight": 1.0,
+          "source_text": "8+ years of software engineering experience building production applications.",
+          "normalized_terms": [
+            "8+ years",
+            "software engineering",
+            "production applications"
+          ],
+          "years": {
+            "minimum": 8,
+            "source_text": "8+ years"
+          },
+          "seniority": [
+            {
+              "value": "Staff",
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_job_a_title",
+                  "source_text": "Staff Software Engineer",
+                  "span": {
+                    "start": 0,
+                    "end": 23
+                  },
+                  "lines": {
+                    "start": 1,
+                    "end": 1
+                  }
+                }
+              ],
+              "confidence": 0.96,
+              "normalized": "staff"
+            }
+          ],
+          "industries": [
+            {
+              "value": "SaaS",
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_job_a_saas",
+                  "source_text": "Background building or operating SaaS products.",
+                  "span": {
+                    "start": 352,
+                    "end": 399
+                  },
+                  "lines": {
+                    "start": 9,
+                    "end": 9
+                  }
+                }
+              ],
+              "confidence": 0.9,
+              "normalized": "saas"
+            }
+          ],
+          "domains": [
+            {
+              "value": "product platform",
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_job_a_company",
+                  "source_text": "Example Product Platform",
+                  "span": {
+                    "start": 24,
+                    "end": 48
+                  },
+                  "lines": {
+                    "start": 2,
+                    "end": 2
+                  }
+                }
+              ],
+              "confidence": 0.88,
+              "normalized": "product platform"
+            }
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_a_years",
+              "source_text": "8+ years of software engineering experience building production applications.",
+              "span": {
+                "start": 77,
+                "end": 154
+              },
+              "lines": {
+                "start": 5,
+                "end": 5
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "requirement_id": "req_smoke_a_react_typescript",
+          "classification": "required",
+          "concept": "React and TypeScript",
+          "importance": "high",
+          "weight": 1.0,
+          "source_text": "Strong React and TypeScript experience.",
+          "normalized_terms": [
+            "react",
+            "typescript"
+          ],
+          "years": null,
+          "seniority": [
+            {
+              "value": "Staff",
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_job_a_title",
+                  "source_text": "Staff Software Engineer",
+                  "span": {
+                    "start": 0,
+                    "end": 23
+                  },
+                  "lines": {
+                    "start": 1,
+                    "end": 1
+                  }
+                }
+              ],
+              "confidence": 0.96,
+              "normalized": "staff"
+            }
+          ],
+          "industries": [],
+          "domains": [],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_a_react_ts",
+              "source_text": "Strong React and TypeScript experience.",
+              "span": {
+                "start": 157,
+                "end": 196
+              },
+              "lines": {
+                "start": 6,
+                "end": 6
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "requirement_id": "req_smoke_a_api_architecture",
+          "classification": "required",
+          "concept": "API architecture/design",
+          "importance": "high",
+          "weight": 1.0,
+          "source_text": "Experience with API architecture/design for distributed product systems.",
+          "normalized_terms": [
+            "api",
+            "api architecture",
+            "api design",
+            "distributed product systems"
+          ],
+          "years": null,
+          "seniority": [
+            {
+              "value": "Staff",
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_job_a_title",
+                  "source_text": "Staff Software Engineer",
+                  "span": {
+                    "start": 0,
+                    "end": 23
+                  },
+                  "lines": {
+                    "start": 1,
+                    "end": 1
+                  }
+                }
+              ],
+              "confidence": 0.96,
+              "normalized": "staff"
+            }
+          ],
+          "industries": [],
+          "domains": [
+            {
+              "value": "API architecture",
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_job_a_api",
+                  "source_text": "Experience with API architecture/design for distributed product systems.",
+                  "span": {
+                    "start": 199,
+                    "end": 271
+                  },
+                  "lines": {
+                    "start": 7,
+                    "end": 7
+                  }
+                }
+              ],
+              "confidence": 0.9,
+              "normalized": "api architecture"
+            }
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_a_api",
+              "source_text": "Experience with API architecture/design for distributed product systems.",
+              "span": {
+                "start": 199,
+                "end": 271
+              },
+              "lines": {
+                "start": 7,
+                "end": 7
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "requirement_id": "req_smoke_a_responsive",
+          "classification": "required",
+          "concept": "responsive design",
+          "importance": "high",
+          "weight": 1.0,
+          "source_text": "Experience delivering responsive design across desktop and mobile surfaces.",
+          "normalized_terms": [
+            "responsive design",
+            "desktop",
+            "mobile"
+          ],
+          "years": null,
+          "seniority": [],
+          "industries": [],
+          "domains": [
+            {
+              "value": "responsive design",
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_job_a_responsive",
+                  "source_text": "Experience delivering responsive design across desktop and mobile surfaces.",
+                  "span": {
+                    "start": 274,
+                    "end": 349
+                  },
+                  "lines": {
+                    "start": 8,
+                    "end": 8
+                  }
+                }
+              ],
+              "confidence": 0.9,
+              "normalized": "responsive design"
+            }
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_a_responsive",
+              "source_text": "Experience delivering responsive design across desktop and mobile surfaces.",
+              "span": {
+                "start": 274,
+                "end": 349
+              },
+              "lines": {
+                "start": 8,
+                "end": 8
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "requirement_id": "req_smoke_a_saas",
+          "classification": "required",
+          "concept": "SaaS products",
+          "importance": "high",
+          "weight": 1.0,
+          "source_text": "Background building or operating SaaS products.",
+          "normalized_terms": [
+            "saas",
+            "products"
+          ],
+          "years": null,
+          "seniority": [],
+          "industries": [
+            {
+              "value": "SaaS",
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_job_a_saas",
+                  "source_text": "Background building or operating SaaS products.",
+                  "span": {
+                    "start": 352,
+                    "end": 399
+                  },
+                  "lines": {
+                    "start": 9,
+                    "end": 9
+                  }
+                }
+              ],
+              "confidence": 0.9,
+              "normalized": "saas"
+            }
+          ],
+          "domains": [
+            {
+              "value": "product platform",
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_job_a_company",
+                  "source_text": "Example Product Platform",
+                  "span": {
+                    "start": 24,
+                    "end": 48
+                  },
+                  "lines": {
+                    "start": 2,
+                    "end": 2
+                  }
+                }
+              ],
+              "confidence": 0.88,
+              "normalized": "product platform"
+            }
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_a_saas",
+              "source_text": "Background building or operating SaaS products.",
+              "span": {
+                "start": 352,
+                "end": 399
+              },
+              "lines": {
+                "start": 9,
+                "end": 9
+              }
+            }
+          ],
+          "confidence": 0.94
+        }
+      ],
+      "preferred": [
+        {
+          "requirement_id": "req_smoke_a_aws",
+          "classification": "preferred",
+          "concept": "AWS",
+          "importance": "medium",
+          "weight": 0.6,
+          "source_text": "AWS experience.",
+          "normalized_terms": [
+            "aws"
+          ],
+          "years": null,
+          "seniority": [],
+          "industries": [],
+          "domains": [],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_a_aws",
+              "source_text": "AWS experience.",
+              "span": {
+                "start": 429,
+                "end": 444
+              },
+              "lines": {
+                "start": 12,
+                "end": 12
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "requirement_id": "req_smoke_a_graphql_api",
+          "classification": "preferred",
+          "concept": "GraphQL API",
+          "importance": "medium",
+          "weight": 0.6,
+          "source_text": "GraphQL API experience.",
+          "normalized_terms": [
+            "graphql",
+            "api"
+          ],
+          "years": null,
+          "seniority": [],
+          "industries": [],
+          "domains": [
+            {
+              "value": "API architecture",
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_job_a_api",
+                  "source_text": "Experience with API architecture/design for distributed product systems.",
+                  "span": {
+                    "start": 199,
+                    "end": 271
+                  },
+                  "lines": {
+                    "start": 7,
+                    "end": 7
+                  }
+                }
+              ],
+              "confidence": 0.9,
+              "normalized": "api architecture"
+            }
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_a_graphql",
+              "source_text": "GraphQL API experience.",
+              "span": {
+                "start": 447,
+                "end": 470
+              },
+              "lines": {
+                "start": 13,
+                "end": 13
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "requirement_id": "req_smoke_a_leadership",
+          "classification": "preferred",
+          "concept": "technical leadership",
+          "importance": "medium",
+          "weight": 0.6,
+          "source_text": "Technical leadership through mentoring, design review, or cross-team architecture work.",
+          "normalized_terms": [
+            "technical leadership",
+            "mentoring",
+            "design review",
+            "cross-team architecture"
+          ],
+          "years": null,
+          "seniority": [
+            {
+              "value": "Staff",
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_job_a_title",
+                  "source_text": "Staff Software Engineer",
+                  "span": {
+                    "start": 0,
+                    "end": 23
+                  },
+                  "lines": {
+                    "start": 1,
+                    "end": 1
+                  }
+                }
+              ],
+              "confidence": 0.96,
+              "normalized": "staff"
+            }
+          ],
+          "industries": [],
+          "domains": [],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_a_leadership",
+              "source_text": "Technical leadership through mentoring, design review, or cross-team architecture work.",
+              "span": {
+                "start": 473,
+                "end": 560
+              },
+              "lines": {
+                "start": 14,
+                "end": 14
+              }
+            }
+          ],
+          "confidence": 0.94
+        }
+      ],
+      "terminology": [
+        {
+          "surface": "Staff Software Engineer",
+          "canonical": "staff software engineer",
+          "source": "title",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_a_title",
+              "source_text": "Staff Software Engineer",
+              "span": {
+                "start": 0,
+                "end": 23
+              },
+              "lines": {
+                "start": 1,
+                "end": 1
+              }
+            }
+          ],
+          "confidence": 0.9
+        },
+        {
+          "surface": "React",
+          "canonical": "react",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_a_react_ts",
+              "source_text": "Strong React and TypeScript experience.",
+              "span": {
+                "start": 157,
+                "end": 196
+              },
+              "lines": {
+                "start": 6,
+                "end": 6
+              }
+            }
+          ],
+          "confidence": 0.9
+        },
+        {
+          "surface": "TypeScript",
+          "canonical": "typescript",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_a_react_ts",
+              "source_text": "Strong React and TypeScript experience.",
+              "span": {
+                "start": 157,
+                "end": 196
+              },
+              "lines": {
+                "start": 6,
+                "end": 6
+              }
+            }
+          ],
+          "confidence": 0.9
+        },
+        {
+          "surface": "API architecture/design",
+          "canonical": "api architecture",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_a_api",
+              "source_text": "Experience with API architecture/design for distributed product systems.",
+              "span": {
+                "start": 199,
+                "end": 271
+              },
+              "lines": {
+                "start": 7,
+                "end": 7
+              }
+            }
+          ],
+          "confidence": 0.9
+        },
+        {
+          "surface": "responsive design",
+          "canonical": "responsive design",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_a_responsive",
+              "source_text": "Experience delivering responsive design across desktop and mobile surfaces.",
+              "span": {
+                "start": 274,
+                "end": 349
+              },
+              "lines": {
+                "start": 8,
+                "end": 8
+              }
+            }
+          ],
+          "confidence": 0.9
+        },
+        {
+          "surface": "SaaS",
+          "canonical": "saas",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_a_saas",
+              "source_text": "Background building or operating SaaS products.",
+              "span": {
+                "start": 352,
+                "end": 399
+              },
+              "lines": {
+                "start": 9,
+                "end": 9
+              }
+            }
+          ],
+          "confidence": 0.9
+        },
+        {
+          "surface": "AWS",
+          "canonical": "aws",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_a_aws",
+              "source_text": "AWS experience.",
+              "span": {
+                "start": 429,
+                "end": 444
+              },
+              "lines": {
+                "start": 12,
+                "end": 12
+              }
+            }
+          ],
+          "confidence": 0.9
+        },
+        {
+          "surface": "GraphQL API",
+          "canonical": "graphql api",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_a_graphql",
+              "source_text": "GraphQL API experience.",
+              "span": {
+                "start": 447,
+                "end": 470
+              },
+              "lines": {
+                "start": 13,
+                "end": 13
+              }
+            }
+          ],
+          "confidence": 0.9
+        }
+      ],
+      "source_evidence": [
+        {
+          "evidence_id": "ev_smoke_job_a_title",
+          "source_text": "Staff Software Engineer",
+          "span": {
+            "start": 0,
+            "end": 23
+          },
+          "lines": {
+            "start": 1,
+            "end": 1
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_job_a_company",
+          "source_text": "Example Product Platform",
+          "span": {
+            "start": 24,
+            "end": 48
+          },
+          "lines": {
+            "start": 2,
+            "end": 2
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_job_a_years",
+          "source_text": "8+ years of software engineering experience building production applications.",
+          "span": {
+            "start": 77,
+            "end": 154
+          },
+          "lines": {
+            "start": 5,
+            "end": 5
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_job_a_react_ts",
+          "source_text": "Strong React and TypeScript experience.",
+          "span": {
+            "start": 157,
+            "end": 196
+          },
+          "lines": {
+            "start": 6,
+            "end": 6
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_job_a_api",
+          "source_text": "Experience with API architecture/design for distributed product systems.",
+          "span": {
+            "start": 199,
+            "end": 271
+          },
+          "lines": {
+            "start": 7,
+            "end": 7
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_job_a_responsive",
+          "source_text": "Experience delivering responsive design across desktop and mobile surfaces.",
+          "span": {
+            "start": 274,
+            "end": 349
+          },
+          "lines": {
+            "start": 8,
+            "end": 8
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_job_a_saas",
+          "source_text": "Background building or operating SaaS products.",
+          "span": {
+            "start": 352,
+            "end": 399
+          },
+          "lines": {
+            "start": 9,
+            "end": 9
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_job_a_aws",
+          "source_text": "AWS experience.",
+          "span": {
+            "start": 429,
+            "end": 444
+          },
+          "lines": {
+            "start": 12,
+            "end": 12
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_job_a_graphql",
+          "source_text": "GraphQL API experience.",
+          "span": {
+            "start": 447,
+            "end": 470
+          },
+          "lines": {
+            "start": 13,
+            "end": 13
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_job_a_leadership",
+          "source_text": "Technical leadership through mentoring, design review, or cross-team architecture work.",
+          "span": {
+            "start": 473,
+            "end": 560
+          },
+          "lines": {
+            "start": 14,
+            "end": 14
+          }
+        }
+      ],
+      "uncertainty": [],
+      "metadata": {
+        "fixture": "smoke-job-a"
+      }
+    }
+  }
+}

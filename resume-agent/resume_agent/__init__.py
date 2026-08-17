@@ -18,7 +18,7 @@ from ._agent_config import (
     resolve_agent_config,
     stable_agent_config_hash,
 )
-from ._extraction_requests import build_resume_extraction_request
+from ._extraction_requests import build_job_extraction_request, build_resume_extraction_request
 from ._fake_adapter import DeterministicFakeAdapter
 
 
@@ -106,11 +106,6 @@ def _contains(text: str, pattern: str) -> bool:
     return re.search(pattern, text, re.IGNORECASE) is not None
 
 
-def _first_match(text: str, pattern: str) -> str | None:
-    match = re.search(pattern, text, re.IGNORECASE)
-    return match.group(0) if match else None
-
-
 def _proposal_fact(
     text: str,
     category: str,
@@ -144,109 +139,6 @@ def _unique(values: list[str]) -> list[str]:
             seen.add(key)
             unique_values.append(cleaned)
     return unique_values
-
-
-def _line_records(text: str) -> list[dict[str, Any]]:
-    records: list[dict[str, Any]] = []
-    offset = 0
-    for raw_line in text.splitlines(keepends=True):
-        line = raw_line.rstrip("\r\n")
-        stripped = line.strip()
-        if stripped:
-            start = offset + line.find(stripped)
-            records.append({"text": stripped, "start": start, "end": start + len(stripped)})
-        offset += len(raw_line)
-    return records
-
-
-def _evidence_from_span(text: str, snippet: str, start: int, end: int, prefix: str) -> dict[str, Any]:
-    return {
-        "evidence_id": _stable_id(prefix, f"{start}:{snippet}"),
-        "text": snippet,
-        "snippet": snippet,
-        "span": {"start": start, "end": end},
-    }
-
-
-def _is_section_heading(line: str) -> bool:
-    cleaned = line.strip().rstrip(":").lower()
-    return cleaned in {
-        "required",
-        "requirements",
-        "required qualifications",
-        "minimum qualifications",
-        "preferred",
-        "preferred qualifications",
-        "nice to have",
-        "nice-to-have",
-        "context",
-        "about",
-        "responsibilities",
-        "qualifications",
-    }
-
-
-def _job_heading_classification(line: str) -> tuple[str | None, str]:
-    match = re.match(
-        r"^\s*(required(?:\s+qualifications?)?|requirements?|minimum qualifications?|preferred(?:\s+qualifications?)?|nice[- ]to[- ]have|contextual|responsibilities|about)\s*:?\s*(.*)$",
-        line,
-        re.IGNORECASE,
-    )
-    if not match:
-        return None, ""
-    heading = match.group(1).lower()
-    if "preferred" in heading or "nice" in heading:
-        return "preferred", match.group(2).strip()
-    if "required" in heading or "requirement" in heading or "minimum" in heading:
-        return "required", match.group(2).strip()
-    return "contextual", match.group(2).strip()
-
-
-def _strip_bullet(line: str) -> str:
-    return re.sub(r"^\s*[-*•◦]\s*", "", line).strip()
-
-
-def _requirement_items(body: str) -> list[str]:
-    cleaned = _clean_text(body.strip(" .;"))
-    if not cleaned:
-        return []
-    if "," not in cleaned:
-        return [cleaned]
-    parts = re.split(r",|\band\b", cleaned)
-    return [_clean_text(part.strip(" .;:")) for part in parts if _clean_text(part.strip(" .;:"))]
-
-
-def _years_detail(text: str) -> dict[str, Any] | None:
-    match = re.search(r"\b(\d+)\s*\+?\s*years?\b", text, re.IGNORECASE)
-    if not match:
-        return None
-    return {"minimum": int(match.group(1)), "source_text": _clean_text(match.group(0))}
-
-
-def _requirement_concepts(source_text: str) -> list[tuple[str, list[str]]]:
-    lowered = source_text.lower()
-    concepts: list[tuple[str, list[str]]] = []
-    checks = [
-        ("req_years", ["years", "software engineering"], r"\b\d+\s*\+?\s*years?\b"),
-        ("req_react", ["react"], r"\breact\b"),
-        ("req_typescript", ["typescript"], r"\btypescript\b"),
-        ("req_node", ["node.js"], r"\bnode(?:\.js|js)?\b"),
-        ("req_postgresql", ["postgresql"], r"\bpostgres(?:ql)?\b"),
-        ("req_aws", ["aws"], r"\baws\b"),
-        ("req_graphql", ["graphql"], r"\bgraphql\b"),
-        ("req_responsive", ["responsive design"], r"\bresponsive\b"),
-        ("req_saas", ["saas"], r"\bsaas\b"),
-        ("req_leadership", ["technical leadership"], r"\btechnical leadership\b|\bleadership\b|\bmentoring\b|\bdesign review\b|\bcross-team architecture\b"),
-        ("req_api", ["api", "api architecture", "api design"], r"\bapi architecture\b|\barchitecture/design\b|\bapi design\b|\bapis?\b"),
-    ]
-    for requirement_id, terms, pattern in checks:
-        if re.search(pattern, lowered, re.IGNORECASE):
-            concepts.append((requirement_id, terms))
-    if any(requirement_id == "req_graphql" for requirement_id, _ in concepts):
-        concepts = [(requirement_id, terms) for requirement_id, terms in concepts if requirement_id != "req_api"]
-    if not concepts:
-        concepts.append((_stable_id("req", source_text), [_clean_text(source_text).lower()]))
-    return concepts
 
 
 def _safe_topic(value: Any) -> str:
@@ -474,100 +366,165 @@ def _dedupe_evidence(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def extractJobSemantics(rawJobText: str, context: dict[str, Any] | None = None) -> dict[str, Any]:
     """Extract job semantics as proposal data for downstream validation."""
 
-    del context
-    text = _clean_text(rawJobText)
-    if not text:
+    if not _clean_text(rawJobText):
         return _error("validation_error", "rawJobText must be a non-empty string.")
 
+    ctx = context if isinstance(context, dict) else {}
+    try:
+        adapter = _job_extraction_adapter(ctx)
+        request = build_job_extraction_request(rawJobText, source_id=_job_source_id(ctx))
+    except AgentConfigValidationError as exc:
+        return {"status": "error", "error": {"type": "schema_error", "message": str(exc), "violations": exc.errors}}
+
+    completion = adapter.complete(request)
+    if completion.status != "ok":
+        return _adapter_error(completion)
+    payload = completion.payload or {}
+    return _job_extraction_payload_to_proposals(payload)
+
+
+def _job_extraction_adapter(context: dict[str, Any]) -> ModelAdapter:
+    injected = context.get("_adapter")
+    if injected is not None:
+        return injected
+    return DeterministicFakeAdapter(agent_config=require_agent_config(context))
+
+
+def _job_source_id(context: dict[str, Any]) -> str:
+    return _resume_source_id(context)
+
+
+def _job_extraction_payload_to_proposals(payload: dict[str, Any]) -> dict[str, Any]:
     result = _base("job_semantic_extraction")
-    lines = _line_records(rawJobText)
-    heading = str(lines[0]["text"]) if lines else ""
-    job_title = _clean_text(heading.split(",", 1)[0]) if heading else None
-    company = _clean_text(heading.split(",", 1)[1]) if "," in heading else None
-    if company is None and len(lines) > 1:
-        second = str(lines[1]["text"])
-        if not _is_section_heading(second) and not _job_heading_classification(second)[0] and not re.match(r"^\s*[-*•◦]", second):
-            company = second
-
-    requirements: list[dict[str, Any]] = []
-    evidence: list[dict[str, Any]] = []
-    terminology: list[str] = []
-    seen_requirements: set[tuple[str, str]] = set()
-    current_classification: str | None = None
-
-    def append_requirement(source_text: str, classification: str, start: int | None = None, end: int | None = None) -> None:
-        cleaned = _clean_text(source_text.strip(" .;"))
-        if not cleaned:
-            return
-        source = (
-            _evidence_from_span(rawJobText, cleaned, start, end, "job_ev")
-            if start is not None and end is not None
-            else _evidence(rawJobText, cleaned, "job_ev")
-        )
-        evidence.append(source)
-        for requirement_id, concept_terms in _requirement_concepts(cleaned):
-            key = (requirement_id, classification)
-            if key in seen_requirements:
-                continue
-            seen_requirements.add(key)
-            terms = _unique([*concept_terms, cleaned.lower()])
-            terminology.extend(term for term in terms if term not in terminology)
-            requirement: dict[str, Any] = {
-                "requirement_id": requirement_id,
-                "source_text": cleaned,
-                "classification": classification,
-                "normalized_terms": terms,
-                "source_evidence_ids": [source["evidence_id"]],
-            }
-            years = _years_detail(cleaned)
-            if years:
-                requirement["years"] = years
-            requirements.append(requirement)
-
-    start_index = 1
-    if company and len(lines) > 1 and str(lines[1]["text"]) == company:
-        start_index = 2
-
-    for record in lines[start_index:]:
-        line = str(record["text"])
-        heading_classification, heading_body = _job_heading_classification(line)
-        if heading_classification:
-            current_classification = heading_classification
-            if heading_body:
-                for item in _requirement_items(heading_body):
-                    append_requirement(item, current_classification)
-            continue
-
-        body = _strip_bullet(line)
-        if not body or _is_section_heading(body):
-            continue
-        classification = current_classification or "contextual"
-        line_start = int(record["start"]) + line.find(body)
-        line_end = line_start + len(body)
-        append_requirement(body, classification, line_start, line_end)
-
-    if not requirements:
-        result["uncertainty"].append(
-            {
-                "type": "unstructured_job_text",
-                "message": "No labeled requirement sections were found.",
-            }
-        )
-
+    required = [_model_requirement_to_proposal(item) for item in payload.get("requirements", []) if isinstance(item, dict)]
+    preferred = [_model_requirement_to_proposal(item) for item in payload.get("preferred", []) if isinstance(item, dict)]
+    requirements = [item for item in [*required, *preferred] if item]
+    classification_proposals = [_requirement_classification_proposal(item) for item in requirements]
+    source_evidence = _job_source_evidence(payload, requirements)
+    terminology = [_model_term_to_proposal(item) for item in payload.get("terminology", []) if isinstance(item, dict)]
+    terminology = [item for item in terminology if item]
     result.update(
         {
-            "proposals": requirements,
-            "job_title": job_title,
-            "company": company,
-            "seniority": _first_match(job_title or text, r"\b(senior|lead|principal|staff|junior|mid-level)\b"),
-            "industries": ["SaaS"] if _contains(text, r"\bSaaS\b") else [],
-            "domains": [term for term in ["API architecture", "responsive design"] if _contains(text, term)],
-            "requirements": requirements,
+            "job_id": payload.get("job_id"),
+            "source": payload.get("source", {}),
+            "title": payload.get("title"),
+            "job_title": _extracted_value(payload.get("title")),
+            "company": _extracted_value(payload.get("company")),
+            "company_proposal": payload.get("company"),
+            "seniority": payload.get("seniority", []),
+            "industries": payload.get("industries", []),
+            "domains": payload.get("domains", []),
+            "requirements": required,
+            "preferred": preferred,
+            "requirement_proposals": requirements,
+            "requirement_classification_proposals": classification_proposals,
             "terminology": terminology,
-            "source_evidence": evidence,
+            "source_evidence": source_evidence,
+            "uncertainty": payload.get("uncertainty", []),
+            "model_metadata": payload.get("metadata", {}),
+            "proposals": requirements,
         }
     )
     return result
+
+
+def _model_requirement_to_proposal(item: dict[str, Any]) -> dict[str, Any]:
+    evidence = [_model_evidence_to_source(entry) for entry in item.get("evidence", []) if isinstance(entry, dict)]
+    evidence = [entry for entry in evidence if _clean_text(entry.get("evidence_id"))]
+    requirement_id = _clean_text(item.get("requirement_id"))
+    source_text = _clean_text(item.get("source_text") or item.get("concept"))
+    if not requirement_id or not source_text or not evidence:
+        return {}
+    confidence = item.get("confidence")
+    proposal = {
+        "requirement_id": requirement_id,
+        "classification": item.get("classification"),
+        "concept": _clean_text(item.get("concept")) or source_text,
+        "importance": item.get("importance"),
+        "weight": item.get("weight"),
+        "source_text": source_text,
+        "normalized_terms": _unique([str(term) for term in item.get("normalized_terms", []) if _clean_text(term)]),
+        "years": item.get("years"),
+        "seniority": item.get("seniority", []),
+        "industries": item.get("industries", []),
+        "domains": item.get("domains", []),
+        "source_evidence_ids": [str(entry["evidence_id"]) for entry in evidence],
+        "evidence": evidence,
+        "confidence": confidence,
+        "model_confidence": confidence,
+        "review_required": True,
+    }
+    return proposal
+
+
+def _requirement_classification_proposal(requirement: dict[str, Any]) -> dict[str, Any]:
+    confidence = requirement.get("model_confidence")
+    return {
+        "proposal_id": _stable_id(
+            "req_class",
+            ":".join(
+                [
+                    _clean_text(requirement.get("requirement_id")),
+                    _clean_text(requirement.get("classification")),
+                    _clean_text(requirement.get("source_text")),
+                ]
+            ),
+        ),
+        "requirement_id": requirement.get("requirement_id"),
+        "classification": requirement.get("classification"),
+        "source_text": requirement.get("source_text"),
+        "source_evidence_ids": requirement.get("source_evidence_ids", []),
+        "evidence": requirement.get("evidence", []),
+        "confidence": confidence,
+        "model_confidence": confidence,
+        "requires_validation": True,
+    }
+
+
+def _model_term_to_proposal(item: dict[str, Any]) -> dict[str, Any]:
+    evidence = [_model_evidence_to_source(entry) for entry in item.get("evidence", []) if isinstance(entry, dict)]
+    evidence = [entry for entry in evidence if _clean_text(entry.get("evidence_id"))]
+    surface = _clean_text(item.get("surface"))
+    canonical = _clean_text(item.get("canonical"))
+    if not surface or not canonical or not evidence:
+        return {}
+    confidence = item.get("confidence")
+    return {
+        "surface": surface,
+        "canonical": canonical,
+        "source": item.get("source"),
+        "weight": item.get("weight"),
+        "evidence": evidence,
+        "source_evidence_ids": [str(entry["evidence_id"]) for entry in evidence],
+        "confidence": confidence,
+        "model_confidence": confidence,
+    }
+
+
+def _job_source_evidence(payload: dict[str, Any], requirements: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    evidence = [_model_evidence_to_source(item) for item in payload.get("source_evidence", []) if isinstance(item, dict)]
+    for field in ["title", "company"]:
+        value = payload.get(field)
+        if isinstance(value, dict):
+            evidence.extend(_model_evidence_to_source(item) for item in value.get("evidence", []) if isinstance(item, dict))
+    for field in ["seniority", "industries", "domains"]:
+        for item in payload.get(field, []):
+            if isinstance(item, dict):
+                evidence.extend(_model_evidence_to_source(entry) for entry in item.get("evidence", []) if isinstance(entry, dict))
+    for requirement in requirements:
+        evidence.extend(requirement.get("evidence", []))
+        for field in ["seniority", "industries", "domains"]:
+            for item in requirement.get(field, []):
+                if isinstance(item, dict):
+                    evidence.extend(_model_evidence_to_source(entry) for entry in item.get("evidence", []) if isinstance(entry, dict))
+    return _dedupe_evidence(evidence)
+
+
+def _extracted_value(item: Any) -> str | None:
+    if not isinstance(item, dict):
+        return None
+    value = _clean_text(item.get("value"))
+    return value or None
 
 
 def generateClarificationQuestion(context: dict[str, Any]) -> dict[str, Any]:

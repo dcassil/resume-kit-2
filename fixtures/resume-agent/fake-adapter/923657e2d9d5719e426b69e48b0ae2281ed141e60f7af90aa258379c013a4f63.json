@@ -1,0 +1,749 @@
+{
+  "fixture_id": "resume-agent-extraction-smoke-job-b-senior-full-stack-engineer",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Smoke job B extraction is pinned for CLI ingest through extractJobSemantics."
+  ],
+  "comment": "RKIT-T-0093 smoke fixture for fixtures/jobs/job-b-senior-full-stack-engineer.txt.",
+  "data": {
+    "key": {
+      "sha256": "923657e2d9d5719e426b69e48b0ae2281ed141e60f7af90aa258379c013a4f63",
+      "prompt_template_id": "resume-agent.job-extraction@v1",
+      "output_schema_id": "resume-agent.job-extraction.v1",
+      "canonical_input_json": "{\"job_text\":\"Senior Full Stack Engineer\\nExample Growth Systems\\n\\nRequired qualifications:\\n- React experience for production web applications.\\n- Node.js service development.\\n- GraphQL API design or maintenance.\\n- AWS experience for application infrastructure.\\n\\nPreferred qualifications:\\n- PostgreSQL experience.\\n- SaaS product background.\\n\",\"schema_id\":\"resume-agent.job-extraction.v1\",\"source\":{\"kind\":\"raw_text\",\"sha256\":\"f3213fa983a2492c096d2087e857eee697c8dd7be365a2c7052b10420a150ee9\",\"source_id\":\"job-b-senior-full-stack-engineer.txt\"}}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.job-extraction.v1",
+      "proposal_type": "job_extraction",
+      "requires_validation": true,
+      "job_id": "smoke_job_b_senior_full_stack_engineer",
+      "source": {
+        "kind": "raw_text",
+        "source_id": "job-b-senior-full-stack-engineer.txt",
+        "sha256": "f3213fa983a2492c096d2087e857eee697c8dd7be365a2c7052b10420a150ee9"
+      },
+      "title": {
+        "value": "Senior Full Stack Engineer",
+        "evidence": [
+          {
+            "evidence_id": "ev_smoke_job_b_title",
+            "source_text": "Senior Full Stack Engineer",
+            "span": {
+              "start": 0,
+              "end": 26
+            },
+            "lines": {
+              "start": 1,
+              "end": 1
+            }
+          }
+        ],
+        "confidence": 0.96,
+        "normalized": "senior full stack engineer"
+      },
+      "company": {
+        "value": "Example Growth Systems",
+        "evidence": [
+          {
+            "evidence_id": "ev_smoke_job_b_company",
+            "source_text": "Example Growth Systems",
+            "span": {
+              "start": 27,
+              "end": 49
+            },
+            "lines": {
+              "start": 2,
+              "end": 2
+            }
+          }
+        ],
+        "confidence": 0.92
+      },
+      "seniority": [
+        {
+          "value": "Senior",
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_b_title",
+              "source_text": "Senior Full Stack Engineer",
+              "span": {
+                "start": 0,
+                "end": 26
+              },
+              "lines": {
+                "start": 1,
+                "end": 1
+              }
+            }
+          ],
+          "confidence": 0.96,
+          "normalized": "senior"
+        }
+      ],
+      "industries": [
+        {
+          "value": "SaaS",
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_b_saas",
+              "source_text": "SaaS product background.",
+              "span": {
+                "start": 299,
+                "end": 323
+              },
+              "lines": {
+                "start": 12,
+                "end": 12
+              }
+            }
+          ],
+          "confidence": 0.9,
+          "normalized": "saas"
+        }
+      ],
+      "domains": [
+        {
+          "value": "full stack web applications",
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_b_title",
+              "source_text": "Senior Full Stack Engineer",
+              "span": {
+                "start": 0,
+                "end": 26
+              },
+              "lines": {
+                "start": 1,
+                "end": 1
+              }
+            }
+          ],
+          "confidence": 0.88,
+          "normalized": "full stack"
+        },
+        {
+          "value": "GraphQL API design",
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_b_graphql",
+              "source_text": "GraphQL API design or maintenance.",
+              "span": {
+                "start": 161,
+                "end": 195
+              },
+              "lines": {
+                "start": 7,
+                "end": 7
+              }
+            }
+          ],
+          "confidence": 0.9,
+          "normalized": "api design"
+        }
+      ],
+      "requirements": [
+        {
+          "requirement_id": "req_smoke_b_react",
+          "classification": "required",
+          "concept": "React production web applications",
+          "importance": "high",
+          "weight": 1.0,
+          "source_text": "React experience for production web applications.",
+          "normalized_terms": [
+            "react",
+            "production web applications"
+          ],
+          "years": null,
+          "seniority": [
+            {
+              "value": "Senior",
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_job_b_title",
+                  "source_text": "Senior Full Stack Engineer",
+                  "span": {
+                    "start": 0,
+                    "end": 26
+                  },
+                  "lines": {
+                    "start": 1,
+                    "end": 1
+                  }
+                }
+              ],
+              "confidence": 0.96,
+              "normalized": "senior"
+            }
+          ],
+          "industries": [],
+          "domains": [
+            {
+              "value": "full stack web applications",
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_job_b_title",
+                  "source_text": "Senior Full Stack Engineer",
+                  "span": {
+                    "start": 0,
+                    "end": 26
+                  },
+                  "lines": {
+                    "start": 1,
+                    "end": 1
+                  }
+                }
+              ],
+              "confidence": 0.88,
+              "normalized": "full stack"
+            }
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_b_react",
+              "source_text": "React experience for production web applications.",
+              "span": {
+                "start": 78,
+                "end": 127
+              },
+              "lines": {
+                "start": 5,
+                "end": 5
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "requirement_id": "req_smoke_b_node",
+          "classification": "required",
+          "concept": "Node.js service development",
+          "importance": "high",
+          "weight": 1.0,
+          "source_text": "Node.js service development.",
+          "normalized_terms": [
+            "node.js",
+            "service development"
+          ],
+          "years": null,
+          "seniority": [
+            {
+              "value": "Senior",
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_job_b_title",
+                  "source_text": "Senior Full Stack Engineer",
+                  "span": {
+                    "start": 0,
+                    "end": 26
+                  },
+                  "lines": {
+                    "start": 1,
+                    "end": 1
+                  }
+                }
+              ],
+              "confidence": 0.96,
+              "normalized": "senior"
+            }
+          ],
+          "industries": [],
+          "domains": [
+            {
+              "value": "full stack web applications",
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_job_b_title",
+                  "source_text": "Senior Full Stack Engineer",
+                  "span": {
+                    "start": 0,
+                    "end": 26
+                  },
+                  "lines": {
+                    "start": 1,
+                    "end": 1
+                  }
+                }
+              ],
+              "confidence": 0.88,
+              "normalized": "full stack"
+            }
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_b_node",
+              "source_text": "Node.js service development.",
+              "span": {
+                "start": 130,
+                "end": 158
+              },
+              "lines": {
+                "start": 6,
+                "end": 6
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "requirement_id": "req_smoke_b_graphql_api",
+          "classification": "required",
+          "concept": "GraphQL API design",
+          "importance": "high",
+          "weight": 1.0,
+          "source_text": "GraphQL API design or maintenance.",
+          "normalized_terms": [
+            "graphql",
+            "api design",
+            "maintenance"
+          ],
+          "years": null,
+          "seniority": [
+            {
+              "value": "Senior",
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_job_b_title",
+                  "source_text": "Senior Full Stack Engineer",
+                  "span": {
+                    "start": 0,
+                    "end": 26
+                  },
+                  "lines": {
+                    "start": 1,
+                    "end": 1
+                  }
+                }
+              ],
+              "confidence": 0.96,
+              "normalized": "senior"
+            }
+          ],
+          "industries": [],
+          "domains": [
+            {
+              "value": "GraphQL API design",
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_job_b_graphql",
+                  "source_text": "GraphQL API design or maintenance.",
+                  "span": {
+                    "start": 161,
+                    "end": 195
+                  },
+                  "lines": {
+                    "start": 7,
+                    "end": 7
+                  }
+                }
+              ],
+              "confidence": 0.9,
+              "normalized": "api design"
+            }
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_b_graphql",
+              "source_text": "GraphQL API design or maintenance.",
+              "span": {
+                "start": 161,
+                "end": 195
+              },
+              "lines": {
+                "start": 7,
+                "end": 7
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "requirement_id": "req_smoke_b_aws",
+          "classification": "required",
+          "concept": "AWS application infrastructure",
+          "importance": "high",
+          "weight": 1.0,
+          "source_text": "AWS experience for application infrastructure.",
+          "normalized_terms": [
+            "aws",
+            "application infrastructure"
+          ],
+          "years": null,
+          "seniority": [
+            {
+              "value": "Senior",
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_job_b_title",
+                  "source_text": "Senior Full Stack Engineer",
+                  "span": {
+                    "start": 0,
+                    "end": 26
+                  },
+                  "lines": {
+                    "start": 1,
+                    "end": 1
+                  }
+                }
+              ],
+              "confidence": 0.96,
+              "normalized": "senior"
+            }
+          ],
+          "industries": [],
+          "domains": [],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_b_aws",
+              "source_text": "AWS experience for application infrastructure.",
+              "span": {
+                "start": 198,
+                "end": 244
+              },
+              "lines": {
+                "start": 8,
+                "end": 8
+              }
+            }
+          ],
+          "confidence": 0.94
+        }
+      ],
+      "preferred": [
+        {
+          "requirement_id": "req_smoke_b_postgresql",
+          "classification": "preferred",
+          "concept": "PostgreSQL",
+          "importance": "medium",
+          "weight": 0.6,
+          "source_text": "PostgreSQL experience.",
+          "normalized_terms": [
+            "postgresql"
+          ],
+          "years": null,
+          "seniority": [],
+          "industries": [],
+          "domains": [],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_b_postgresql",
+              "source_text": "PostgreSQL experience.",
+              "span": {
+                "start": 274,
+                "end": 296
+              },
+              "lines": {
+                "start": 11,
+                "end": 11
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "requirement_id": "req_smoke_b_saas",
+          "classification": "preferred",
+          "concept": "SaaS product background",
+          "importance": "medium",
+          "weight": 0.6,
+          "source_text": "SaaS product background.",
+          "normalized_terms": [
+            "saas",
+            "product background"
+          ],
+          "years": null,
+          "seniority": [],
+          "industries": [
+            {
+              "value": "SaaS",
+              "evidence": [
+                {
+                  "evidence_id": "ev_smoke_job_b_saas",
+                  "source_text": "SaaS product background.",
+                  "span": {
+                    "start": 299,
+                    "end": 323
+                  },
+                  "lines": {
+                    "start": 12,
+                    "end": 12
+                  }
+                }
+              ],
+              "confidence": 0.9,
+              "normalized": "saas"
+            }
+          ],
+          "domains": [],
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_b_saas",
+              "source_text": "SaaS product background.",
+              "span": {
+                "start": 299,
+                "end": 323
+              },
+              "lines": {
+                "start": 12,
+                "end": 12
+              }
+            }
+          ],
+          "confidence": 0.94
+        }
+      ],
+      "terminology": [
+        {
+          "surface": "Senior Full Stack Engineer",
+          "canonical": "senior full stack engineer",
+          "source": "title",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_b_title",
+              "source_text": "Senior Full Stack Engineer",
+              "span": {
+                "start": 0,
+                "end": 26
+              },
+              "lines": {
+                "start": 1,
+                "end": 1
+              }
+            }
+          ],
+          "confidence": 0.9
+        },
+        {
+          "surface": "React",
+          "canonical": "react",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_b_react",
+              "source_text": "React experience for production web applications.",
+              "span": {
+                "start": 78,
+                "end": 127
+              },
+              "lines": {
+                "start": 5,
+                "end": 5
+              }
+            }
+          ],
+          "confidence": 0.9
+        },
+        {
+          "surface": "Node.js",
+          "canonical": "node.js",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_b_node",
+              "source_text": "Node.js service development.",
+              "span": {
+                "start": 130,
+                "end": 158
+              },
+              "lines": {
+                "start": 6,
+                "end": 6
+              }
+            }
+          ],
+          "confidence": 0.9
+        },
+        {
+          "surface": "GraphQL API design",
+          "canonical": "graphql api design",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_b_graphql",
+              "source_text": "GraphQL API design or maintenance.",
+              "span": {
+                "start": 161,
+                "end": 195
+              },
+              "lines": {
+                "start": 7,
+                "end": 7
+              }
+            }
+          ],
+          "confidence": 0.9
+        },
+        {
+          "surface": "AWS",
+          "canonical": "aws",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_b_aws",
+              "source_text": "AWS experience for application infrastructure.",
+              "span": {
+                "start": 198,
+                "end": 244
+              },
+              "lines": {
+                "start": 8,
+                "end": 8
+              }
+            }
+          ],
+          "confidence": 0.9
+        },
+        {
+          "surface": "PostgreSQL",
+          "canonical": "postgresql",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_b_postgresql",
+              "source_text": "PostgreSQL experience.",
+              "span": {
+                "start": 274,
+                "end": 296
+              },
+              "lines": {
+                "start": 11,
+                "end": 11
+              }
+            }
+          ],
+          "confidence": 0.9
+        },
+        {
+          "surface": "SaaS",
+          "canonical": "saas",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_smoke_job_b_saas",
+              "source_text": "SaaS product background.",
+              "span": {
+                "start": 299,
+                "end": 323
+              },
+              "lines": {
+                "start": 12,
+                "end": 12
+              }
+            }
+          ],
+          "confidence": 0.9
+        }
+      ],
+      "source_evidence": [
+        {
+          "evidence_id": "ev_smoke_job_b_title",
+          "source_text": "Senior Full Stack Engineer",
+          "span": {
+            "start": 0,
+            "end": 26
+          },
+          "lines": {
+            "start": 1,
+            "end": 1
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_job_b_company",
+          "source_text": "Example Growth Systems",
+          "span": {
+            "start": 27,
+            "end": 49
+          },
+          "lines": {
+            "start": 2,
+            "end": 2
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_job_b_react",
+          "source_text": "React experience for production web applications.",
+          "span": {
+            "start": 78,
+            "end": 127
+          },
+          "lines": {
+            "start": 5,
+            "end": 5
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_job_b_node",
+          "source_text": "Node.js service development.",
+          "span": {
+            "start": 130,
+            "end": 158
+          },
+          "lines": {
+            "start": 6,
+            "end": 6
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_job_b_graphql",
+          "source_text": "GraphQL API design or maintenance.",
+          "span": {
+            "start": 161,
+            "end": 195
+          },
+          "lines": {
+            "start": 7,
+            "end": 7
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_job_b_aws",
+          "source_text": "AWS experience for application infrastructure.",
+          "span": {
+            "start": 198,
+            "end": 244
+          },
+          "lines": {
+            "start": 8,
+            "end": 8
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_job_b_postgresql",
+          "source_text": "PostgreSQL experience.",
+          "span": {
+            "start": 274,
+            "end": 296
+          },
+          "lines": {
+            "start": 11,
+            "end": 11
+          }
+        },
+        {
+          "evidence_id": "ev_smoke_job_b_saas",
+          "source_text": "SaaS product background.",
+          "span": {
+            "start": 299,
+            "end": 323
+          },
+          "lines": {
+            "start": 12,
+            "end": 12
+          }
+        }
+      ],
+      "uncertainty": [],
+      "metadata": {
+        "fixture": "smoke-job-b"
+      }
+    }
+  }
+}

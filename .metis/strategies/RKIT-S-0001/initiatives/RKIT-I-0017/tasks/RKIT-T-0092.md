@@ -4,14 +4,14 @@ level: task
 title: "Resume extraction through ModelAdapter; delete resume_patterns/lexicon recall paths"
 short_code: "RKIT-T-0092"
 created_at: 2026-08-17T16:26:26.986828+00:00
-updated_at: 2026-08-17T16:36:22.216390+00:00
+updated_at: 2026-08-17T16:43:57.910294+00:00
 parent: resume-agent-model-based-resume
 blocked_by: [RKIT-T-0091]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0017
 ## Objective **[REQUIRED]**
 
 Rewire `extractResumeSemantics` to real extraction through the RKIT-I-0016 `ModelAdapter` and DELETE the fixture regex engine: `resume_patterns` with its hardcoded fixture phrase "Led a small team of three developers" and fixture labels (audit refs __init__.py:362-394), the "software development experience" years regex (:337-341), `_years_phrase` one..ten word numerals (:286-290), the `_terms_for` 14-entry lexicon (:100-125 — as a RECALL mechanism), and comma-split title parsing (:434-441). No silent deterministic fallback — provider failure surfaces as the typed taxonomy; deterministic code keeps only validation/mapping.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

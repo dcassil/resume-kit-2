@@ -793,7 +793,8 @@ def _resume_provenance(text: str, extraction: JsonObject | None) -> list[JsonObj
 
 def _requirements_from_extraction(extraction: JsonObject | None) -> list[JsonObject]:
     requirements = []
-    for item in (extraction or {}).get("requirements", []):
+    extracted = extraction or {}
+    for item in [*extracted.get("requirements", []), *extracted.get("preferred", [])]:
         if not isinstance(item, dict):
             continue
         source_text = str(item.get("source_text") or item.get("concept") or "")
