@@ -4,14 +4,14 @@ level: task
 title: "Call-audit record schema, sink, and emission from both adapters"
 short_code: "RKIT-T-0101"
 created_at: 2026-08-17T18:37:55.820964+00:00
-updated_at: 2026-08-17T18:40:24.141376+00:00
+updated_at: 2026-08-17T18:47:55.753809+00:00
 parent: resume-agent-auditability
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0021
 ## Objective
 
 Implement the RKIT-A-0003 item 6 call-audit record: a package-owned record schema plus sink interface, emitted for EVERY `ModelAdapter` call — fake and live, success and failure — so that failed and retried calls are audit events, not silences, and identical fake-adapter inputs yield byte-identical records (Determinism Gate).
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

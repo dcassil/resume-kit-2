@@ -4,14 +4,14 @@ level: task
 title: "Agent-metadata manifest block, defined-location contract test, TEST_SPEC :91, reconstruction"
 short_code: "RKIT-T-0102"
 created_at: 2026-08-17T18:37:55.889471+00:00
-updated_at: 2026-08-17T18:37:55.889471+00:00
+updated_at: 2026-08-17T18:47:56.320617+00:00
 parent: resume-agent-auditability
-blocked_by: ["RKIT-T-0101"]
+blocked_by: [RKIT-T-0101]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0021
 ## Objective
 
 Close the resume-agent TEST_SPEC Determinism Strategy (:91) enforceability gap: expose ONE package-owned agent-metadata structure (adapter id/version, model id, config hash, prompt-template versions), define WHERE it lives in the workflow run manifest, assert that location with a contract test, and prove the Audit Gate: from a run manifest plus call-audit records, the exact adapter/model/config/prompt identity and failure history of an agent-involved run are recoverable.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -54,4 +56,5 @@ Recommended Agent: opus + high
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-17: Implemented private resume-agent metadata block and workflow private audit sink route because `tools/resume_agent_guardrails.py` pins `ALLOWED_SURFACES` to the existing five public proposal functions. Added focused contract coverage for manifest location/shape, prompt asset sha inventory, byte-stability, audit refs, and reconstruction with one successful call plus one retried provider failure. Focused unittest checks are green; full gates pending.
+- 2026-08-17: Full verification green: `python3 tools/run_gate.py --pr --root .`, `python3 tools/run_gate.py --smoke --root .`, `python3 tools/run_gate.py --future-contract --root .`; `wc -l workflow/__init__.py` is 1499. No fixture snapshots changed.

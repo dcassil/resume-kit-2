@@ -159,7 +159,7 @@ Call-audit covering tests:
 
 Because language models may vary, official tests should stabilize behavior through:
 
-- fixed model/config metadata in manifests,
+- fixed agent model/config metadata at workflow run manifest `agent_model_config`, with call-audit record paths in `audit_refs`; covered by `test_agent_model_config_manifest_block_has_defined_shape_and_is_byte_stable` and `test_agent_involved_manifest_refs_reconstruct_model_prompt_and_failure_history`,
 - structured output schemas,
 - golden fixture inputs,
 - tolerant assertions on question wording,

@@ -128,7 +128,7 @@ def createRun(workspace: str | Path, config: JsonObject) -> JsonObject:
         "workflow_config": workflow_config.config.to_dict(),
         "workflow_config_errors": list(workflow_config.errors),
         "workflow_config_warnings": list(workflow_config.warnings),
-        "agent_model_config": workflow_config.config.agent_config.to_dict(), "agent_config_hash": workflow_config.config.agent_config_hash,
+        "agent_model_config": workflow_config.config.agent_config.to_dict(metadata=True), "agent_config_hash": workflow_config.config.agent_config_hash,
         "overflow_iteration": 0,
         "render_overflow_state": _empty_render_overflow_state(),
         "render_overflow_blocking_reasons": [],

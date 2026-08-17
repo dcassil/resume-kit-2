@@ -517,7 +517,96 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
 
         self.assertEqual(absent_agent["config_hash"], explicit_defaults["config_hash"])
         self.assertNotEqual(explicit_defaults["config_hash"], changed_model["config_hash"])
-        self.assertEqual(changed_model["agent_model_config"]["model"], "claude-sonnet-4-6-next")
+        self.assertNotEqual(explicit_defaults["agent_model_config"]["config_hash"], changed_model["agent_model_config"]["config_hash"])
+        self.assertEqual(changed_model["agent_config_hash"], changed_model["agent_model_config"]["config_hash"])
+
+    def test_agent_model_config_manifest_block_has_defined_shape_and_is_byte_stable(self):
+        first = self.create_run()
+        second = self.create_run()
+        metadata = first["agent_model_config"]
+
+        self.assertEqual(
+            set(metadata),
+            {"adapter_id", "adapter_version", "model_id", "config_hash", "prompt_template_versions"},
+        )
+        self.assertEqual(metadata["adapter_id"], "resume-agent-deterministic-fake")
+        self.assertEqual(metadata["adapter_version"], "0.1.0")
+        self.assertEqual(metadata["model_id"], "deterministic-fixture-v1")
+        self.assertEqual(metadata["config_hash"], first["agent_config_hash"])
+        prompt_versions = metadata["prompt_template_versions"]
+        self.assertGreaterEqual(len(prompt_versions), 5)
+        prompt_files = sorted((ROOT / "resume-agent" / "resume_agent" / "prompts").glob("*@v*.txt"))
+        self.assertEqual(
+            {item["prompt_template_id"] for item in prompt_versions},
+            {path.name.removesuffix(".txt") for path in prompt_files},
+        )
+        for prompt_version in prompt_versions:
+            self.assertEqual(
+                set(prompt_version),
+                {"prompt_template_id", "template_id", "version", "path", "sha256"},
+            )
+            self.assertRegex(prompt_version["prompt_template_id"], r"^resume-agent\..+@v[0-9]+$")
+            self.assertRegex(prompt_version["version"], r"^v[0-9]+$")
+            self.assertTrue(prompt_version["path"].endswith(f"{prompt_version['prompt_template_id']}.txt"))
+            prompt_path = ROOT / "resume-agent" / "resume_agent" / prompt_version["path"]
+            self.assertEqual(prompt_version["sha256"], hashlib.sha256(prompt_path.read_bytes()).hexdigest())
+        first_bytes = json.dumps(first["agent_model_config"], sort_keys=True, separators=(",", ":"))
+        second_bytes = json.dumps(second["agent_model_config"], sort_keys=True, separators=(",", ":"))
+        self.assertEqual(first_bytes, second_bytes)
+
+    def test_agent_involved_manifest_refs_reconstruct_model_prompt_and_failure_history(self):
+        from resume_agent._adapters import AdapterProviderError, ValidatingModelAdapter
+        from resume_agent._fake_adapter import DEFAULT_FAKE_OUTPUT_SCHEMAS, DeterministicFakeAdapter
+        from resume_agent._interview_requests import build_question_request
+        from workflow.agent_metadata import call_audit_sink_for_run, read_call_audit_records
+
+        class RetriedProviderFailure(AdapterProviderError):
+            retries = 2
+            usage = {"input_tokens": 9}
+
+        class FailingAdapter(ValidatingModelAdapter):
+            def __init__(self, manifest_metadata, sink, agent_config):
+                super().__init__(
+                    adapter_id=manifest_metadata["adapter_id"],
+                    adapter_version=manifest_metadata["adapter_version"],
+                    model_id=manifest_metadata["model_id"],
+                    agent_config=agent_config,
+                    output_schemas=DEFAULT_FAKE_OUTPUT_SCHEMAS,
+                    call_audit_sink=sink,
+                )
+
+            def _complete_unchecked(self, _request):
+                raise RetriedProviderFailure("provider unavailable")
+
+        run_state = self.valid_manifest_run_state()
+        sink = call_audit_sink_for_run(run_state)
+        request = build_question_request("AWS", {"requirement_ids": ["req_aws"], "fact_ids": []}, [])
+        ok_result = DeterministicFakeAdapter(call_audit_sink=sink).complete(request)
+        failed_result = FailingAdapter(
+            run_state["agent_model_config"],
+            sink,
+            self.workflow._resolve_workflow_config(self.config).config.agent_config,
+        ).complete(request)
+        manifest = maybe_await(self.workflow.buildRunManifest(run_state))
+
+        self.assertEqual(ok_result.status, "ok")
+        self.assertEqual(failed_result.status, "error")
+        self.assertEqual(failed_result.retries, 2)
+        self.assertEqual(len(manifest["audit_refs"]), 2)
+        records = read_call_audit_records(self.workspace, manifest["audit_refs"])
+        metadata = manifest["agent_model_config"]
+        prompt_hashes = {item["sha256"] for item in metadata["prompt_template_versions"]}
+        for record in records:
+            self.assertEqual(record["adapter_id"], metadata["adapter_id"])
+            self.assertEqual(record["adapter_version"], metadata["adapter_version"])
+            self.assertEqual(record["model_id"], metadata["model_id"])
+            self.assertEqual(record["config_hash"], metadata["config_hash"])
+            self.assertIn(record["prompt_hash"], prompt_hashes)
+            self.assertRegex(record["call_id"], r"^[0-9a-f]{64}$")
+        self.assertEqual(
+            [{"outcome": record["outcome"], "retry_count": record["retry_count"]} for record in records],
+            [{"outcome": "ok", "retry_count": 0}, {"outcome": "provider_error", "retry_count": 2}],
+        )
 
     def test_recover_run_unknown_run_raises_unknown_run_error(self):
         with self.assertRaises(self.workflow.UnknownRunError) as raised:
@@ -1509,7 +1598,6 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
                 "job_id": "job_1",
                 "career_db_schema_version": "1",
                 "renderer_template_version": "ats-clean@1",
-                "agent_model_config": {"model": "fixed-test"},
                 "initial_score": 6.4,
                 "final_score": 8.2,
                 "facts_added": ["fact_aws"],

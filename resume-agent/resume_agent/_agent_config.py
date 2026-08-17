@@ -56,7 +56,11 @@ class AgentConfig:
     max_retries: int = DEFAULT_AGENT_MAX_RETRIES
     cost_ceiling: float = DEFAULT_AGENT_COST_CEILING
 
-    def to_dict(self) -> JsonObject:
+    def to_dict(self, *, metadata: bool = False) -> JsonObject:
+        if metadata:
+            from ._agent_metadata import build_agent_metadata
+
+            return build_agent_metadata(self)
         return {
             "model": self.model,
             "schema_mode": self.schema_mode,
