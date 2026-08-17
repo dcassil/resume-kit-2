@@ -4,14 +4,14 @@ level: initiative
 title: "PDF Support Policy: Honest Unsupported Status (Runtime Deferred per RKIT-A-0004)"
 short_code: "RKIT-I-0033"
 created_at: 2026-08-13T20:41:37.697247+00:00
-updated_at: 2026-08-17T20:05:36.427258+00:00
+updated_at: 2026-08-17T20:13:08.794089+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: []
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -59,6 +59,10 @@ Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
 
 ### Blocked Status
 - No. `blocked_by: []` — the ADR block is lifted (RKIT-A-0004 decided 2026-08-13).
+
+## Status Updates
+
+- 2026-08-17: COMPLETE (single task T-0110, ee958e8). Fake-PDF fabrication deleted grep-proof; three-reason unsupported decision order live and independently probed (format_targets_missing / not_in_format_targets / pdf_not_supported_in_mvp), no artifact ever; future-runtime invariant test (%PDF bytes required for ok) in place; render_surface.json reason enum; TEST_SPEC "producing a PDF = actual bytes"; CLI export pdf = skip-with-notice exit 0. No new deps; zero protected edits; gates PR 584 / future 591 / smoke green; version 0.26.0.
 
 ## Detailed Design **[REQUIRED]**
 

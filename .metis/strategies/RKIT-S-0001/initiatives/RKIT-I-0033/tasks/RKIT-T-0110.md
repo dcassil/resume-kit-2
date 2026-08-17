@@ -4,14 +4,14 @@ level: task
 title: "renderPdf honest unsupported: three-reason decision order, no fabricated artifact, surface/TEST_SPEC alignment"
 short_code: "RKIT-T-0110"
 created_at: 2026-08-17T20:05:02.206393+00:00
-updated_at: 2026-08-17T20:05:36.574109+00:00
+updated_at: 2026-08-17T20:13:00.154452+00:00
 parent: pdf-support-policy-honest
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0033
 ## Objective
 
 Kill the fake-PDF honesty violation per RKIT-A-0004 item 2: `renderPdf` returns `{status: "unsupported", reason, format: "pdf", template_version}` with NO fabricated artifact for all three reason paths, the reason vocabulary is enumerated in `render_surface.json`, TEST_SPEC defines "producing a PDF" as actual PDF bytes, and the Markdown+DOCX release targets are provably unaffected.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
