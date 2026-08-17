@@ -37,6 +37,14 @@ from resume_agent._extraction_requests import (
     prompt_template_text,
 )
 from resume_agent._extraction_schemas import JOB_EXTRACTION_SCHEMA_ID, RESUME_EXTRACTION_SCHEMA_ID
+from resume_agent._interview_requests import (
+    ANSWER_INTERPRETATION_PROMPT_TEMPLATE_ID,
+    QUESTION_GENERATION_PROMPT_TEMPLATE_ID,
+    build_answer_interpretation_request,
+    build_question_request,
+    prompt_template_text as interview_prompt_template_text,
+)
+from resume_agent._interview_schemas import ANSWER_INTERPRETATION_SCHEMA_ID, QUESTION_GENERATION_SCHEMA_ID
 from resume_agent._schema_validation import validate_json_schema, validate_schema_id
 
 
@@ -148,6 +156,22 @@ Required:
 Preferred:
 - TypeScript experience.
 """
+
+AWS_QUESTION_REQUEST_ARGS = (
+    "AWS",
+    {"requirement_ids": ["req_aws"], "fact_ids": ["fact_cloud"]},
+    ["Preferred: AWS production experience."],
+)
+TERRAFORM_QUESTION_REQUEST_ARGS = (
+    "Terraform",
+    {"requirement_ids": ["req_terraform"], "fact_ids": ["fact_iac"]},
+    ["Preferred: Terraform infrastructure-as-code experience."],
+)
+AWS_DENIAL_ANSWER = "No, I have never used AWS professionally"
+GRAPHQL_QUALIFIED_ANSWER = "Yes, but only internal tools"
+ARCHITECTURE_AFFIRMED_ANSWER = "Yes, I designed REST API architecture for customer-facing SaaS products."
+AWS_UNRESPONSIVE_ANSWER = "I really prefer working on frontend design systems."
+TERRAFORM_AFFIRMED_ANSWER = "I used Terraform to manage GCP infrastructure modules for internal platform environments."
 
 
 def request() -> AdapterRequest:
@@ -437,6 +461,98 @@ class ResumeAgentExtractionSchemaContractTests(unittest.TestCase):
             for skill_name in expected_skills:
                 with self.subTest(fixture_id=fixture_id, skill=skill_name):
                     self.assertIn(skill_name, requirement_text)
+
+
+class ResumeAgentInterviewSchemaContractTests(unittest.TestCase):
+    def test_interview_schema_ids_are_registered_with_fake_adapter_validator(self):
+        self.assertIn(QUESTION_GENERATION_SCHEMA_ID, DEFAULT_FAKE_OUTPUT_SCHEMAS)
+        self.assertIn(ANSWER_INTERPRETATION_SCHEMA_ID, DEFAULT_FAKE_OUTPUT_SCHEMAS)
+
+        question_payload = _fixture_payload("resume-agent-question-generation-aws")
+        interpretation_payload = _fixture_payload("resume-agent-answer-interpretation-aws-denial")
+
+        self.assertEqual(validate_schema_id(question_payload, QUESTION_GENERATION_SCHEMA_ID, DEFAULT_FAKE_OUTPUT_SCHEMAS), [])
+        self.assertEqual(validate_schema_id(interpretation_payload, ANSWER_INTERPRETATION_SCHEMA_ID, DEFAULT_FAKE_OUTPUT_SCHEMAS), [])
+
+    def test_answer_interpretation_schema_requires_polarity_and_canonical_resolution_state(self):
+        payload = copy.deepcopy(_fixture_payload("resume-agent-answer-interpretation-aws-denial"))
+        del payload["polarity"]
+        payload["requirementResolutions"][0]["suggested_state"] = "explicit_absence"
+
+        violations = validate_schema_id(payload, ANSWER_INTERPRETATION_SCHEMA_ID, DEFAULT_FAKE_OUTPUT_SCHEMAS)
+        pairs = {(item.get("code"), item.get("field_path")) for item in violations}
+
+        self.assertIn(("missing_field", "polarity"), pairs)
+        self.assertIn(("invalid_enum", "requirementResolutions/0/suggested_state"), pairs)
+
+    def test_interview_prompt_assets_use_template_id_at_version_convention(self):
+        self.assertEqual(QUESTION_GENERATION_PROMPT_TEMPLATE_ID, "resume-agent.question-generation@v1")
+        self.assertEqual(ANSWER_INTERPRETATION_PROMPT_TEMPLATE_ID, "resume-agent.answer-interpretation@v1")
+        self.assertIn("Return only JSON", interview_prompt_template_text(QUESTION_GENERATION_PROMPT_TEMPLATE_ID))
+        self.assertIn("Return only JSON", interview_prompt_template_text(ANSWER_INTERPRETATION_PROMPT_TEMPLATE_ID))
+
+    def test_interview_request_builders_are_deterministic_and_do_not_filter_verified_facts(self):
+        first = build_question_request(*AWS_QUESTION_REQUEST_ARGS)
+        second = build_question_request(*AWS_QUESTION_REQUEST_ARGS)
+        changed_topic = build_question_request("Terraform", AWS_QUESTION_REQUEST_ARGS[1], AWS_QUESTION_REQUEST_ARGS[2])
+
+        self.assertEqual(first, second)
+        self.assertNotEqual(first.input_payload, changed_topic.input_payload)
+        self.assertEqual(first.prompt_template_id, QUESTION_GENERATION_PROMPT_TEMPLATE_ID)
+        self.assertEqual(first.output_schema_id, QUESTION_GENERATION_SCHEMA_ID)
+        self.assertEqual(first.input_payload["schema_id"], QUESTION_GENERATION_SCHEMA_ID)
+        self.assertNotIn("already_verified_fact_ids", first.input_payload)
+
+        answer_first = build_answer_interpretation_request("What AWS services have you used professionally?", AWS_DENIAL_ANSWER, "AWS")
+        answer_second = build_answer_interpretation_request("What AWS services have you used professionally?", AWS_DENIAL_ANSWER, "AWS")
+        self.assertEqual(answer_first, answer_second)
+        self.assertEqual(answer_first.prompt_template_id, ANSWER_INTERPRETATION_PROMPT_TEMPLATE_ID)
+        self.assertEqual(answer_first.output_schema_id, ANSWER_INTERPRETATION_SCHEMA_ID)
+
+    def test_golden_interview_fixtures_are_retrievable_by_deterministic_requests(self):
+        cases = [
+            build_question_request(*AWS_QUESTION_REQUEST_ARGS),
+            build_question_request(*TERRAFORM_QUESTION_REQUEST_ARGS),
+            build_answer_interpretation_request("What AWS services have you used professionally?", AWS_DENIAL_ANSWER, "AWS"),
+            build_answer_interpretation_request("Have you built GraphQL APIs in production?", GRAPHQL_QUALIFIED_ANSWER, "GraphQL"),
+            build_answer_interpretation_request("What API or application architecture have you designed?", ARCHITECTURE_AFFIRMED_ANSWER, "API architecture"),
+            build_answer_interpretation_request("What AWS services have you used professionally?", AWS_UNRESPONSIVE_ANSWER, "AWS"),
+            build_answer_interpretation_request(
+                "What Terraform infrastructure-as-code experience do you have?",
+                TERRAFORM_AFFIRMED_ANSWER,
+                "Terraform",
+            ),
+        ]
+        adapter = DeterministicFakeAdapter(fixture_dir=FAKE_FIXTURES)
+
+        for request in cases:
+            key = deterministic_fake_key(request.prompt_template_id, request.output_schema_id, request.input_payload)
+            with self.subTest(key=key):
+                result = adapter.complete(request)
+                self.assertEqual(result.status, "ok")
+                self.assertTrue(result.payload["requires_validation"])
+
+    def test_denial_fixture_has_explicit_absence_and_zero_positive_fact_proposals(self):
+        payload = _fixture_payload("resume-agent-answer-interpretation-aws-denial")
+
+        self.assertEqual(payload["polarity"], "denied")
+        self.assertEqual(payload["requirementResolutions"][0]["suggested_state"], "explicitly_missing")
+        self.assertEqual(payload["factProposals"], [])
+
+    def test_qualified_fixture_preserves_hedge(self):
+        payload = _fixture_payload("resume-agent-answer-interpretation-graphql-qualified")
+
+        self.assertEqual(payload["polarity"], "qualified")
+        self.assertEqual(payload["requirementResolutions"][0]["hedge_or_qualifier"], "only internal tools")
+        self.assertEqual(payload["factProposals"][0]["hedge_or_qualifier"], "only internal tools")
+
+    def test_non_fixture_topic_pair_covers_terraform_question_and_interpretation(self):
+        question = _fixture_payload("resume-agent-question-generation-terraform")
+        answer = _fixture_payload("resume-agent-answer-interpretation-terraform-affirmed")
+
+        self.assertIn("Terraform", question["question"])
+        self.assertEqual(answer["polarity"], "affirmed")
+        self.assertIn("terraform", json.dumps(answer["factProposals"], sort_keys=True).lower())
 
 
 class ResumeAgentAnthropicAdapterContractTests(unittest.TestCase):

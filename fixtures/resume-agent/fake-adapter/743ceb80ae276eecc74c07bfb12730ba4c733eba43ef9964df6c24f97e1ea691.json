@@ -1,0 +1,82 @@
+{
+  "fixture_id": "resume-agent-answer-interpretation-architecture-affirmed",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Affirmed architecture answer produces source-linked fact proposal."
+  ],
+  "comment": "RKIT-T-0095 interview schema golden fixture. The file name is the sha256 key for the request tuple.",
+  "data": {
+    "key": {
+      "sha256": "743ceb80ae276eecc74c07bfb12730ba4c733eba43ef9964df6c24f97e1ea691",
+      "prompt_template_id": "resume-agent.answer-interpretation@v1",
+      "output_schema_id": "resume-agent.answer-interpretation.v1",
+      "canonical_input_json": "{\"answer_text\":\"Yes, I designed REST API architecture for customer-facing SaaS products.\",\"question\":\"What API or application architecture have you designed?\",\"schema_id\":\"resume-agent.answer-interpretation.v1\",\"topic\":\"API architecture\"}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.answer-interpretation.v1",
+      "proposal_type": "answer_interpretation",
+      "requires_validation": true,
+      "polarity": "affirmed",
+      "requirementResolutions": [
+        {
+          "requirement_id": "req_api_architecture",
+          "suggested_state": "possible_match",
+          "confidence": 0.89,
+          "hedge_or_qualifier": null,
+          "evidence": [
+            {
+              "evidence_id": "ev_answer_architecture_affirmed",
+              "source_text": "Yes, I designed REST API architecture for customer-facing SaaS products.",
+              "span": {
+                "start": 0,
+                "end": 72
+              }
+            }
+          ]
+        }
+      ],
+      "factProposals": [
+        {
+          "fact_id": "fact_rest_api_architecture",
+          "category": "experience",
+          "text": "Designed REST API architecture for customer-facing SaaS products",
+          "normalized_terms": [
+            "rest api architecture",
+            "customer-facing saas products"
+          ],
+          "source_evidence_ids": [
+            "ev_answer_architecture_affirmed"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_answer_architecture_affirmed",
+              "source_text": "Yes, I designed REST API architecture for customer-facing SaaS products.",
+              "span": {
+                "start": 0,
+                "end": 72
+              }
+            }
+          ],
+          "verification_state": "inferred",
+          "confidence": 0.89,
+          "hedge_or_qualifier": null
+        }
+      ],
+      "evidenceProposals": [
+        {
+          "evidence_id": "ev_answer_architecture_affirmed",
+          "kind": "user_answer",
+          "text": "Yes, I designed REST API architecture for customer-facing SaaS products.",
+          "span": {
+            "start": 0,
+            "end": 72
+          },
+          "confidence": 1.0
+        }
+      ],
+      "uncertainty": []
+    }
+  }
+}

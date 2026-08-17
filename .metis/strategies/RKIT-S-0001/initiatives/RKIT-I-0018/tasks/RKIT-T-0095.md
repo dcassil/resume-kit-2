@@ -4,14 +4,14 @@ level: task
 title: "Question/interpretation schemas + fake fixtures (affirm/deny/qualified/off-topic)"
 short_code: "RKIT-T-0095"
 created_at: 2026-08-17T16:59:31.355618+00:00
-updated_at: 2026-08-17T16:59:31.355618+00:00
+updated_at: 2026-08-17T17:00:58.981629+00:00
 parent: resume-agent-targeted-interview
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0018
 ## Objective **[REQUIRED]**
 
 Land the interview-surface substrate on the I-0016/I-0017 pattern: (1) a question-generation output schema — question text, targeted requirement/fact ids, rationale — and an answer-interpretation output schema per section 8: `{requirementResolutions, factProposals, evidenceProposals}` with per-item model-sourced confidence, resolution states from the section 4.4 set, fact proposals carrying evidence linkage to the answer text + verification_state; the interpretation payload also carries an explicit `polarity` classification (affirmed | denied | qualified | unresponsive) the T-0097 post-guard will enforce against. (2) Versioned prompt-template assets + deterministic builders. (3) Fake-adapter fixtures covering affirmation, denial, qualification ("yes, but only internal tools"), and off-topic/unresponsive answers, PLUS a non-fixture topic (not aws/graphql/architecture) — the substrate for the negation and persistence batteries.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria **[REQUIRED]**
 
@@ -52,4 +54,4 @@ None within I-0018 (first task). Serial chain T-0095→0096→0097.
 
 ## Status Updates **[REQUIRED]**
 
-*To be added during implementation*
+- 2026-08-17: I-0017 complete (v0.19.0 pushed 6971a66). I-0018 decomposed T-0095..0097 (serial). Codex launched on the substrate: question-generation.v1 + answer-interpretation.v1 schemas (polarity required), prompt assets + builders, denial/qualified/affirmation/unresponsive/Terraform fixtures.

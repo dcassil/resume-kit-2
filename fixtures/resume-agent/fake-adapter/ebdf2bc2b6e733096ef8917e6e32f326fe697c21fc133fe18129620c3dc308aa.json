@@ -1,0 +1,61 @@
+{
+  "fixture_id": "resume-agent-answer-interpretation-aws-unresponsive",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Off-topic AWS answer is unresponsive and does not invent AWS facts."
+  ],
+  "comment": "RKIT-T-0095 interview schema golden fixture. The file name is the sha256 key for the request tuple.",
+  "data": {
+    "key": {
+      "sha256": "ebdf2bc2b6e733096ef8917e6e32f326fe697c21fc133fe18129620c3dc308aa",
+      "prompt_template_id": "resume-agent.answer-interpretation@v1",
+      "output_schema_id": "resume-agent.answer-interpretation.v1",
+      "canonical_input_json": "{\"answer_text\":\"I really prefer working on frontend design systems.\",\"question\":\"What AWS services have you used professionally?\",\"schema_id\":\"resume-agent.answer-interpretation.v1\",\"topic\":\"AWS\"}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.answer-interpretation.v1",
+      "proposal_type": "answer_interpretation",
+      "requires_validation": true,
+      "polarity": "unresponsive",
+      "requirementResolutions": [
+        {
+          "requirement_id": "req_aws",
+          "suggested_state": "unknown",
+          "confidence": 0.88,
+          "hedge_or_qualifier": null,
+          "evidence": [
+            {
+              "evidence_id": "ev_answer_aws_unresponsive",
+              "source_text": "I really prefer working on frontend design systems.",
+              "span": {
+                "start": 0,
+                "end": 51
+              }
+            }
+          ]
+        }
+      ],
+      "factProposals": [],
+      "evidenceProposals": [
+        {
+          "evidence_id": "ev_answer_aws_unresponsive",
+          "kind": "user_answer",
+          "text": "I really prefer working on frontend design systems.",
+          "span": {
+            "start": 0,
+            "end": 51
+          },
+          "confidence": 1.0
+        }
+      ],
+      "uncertainty": [
+        {
+          "kind": "off_topic",
+          "message": "The answer does not address AWS experience."
+        }
+      ]
+    }
+  }
+}

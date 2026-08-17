@@ -1,0 +1,82 @@
+{
+  "fixture_id": "resume-agent-answer-interpretation-graphql-qualified",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Qualified GraphQL answer preserves the internal-tools hedge."
+  ],
+  "comment": "RKIT-T-0095 interview schema golden fixture. The file name is the sha256 key for the request tuple.",
+  "data": {
+    "key": {
+      "sha256": "24df88bf38a9141f3b8f2b6d1352c8ea2c0db5f0879b2278eee2c6a89d15c98e",
+      "prompt_template_id": "resume-agent.answer-interpretation@v1",
+      "output_schema_id": "resume-agent.answer-interpretation.v1",
+      "canonical_input_json": "{\"answer_text\":\"Yes, but only internal tools\",\"question\":\"Have you built GraphQL APIs in production?\",\"schema_id\":\"resume-agent.answer-interpretation.v1\",\"topic\":\"GraphQL\"}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.answer-interpretation.v1",
+      "proposal_type": "answer_interpretation",
+      "requires_validation": true,
+      "polarity": "qualified",
+      "requirementResolutions": [
+        {
+          "requirement_id": "req_graphql",
+          "suggested_state": "possible_match",
+          "confidence": 0.82,
+          "hedge_or_qualifier": "only internal tools",
+          "evidence": [
+            {
+              "evidence_id": "ev_answer_graphql_qualified",
+              "source_text": "Yes, but only internal tools",
+              "span": {
+                "start": 0,
+                "end": 28
+              }
+            }
+          ]
+        }
+      ],
+      "factProposals": [
+        {
+          "fact_id": "fact_graphql_internal_tools",
+          "category": "skill",
+          "text": "GraphQL experience limited to internal tools",
+          "normalized_terms": [
+            "graphql",
+            "internal tools"
+          ],
+          "source_evidence_ids": [
+            "ev_answer_graphql_qualified"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_answer_graphql_qualified",
+              "source_text": "Yes, but only internal tools",
+              "span": {
+                "start": 0,
+                "end": 28
+              }
+            }
+          ],
+          "verification_state": "inferred",
+          "confidence": 0.82,
+          "hedge_or_qualifier": "only internal tools"
+        }
+      ],
+      "evidenceProposals": [
+        {
+          "evidence_id": "ev_answer_graphql_qualified",
+          "kind": "user_answer",
+          "text": "Yes, but only internal tools",
+          "span": {
+            "start": 0,
+            "end": 28
+          },
+          "confidence": 1.0
+        }
+      ],
+      "uncertainty": []
+    }
+  }
+}

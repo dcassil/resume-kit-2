@@ -1,0 +1,56 @@
+{
+  "fixture_id": "resume-agent-answer-interpretation-aws-denial",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "AWS denial is represented as explicitly_missing with zero positive fact proposals."
+  ],
+  "comment": "RKIT-T-0095 interview schema golden fixture. The file name is the sha256 key for the request tuple.",
+  "data": {
+    "key": {
+      "sha256": "d9e7d275213d613982ea066857229209209f57e78719e7babfa3d0cf31f43366",
+      "prompt_template_id": "resume-agent.answer-interpretation@v1",
+      "output_schema_id": "resume-agent.answer-interpretation.v1",
+      "canonical_input_json": "{\"answer_text\":\"No, I have never used AWS professionally\",\"question\":\"What AWS services have you used professionally?\",\"schema_id\":\"resume-agent.answer-interpretation.v1\",\"topic\":\"AWS\"}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.answer-interpretation.v1",
+      "proposal_type": "answer_interpretation",
+      "requires_validation": true,
+      "polarity": "denied",
+      "requirementResolutions": [
+        {
+          "requirement_id": "req_aws",
+          "suggested_state": "explicitly_missing",
+          "confidence": 0.96,
+          "hedge_or_qualifier": null,
+          "evidence": [
+            {
+              "evidence_id": "ev_answer_aws_denial",
+              "source_text": "No, I have never used AWS professionally",
+              "span": {
+                "start": 0,
+                "end": 40
+              }
+            }
+          ]
+        }
+      ],
+      "factProposals": [],
+      "evidenceProposals": [
+        {
+          "evidence_id": "ev_answer_aws_denial",
+          "kind": "user_answer",
+          "text": "No, I have never used AWS professionally",
+          "span": {
+            "start": 0,
+            "end": 40
+          },
+          "confidence": 1.0
+        }
+      ],
+      "uncertainty": []
+    }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "fixture_id": "resume-agent-question-generation-terraform",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Non-fixture-topic question generation supports Terraform without substring fixtures."
+  ],
+  "comment": "RKIT-T-0095 interview schema golden fixture. The file name is the sha256 key for the request tuple.",
+  "data": {
+    "key": {
+      "sha256": "dc91b33920c9919586af7d76d9d563deb9c0266ad1fa5480fe940814b0d8393d",
+      "prompt_template_id": "resume-agent.question-generation@v1",
+      "output_schema_id": "resume-agent.question-generation.v1",
+      "canonical_input_json": "{\"context_snippets\":[\"Preferred: Terraform infrastructure-as-code experience.\"],\"schema_id\":\"resume-agent.question-generation.v1\",\"target_ids\":{\"fact_ids\":[\"fact_iac\"],\"requirement_ids\":[\"req_terraform\"]},\"topic\":\"Terraform\"}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.question-generation.v1",
+      "proposal_type": "question_generation",
+      "requires_validation": true,
+      "question": "What Terraform infrastructure-as-code work have you done, and what environments did it support?",
+      "target_ids": {
+        "requirement_ids": [
+          "req_terraform"
+        ],
+        "fact_ids": [
+          "fact_iac"
+        ]
+      },
+      "rationale": "The selected Terraform requirement needs direct infrastructure-as-code evidence without changing the topic.",
+      "confidence": 0.9
+    }
+  }
+}
