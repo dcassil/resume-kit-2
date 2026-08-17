@@ -1826,10 +1826,6 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         }
 
 
-# Bridge the new five-point recovery matrix into the current static PR/future
-# gate module list until tools/run_tests.py is approved to include it directly.
-from tests.contract.test_workflow_recovery_matrix import WorkflowRecoveryMatrixContractTests  # noqa: E402,F401
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -483,7 +483,7 @@ class CareerMcpAdapterContractTests(unittest.TestCase):
                 self.assertIn(result["error"]["type"], {"validation_error", "not_found", "policy_error"})
                 self.assertNotRegex(json.dumps(result).lower(), r"\b(sqlite|select|insert|update|delete|traceback)\b")
 
-    def test_child_parent_relationship_types_fail_at_schema_validation(self):
+    def test_child_parent_relationship_types_are_accepted_and_unadvertised_values_rejected(self):
         for relationship_type in ("child", "parent"):
             with self.subTest(relationship_type=relationship_type):
                 result = call_tool(
@@ -495,9 +495,19 @@ class CareerMcpAdapterContractTests(unittest.TestCase):
                         "relationship_type": relationship_type,
                     },
                 )
-                self.assertEqual(result["status"], "error")
-                self.assertEqual(result["error"]["type"], "validation_error")
-                self.assertEqual(result["error"]["message"], "relationship_type is not supported.")
+                self.assertEqual(result["status"], "ok", result)
+        result = call_tool(
+            self.adapter,
+            "career.add_relationship",
+            {
+                "from_fact_id": "fact_aws",
+                "to_fact_id": "fact_azure",
+                "relationship_type": "sibling",
+            },
+        )
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(result["error"]["type"], "validation_error")
+        self.assertEqual(result["error"]["message"], "relationship_type is not supported.")
 
     def test_search_facts_returns_deterministic_minimum_evidence_without_sensitive_fields(self):
         result = call_tool(self.adapter, "career.search_facts", {"query": "React", "verification": ["source_stated"]})
@@ -1220,10 +1230,6 @@ class CareerMcpNoRawToolTests(unittest.TestCase):
                     self.assertIn(result["error"]["type"], {"unknown_tool", "not_found", "validation_error"})
                     self.assertNotRegex(json.dumps(result).lower(), r"\bselect \*|sqlite|traceback\b")
 
-
-# Bridge the career-mcp manifest parity tests into the current static PR/future
-# gate module list until tools/run_tests.py is approved to include it directly.
-from tests.contract.test_career_mcp_manifest_parity import CareerMcpManifestParityTests  # noqa: E402,F401
 
 
 if __name__ == "__main__":

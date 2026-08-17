@@ -25,6 +25,12 @@ ALLOWED_SURFACES = {
     "findCandidateMatches",
     "recordJobMatch",
     "findConflicts",
+    "getMigrationState",
+    "mergeFacts",
+    "confirmRelationship",
+    "recordInteraction",
+    "listInteractions",
+    "adjudicateConflict",
 }
 
 REQUIRED_TYPES = {
@@ -46,7 +52,7 @@ REQUIRED_VERIFICATION_STATES = {
     "unknown",
 }
 
-REQUIRED_RELATIONSHIP_TYPES = {"alias", "equivalent", "related", "contradicts"}
+REQUIRED_RELATIONSHIP_TYPES = {"alias", "equivalent", "related", "contradicts", "parent", "child"}
 
 REQUIRED_RESOLUTION_STATES = {
     "exact_match",
@@ -59,7 +65,22 @@ REQUIRED_RESOLUTION_STATES = {
     "not_applicable",
 }
 
-MUTATING_SURFACES = {"upsertFact", "verifyFact", "addEvidence", "addRelationship", "recordJobMatch"}
+MUTATING_SURFACES = {
+    "upsertFact",
+    "verifyFact",
+    "addEvidence",
+    "addRelationship",
+    "recordJobMatch",
+    "mergeFacts",
+    "confirmRelationship",
+    "recordInteraction",
+    "adjudicateConflict",
+}
+
+# getMigrationState returns the MigrationState dataclass (RKIT-A-0001): a
+# read-only introspection result with schema_version and status but no audit
+# envelope, so it is exempt from the audit-field requirement below.
+INTROSPECTION_SURFACES = {"getMigrationState"}
 
 FORBIDDEN_PUBLIC_API = {
     "executeSql",
@@ -227,7 +248,8 @@ def validate_surface(root: Path, surface: dict) -> list[Failure]:
         name = entry.get("name", "<unknown>")
         output = entry.get("output_contract", {})
         required_fields = set(output.get("required_fields", [])) if isinstance(output, dict) else set()
-        missing_basics = sorted({"schema_version", "status", "audit"} - required_fields)
+        required_basics = {"schema_version", "status"} if name in INTROSPECTION_SURFACES else {"schema_version", "status", "audit"}
+        missing_basics = sorted(required_basics - required_fields)
         if missing_basics:
             failures.append(
                 Failure(

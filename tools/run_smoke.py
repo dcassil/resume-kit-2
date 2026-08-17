@@ -137,7 +137,20 @@ def run_smoke(root: Path, workspace: Path, keep_workspace: bool) -> None:
     assert_store_fact(store, "api")
 
     adapter = career_mcp.create_career_mcp(store)
-    tool_names = {tool.get("name") for tool in adapter.list_tools()}
+    listed_tools = {tool.get("name"): tool for tool in adapter.list_tools() if isinstance(tool, dict)}
+    canonical_surface = require_json(
+        root / "career-mcp" / "career_mcp" / "tool_surface.json",
+        "career-mcp/career_mcp/tool_surface.json",
+    )
+    canonical_tools = {tool.get("name"): tool for tool in canonical_surface.get("tools", []) if isinstance(tool, dict)}
+    require(bool(canonical_tools), "canonical package MCP manifest did not declare tools")
+    require(set(listed_tools) == set(canonical_tools), "MCP tool registry did not match canonical package manifest")
+    for name in sorted(canonical_tools):
+        require(
+            listed_tools[name].get("input_schema") == canonical_tools[name].get("input_schema"),
+            f"MCP tool schema drifted from canonical package manifest: {name}",
+        )
+    tool_names = set(listed_tools)
     require("career.search_facts" in tool_names and "career.get_fact" in tool_names, "MCP search/detail tools must be exposed")
     require(not any("raw" in str(name).casefold() or "sql" in str(name).casefold() for name in tool_names), "MCP exposed raw SQL-style tool")
     mcp_search = asyncio.run(adapter.call_tool("career.search_facts", {"query": "React", "limit": 5}))

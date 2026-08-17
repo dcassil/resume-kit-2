@@ -105,10 +105,12 @@ class CareerStoreSurfaceManifestTests(unittest.TestCase):
                 "findCandidateMatches",
                 "recordJobMatch",
                 "findConflicts",
-                # "getMigrationState" joins this tuple when the protected
-                # career_store_guardrails allowlist realignment (RKIT-A-0001 /
-                # RKIT-A-0006, queued for the approve/update-locks batch) lands
-                # together with the store_surface.json declaration.
+                "getMigrationState",
+                "mergeFacts",
+                "confirmRelationship",
+                "recordInteraction",
+                "listInteractions",
+                "adjudicateConflict",
             ),
         )
         self.assertEqual(

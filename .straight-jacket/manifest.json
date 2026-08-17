@@ -190,7 +190,7 @@
       "name": "resume_agent_guardrails.py",
       "checksum": "sha256:5db8daee148cded8773a705839319eba70b84775f4c4a98a84712ec15ed8ebef",
       "size": 15807,
-      "registeredAt": "2026-08-13T20:26:37.395Z"
+      "registeredAt": "2026-08-17T17:58:52.309Z"
     },
     {
       "path": "tools/resume_cli_guardrails.py",

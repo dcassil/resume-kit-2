@@ -22,7 +22,13 @@
       "addRelationship",
       "findCandidateMatches",
       "recordJobMatch",
-      "findConflicts"
+      "findConflicts",
+      "getMigrationState",
+      "mergeFacts",
+      "confirmRelationship",
+      "recordInteraction",
+      "listInteractions",
+      "adjudicateConflict"
     ]
   },
   "verification_states": [
@@ -36,7 +42,9 @@
     "alias",
     "equivalent",
     "related",
-    "contradicts"
+    "contradicts",
+    "parent",
+    "child"
   ],
   "resolution_states": [
     "exact_match",
@@ -92,102 +100,395 @@
       "name": "searchFacts",
       "description": "Search facts by concept, normalized terms, aliases, and filters with deterministic ordering.",
       "input_contract": {
-        "required_fields": ["query"],
-        "optional_fields": ["filters", "limit", "include_evidence"]
+        "required_fields": [
+          "query"
+        ],
+        "optional_fields": [
+          "filters",
+          "limit",
+          "include_evidence"
+        ]
       },
       "output_contract": {
-        "required_fields": ["schema_version", "status", "facts", "query", "audit"],
-        "must_not_include": ["raw_sql", "connection", "internal_rows"]
+        "required_fields": [
+          "schema_version",
+          "status",
+          "facts",
+          "query",
+          "audit"
+        ],
+        "must_not_include": [
+          "raw_sql",
+          "connection",
+          "internal_rows"
+        ]
       }
     },
     {
       "name": "getFact",
       "description": "Fetch one fact with minimum necessary evidence, relationships, conflicts, and verification state.",
       "input_contract": {
-        "required_fields": ["fact_id"]
+        "required_fields": [
+          "fact_id"
+        ]
       },
       "output_contract": {
-        "required_fields": ["schema_version", "status", "fact", "evidence", "relationships", "conflicts", "audit"],
-        "must_not_include": ["raw_sql", "connection"]
+        "required_fields": [
+          "schema_version",
+          "status",
+          "fact",
+          "evidence",
+          "relationships",
+          "conflicts",
+          "audit"
+        ],
+        "must_not_include": [
+          "raw_sql",
+          "connection"
+        ]
       }
     },
     {
       "name": "upsertFact",
       "description": "Create or update a fact with dedupe, conflict detection, verification-state policy, and audit metadata.",
       "input_contract": {
-        "required_fields": ["fact", "evidence", "source", "policy"]
+        "required_fields": [
+          "fact",
+          "evidence",
+          "source",
+          "policy"
+        ]
       },
       "output_contract": {
-        "required_fields": ["schema_version", "status", "mutation_status", "fact_id", "verification_state", "conflicts", "confirmation_required", "audit"],
-        "must_not_include": ["raw_sql", "silent_user_verified_promotion"]
+        "required_fields": [
+          "schema_version",
+          "status",
+          "mutation_status",
+          "fact_id",
+          "verification_state",
+          "conflicts",
+          "confirmation_required",
+          "audit"
+        ],
+        "must_not_include": [
+          "raw_sql",
+          "silent_user_verified_promotion"
+        ]
       }
     },
     {
       "name": "verifyFact",
       "description": "Set fact verification state only through explicit policy and confirmation rules.",
       "input_contract": {
-        "required_fields": ["fact_id", "verification_state", "confirmation", "source"]
+        "required_fields": [
+          "fact_id",
+          "verification_state",
+          "confirmation",
+          "source"
+        ]
       },
       "output_contract": {
-        "required_fields": ["schema_version", "status", "mutation_status", "fact_id", "verification_state", "conflicts", "confirmation_required", "audit"],
-        "must_not_include": ["raw_sql", "implicit_confirmation"]
+        "required_fields": [
+          "schema_version",
+          "status",
+          "mutation_status",
+          "fact_id",
+          "verification_state",
+          "conflicts",
+          "confirmation_required",
+          "audit"
+        ],
+        "must_not_include": [
+          "raw_sql",
+          "implicit_confirmation"
+        ]
       }
     },
     {
       "name": "addEvidence",
       "description": "Append evidence to a fact without destructive overwrite.",
       "input_contract": {
-        "required_fields": ["fact_id", "evidence", "source"]
+        "required_fields": [
+          "fact_id",
+          "evidence",
+          "source"
+        ]
       },
       "output_contract": {
-        "required_fields": ["schema_version", "status", "mutation_status", "fact_id", "verification_state", "conflicts", "confirmation_required", "audit"],
-        "must_not_include": ["raw_sql", "destructive_delete"]
+        "required_fields": [
+          "schema_version",
+          "status",
+          "mutation_status",
+          "fact_id",
+          "verification_state",
+          "conflicts",
+          "confirmation_required",
+          "audit"
+        ],
+        "must_not_include": [
+          "raw_sql",
+          "destructive_delete"
+        ]
       }
     },
     {
       "name": "addRelationship",
       "description": "Add alias, equivalent, related, or contradiction relationships with policy and evidence/rationale.",
       "input_contract": {
-        "required_fields": ["from_fact_id", "to_fact_id", "relationship_type", "evidence_or_rationale", "policy"]
+        "required_fields": [
+          "from_fact_id",
+          "to_fact_id",
+          "relationship_type",
+          "evidence_or_rationale",
+          "policy"
+        ]
       },
       "output_contract": {
-        "required_fields": ["schema_version", "status", "mutation_status", "fact_id", "relationship_id", "verification_state", "conflicts", "confirmation_required", "audit"],
-        "must_not_include": ["raw_sql", "related_as_equivalent_without_policy"]
+        "required_fields": [
+          "schema_version",
+          "status",
+          "mutation_status",
+          "fact_id",
+          "relationship_id",
+          "verification_state",
+          "conflicts",
+          "confirmation_required",
+          "audit"
+        ],
+        "must_not_include": [
+          "raw_sql",
+          "related_as_equivalent_without_policy"
+        ]
       }
     },
     {
       "name": "findCandidateMatches",
       "description": "Match job requirements to stored facts while distinguishing exact, alias, related, possible, unknown, explicitly missing, and not-applicable states; conflicts are returned as conflict records.",
       "input_contract": {
-        "required_fields": ["requirements", "policy"],
-        "optional_fields": ["job_id", "include_evidence"]
+        "required_fields": [
+          "requirements",
+          "policy"
+        ],
+        "optional_fields": [
+          "job_id",
+          "include_evidence"
+        ]
       },
       "output_contract": {
-        "required_fields": ["schema_version", "status", "matches", "unresolved", "conflicts", "audit"],
-        "must_not_include": ["official_score", "raw_sql"]
+        "required_fields": [
+          "schema_version",
+          "status",
+          "matches",
+          "unresolved",
+          "conflicts",
+          "audit"
+        ],
+        "must_not_include": [
+          "official_score",
+          "raw_sql"
+        ]
       }
     },
     {
       "name": "recordJobMatch",
       "description": "Record which facts were used for a job requirement without mutating resumes or polluting base state.",
       "input_contract": {
-        "required_fields": ["job_id", "requirement_id", "fact_ids", "resolution_state"]
+        "required_fields": [
+          "job_id",
+          "requirement_id",
+          "fact_ids",
+          "resolution_state"
+        ]
       },
       "output_contract": {
-        "required_fields": ["schema_version", "status", "mutation_status", "job_match_id", "audit"],
-        "must_not_include": ["resume_patch", "raw_sql"]
+        "required_fields": [
+          "schema_version",
+          "status",
+          "mutation_status",
+          "job_match_id",
+          "audit"
+        ],
+        "must_not_include": [
+          "resume_patch",
+          "raw_sql"
+        ]
       }
     },
     {
       "name": "findConflicts",
       "description": "Return contradictory facts and conflict details without overwriting truth history.",
       "input_contract": {
-        "required_fields": ["fact_or_claim"],
-        "optional_fields": ["scope"]
+        "required_fields": [
+          "fact_or_claim"
+        ],
+        "optional_fields": [
+          "scope"
+        ]
       },
       "output_contract": {
-        "required_fields": ["schema_version", "status", "conflicts", "audit"],
-        "must_not_include": ["destructive_resolution", "raw_sql"]
+        "required_fields": [
+          "schema_version",
+          "status",
+          "conflicts",
+          "audit"
+        ],
+        "must_not_include": [
+          "destructive_resolution",
+          "raw_sql"
+        ]
+      }
+    },
+    {
+      "name": "getMigrationState",
+      "description": "Report migration/schema state (RKIT-A-0001): schema version, applied and pending migrations, and status, as the MigrationState introspection result.",
+      "input_contract": {
+        "required_fields": [],
+        "optional_fields": []
+      },
+      "output_contract": {
+        "required_fields": [
+          "schema_version",
+          "database_path",
+          "applied_migrations",
+          "pending_migrations",
+          "status",
+          "metadata"
+        ],
+        "must_not_include": [
+          "raw_sql",
+          "connection",
+          "internal_rows"
+        ]
+      }
+    },
+    {
+      "name": "mergeFacts",
+      "description": "Merge a duplicate fact into a survivor with full retention and redirects; requires provenance for the merge decision.",
+      "input_contract": {
+        "required_fields": [
+          "survivorId",
+          "mergedId",
+          "provenance"
+        ],
+        "optional_fields": []
+      },
+      "output_contract": {
+        "required_fields": [
+          "schema_version",
+          "status",
+          "audit",
+          "mutation_status",
+          "survivor_fact_id",
+          "merged_fact_id"
+        ],
+        "must_not_include": [
+          "raw_sql",
+          "connection",
+          "internal_rows"
+        ]
+      }
+    },
+    {
+      "name": "confirmRelationship",
+      "description": "Confirm a proposed term relationship with user/trusted provenance; the single policy chokepoint for unverified alias creation.",
+      "input_contract": {
+        "required_fields": [
+          "relationshipId",
+          "provenance"
+        ],
+        "optional_fields": []
+      },
+      "output_contract": {
+        "required_fields": [
+          "schema_version",
+          "status",
+          "audit",
+          "mutation_status",
+          "relationship_id",
+          "confirmation_status"
+        ],
+        "must_not_include": [
+          "raw_sql",
+          "connection",
+          "internal_rows"
+        ]
+      }
+    },
+    {
+      "name": "recordInteraction",
+      "description": "Append an interaction record (question, answer, decision) for a subject; append-only, no fact mutation.",
+      "input_contract": {
+        "required_fields": [
+          "interaction_type",
+          "subject_id",
+          "input_json"
+        ],
+        "optional_fields": [
+          "result_json"
+        ]
+      },
+      "output_contract": {
+        "required_fields": [
+          "schema_version",
+          "status",
+          "audit",
+          "mutation_status",
+          "interaction_id"
+        ],
+        "must_not_include": [
+          "raw_sql",
+          "connection",
+          "internal_rows"
+        ]
+      }
+    },
+    {
+      "name": "listInteractions",
+      "description": "List recorded interactions with optional filters; read-only.",
+      "input_contract": {
+        "required_fields": [],
+        "optional_fields": [
+          "filters"
+        ]
+      },
+      "output_contract": {
+        "required_fields": [
+          "schema_version",
+          "status",
+          "audit",
+          "interactions"
+        ],
+        "must_not_include": [
+          "raw_sql",
+          "connection",
+          "internal_rows"
+        ]
+      }
+    },
+    {
+      "name": "adjudicateConflict",
+      "description": "Adjudicate a recorded conflict through the verification engine with provenance; decisions never silently promote facts.",
+      "input_contract": {
+        "required_fields": [
+          "conflictId",
+          "decision",
+          "provenance"
+        ],
+        "optional_fields": []
+      },
+      "output_contract": {
+        "required_fields": [
+          "schema_version",
+          "status",
+          "audit",
+          "mutation_status",
+          "conflict_id"
+        ],
+        "must_not_include": [
+          "raw_sql",
+          "connection",
+          "internal_rows"
+        ]
       }
     }
   ]

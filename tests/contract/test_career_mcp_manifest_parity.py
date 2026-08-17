@@ -199,14 +199,14 @@ class CareerMcpManifestParityTests(unittest.TestCase):
         # declared store_surface.json relationship set to these four types.
         self.assertTrue(accepted >= declared, f"store rejected declared relationship types: {sorted(declared - accepted)}")
 
-    def test_parent_relationship_type_fails_store_subset_assertion(self):
+    def test_undeclared_relationship_type_fails_store_subset_assertion(self):
         manifest = load_json(PACKAGE_SURFACE_PATH)
-        manifest["relationship_types"] = [*manifest["relationship_types"], "parent"]
+        manifest["relationship_types"] = [*manifest["relationship_types"], "sibling"]
         add_relationship = manifest_tools_by_name(manifest)["career.add_relationship"]
         relationship_schema = add_relationship["input_schema"]["properties"]["relationship_type"]
-        relationship_schema["enum"] = [*relationship_schema["enum"], "parent"]
+        relationship_schema["enum"] = [*relationship_schema["enum"], "sibling"]
 
-        with self.assertRaisesRegex(AssertionError, "unsupported.*parent"):
+        with self.assertRaisesRegex(AssertionError, "unsupported.*sibling"):
             assert_manifest_relationship_types_supported(self, manifest, load_json(STORE_SURFACE_PATH))
 
     def test_generated_tool_surface_is_byte_identical_to_package_manifest(self):

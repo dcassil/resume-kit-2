@@ -32,7 +32,9 @@
     "alias",
     "equivalent",
     "related",
-    "contradicts"
+    "contradicts",
+    "parent",
+    "child"
   ],
   "resolution_states": [
     "exact_match",
@@ -299,7 +301,7 @@
     },
     {
       "name": "career.add_relationship",
-      "description": "Add a validated alias, equivalent, related, or contradicts relationship through career-store validation. Equivalent relationships require user confirmation or trusted evidence.",
+      "description": "Add a validated alias, equivalent, related, contradicts, parent, or child relationship through career-store validation. Equivalent relationships require user confirmation or trusted evidence.",
       "mutates": true,
       "input_schema": {
         "type": "object",
@@ -324,7 +326,9 @@
               "alias",
               "equivalent",
               "related",
-              "contradicts"
+              "contradicts",
+              "parent",
+              "child"
             ]
           },
           "evidence": {

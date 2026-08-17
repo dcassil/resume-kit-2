@@ -69,17 +69,27 @@ class Failure:
 
 
 def load_surface(root: Path) -> tuple[dict, list[Failure]]:
-    path = root / "career-mcp" / "tool_surface.json"
+    path = root / "career-mcp" / "career_mcp" / "tool_surface.json"
+    generated_path = root / "career-mcp" / "tool_surface.json"
     if not path.exists():
         return {}, [
             Failure(
                 path,
                 "Missing machine-readable MCP surface contract.",
-                "Restore career-mcp/tool_surface.json and update it before changing exposed tools.",
+                "Restore career-mcp/career_mcp/tool_surface.json and update it before changing exposed tools.",
             )
         ]
     try:
-        return json.loads(path.read_text(encoding="utf-8")), []
+        failures: list[Failure] = []
+        if generated_path.exists() and generated_path.read_bytes() != path.read_bytes():
+            failures.append(
+                Failure(
+                    generated_path,
+                    "Generated MCP surface copy is not byte-identical to the canonical package manifest.",
+                    "Run career-mcp/tools/sync_tool_surface.py to regenerate career-mcp/tool_surface.json from the package manifest.",
+                )
+            )
+        return json.loads(path.read_text(encoding="utf-8")), failures
     except json.JSONDecodeError as exc:
         return {}, [
             Failure(
@@ -92,7 +102,7 @@ def load_surface(root: Path) -> tuple[dict, list[Failure]]:
 
 
 def validate_surface(root: Path, surface: dict) -> list[Failure]:
-    path = root / "career-mcp" / "tool_surface.json"
+    path = root / "career-mcp" / "career_mcp" / "tool_surface.json"
     failures: list[Failure] = []
     tools = surface.get("tools")
     if not isinstance(tools, list):

@@ -28,8 +28,9 @@ def run_guardrail(root: Path) -> subprocess.CompletedProcess[str]:
 
 def make_temp_repo() -> Path:
     temp = Path(tempfile.mkdtemp(prefix="career-mcp-guardrail-"))
-    (temp / "career-mcp").mkdir(parents=True)
+    (temp / "career-mcp" / "career_mcp").mkdir(parents=True)
     (temp / "tools").mkdir()
+    shutil.copy2(ROOT / "career-mcp" / "career_mcp" / "tool_surface.json", temp / "career-mcp" / "career_mcp" / "tool_surface.json")
     shutil.copy2(ROOT / "career-mcp" / "tool_surface.json", temp / "career-mcp" / "tool_surface.json")
     return temp
 
@@ -53,7 +54,9 @@ class CareerMcpGuardrailTests(unittest.TestCase):
                     "response_contract": {"required_fields": ["rows"]},
                 }
             )
-            (temp / "career-mcp" / "tool_surface.json").write_text(json.dumps(bad_surface), encoding="utf-8")
+            bad_payload = json.dumps(bad_surface)
+            (temp / "career-mcp" / "career_mcp" / "tool_surface.json").write_text(bad_payload, encoding="utf-8")
+            (temp / "career-mcp" / "tool_surface.json").write_text(bad_payload, encoding="utf-8")
             result = run_guardrail(temp)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Forbidden unrestricted database tools", result.stdout)
