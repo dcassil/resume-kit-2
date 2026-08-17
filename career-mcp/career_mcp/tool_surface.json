@@ -13,8 +13,14 @@
   },
   "policy": {
     "model": "single-user-local-v1",
+    "posture": "Single-user local adapter. No v1 multi-user permission layer is implemented.",
     "confirmation": "Manifest-declared mutating tools require host-mediated confirmed=true before career-store dispatch.",
-    "scope_enforcement": "none in v1 per RKIT-A-0002 item 2"
+    "gated_tools": [
+      "career.propose_fact",
+      "career.add_evidence",
+      "career.verify_fact",
+      "career.add_relationship"
+    ]
   },
   "mcp_endpoints": [
     {

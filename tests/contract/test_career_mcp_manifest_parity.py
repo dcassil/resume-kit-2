@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import inspect
 import json
 import re
@@ -17,7 +18,9 @@ ROOT = Path(__file__).resolve().parents[2]
 PACKAGE_SURFACE_PATH = ROOT / "career-mcp" / "career_mcp" / "tool_surface.json"
 GENERATED_SURFACE_PATH = ROOT / "career-mcp" / "tool_surface.json"
 STORE_SURFACE_PATH = ROOT / "career-store" / "store_surface.json"
+CAREER_MCP_CONTRACT_TEST_PATH = ROOT / "tests" / "contract" / "test_career_mcp_contract.py"
 SYNC_TOOL_PATH = "career-mcp/tools/sync_tool_surface.py"
+POLICY_VOCABULARY_BLOCKLIST = frozenset({"scope", "principal", "role", "authorization"})
 
 JsonObject = dict[str, Any]
 
@@ -37,6 +40,27 @@ def maybe_await(value: Any) -> Any:
 def manifest_tools_by_name(surface: JsonObject) -> dict[str, JsonObject]:
     tools = surface.get("tools", [])
     return {tool.get("name"): tool for tool in tools if isinstance(tool, dict)}
+
+
+def declared_policy_gated_tools(surface: JsonObject) -> set[str]:
+    policy = surface.get("policy", {})
+    gated_tools = policy.get("gated_tools", [])
+    return {tool for tool in gated_tools if isinstance(tool, str)}
+
+
+def runtime_policy_gated_tools() -> set[str]:
+    career_mcp_policy = importlib.import_module("career_mcp.policy")
+    mutation_map = career_mcp_policy._tool_mutation_map()  # noqa: SLF001 - contract test for policy classification.
+    return {name for name, mutates in mutation_map.items() if mutates}
+
+
+def fake_career_store_class() -> Any:
+    spec = importlib.util.spec_from_file_location("career_mcp_contract_helpers", CAREER_MCP_CONTRACT_TEST_PATH)
+    if spec is None or spec.loader is None:
+        raise AssertionError(f"Unable to load contract helpers from {CAREER_MCP_CONTRACT_TEST_PATH}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.FakeCareerStore
 
 
 def runtime_tools() -> list[JsonObject]:
@@ -94,6 +118,67 @@ def collect_relationship_type_values(value: Any, path: tuple[str, ...] = ()) -> 
         for index, item in enumerate(value):
             found.update(collect_relationship_type_values(item, (*path, str(index))))
     return found
+
+
+def collect_policy_vocabulary_hits(value: Any, path: tuple[str, ...] = ()) -> list[tuple[str, str, str]]:
+    hits: list[tuple[str, str, str]] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_path = (*path, str(key))
+            hits.extend(_policy_vocabulary_hits(str(key), child_path, context="key"))
+            hits.extend(collect_policy_vocabulary_hits(child, child_path))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            hits.extend(collect_policy_vocabulary_hits(item, (*path, str(index))))
+    elif isinstance(value, str):
+        hits.extend(_policy_vocabulary_hits(value, path, context="value"))
+    return hits
+
+
+def _policy_vocabulary_hits(text: str, path: tuple[str, ...], context: str) -> list[tuple[str, str, str]]:
+    hits: list[tuple[str, str, str]] = []
+    for token in re.findall(r"[A-Za-z]+", text.lower()):
+        normalized = token[:-1] if token.endswith("s") else token
+        if normalized not in POLICY_VOCABULARY_BLOCKLIST:
+            continue
+        if _is_legitimate_policy_vocabulary_use(normalized, text, path, context):
+            continue
+        hits.append((normalized, ".".join(path), text))
+    return hits
+
+
+def _is_legitimate_policy_vocabulary_use(term: str, text: str, path: tuple[str, ...], context: str) -> bool:
+    # The manifest's fact vocabulary includes "role" as a fact type. That is
+    # domain data, not an access-control role claim.
+    return (
+        term == "role"
+        and context == "value"
+        and text == "role"
+        and len(path) >= 4
+        and path[-2] == "enum"
+        and path[-3] == "items"
+        and path[-4] == "types"
+    )
+
+
+def minimal_valid_arguments(tool: JsonObject) -> JsonObject:
+    samples: JsonObject = {
+        "type": "skill",
+        "text": "AWS experience",
+        "source": "agent_interpretation",
+        "fact_id": "fact_aws",
+        "verification_state": "source_stated",
+        "confirmation": {
+            "outcome": "affirmed",
+            "provenance": [{"source": "resume_source", "source_id": "resume_1", "text": "Resume states this fact."}],
+        },
+        "evidence": {"source": "user_answer", "text": "Additional evidence."},
+        "from_fact_id": "fact_aws",
+        "to_fact_id": "fact_azure",
+        "relationship_type": "related",
+    }
+    required = tool.get("input_schema", {}).get("required", [])
+    return {name: samples[name] for name in required}
 
 
 def assert_manifest_relationship_types_supported(
@@ -172,13 +257,48 @@ class CareerMcpManifestParityTests(unittest.TestCase):
         statement = manifest.get("policy", {})
 
         self.assertEqual(statement.get("model"), "single-user-local-v1")
+        self.assertIn("Single-user local", statement.get("posture", ""))
+        self.assertIn("No v1 multi-user permission layer", statement.get("posture", ""))
         self.assertIn("confirmed=true", statement.get("confirmation", ""))
-        self.assertEqual(statement.get("scope_enforcement"), "none in v1 per RKIT-A-0002 item 2")
+        self.assertNotIn("scope_enforcement", statement)
+        self.assertEqual(declared_policy_gated_tools(manifest), runtime_policy_gated_tools())
 
         for name, tool in manifest_tools_by_name(manifest).items():
             with self.subTest(tool=name):
                 decision = career_mcp_policy.evaluate_policy(name, {}, confirmed=False)
                 self.assertEqual(decision.requires_confirmation, tool.get("mutates") is True)
+
+    def test_manifest_policy_block_declares_exact_runtime_gated_tool_set(self):
+        manifest = load_json(PACKAGE_SURFACE_PATH)
+        declared = declared_policy_gated_tools(manifest)
+        manifest_mutating = {name for name, tool in manifest_tools_by_name(manifest).items() if tool.get("mutates") is True}
+
+        self.assertEqual(declared, runtime_policy_gated_tools())
+        self.assertEqual(declared, manifest_mutating)
+
+    def test_manifest_has_no_access_control_vocabulary_outside_fact_type_role(self):
+        manifest = load_json(PACKAGE_SURFACE_PATH)
+
+        self.assertEqual(collect_policy_vocabulary_hits(manifest), [])
+
+    def test_manifest_declared_gated_tools_reject_unconfirmed_minimal_valid_mutations(self):
+        career_mcp = importlib.import_module("career_mcp")
+        FakeCareerStore = fake_career_store_class()
+        manifest = load_json(PACKAGE_SURFACE_PATH)
+        manifest_by_name = manifest_tools_by_name(manifest)
+
+        for name in sorted(declared_policy_gated_tools(manifest)):
+            with self.subTest(tool=name):
+                store = FakeCareerStore()
+                adapter = career_mcp.create_career_mcp(store=store)
+                result = maybe_await(adapter.call_tool(name, minimal_valid_arguments(manifest_by_name[name])))
+
+                self.assertEqual(result["status"], "rejected")
+                self.assertEqual(result["error"]["type"], "policy_error")
+                self.assertEqual(result["error"]["reason"], "confirmation_required")
+                self.assertTrue(result["confirmation_required"])
+                self.assertFalse(result["confirmed"])
+                self.assertEqual(store.calls, [])
 
     def test_store_accepts_every_declared_relationship_type_behaviorally(self):
         career_store = importlib.import_module("career_store")

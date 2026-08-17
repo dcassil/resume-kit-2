@@ -32,7 +32,7 @@ Tests should treat MCP as an adapter with:
 - argument validation
 - response DTO normalization
 - error mapping
-- v1 single-user local policy: mutating tools require explicit host-mediated confirmation; no multi-user authorization layer is advertised
+- v1 single-user local policy: every manifest policy claim must name executable test coverage, and mutating tools require explicit host-mediated confirmation
 - store service dependency injection
 
 ## Contract Test Cases
@@ -64,7 +64,10 @@ Tests should treat MCP as an adapter with:
 - Confirmed mutating tools must reach the store and expose `confirmation_required: true` plus `confirmed: true`; covered by `test_confirmed_mutation_proceeds_and_exposes_policy_flags`.
 - Read tools must remain callable without `confirmed`; covered by `test_read_tool_does_not_require_confirmation`.
 - `career.get_unverified` must compute each fact's `confirmation_required` flag from policy rather than a constant; covered by `test_get_unverified_confirmation_flag_comes_from_policy`.
-- Any policy claim in `tool_surface.json` must have runtime parity coverage; covered by `test_manifest_policy_statement_matches_runtime_confirmation_policy`.
+- The manifest policy block's declared gated-tool set must exactly match runtime policy classification and the canonical manifest `mutates` flags; covered by `test_manifest_policy_block_declares_exact_runtime_gated_tool_set` and `test_manifest_policy_statement_matches_runtime_confirmation_policy`.
+- Every declared gated tool must reject an unconfirmed minimal-valid mutation before store dispatch; covered by `test_manifest_declared_gated_tools_reject_unconfirmed_minimal_valid_mutations`.
+- The manifest must avoid permission-model vocabulary beyond the fact type enum value `role`; covered by `test_manifest_has_no_access_control_vocabulary_outside_fact_type_role`.
+- Any policy claim in `tool_surface.json` MUST have named executable tests; covered by `test_manifest_policy_statement_matches_runtime_confirmation_policy`, `test_manifest_policy_block_declares_exact_runtime_gated_tool_set`, `test_manifest_declared_gated_tools_reject_unconfirmed_minimal_valid_mutations`, and `test_manifest_has_no_access_control_vocabulary_outside_fact_type_role`.
 
 ### Search behavior
 

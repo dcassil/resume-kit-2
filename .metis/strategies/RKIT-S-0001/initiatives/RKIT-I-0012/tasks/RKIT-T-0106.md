@@ -4,14 +4,14 @@ level: task
 title: "Policy module, call_tool confirmation enforcement, confirmed arg, computed flags, context honesty"
 short_code: "RKIT-T-0106"
 created_at: 2026-08-17T19:29:02.750630+00:00
-updated_at: 2026-08-17T19:30:18.983447+00:00
+updated_at: 2026-08-17T19:38:28.856584+00:00
 parent: add-career-mcp-policy-scope-and
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0012
 ## Objective
 
 Make career-mcp confirmation enforcement REAL per initiative R1–R4: a pure policy evaluation step gating every store mutation (unconfirmed required-confirmation mutation → typed `policy_error`, zero store calls), a defined `confirmed: true` satisfaction contract on mutating tool schemas, `get_unverified`'s `confirmation_required` computed from policy instead of hardcoded true, and honest `context` semantics (feed policy or remove the echo).
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
