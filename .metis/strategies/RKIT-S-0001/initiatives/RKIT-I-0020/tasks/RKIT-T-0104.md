@@ -4,14 +4,14 @@ level: task
 title: "proposeEquivalences surface: DTO, prompt/schema assets, adapter implementation, guardrail+manifest lockstep, TEST_SPEC, contract tests"
 short_code: "RKIT-T-0104"
 created_at: 2026-08-17T19:08:37.872604+00:00
-updated_at: 2026-08-17T19:09:58.370406+00:00
+updated_at: 2026-08-17T19:20:26.748790+00:00
 parent: resume-agent-semantic-equivalence
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0020
 ## Objective
 
 Build the entire missing `proposeEquivalences(context)` public surface per RKIT-A-0003 item 5, landing the function, its versioned prompt/schema assets, fake-adapter fixtures, `agent_surface.json` declaration, resume-agent TEST_SPEC public-surfaces entry, AND the protected `tools/resume_agent_guardrails.py` ALLOWED_SURFACES edit in ONE lockstep change — day-one manifest coverage, no drift window. Protected edits are authorized under the no-verify workflow (commit `--no-verify`; Daniel re-registers straight-jacket locks in one later pass).
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

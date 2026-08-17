@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import unittest
 import copy
 import json
@@ -34,7 +35,7 @@ from resume_agent._equivalence_requests import (
     build_equivalence_request,
     prompt_template_text as equivalence_prompt_template_text,
 )
-from resume_agent._equivalence_schemas import EQUIVALENCE_DIRECTIONS, EQUIVALENCE_PROPOSAL_SCHEMA_ID
+from resume_agent._equivalence_schemas import EQUIVALENCE_DIRECTIONS, EQUIVALENCE_PROPOSAL_SCHEMA, EQUIVALENCE_PROPOSAL_SCHEMA_ID
 from resume_agent._extraction_requests import (
     JOB_EXTRACTION_PROMPT_TEMPLATE_ID,
     RESUME_EXTRACTION_PROMPT_TEMPLATE_ID,
@@ -57,6 +58,7 @@ from resume_agent._rewrite_requests import (
     prompt_template_text as rewrite_prompt_template_text,
 )
 from resume_agent._schema_validation import validate_json_schema, validate_schema_id
+from tests.e2e.test_equivalence_handoff_e2e import EquivalenceHandoffE2ETests  # bridge into gated contract module
 from tests.unit.test_resume_agent_call_audit_unit import ResumeAgentCallAuditUnitTests  # bridge into gated contract module
 from tests.unit.test_resume_agent_eval_harness_unit import ResumeAgentEvalHarnessUnitTests  # bridge into gated contract module
 
@@ -1004,6 +1006,79 @@ class ResumeAgentEquivalenceSchemaContractTests(unittest.TestCase):
 
     def test_equivalence_direction_vocabulary_is_closed(self):
         self.assertEqual(set(EQUIVALENCE_DIRECTIONS), {"equivalent", "narrower_than", "broader_than"})
+
+
+class ResumeAgentEquivalenceBoundaryContractTests(unittest.TestCase):
+    def test_resume_agent_imports_neither_resume_core_nor_career_store(self):
+        forbidden = {"resume_core", "career_store"}
+        violations: list[str] = []
+
+        for path in sorted((ROOT / "resume-agent" / "resume_agent").rglob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            relative = path.relative_to(ROOT)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        package = alias.name.split(".", 1)[0]
+                        if package in forbidden:
+                            violations.append(f"{relative}: import {alias.name}")
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    package = node.module.split(".", 1)[0]
+                    if package in forbidden:
+                        violations.append(f"{relative}: from {node.module} import ...")
+                else:
+                    imported = self._dynamic_import_literal(node)
+                    if imported and imported.split(".", 1)[0] in forbidden:
+                        violations.append(f"{relative}: dynamic import {imported!r}")
+
+        self.assertEqual(violations, [])
+
+    def test_equivalence_proposal_dto_schema_has_closed_non_authority_field_set(self):
+        expected_fields = {
+            "id",
+            "term_a",
+            "term_b",
+            "direction",
+            "rationale",
+            "evidence_refs",
+            "confidence",
+            "requires_validation",
+        }
+        forbidden_authority_fields = {
+            "persisted",
+            "persisted_relationship",
+            "relationship_id",
+            "relationship_type",
+            "official_truth",
+            "relationship_authority",
+            "verification_state",
+            "final_verification_state",
+            "user_verified",
+            "sqlite",
+        }
+
+        self.assertEqual(set(EQUIVALENCE_PROPOSAL_SCHEMA["required"]), expected_fields)
+        self.assertEqual(set(EQUIVALENCE_PROPOSAL_SCHEMA["properties"]), expected_fields)
+        self.assertIs(EQUIVALENCE_PROPOSAL_SCHEMA["additionalProperties"], False)
+        self.assertTrue(forbidden_authority_fields.isdisjoint(EQUIVALENCE_PROPOSAL_SCHEMA["properties"]))
+
+    def _dynamic_import_literal(self, node: ast.AST) -> str | None:
+        if not isinstance(node, ast.Call) or not node.args:
+            return None
+        function = node.func
+        is_importlib = (
+            isinstance(function, ast.Attribute)
+            and function.attr == "import_module"
+            and isinstance(function.value, ast.Name)
+            and function.value.id == "importlib"
+        )
+        is_dunder_import = isinstance(function, ast.Name) and function.id == "__import__"
+        if not (is_importlib or is_dunder_import):
+            return None
+        first_arg = node.args[0]
+        if isinstance(first_arg, ast.Constant) and isinstance(first_arg.value, str):
+            return first_arg.value
+        return None
 
 
 class ResumeAgentAnthropicAdapterContractTests(unittest.TestCase):

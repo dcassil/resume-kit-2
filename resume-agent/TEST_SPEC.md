@@ -124,6 +124,8 @@ DTO, grounding, and empty-context battery:
 - Subsumption golden: `test_equivalence_subsumption_fixture_preserves_direction` covers fixture `resume-agent-equivalence-subsumption-react-js-framework`.
 - Call audit: `test_equivalence_adapter_call_emits_audit_record` asserts the adapter chokepoint records one equivalence call.
 - Adapter failure: `test_equivalence_adapter_failure_returns_typed_error_without_partial_proposals` asserts no partial proposals on fixture miss.
+- Boundary handoff guard: `test_resume_agent_imports_neither_resume_core_nor_career_store` AST-scans `resume_agent` production modules for forbidden core/store imports; `test_equivalence_proposal_dto_schema_has_closed_non_authority_field_set` asserts the DTO schema is closed and contains no persistence or official-truth fields.
+- E2E validation handoff: `tests.e2e.test_equivalence_handoff_e2e.EquivalenceHandoffE2ETests` covers fixture-pinned `proposeEquivalences` output, resume-core structural validation through `scoreMatch(..., term_relationships=...)`, post-validation `career_store.addRelationship`/`confirmRelationship`, rejected/unvalidated no-store-mutation behavior, and the current `narrower_than` -> `child` direction mapping. This E2E is bridged into the gated resume-agent contract module because the canonical runner list is protected.
 
 ### Rewrite proposals
 
