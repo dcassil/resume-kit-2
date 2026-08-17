@@ -1,0 +1,994 @@
+{
+  "fixture_id": "resume-agent-extraction-legacy-job",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Legacy job fixture extraction preserving required and preferred requirements from the historical test input.",
+    "Payload is a complete source-grounded extraction proposal for the supplied canonical input."
+  ],
+  "comment": "RKIT-T-0091 extraction schema golden fixture. The file name is the sha256 key for the request tuple.",
+  "data": {
+    "key": {
+      "sha256": "0d7d5fa989f6b0a7f8d3a5de083bac21ccbbb51218af0579f02598eda0b449ed",
+      "prompt_template_id": "resume-agent.job-extraction@v1",
+      "output_schema_id": "resume-agent.job-extraction.v1",
+      "canonical_input_json": "{\"job_text\":\"\\nSenior Software Engineer, Example SaaS Co.\\nRequired: 8+ years of software engineering experience, React, TypeScript, API architecture/design, responsive design.\\nPreferred: AWS, GraphQL, SaaS experience, and technical leadership.\\n\",\"schema_id\":\"resume-agent.job-extraction.v1\",\"source\":{\"kind\":\"raw_text\",\"sha256\":\"a6669d4bfbd477ee944366c1054195b1374ebc24d4bc83be682282d885a26a9d\",\"source_id\":\"legacy-job-fixture\"}}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.job-extraction.v1",
+      "proposal_type": "job_extraction",
+      "requires_validation": true,
+      "job_id": "legacy_job_fixture",
+      "source": {
+        "kind": "raw_text",
+        "source_id": "legacy-job-fixture",
+        "sha256": "a6669d4bfbd477ee944366c1054195b1374ebc24d4bc83be682282d885a26a9d"
+      },
+      "title": {
+        "value": "Senior Software Engineer",
+        "evidence": [
+          {
+            "evidence_id": "ev_legacy_job_title",
+            "source_text": "Senior Software Engineer",
+            "span": {
+              "start": 1,
+              "end": 25
+            },
+            "lines": {
+              "start": 2,
+              "end": 2
+            }
+          }
+        ],
+        "confidence": 0.96,
+        "normalized": "software engineer"
+      },
+      "company": {
+        "value": "Example SaaS Co.",
+        "evidence": [
+          {
+            "evidence_id": "ev_legacy_job_company",
+            "source_text": "Example SaaS Co.",
+            "span": {
+              "start": 27,
+              "end": 43
+            },
+            "lines": {
+              "start": 2,
+              "end": 2
+            }
+          }
+        ],
+        "confidence": 0.93
+      },
+      "seniority": [
+        {
+          "value": "Senior",
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_job_title",
+              "source_text": "Senior Software Engineer",
+              "span": {
+                "start": 1,
+                "end": 25
+              },
+              "lines": {
+                "start": 2,
+                "end": 2
+              }
+            }
+          ],
+          "confidence": 0.96,
+          "normalized": "senior"
+        }
+      ],
+      "industries": [
+        {
+          "value": "SaaS",
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_job_company",
+              "source_text": "Example SaaS Co.",
+              "span": {
+                "start": 27,
+                "end": 43
+              },
+              "lines": {
+                "start": 2,
+                "end": 2
+              }
+            }
+          ],
+          "confidence": 0.9,
+          "normalized": "saas"
+        }
+      ],
+      "domains": [
+        {
+          "value": "API architecture/design",
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_job_required",
+              "source_text": "Required: 8+ years of software engineering experience, React, TypeScript, API architecture/design, responsive design.",
+              "span": {
+                "start": 44,
+                "end": 161
+              },
+              "lines": {
+                "start": 3,
+                "end": 3
+              }
+            }
+          ],
+          "confidence": 0.94,
+          "normalized": "api architecture"
+        },
+        {
+          "value": "responsive design",
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_job_required",
+              "source_text": "Required: 8+ years of software engineering experience, React, TypeScript, API architecture/design, responsive design.",
+              "span": {
+                "start": 44,
+                "end": 161
+              },
+              "lines": {
+                "start": 3,
+                "end": 3
+              }
+            }
+          ],
+          "confidence": 0.92,
+          "normalized": "responsive design"
+        }
+      ],
+      "requirements": [
+        {
+          "requirement_id": "req_legacy_years",
+          "classification": "required",
+          "concept": "software engineering experience",
+          "importance": "high",
+          "weight": 1.0,
+          "source_text": "8+ years of software engineering experience",
+          "normalized_terms": [
+            "8+ years",
+            "software engineering"
+          ],
+          "years": {
+            "minimum": 8,
+            "source_text": "8+ years"
+          },
+          "seniority": [
+            {
+              "value": "Senior",
+              "evidence": [
+                {
+                  "evidence_id": "ev_legacy_job_title",
+                  "source_text": "Senior Software Engineer",
+                  "span": {
+                    "start": 1,
+                    "end": 25
+                  },
+                  "lines": {
+                    "start": 2,
+                    "end": 2
+                  }
+                }
+              ],
+              "confidence": 0.96,
+              "normalized": "senior"
+            }
+          ],
+          "industries": [
+            {
+              "value": "SaaS",
+              "evidence": [
+                {
+                  "evidence_id": "ev_legacy_job_company",
+                  "source_text": "Example SaaS Co.",
+                  "span": {
+                    "start": 27,
+                    "end": 43
+                  },
+                  "lines": {
+                    "start": 2,
+                    "end": 2
+                  }
+                }
+              ],
+              "confidence": 0.9,
+              "normalized": "saas"
+            }
+          ],
+          "domains": [],
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_job_required",
+              "source_text": "Required: 8+ years of software engineering experience, React, TypeScript, API architecture/design, responsive design.",
+              "span": {
+                "start": 44,
+                "end": 161
+              },
+              "lines": {
+                "start": 3,
+                "end": 3
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "requirement_id": "req_legacy_react",
+          "classification": "required",
+          "concept": "React",
+          "importance": "high",
+          "weight": 1.0,
+          "source_text": "React",
+          "normalized_terms": [
+            "react"
+          ],
+          "years": null,
+          "seniority": [
+            {
+              "value": "Senior",
+              "evidence": [
+                {
+                  "evidence_id": "ev_legacy_job_title",
+                  "source_text": "Senior Software Engineer",
+                  "span": {
+                    "start": 1,
+                    "end": 25
+                  },
+                  "lines": {
+                    "start": 2,
+                    "end": 2
+                  }
+                }
+              ],
+              "confidence": 0.96,
+              "normalized": "senior"
+            }
+          ],
+          "industries": [
+            {
+              "value": "SaaS",
+              "evidence": [
+                {
+                  "evidence_id": "ev_legacy_job_company",
+                  "source_text": "Example SaaS Co.",
+                  "span": {
+                    "start": 27,
+                    "end": 43
+                  },
+                  "lines": {
+                    "start": 2,
+                    "end": 2
+                  }
+                }
+              ],
+              "confidence": 0.9,
+              "normalized": "saas"
+            }
+          ],
+          "domains": [],
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_job_required",
+              "source_text": "Required: 8+ years of software engineering experience, React, TypeScript, API architecture/design, responsive design.",
+              "span": {
+                "start": 44,
+                "end": 161
+              },
+              "lines": {
+                "start": 3,
+                "end": 3
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "requirement_id": "req_legacy_typescript",
+          "classification": "required",
+          "concept": "TypeScript",
+          "importance": "high",
+          "weight": 1.0,
+          "source_text": "TypeScript",
+          "normalized_terms": [
+            "typescript"
+          ],
+          "years": null,
+          "seniority": [
+            {
+              "value": "Senior",
+              "evidence": [
+                {
+                  "evidence_id": "ev_legacy_job_title",
+                  "source_text": "Senior Software Engineer",
+                  "span": {
+                    "start": 1,
+                    "end": 25
+                  },
+                  "lines": {
+                    "start": 2,
+                    "end": 2
+                  }
+                }
+              ],
+              "confidence": 0.96,
+              "normalized": "senior"
+            }
+          ],
+          "industries": [
+            {
+              "value": "SaaS",
+              "evidence": [
+                {
+                  "evidence_id": "ev_legacy_job_company",
+                  "source_text": "Example SaaS Co.",
+                  "span": {
+                    "start": 27,
+                    "end": 43
+                  },
+                  "lines": {
+                    "start": 2,
+                    "end": 2
+                  }
+                }
+              ],
+              "confidence": 0.9,
+              "normalized": "saas"
+            }
+          ],
+          "domains": [],
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_job_required",
+              "source_text": "Required: 8+ years of software engineering experience, React, TypeScript, API architecture/design, responsive design.",
+              "span": {
+                "start": 44,
+                "end": 161
+              },
+              "lines": {
+                "start": 3,
+                "end": 3
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "requirement_id": "req_legacy_api",
+          "classification": "required",
+          "concept": "API architecture/design",
+          "importance": "high",
+          "weight": 1.0,
+          "source_text": "API architecture/design",
+          "normalized_terms": [
+            "api",
+            "api architecture",
+            "api design"
+          ],
+          "years": null,
+          "seniority": [
+            {
+              "value": "Senior",
+              "evidence": [
+                {
+                  "evidence_id": "ev_legacy_job_title",
+                  "source_text": "Senior Software Engineer",
+                  "span": {
+                    "start": 1,
+                    "end": 25
+                  },
+                  "lines": {
+                    "start": 2,
+                    "end": 2
+                  }
+                }
+              ],
+              "confidence": 0.96,
+              "normalized": "senior"
+            }
+          ],
+          "industries": [
+            {
+              "value": "SaaS",
+              "evidence": [
+                {
+                  "evidence_id": "ev_legacy_job_company",
+                  "source_text": "Example SaaS Co.",
+                  "span": {
+                    "start": 27,
+                    "end": 43
+                  },
+                  "lines": {
+                    "start": 2,
+                    "end": 2
+                  }
+                }
+              ],
+              "confidence": 0.9,
+              "normalized": "saas"
+            }
+          ],
+          "domains": [
+            {
+              "value": "API architecture/design",
+              "evidence": [
+                {
+                  "evidence_id": "ev_legacy_job_required",
+                  "source_text": "Required: 8+ years of software engineering experience, React, TypeScript, API architecture/design, responsive design.",
+                  "span": {
+                    "start": 44,
+                    "end": 161
+                  },
+                  "lines": {
+                    "start": 3,
+                    "end": 3
+                  }
+                }
+              ],
+              "confidence": 0.94,
+              "normalized": "api architecture"
+            }
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_job_required",
+              "source_text": "Required: 8+ years of software engineering experience, React, TypeScript, API architecture/design, responsive design.",
+              "span": {
+                "start": 44,
+                "end": 161
+              },
+              "lines": {
+                "start": 3,
+                "end": 3
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "requirement_id": "req_legacy_responsive",
+          "classification": "required",
+          "concept": "responsive design",
+          "importance": "high",
+          "weight": 1.0,
+          "source_text": "responsive design",
+          "normalized_terms": [
+            "responsive design"
+          ],
+          "years": null,
+          "seniority": [
+            {
+              "value": "Senior",
+              "evidence": [
+                {
+                  "evidence_id": "ev_legacy_job_title",
+                  "source_text": "Senior Software Engineer",
+                  "span": {
+                    "start": 1,
+                    "end": 25
+                  },
+                  "lines": {
+                    "start": 2,
+                    "end": 2
+                  }
+                }
+              ],
+              "confidence": 0.96,
+              "normalized": "senior"
+            }
+          ],
+          "industries": [
+            {
+              "value": "SaaS",
+              "evidence": [
+                {
+                  "evidence_id": "ev_legacy_job_company",
+                  "source_text": "Example SaaS Co.",
+                  "span": {
+                    "start": 27,
+                    "end": 43
+                  },
+                  "lines": {
+                    "start": 2,
+                    "end": 2
+                  }
+                }
+              ],
+              "confidence": 0.9,
+              "normalized": "saas"
+            }
+          ],
+          "domains": [
+            {
+              "value": "responsive design",
+              "evidence": [
+                {
+                  "evidence_id": "ev_legacy_job_required",
+                  "source_text": "Required: 8+ years of software engineering experience, React, TypeScript, API architecture/design, responsive design.",
+                  "span": {
+                    "start": 44,
+                    "end": 161
+                  },
+                  "lines": {
+                    "start": 3,
+                    "end": 3
+                  }
+                }
+              ],
+              "confidence": 0.92,
+              "normalized": "responsive design"
+            }
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_job_required",
+              "source_text": "Required: 8+ years of software engineering experience, React, TypeScript, API architecture/design, responsive design.",
+              "span": {
+                "start": 44,
+                "end": 161
+              },
+              "lines": {
+                "start": 3,
+                "end": 3
+              }
+            }
+          ],
+          "confidence": 0.94
+        }
+      ],
+      "preferred": [
+        {
+          "requirement_id": "req_legacy_aws",
+          "classification": "preferred",
+          "concept": "AWS",
+          "importance": "medium",
+          "weight": 0.6,
+          "source_text": "AWS",
+          "normalized_terms": [
+            "aws"
+          ],
+          "years": null,
+          "seniority": [],
+          "industries": [
+            {
+              "value": "SaaS",
+              "evidence": [
+                {
+                  "evidence_id": "ev_legacy_job_company",
+                  "source_text": "Example SaaS Co.",
+                  "span": {
+                    "start": 27,
+                    "end": 43
+                  },
+                  "lines": {
+                    "start": 2,
+                    "end": 2
+                  }
+                }
+              ],
+              "confidence": 0.9,
+              "normalized": "saas"
+            }
+          ],
+          "domains": [],
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_job_preferred",
+              "source_text": "Preferred: AWS, GraphQL, SaaS experience, and technical leadership.",
+              "span": {
+                "start": 162,
+                "end": 229
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "requirement_id": "req_legacy_graphql",
+          "classification": "preferred",
+          "concept": "GraphQL",
+          "importance": "medium",
+          "weight": 0.6,
+          "source_text": "GraphQL",
+          "normalized_terms": [
+            "graphql"
+          ],
+          "years": null,
+          "seniority": [],
+          "industries": [
+            {
+              "value": "SaaS",
+              "evidence": [
+                {
+                  "evidence_id": "ev_legacy_job_company",
+                  "source_text": "Example SaaS Co.",
+                  "span": {
+                    "start": 27,
+                    "end": 43
+                  },
+                  "lines": {
+                    "start": 2,
+                    "end": 2
+                  }
+                }
+              ],
+              "confidence": 0.9,
+              "normalized": "saas"
+            }
+          ],
+          "domains": [],
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_job_preferred",
+              "source_text": "Preferred: AWS, GraphQL, SaaS experience, and technical leadership.",
+              "span": {
+                "start": 162,
+                "end": 229
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "requirement_id": "req_legacy_saas",
+          "classification": "preferred",
+          "concept": "SaaS experience",
+          "importance": "medium",
+          "weight": 0.6,
+          "source_text": "SaaS experience",
+          "normalized_terms": [
+            "saas"
+          ],
+          "years": null,
+          "seniority": [],
+          "industries": [
+            {
+              "value": "SaaS",
+              "evidence": [
+                {
+                  "evidence_id": "ev_legacy_job_company",
+                  "source_text": "Example SaaS Co.",
+                  "span": {
+                    "start": 27,
+                    "end": 43
+                  },
+                  "lines": {
+                    "start": 2,
+                    "end": 2
+                  }
+                }
+              ],
+              "confidence": 0.9,
+              "normalized": "saas"
+            }
+          ],
+          "domains": [],
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_job_preferred",
+              "source_text": "Preferred: AWS, GraphQL, SaaS experience, and technical leadership.",
+              "span": {
+                "start": 162,
+                "end": 229
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "requirement_id": "req_legacy_leadership",
+          "classification": "preferred",
+          "concept": "technical leadership",
+          "importance": "medium",
+          "weight": 0.6,
+          "source_text": "technical leadership",
+          "normalized_terms": [
+            "technical leadership"
+          ],
+          "years": null,
+          "seniority": [],
+          "industries": [
+            {
+              "value": "SaaS",
+              "evidence": [
+                {
+                  "evidence_id": "ev_legacy_job_company",
+                  "source_text": "Example SaaS Co.",
+                  "span": {
+                    "start": 27,
+                    "end": 43
+                  },
+                  "lines": {
+                    "start": 2,
+                    "end": 2
+                  }
+                }
+              ],
+              "confidence": 0.9,
+              "normalized": "saas"
+            }
+          ],
+          "domains": [],
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_job_preferred",
+              "source_text": "Preferred: AWS, GraphQL, SaaS experience, and technical leadership.",
+              "span": {
+                "start": 162,
+                "end": 229
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.94
+        }
+      ],
+      "terminology": [
+        {
+          "surface": "8+ years",
+          "canonical": "8+ years",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_job_required",
+              "source_text": "Required: 8+ years of software engineering experience, React, TypeScript, API architecture/design, responsive design.",
+              "span": {
+                "start": 44,
+                "end": 161
+              },
+              "lines": {
+                "start": 3,
+                "end": 3
+              }
+            }
+          ],
+          "confidence": 0.93
+        },
+        {
+          "surface": "React",
+          "canonical": "react",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_job_required",
+              "source_text": "Required: 8+ years of software engineering experience, React, TypeScript, API architecture/design, responsive design.",
+              "span": {
+                "start": 44,
+                "end": 161
+              },
+              "lines": {
+                "start": 3,
+                "end": 3
+              }
+            }
+          ],
+          "confidence": 0.93
+        },
+        {
+          "surface": "TypeScript",
+          "canonical": "typescript",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_job_required",
+              "source_text": "Required: 8+ years of software engineering experience, React, TypeScript, API architecture/design, responsive design.",
+              "span": {
+                "start": 44,
+                "end": 161
+              },
+              "lines": {
+                "start": 3,
+                "end": 3
+              }
+            }
+          ],
+          "confidence": 0.93
+        },
+        {
+          "surface": "API architecture/design",
+          "canonical": "api architecture",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_job_required",
+              "source_text": "Required: 8+ years of software engineering experience, React, TypeScript, API architecture/design, responsive design.",
+              "span": {
+                "start": 44,
+                "end": 161
+              },
+              "lines": {
+                "start": 3,
+                "end": 3
+              }
+            }
+          ],
+          "confidence": 0.93
+        },
+        {
+          "surface": "responsive design",
+          "canonical": "responsive design",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_job_required",
+              "source_text": "Required: 8+ years of software engineering experience, React, TypeScript, API architecture/design, responsive design.",
+              "span": {
+                "start": 44,
+                "end": 161
+              },
+              "lines": {
+                "start": 3,
+                "end": 3
+              }
+            }
+          ],
+          "confidence": 0.93
+        },
+        {
+          "surface": "AWS",
+          "canonical": "aws",
+          "source": "requirement",
+          "weight": 0.6,
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_job_preferred",
+              "source_text": "Preferred: AWS, GraphQL, SaaS experience, and technical leadership.",
+              "span": {
+                "start": 162,
+                "end": 229
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.93
+        },
+        {
+          "surface": "GraphQL",
+          "canonical": "graphql",
+          "source": "requirement",
+          "weight": 0.6,
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_job_preferred",
+              "source_text": "Preferred: AWS, GraphQL, SaaS experience, and technical leadership.",
+              "span": {
+                "start": 162,
+                "end": 229
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.93
+        },
+        {
+          "surface": "SaaS",
+          "canonical": "saas",
+          "source": "requirement",
+          "weight": 0.7,
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_job_preferred",
+              "source_text": "Preferred: AWS, GraphQL, SaaS experience, and technical leadership.",
+              "span": {
+                "start": 162,
+                "end": 229
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.93
+        },
+        {
+          "surface": "technical leadership",
+          "canonical": "technical leadership",
+          "source": "requirement",
+          "weight": 0.6,
+          "evidence": [
+            {
+              "evidence_id": "ev_legacy_job_preferred",
+              "source_text": "Preferred: AWS, GraphQL, SaaS experience, and technical leadership.",
+              "span": {
+                "start": 162,
+                "end": 229
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.93
+        }
+      ],
+      "source_evidence": [
+        {
+          "evidence_id": "ev_legacy_job_title",
+          "source_text": "Senior Software Engineer",
+          "span": {
+            "start": 1,
+            "end": 25
+          },
+          "lines": {
+            "start": 2,
+            "end": 2
+          }
+        },
+        {
+          "evidence_id": "ev_legacy_job_company",
+          "source_text": "Example SaaS Co.",
+          "span": {
+            "start": 27,
+            "end": 43
+          },
+          "lines": {
+            "start": 2,
+            "end": 2
+          }
+        },
+        {
+          "evidence_id": "ev_legacy_job_required",
+          "source_text": "Required: 8+ years of software engineering experience, React, TypeScript, API architecture/design, responsive design.",
+          "span": {
+            "start": 44,
+            "end": 161
+          },
+          "lines": {
+            "start": 3,
+            "end": 3
+          }
+        },
+        {
+          "evidence_id": "ev_legacy_job_preferred",
+          "source_text": "Preferred: AWS, GraphQL, SaaS experience, and technical leadership.",
+          "span": {
+            "start": 162,
+            "end": 229
+          },
+          "lines": {
+            "start": 4,
+            "end": 4
+          }
+        }
+      ],
+      "uncertainty": [],
+      "metadata": {
+        "fixture_source_id": "legacy-job-fixture"
+      }
+    }
+  }
+}

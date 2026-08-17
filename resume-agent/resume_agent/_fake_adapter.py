@@ -11,6 +11,7 @@ from typing import Any, Mapping
 
 from ._adapters import AdapterCompletion, AdapterProviderError, AdapterRequest, ValidatingModelAdapter
 from ._agent_config import AgentConfig, resolve_agent_config
+from ._extraction_schemas import EXTRACTION_OUTPUT_SCHEMAS
 from ._schema_validation import JsonObject, JsonSchemaRegistry, validate_schema_id
 
 
@@ -138,6 +139,7 @@ DEFAULT_FAKE_OUTPUT_SCHEMAS: JsonSchemaRegistry = {
         "additionalProperties": False,
     },
 }
+DEFAULT_FAKE_OUTPUT_SCHEMAS.update(EXTRACTION_OUTPUT_SCHEMAS)
 
 
 @dataclass(frozen=True)

@@ -250,6 +250,7 @@ from tests.contract.test_resume_agent_adapter_contract import (  # noqa: E402,F4
     ResumeAgentAnthropicAdapterContractTests,
     ResumeAgentAdapterContractTests,
     ResumeAgentDeterministicFakeAdapterContractTests,
+    ResumeAgentExtractionSchemaContractTests,
     ResumeAgentSchemaValidatorContractTests,
 )
 

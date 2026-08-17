@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import unittest
+import copy
 import json
 import sys
 import tempfile
@@ -21,13 +22,22 @@ from resume_agent._adapters import (
 )
 from resume_agent import AGENT_CONFIG_DEFAULTS, resolve_agent_config, stable_agent_config_hash
 from resume_agent._fake_adapter import (
+    DEFAULT_FAKE_OUTPUT_SCHEMAS,
     FACT_PROPOSAL_SCHEMA_ID,
     REWRITE_PROPOSAL_SCHEMA_ID,
     DeterministicFakeAdapter,
     deterministic_fake_key,
     validate_fake_fixture_dir,
 )
-from resume_agent._schema_validation import validate_json_schema
+from resume_agent._extraction_requests import (
+    JOB_EXTRACTION_PROMPT_TEMPLATE_ID,
+    RESUME_EXTRACTION_PROMPT_TEMPLATE_ID,
+    build_job_extraction_request,
+    build_resume_extraction_request,
+    prompt_template_text,
+)
+from resume_agent._extraction_schemas import JOB_EXTRACTION_SCHEMA_ID, RESUME_EXTRACTION_SCHEMA_ID
+from resume_agent._schema_validation import validate_json_schema, validate_schema_id
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -89,6 +99,55 @@ REWRITE_SEED_INPUT = {
 }
 REWRITE_SEED_TEMPLATE = "resume-agent.propose-rewrite.v1"
 REWRITE_SEED_KEY = "804cc1b63efc716aff6873933e8a999a57551ee379f20315212d8a12f70cf2de"
+
+LEGACY_RESUME_FIXTURE = """
+Daniel Candidate
+Software Engineer
+
+Experience building React and TypeScript front ends, REST APIs, and responsive web applications.
+Designed API architecture for customer-facing SaaS products.
+"""
+
+LEGACY_JOB_FIXTURE = """
+Senior Software Engineer, Example SaaS Co.
+Required: 8+ years of software engineering experience, React, TypeScript, API architecture/design, responsive design.
+Preferred: AWS, GraphQL, SaaS experience, and technical leadership.
+"""
+
+ML_ENGINEER_RESUME = """Maya Patel
+Machine Learning Engineer
+
+Skills: Python, TensorFlow, Kubernetes, Google Cloud Platform (GCP), Go, Spark, MLOps.
+Experience
+Senior ML Engineer, CloudScale AI, 2021-Present
+Built TensorFlow training pipelines in Python and deployed model serving workloads on Kubernetes and GCP.
+Machine Learning Engineer, DataWorks, 2018-2021
+Developed Go services for feature ingestion and batch prediction.
+Education
+PhD in Computer Science, University of Illinois, 2018
+Certifications
+Google Professional Machine Learning Engineer, Google Cloud, 2022
+Projects
+Realtime Fraud Detection: Python and TensorFlow system with Kubernetes inference services.
+"""
+
+PYTHON_SPARK_JOB = """Senior Data Platform Engineer
+DataLake Systems
+Requirements:
+- 5+ years with Python, Spark, and distributed data processing.
+- Build production ETL pipelines on cloud infrastructure.
+Preferred:
+- Kubernetes experience.
+"""
+
+GRAPHQL_API_JOB = """Backend Platform Engineer
+API Studio
+Required:
+- Design GraphQL APIs for customer-facing products.
+- Lead REST API design and versioning for partner integrations.
+Preferred:
+- TypeScript experience.
+"""
 
 
 def request() -> AdapterRequest:
@@ -285,6 +344,101 @@ class ResumeAgentDeterministicFakeAdapterContractTests(unittest.TestCase):
             create_live_model_adapter(env={"RESUME_AGENT_ALLOW_LIVE": "1"}, agent_config={"model": "raw-dict"})
 
 
+class ResumeAgentExtractionSchemaContractTests(unittest.TestCase):
+    def test_extraction_schema_ids_are_registered_with_fake_adapter_validator(self):
+        self.assertIn(RESUME_EXTRACTION_SCHEMA_ID, DEFAULT_FAKE_OUTPUT_SCHEMAS)
+        self.assertIn(JOB_EXTRACTION_SCHEMA_ID, DEFAULT_FAKE_OUTPUT_SCHEMAS)
+
+        resume_payload = _fixture_payload("resume-agent-extraction-ml-engineer-resume")
+        job_payload = _fixture_payload("resume-agent-extraction-python-spark-job")
+
+        self.assertEqual(validate_schema_id(resume_payload, RESUME_EXTRACTION_SCHEMA_ID, DEFAULT_FAKE_OUTPUT_SCHEMAS), [])
+        self.assertEqual(validate_schema_id(job_payload, JOB_EXTRACTION_SCHEMA_ID, DEFAULT_FAKE_OUTPUT_SCHEMAS), [])
+
+    def test_extraction_schemas_require_item_evidence_and_confidence(self):
+        resume_payload = copy.deepcopy(_fixture_payload("resume-agent-extraction-ml-engineer-resume"))
+        del resume_payload["skills"][0]["evidence"]
+        del resume_payload["experience"][0]["confidence"]
+
+        job_payload = copy.deepcopy(_fixture_payload("resume-agent-extraction-python-spark-job"))
+        del job_payload["requirements"][0]["evidence"]
+        del job_payload["requirements"][0]["confidence"]
+
+        resume_violations = validate_schema_id(resume_payload, RESUME_EXTRACTION_SCHEMA_ID, DEFAULT_FAKE_OUTPUT_SCHEMAS)
+        job_violations = validate_schema_id(job_payload, JOB_EXTRACTION_SCHEMA_ID, DEFAULT_FAKE_OUTPUT_SCHEMAS)
+
+        resume_pairs = {(item.get("code"), item.get("field_path")) for item in resume_violations}
+        job_pairs = {(item.get("code"), item.get("field_path")) for item in job_violations}
+        self.assertIn(("missing_field", "skills/0/evidence"), resume_pairs)
+        self.assertIn(("missing_field", "experience/0/confidence"), resume_pairs)
+        self.assertIn(("missing_field", "requirements/0/evidence"), job_pairs)
+        self.assertIn(("missing_field", "requirements/0/confidence"), job_pairs)
+
+    def test_prompt_assets_use_template_id_at_version_convention(self):
+        self.assertEqual(RESUME_EXTRACTION_PROMPT_TEMPLATE_ID, "resume-agent.resume-extraction@v1")
+        self.assertEqual(JOB_EXTRACTION_PROMPT_TEMPLATE_ID, "resume-agent.job-extraction@v1")
+        self.assertIn("Return only JSON", prompt_template_text(RESUME_EXTRACTION_PROMPT_TEMPLATE_ID))
+        self.assertIn("Return only JSON", prompt_template_text(JOB_EXTRACTION_PROMPT_TEMPLATE_ID))
+
+    def test_extraction_request_builders_are_deterministic(self):
+        first = build_resume_extraction_request(ML_ENGINEER_RESUME, source_id="ml-engineer-golden-resume")
+        second = build_resume_extraction_request(ML_ENGINEER_RESUME, source_id="ml-engineer-golden-resume")
+        changed_source = build_resume_extraction_request(ML_ENGINEER_RESUME, source_id="other-source")
+
+        self.assertEqual(first, second)
+        self.assertNotEqual(first.input_payload, changed_source.input_payload)
+        self.assertEqual(first.prompt_template_id, RESUME_EXTRACTION_PROMPT_TEMPLATE_ID)
+        self.assertEqual(first.output_schema_id, RESUME_EXTRACTION_SCHEMA_ID)
+        self.assertEqual(first.input_payload["schema_id"], RESUME_EXTRACTION_SCHEMA_ID)
+
+        job_first = build_job_extraction_request(PYTHON_SPARK_JOB, source_id="python-spark-golden-job")
+        job_second = build_job_extraction_request(PYTHON_SPARK_JOB, source_id="python-spark-golden-job")
+        self.assertEqual(job_first, job_second)
+        self.assertEqual(job_first.prompt_template_id, JOB_EXTRACTION_PROMPT_TEMPLATE_ID)
+        self.assertEqual(job_first.output_schema_id, JOB_EXTRACTION_SCHEMA_ID)
+
+    def test_golden_extraction_fixtures_are_retrievable_by_deterministic_requests(self):
+        cases = [
+            build_resume_extraction_request(LEGACY_RESUME_FIXTURE, source_id="legacy-resume-fixture"),
+            build_job_extraction_request(LEGACY_JOB_FIXTURE, source_id="legacy-job-fixture"),
+            build_resume_extraction_request(ML_ENGINEER_RESUME, source_id="ml-engineer-golden-resume"),
+            build_job_extraction_request(PYTHON_SPARK_JOB, source_id="python-spark-golden-job"),
+            build_job_extraction_request(GRAPHQL_API_JOB, source_id="graphql-api-design-golden-job"),
+        ]
+        adapter = DeterministicFakeAdapter(fixture_dir=FAKE_FIXTURES)
+
+        for request in cases:
+            key = deterministic_fake_key(request.prompt_template_id, request.output_schema_id, request.input_payload)
+            with self.subTest(key=key):
+                result = adapter.complete(request)
+                self.assertEqual(result.status, "ok")
+                self.assertTrue(result.payload["requires_validation"])
+
+    def test_ml_engineer_resume_fixture_represents_every_populated_section(self):
+        payload = _fixture_payload("resume-agent-extraction-ml-engineer-resume")
+
+        for section in ["skills", "experience", "education", "certifications", "projects", "employment"]:
+            with self.subTest(section=section):
+                self.assertTrue(payload[section])
+
+        serialized = json.dumps(payload, sort_keys=True).lower()
+        for expected in ["python", "tensorflow", "kubernetes", "gcp", "go", "phd"]:
+            self.assertIn(expected, serialized)
+
+    def test_jd_golden_skills_are_present_in_requirement_entries(self):
+        cases = [
+            ("resume-agent-extraction-python-spark-job", ["python", "spark", "kubernetes"]),
+            ("resume-agent-extraction-graphql-api-job", ["graphql", "api design", "typescript"]),
+        ]
+
+        for fixture_id, expected_skills in cases:
+            payload = _fixture_payload(fixture_id)
+            requirement_text = json.dumps(payload["requirements"] + payload["preferred"], sort_keys=True).lower()
+            for skill_name in expected_skills:
+                with self.subTest(fixture_id=fixture_id, skill=skill_name):
+                    self.assertIn(skill_name, requirement_text)
+
+
 class ResumeAgentAnthropicAdapterContractTests(unittest.TestCase):
     def setUp(self):
         self.previous_anthropic = sys.modules.get("anthropic")
@@ -446,6 +600,14 @@ def _fake_fixture_envelope(payload):
             "payload": payload,
         },
     }
+
+
+def _fixture_payload(fixture_id: str):
+    for path in sorted(FAKE_FIXTURES.glob("*.json")):
+        fixture = json.loads(path.read_text(encoding="utf-8"))
+        if fixture.get("fixture_id") == fixture_id:
+            return fixture["data"]["payload"]
+    raise AssertionError(f"Missing fake adapter fixture {fixture_id}.")
 
 
 def _install_anthropic_stub():

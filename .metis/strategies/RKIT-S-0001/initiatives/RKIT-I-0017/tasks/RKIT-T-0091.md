@@ -4,14 +4,14 @@ level: task
 title: "Extraction output schemas (resume + job) with evidence/confidence; fake-adapter fixtures for legacy + non-fixture goldens"
 short_code: "RKIT-T-0091"
 created_at: 2026-08-17T16:26:26.925580+00:00
-updated_at: 2026-08-17T16:26:26.925580+00:00
+updated_at: 2026-08-17T16:28:08.921729+00:00
 parent: resume-agent-model-based-resume
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0017
 ## Objective **[REQUIRED]**
 
 Land the substrate for model-based extraction: versioned resume-extraction and job-extraction OUTPUT schemas aligned to the section 4.2 shapes (CanonicalResume-shaped resume proposal; JobModel-shaped job proposal with requirement entries carrying classification/seniority/industry/domain), every extracted item carrying source-evidence references (text span/line) and model-sourced confidence; versioned prompt-template assets + deterministic prompt/input builders (RKIT-I-0021 will hash them); and DeterministicFakeAdapter fixtures for BOTH the legacy fixture inputs AND new non-fixture golden inputs — including the audit's ML-engineer probe profile (Python, TensorFlow, Kubernetes, GCP, Go, PhD) whose current extraction yields only the title line.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria **[REQUIRED]**
 
@@ -53,4 +55,4 @@ None within I-0017 (first task). Serial chain T-0091→0092→0093→0094.
 
 ## Status Updates **[REQUIRED]**
 
-*To be added during implementation*
+- 2026-08-17: I-0016 complete (v0.18.0 pushed 7d10e7e; resume-agent behavior tier unblocked). I-0017 decomposed T-0091..0094 (serial). Codex launched on the substrate: two versioned extraction schemas w/ mandatory evidence+confidence, prompt-template file assets, complete pinned fake fixtures for legacy inputs + ML-engineer/Python-Spark/GraphQL+API goldens, fixture-completeness tests.

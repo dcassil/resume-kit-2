@@ -1,0 +1,400 @@
+{
+  "fixture_id": "resume-agent-extraction-graphql-api-job",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "JD golden extraction retaining GraphQL and API-design requirements independently.",
+    "Payload is a complete source-grounded extraction proposal for the supplied canonical input."
+  ],
+  "comment": "RKIT-T-0091 extraction schema golden fixture. The file name is the sha256 key for the request tuple.",
+  "data": {
+    "key": {
+      "sha256": "05625e3246cfc452110a6aad68093a004e93edcbba1a4e7ec8f3fe9266feacd3",
+      "prompt_template_id": "resume-agent.job-extraction@v1",
+      "output_schema_id": "resume-agent.job-extraction.v1",
+      "canonical_input_json": "{\"job_text\":\"Backend Platform Engineer\\nAPI Studio\\nRequired:\\n- Design GraphQL APIs for customer-facing products.\\n- Lead REST API design and versioning for partner integrations.\\nPreferred:\\n- TypeScript experience.\\n\",\"schema_id\":\"resume-agent.job-extraction.v1\",\"source\":{\"kind\":\"raw_text\",\"sha256\":\"2517055355836a409d1ff5e697e0dabe6a6b078cbe41436baf346de41cc138ec\",\"source_id\":\"graphql-api-design-golden-job\"}}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.job-extraction.v1",
+      "proposal_type": "job_extraction",
+      "requires_validation": true,
+      "job_id": "graphql_api_design_golden_job",
+      "source": {
+        "kind": "raw_text",
+        "source_id": "graphql-api-design-golden-job",
+        "sha256": "2517055355836a409d1ff5e697e0dabe6a6b078cbe41436baf346de41cc138ec"
+      },
+      "title": {
+        "value": "Backend Platform Engineer",
+        "evidence": [
+          {
+            "evidence_id": "ev_graphql_api_title",
+            "source_text": "Backend Platform Engineer",
+            "span": {
+              "start": 0,
+              "end": 25
+            },
+            "lines": {
+              "start": 1,
+              "end": 1
+            }
+          }
+        ],
+        "confidence": 0.95,
+        "normalized": "backend platform engineer"
+      },
+      "company": {
+        "value": "API Studio",
+        "evidence": [
+          {
+            "evidence_id": "ev_graphql_api_company",
+            "source_text": "API Studio",
+            "span": {
+              "start": 26,
+              "end": 36
+            },
+            "lines": {
+              "start": 2,
+              "end": 2
+            }
+          }
+        ],
+        "confidence": 0.91
+      },
+      "seniority": [],
+      "industries": [],
+      "domains": [
+        {
+          "value": "API design",
+          "evidence": [
+            {
+              "evidence_id": "ev_graphql_api_api_design",
+              "source_text": "Lead REST API design and versioning for partner integrations.",
+              "span": {
+                "start": 101,
+                "end": 162
+              },
+              "lines": {
+                "start": 5,
+                "end": 5
+              }
+            }
+          ],
+          "confidence": 0.95,
+          "normalized": "api design"
+        },
+        {
+          "value": "GraphQL APIs",
+          "evidence": [
+            {
+              "evidence_id": "ev_graphql_api_graphql",
+              "source_text": "Design GraphQL APIs for customer-facing products.",
+              "span": {
+                "start": 49,
+                "end": 98
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.95,
+          "normalized": "graphql api"
+        }
+      ],
+      "requirements": [
+        {
+          "requirement_id": "req_graphql_api",
+          "classification": "required",
+          "concept": "GraphQL APIs",
+          "importance": "high",
+          "weight": 1.0,
+          "source_text": "Design GraphQL APIs for customer-facing products.",
+          "normalized_terms": [
+            "graphql",
+            "api",
+            "customer-facing products"
+          ],
+          "years": null,
+          "seniority": [],
+          "industries": [],
+          "domains": [
+            {
+              "value": "GraphQL APIs",
+              "evidence": [
+                {
+                  "evidence_id": "ev_graphql_api_graphql",
+                  "source_text": "Design GraphQL APIs for customer-facing products.",
+                  "span": {
+                    "start": 49,
+                    "end": 98
+                  },
+                  "lines": {
+                    "start": 4,
+                    "end": 4
+                  }
+                }
+              ],
+              "confidence": 0.95,
+              "normalized": "graphql api"
+            }
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_graphql_api_graphql",
+              "source_text": "Design GraphQL APIs for customer-facing products.",
+              "span": {
+                "start": 49,
+                "end": 98
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "requirement_id": "req_api_design",
+          "classification": "required",
+          "concept": "REST API design",
+          "importance": "high",
+          "weight": 1.0,
+          "source_text": "Lead REST API design and versioning for partner integrations.",
+          "normalized_terms": [
+            "rest api",
+            "api design",
+            "versioning",
+            "partner integrations"
+          ],
+          "years": null,
+          "seniority": [],
+          "industries": [],
+          "domains": [
+            {
+              "value": "API design",
+              "evidence": [
+                {
+                  "evidence_id": "ev_graphql_api_api_design",
+                  "source_text": "Lead REST API design and versioning for partner integrations.",
+                  "span": {
+                    "start": 101,
+                    "end": 162
+                  },
+                  "lines": {
+                    "start": 5,
+                    "end": 5
+                  }
+                }
+              ],
+              "confidence": 0.95,
+              "normalized": "api design"
+            }
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_graphql_api_api_design",
+              "source_text": "Lead REST API design and versioning for partner integrations.",
+              "span": {
+                "start": 101,
+                "end": 162
+              },
+              "lines": {
+                "start": 5,
+                "end": 5
+              }
+            }
+          ],
+          "confidence": 0.94
+        }
+      ],
+      "preferred": [
+        {
+          "requirement_id": "req_typescript",
+          "classification": "preferred",
+          "concept": "TypeScript",
+          "importance": "medium",
+          "weight": 0.5,
+          "source_text": "TypeScript experience.",
+          "normalized_terms": [
+            "typescript"
+          ],
+          "years": null,
+          "seniority": [],
+          "industries": [],
+          "domains": [],
+          "evidence": [
+            {
+              "evidence_id": "ev_graphql_api_typescript",
+              "source_text": "TypeScript experience.",
+              "span": {
+                "start": 176,
+                "end": 198
+              },
+              "lines": {
+                "start": 7,
+                "end": 7
+              }
+            }
+          ],
+          "confidence": 0.94
+        }
+      ],
+      "terminology": [
+        {
+          "surface": "GraphQL",
+          "canonical": "graphql",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_graphql_api_graphql",
+              "source_text": "Design GraphQL APIs for customer-facing products.",
+              "span": {
+                "start": 49,
+                "end": 98
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.93
+        },
+        {
+          "surface": "API design",
+          "canonical": "api design",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_graphql_api_api_design",
+              "source_text": "Lead REST API design and versioning for partner integrations.",
+              "span": {
+                "start": 101,
+                "end": 162
+              },
+              "lines": {
+                "start": 5,
+                "end": 5
+              }
+            }
+          ],
+          "confidence": 0.93
+        },
+        {
+          "surface": "REST API",
+          "canonical": "rest api",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_graphql_api_api_design",
+              "source_text": "Lead REST API design and versioning for partner integrations.",
+              "span": {
+                "start": 101,
+                "end": 162
+              },
+              "lines": {
+                "start": 5,
+                "end": 5
+              }
+            }
+          ],
+          "confidence": 0.93
+        },
+        {
+          "surface": "TypeScript",
+          "canonical": "typescript",
+          "source": "requirement",
+          "weight": 0.5,
+          "evidence": [
+            {
+              "evidence_id": "ev_graphql_api_typescript",
+              "source_text": "TypeScript experience.",
+              "span": {
+                "start": 176,
+                "end": 198
+              },
+              "lines": {
+                "start": 7,
+                "end": 7
+              }
+            }
+          ],
+          "confidence": 0.93
+        }
+      ],
+      "source_evidence": [
+        {
+          "evidence_id": "ev_graphql_api_title",
+          "source_text": "Backend Platform Engineer",
+          "span": {
+            "start": 0,
+            "end": 25
+          },
+          "lines": {
+            "start": 1,
+            "end": 1
+          }
+        },
+        {
+          "evidence_id": "ev_graphql_api_company",
+          "source_text": "API Studio",
+          "span": {
+            "start": 26,
+            "end": 36
+          },
+          "lines": {
+            "start": 2,
+            "end": 2
+          }
+        },
+        {
+          "evidence_id": "ev_graphql_api_graphql",
+          "source_text": "Design GraphQL APIs for customer-facing products.",
+          "span": {
+            "start": 49,
+            "end": 98
+          },
+          "lines": {
+            "start": 4,
+            "end": 4
+          }
+        },
+        {
+          "evidence_id": "ev_graphql_api_api_design",
+          "source_text": "Lead REST API design and versioning for partner integrations.",
+          "span": {
+            "start": 101,
+            "end": 162
+          },
+          "lines": {
+            "start": 5,
+            "end": 5
+          }
+        },
+        {
+          "evidence_id": "ev_graphql_api_typescript",
+          "source_text": "TypeScript experience.",
+          "span": {
+            "start": 176,
+            "end": 198
+          },
+          "lines": {
+            "start": 7,
+            "end": 7
+          }
+        }
+      ],
+      "uncertainty": [],
+      "metadata": {
+        "fixture_source_id": "graphql-api-design-golden-job"
+      }
+    }
+  }
+}

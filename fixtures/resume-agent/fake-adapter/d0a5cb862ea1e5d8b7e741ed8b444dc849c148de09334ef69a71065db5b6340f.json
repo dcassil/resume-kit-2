@@ -1,0 +1,465 @@
+{
+  "fixture_id": "resume-agent-extraction-python-spark-job",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "JD golden extraction retaining both Python and Spark from the 5+ years requirement.",
+    "Payload is a complete source-grounded extraction proposal for the supplied canonical input."
+  ],
+  "comment": "RKIT-T-0091 extraction schema golden fixture. The file name is the sha256 key for the request tuple.",
+  "data": {
+    "key": {
+      "sha256": "d0a5cb862ea1e5d8b7e741ed8b444dc849c148de09334ef69a71065db5b6340f",
+      "prompt_template_id": "resume-agent.job-extraction@v1",
+      "output_schema_id": "resume-agent.job-extraction.v1",
+      "canonical_input_json": "{\"job_text\":\"Senior Data Platform Engineer\\nDataLake Systems\\nRequirements:\\n- 5+ years with Python, Spark, and distributed data processing.\\n- Build production ETL pipelines on cloud infrastructure.\\nPreferred:\\n- Kubernetes experience.\\n\",\"schema_id\":\"resume-agent.job-extraction.v1\",\"source\":{\"kind\":\"raw_text\",\"sha256\":\"563a9713425490c98979e39171da72dc049ff095796454d6d5a0f40a08997f5d\",\"source_id\":\"python-spark-golden-job\"}}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.job-extraction.v1",
+      "proposal_type": "job_extraction",
+      "requires_validation": true,
+      "job_id": "python_spark_golden_job",
+      "source": {
+        "kind": "raw_text",
+        "source_id": "python-spark-golden-job",
+        "sha256": "563a9713425490c98979e39171da72dc049ff095796454d6d5a0f40a08997f5d"
+      },
+      "title": {
+        "value": "Senior Data Platform Engineer",
+        "evidence": [
+          {
+            "evidence_id": "ev_python_spark_title",
+            "source_text": "Senior Data Platform Engineer",
+            "span": {
+              "start": 0,
+              "end": 29
+            },
+            "lines": {
+              "start": 1,
+              "end": 1
+            }
+          }
+        ],
+        "confidence": 0.96,
+        "normalized": "data platform engineer"
+      },
+      "company": {
+        "value": "DataLake Systems",
+        "evidence": [
+          {
+            "evidence_id": "ev_python_spark_company",
+            "source_text": "DataLake Systems",
+            "span": {
+              "start": 30,
+              "end": 46
+            },
+            "lines": {
+              "start": 2,
+              "end": 2
+            }
+          }
+        ],
+        "confidence": 0.92
+      },
+      "seniority": [
+        {
+          "value": "Senior",
+          "evidence": [
+            {
+              "evidence_id": "ev_python_spark_title",
+              "source_text": "Senior Data Platform Engineer",
+              "span": {
+                "start": 0,
+                "end": 29
+              },
+              "lines": {
+                "start": 1,
+                "end": 1
+              }
+            }
+          ],
+          "confidence": 0.96,
+          "normalized": "senior"
+        }
+      ],
+      "industries": [],
+      "domains": [
+        {
+          "value": "data platform",
+          "evidence": [
+            {
+              "evidence_id": "ev_python_spark_title",
+              "source_text": "Senior Data Platform Engineer",
+              "span": {
+                "start": 0,
+                "end": 29
+              },
+              "lines": {
+                "start": 1,
+                "end": 1
+              }
+            }
+          ],
+          "confidence": 0.9,
+          "normalized": "data platform"
+        }
+      ],
+      "requirements": [
+        {
+          "requirement_id": "req_python_spark_years",
+          "classification": "required",
+          "concept": "Python and Spark experience",
+          "importance": "high",
+          "weight": 1.0,
+          "source_text": "5+ years with Python, Spark, and distributed data processing.",
+          "normalized_terms": [
+            "5+ years",
+            "python",
+            "spark",
+            "distributed data processing"
+          ],
+          "years": {
+            "minimum": 5,
+            "source_text": "5+ years"
+          },
+          "seniority": [
+            {
+              "value": "Senior",
+              "evidence": [
+                {
+                  "evidence_id": "ev_python_spark_title",
+                  "source_text": "Senior Data Platform Engineer",
+                  "span": {
+                    "start": 0,
+                    "end": 29
+                  },
+                  "lines": {
+                    "start": 1,
+                    "end": 1
+                  }
+                }
+              ],
+              "confidence": 0.96,
+              "normalized": "senior"
+            }
+          ],
+          "industries": [],
+          "domains": [
+            {
+              "value": "data platform",
+              "evidence": [
+                {
+                  "evidence_id": "ev_python_spark_title",
+                  "source_text": "Senior Data Platform Engineer",
+                  "span": {
+                    "start": 0,
+                    "end": 29
+                  },
+                  "lines": {
+                    "start": 1,
+                    "end": 1
+                  }
+                }
+              ],
+              "confidence": 0.9,
+              "normalized": "data platform"
+            }
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_python_spark_requirement",
+              "source_text": "5+ years with Python, Spark, and distributed data processing.",
+              "span": {
+                "start": 63,
+                "end": 124
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "requirement_id": "req_etl_cloud",
+          "classification": "required",
+          "concept": "production ETL pipelines",
+          "importance": "high",
+          "weight": 0.9,
+          "source_text": "Build production ETL pipelines on cloud infrastructure.",
+          "normalized_terms": [
+            "etl",
+            "cloud infrastructure",
+            "production pipelines"
+          ],
+          "years": null,
+          "seniority": [],
+          "industries": [],
+          "domains": [
+            {
+              "value": "data platform",
+              "evidence": [
+                {
+                  "evidence_id": "ev_python_spark_title",
+                  "source_text": "Senior Data Platform Engineer",
+                  "span": {
+                    "start": 0,
+                    "end": 29
+                  },
+                  "lines": {
+                    "start": 1,
+                    "end": 1
+                  }
+                }
+              ],
+              "confidence": 0.9,
+              "normalized": "data platform"
+            }
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_python_spark_etl",
+              "source_text": "Build production ETL pipelines on cloud infrastructure.",
+              "span": {
+                "start": 127,
+                "end": 182
+              },
+              "lines": {
+                "start": 5,
+                "end": 5
+              }
+            }
+          ],
+          "confidence": 0.94
+        }
+      ],
+      "preferred": [
+        {
+          "requirement_id": "req_kubernetes",
+          "classification": "preferred",
+          "concept": "Kubernetes",
+          "importance": "medium",
+          "weight": 0.5,
+          "source_text": "Kubernetes experience.",
+          "normalized_terms": [
+            "kubernetes"
+          ],
+          "years": null,
+          "seniority": [],
+          "industries": [],
+          "domains": [
+            {
+              "value": "data platform",
+              "evidence": [
+                {
+                  "evidence_id": "ev_python_spark_title",
+                  "source_text": "Senior Data Platform Engineer",
+                  "span": {
+                    "start": 0,
+                    "end": 29
+                  },
+                  "lines": {
+                    "start": 1,
+                    "end": 1
+                  }
+                }
+              ],
+              "confidence": 0.9,
+              "normalized": "data platform"
+            }
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_python_spark_kubernetes",
+              "source_text": "Kubernetes experience.",
+              "span": {
+                "start": 196,
+                "end": 218
+              },
+              "lines": {
+                "start": 7,
+                "end": 7
+              }
+            }
+          ],
+          "confidence": 0.94
+        }
+      ],
+      "terminology": [
+        {
+          "surface": "Python",
+          "canonical": "python",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_python_spark_requirement",
+              "source_text": "5+ years with Python, Spark, and distributed data processing.",
+              "span": {
+                "start": 63,
+                "end": 124
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.93
+        },
+        {
+          "surface": "Spark",
+          "canonical": "spark",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_python_spark_requirement",
+              "source_text": "5+ years with Python, Spark, and distributed data processing.",
+              "span": {
+                "start": 63,
+                "end": 124
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.93
+        },
+        {
+          "surface": "5+ years",
+          "canonical": "5+ years",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_python_spark_requirement",
+              "source_text": "5+ years with Python, Spark, and distributed data processing.",
+              "span": {
+                "start": 63,
+                "end": 124
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.93
+        },
+        {
+          "surface": "ETL",
+          "canonical": "etl",
+          "source": "requirement",
+          "weight": 0.9,
+          "evidence": [
+            {
+              "evidence_id": "ev_python_spark_etl",
+              "source_text": "Build production ETL pipelines on cloud infrastructure.",
+              "span": {
+                "start": 127,
+                "end": 182
+              },
+              "lines": {
+                "start": 5,
+                "end": 5
+              }
+            }
+          ],
+          "confidence": 0.93
+        },
+        {
+          "surface": "Kubernetes",
+          "canonical": "kubernetes",
+          "source": "requirement",
+          "weight": 0.5,
+          "evidence": [
+            {
+              "evidence_id": "ev_python_spark_kubernetes",
+              "source_text": "Kubernetes experience.",
+              "span": {
+                "start": 196,
+                "end": 218
+              },
+              "lines": {
+                "start": 7,
+                "end": 7
+              }
+            }
+          ],
+          "confidence": 0.93
+        }
+      ],
+      "source_evidence": [
+        {
+          "evidence_id": "ev_python_spark_title",
+          "source_text": "Senior Data Platform Engineer",
+          "span": {
+            "start": 0,
+            "end": 29
+          },
+          "lines": {
+            "start": 1,
+            "end": 1
+          }
+        },
+        {
+          "evidence_id": "ev_python_spark_company",
+          "source_text": "DataLake Systems",
+          "span": {
+            "start": 30,
+            "end": 46
+          },
+          "lines": {
+            "start": 2,
+            "end": 2
+          }
+        },
+        {
+          "evidence_id": "ev_python_spark_requirement",
+          "source_text": "5+ years with Python, Spark, and distributed data processing.",
+          "span": {
+            "start": 63,
+            "end": 124
+          },
+          "lines": {
+            "start": 4,
+            "end": 4
+          }
+        },
+        {
+          "evidence_id": "ev_python_spark_etl",
+          "source_text": "Build production ETL pipelines on cloud infrastructure.",
+          "span": {
+            "start": 127,
+            "end": 182
+          },
+          "lines": {
+            "start": 5,
+            "end": 5
+          }
+        },
+        {
+          "evidence_id": "ev_python_spark_kubernetes",
+          "source_text": "Kubernetes experience.",
+          "span": {
+            "start": 196,
+            "end": 218
+          },
+          "lines": {
+            "start": 7,
+            "end": 7
+          }
+        }
+      ],
+      "uncertainty": [],
+      "metadata": {
+        "fixture_source_id": "python-spark-golden-job"
+      }
+    }
+  }
+}

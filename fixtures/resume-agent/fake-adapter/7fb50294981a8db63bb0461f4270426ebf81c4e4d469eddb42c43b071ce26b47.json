@@ -1,0 +1,641 @@
+{
+  "fixture_id": "resume-agent-extraction-ml-engineer-resume",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "ML-engineer golden resume extraction covering Python, TensorFlow, Kubernetes, GCP, Go, PhD, certification, project, and employment structure.",
+    "Payload is a complete source-grounded extraction proposal for the supplied canonical input."
+  ],
+  "comment": "RKIT-T-0091 extraction schema golden fixture. The file name is the sha256 key for the request tuple.",
+  "data": {
+    "key": {
+      "sha256": "7fb50294981a8db63bb0461f4270426ebf81c4e4d469eddb42c43b071ce26b47",
+      "prompt_template_id": "resume-agent.resume-extraction@v1",
+      "output_schema_id": "resume-agent.resume-extraction.v1",
+      "canonical_input_json": "{\"resume_text\":\"Maya Patel\\nMachine Learning Engineer\\n\\nSkills: Python, TensorFlow, Kubernetes, Google Cloud Platform (GCP), Go, Spark, MLOps.\\nExperience\\nSenior ML Engineer, CloudScale AI, 2021-Present\\nBuilt TensorFlow training pipelines in Python and deployed model serving workloads on Kubernetes and GCP.\\nMachine Learning Engineer, DataWorks, 2018-2021\\nDeveloped Go services for feature ingestion and batch prediction.\\nEducation\\nPhD in Computer Science, University of Illinois, 2018\\nCertifications\\nGoogle Professional Machine Learning Engineer, Google Cloud, 2022\\nProjects\\nRealtime Fraud Detection: Python and TensorFlow system with Kubernetes inference services.\\n\",\"schema_id\":\"resume-agent.resume-extraction.v1\",\"source\":{\"kind\":\"raw_text\",\"sha256\":\"b158bcf22b36d4aee8b06d308c752bba80951ee16236b244c7ce1113a9ec71a0\",\"source_id\":\"ml-engineer-golden-resume\"}}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.resume-extraction.v1",
+      "proposal_type": "resume_extraction",
+      "requires_validation": true,
+      "resume_id": "ml_engineer_golden_resume",
+      "source": {
+        "kind": "raw_text",
+        "source_id": "ml-engineer-golden-resume",
+        "sha256": "b158bcf22b36d4aee8b06d308c752bba80951ee16236b244c7ce1113a9ec71a0"
+      },
+      "basics": {
+        "name": {
+          "value": "Maya Patel",
+          "evidence": [
+            {
+              "evidence_id": "ev_ml_name",
+              "source_text": "Maya Patel",
+              "span": {
+                "start": 0,
+                "end": 10
+              },
+              "lines": {
+                "start": 1,
+                "end": 1
+              }
+            }
+          ],
+          "confidence": 0.98
+        },
+        "title": {
+          "value": "Machine Learning Engineer",
+          "evidence": [
+            {
+              "evidence_id": "ev_ml_title",
+              "source_text": "Machine Learning Engineer",
+              "span": {
+                "start": 11,
+                "end": 36
+              },
+              "lines": {
+                "start": 2,
+                "end": 2
+              }
+            }
+          ],
+          "confidence": 0.97,
+          "normalized": "machine learning engineer"
+        }
+      },
+      "skills": [
+        {
+          "name": "Python",
+          "category": "language",
+          "normalized_terms": [
+            "python"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_ml_skills",
+              "source_text": "Skills: Python, TensorFlow, Kubernetes, Google Cloud Platform (GCP), Go, Spark, MLOps.",
+              "span": {
+                "start": 38,
+                "end": 124
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "name": "TensorFlow",
+          "category": "ml_framework",
+          "normalized_terms": [
+            "tensorflow"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_ml_skills",
+              "source_text": "Skills: Python, TensorFlow, Kubernetes, Google Cloud Platform (GCP), Go, Spark, MLOps.",
+              "span": {
+                "start": 38,
+                "end": 124
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "name": "Kubernetes",
+          "category": "platform",
+          "normalized_terms": [
+            "kubernetes"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_ml_skills",
+              "source_text": "Skills: Python, TensorFlow, Kubernetes, Google Cloud Platform (GCP), Go, Spark, MLOps.",
+              "span": {
+                "start": 38,
+                "end": 124
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "name": "Google Cloud Platform (GCP)",
+          "category": "cloud",
+          "normalized_terms": [
+            "google cloud platform",
+            "gcp"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_ml_skills",
+              "source_text": "Skills: Python, TensorFlow, Kubernetes, Google Cloud Platform (GCP), Go, Spark, MLOps.",
+              "span": {
+                "start": 38,
+                "end": 124
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "name": "Go",
+          "category": "language",
+          "normalized_terms": [
+            "go"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_ml_skills",
+              "source_text": "Skills: Python, TensorFlow, Kubernetes, Google Cloud Platform (GCP), Go, Spark, MLOps.",
+              "span": {
+                "start": 38,
+                "end": 124
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "name": "Spark",
+          "category": "data",
+          "normalized_terms": [
+            "spark"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_ml_skills",
+              "source_text": "Skills: Python, TensorFlow, Kubernetes, Google Cloud Platform (GCP), Go, Spark, MLOps.",
+              "span": {
+                "start": 38,
+                "end": 124
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "name": "MLOps",
+          "category": "practice",
+          "normalized_terms": [
+            "mlops"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_ml_skills",
+              "source_text": "Skills: Python, TensorFlow, Kubernetes, Google Cloud Platform (GCP), Go, Spark, MLOps.",
+              "span": {
+                "start": 38,
+                "end": 124
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.94
+        }
+      ],
+      "experience": [
+        {
+          "role": "Senior ML Engineer",
+          "organization": "CloudScale AI",
+          "employment": {
+            "organization": "CloudScale AI",
+            "role": "Senior ML Engineer",
+            "start_date": "2021",
+            "end_date": null,
+            "current": true,
+            "evidence": [
+              {
+                "evidence_id": "ev_ml_job_cloudscale",
+                "source_text": "Senior ML Engineer, CloudScale AI, 2021-Present",
+                "span": {
+                  "start": 136,
+                  "end": 183
+                },
+                "lines": {
+                  "start": 6,
+                  "end": 6
+                }
+              }
+            ],
+            "confidence": 0.94
+          },
+          "location": null,
+          "highlights": [
+            {
+              "text": "Built TensorFlow training pipelines in Python and deployed model serving workloads on Kubernetes and GCP.",
+              "normalized_terms": [
+                "tensorflow",
+                "python",
+                "kubernetes",
+                "gcp"
+              ],
+              "evidence": [
+                {
+                  "evidence_id": "ev_ml_highlight_cloudscale",
+                  "source_text": "Built TensorFlow training pipelines in Python and deployed model serving workloads on Kubernetes and GCP.",
+                  "span": {
+                    "start": 184,
+                    "end": 289
+                  },
+                  "lines": {
+                    "start": 7,
+                    "end": 7
+                  }
+                }
+              ],
+              "confidence": 0.93
+            }
+          ],
+          "skills": [
+            "TensorFlow",
+            "Python",
+            "Kubernetes",
+            "GCP"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_ml_job_cloudscale",
+              "source_text": "Senior ML Engineer, CloudScale AI, 2021-Present",
+              "span": {
+                "start": 136,
+                "end": 183
+              },
+              "lines": {
+                "start": 6,
+                "end": 6
+              }
+            },
+            {
+              "evidence_id": "ev_ml_highlight_cloudscale",
+              "source_text": "Built TensorFlow training pipelines in Python and deployed model serving workloads on Kubernetes and GCP.",
+              "span": {
+                "start": 184,
+                "end": 289
+              },
+              "lines": {
+                "start": 7,
+                "end": 7
+              }
+            }
+          ],
+          "confidence": 0.95
+        },
+        {
+          "role": "Machine Learning Engineer",
+          "organization": "DataWorks",
+          "employment": {
+            "organization": "DataWorks",
+            "role": "Machine Learning Engineer",
+            "start_date": "2018",
+            "end_date": "2021",
+            "current": false,
+            "evidence": [
+              {
+                "evidence_id": "ev_ml_job_dataworks",
+                "source_text": "Machine Learning Engineer, DataWorks, 2018-2021",
+                "span": {
+                  "start": 290,
+                  "end": 337
+                },
+                "lines": {
+                  "start": 8,
+                  "end": 8
+                }
+              }
+            ],
+            "confidence": 0.94
+          },
+          "location": null,
+          "highlights": [
+            {
+              "text": "Developed Go services for feature ingestion and batch prediction.",
+              "normalized_terms": [
+                "go",
+                "feature ingestion",
+                "batch prediction"
+              ],
+              "evidence": [
+                {
+                  "evidence_id": "ev_ml_highlight_dataworks",
+                  "source_text": "Developed Go services for feature ingestion and batch prediction.",
+                  "span": {
+                    "start": 338,
+                    "end": 403
+                  },
+                  "lines": {
+                    "start": 9,
+                    "end": 9
+                  }
+                }
+              ],
+              "confidence": 0.93
+            }
+          ],
+          "skills": [
+            "Go",
+            "feature ingestion",
+            "batch prediction"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_ml_job_dataworks",
+              "source_text": "Machine Learning Engineer, DataWorks, 2018-2021",
+              "span": {
+                "start": 290,
+                "end": 337
+              },
+              "lines": {
+                "start": 8,
+                "end": 8
+              }
+            },
+            {
+              "evidence_id": "ev_ml_highlight_dataworks",
+              "source_text": "Developed Go services for feature ingestion and batch prediction.",
+              "span": {
+                "start": 338,
+                "end": 403
+              },
+              "lines": {
+                "start": 9,
+                "end": 9
+              }
+            }
+          ],
+          "confidence": 0.94
+        }
+      ],
+      "education": [
+        {
+          "institution": "University of Illinois",
+          "degree": "PhD",
+          "field": "Computer Science",
+          "graduation_date": "2018",
+          "evidence": [
+            {
+              "evidence_id": "ev_ml_education",
+              "source_text": "PhD in Computer Science, University of Illinois, 2018",
+              "span": {
+                "start": 414,
+                "end": 467
+              },
+              "lines": {
+                "start": 11,
+                "end": 11
+              }
+            }
+          ],
+          "confidence": 0.95
+        }
+      ],
+      "certifications": [
+        {
+          "name": "Google Professional Machine Learning Engineer",
+          "issuer": "Google Cloud",
+          "date": "2022",
+          "evidence": [
+            {
+              "evidence_id": "ev_ml_certification",
+              "source_text": "Google Professional Machine Learning Engineer, Google Cloud, 2022",
+              "span": {
+                "start": 483,
+                "end": 548
+              },
+              "lines": {
+                "start": 13,
+                "end": 13
+              }
+            }
+          ],
+          "confidence": 0.94
+        }
+      ],
+      "projects": [
+        {
+          "name": "Realtime Fraud Detection",
+          "description": "Python and TensorFlow system with Kubernetes inference services.",
+          "skills": [
+            "Python",
+            "TensorFlow",
+            "Kubernetes"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_ml_project",
+              "source_text": "Realtime Fraud Detection: Python and TensorFlow system with Kubernetes inference services.",
+              "span": {
+                "start": 558,
+                "end": 648
+              },
+              "lines": {
+                "start": 15,
+                "end": 15
+              }
+            }
+          ],
+          "confidence": 0.93
+        }
+      ],
+      "employment": [
+        {
+          "organization": "CloudScale AI",
+          "role": "Senior ML Engineer",
+          "start_date": "2021",
+          "end_date": null,
+          "current": true,
+          "evidence": [
+            {
+              "evidence_id": "ev_ml_job_cloudscale",
+              "source_text": "Senior ML Engineer, CloudScale AI, 2021-Present",
+              "span": {
+                "start": 136,
+                "end": 183
+              },
+              "lines": {
+                "start": 6,
+                "end": 6
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "organization": "DataWorks",
+          "role": "Machine Learning Engineer",
+          "start_date": "2018",
+          "end_date": "2021",
+          "current": false,
+          "evidence": [
+            {
+              "evidence_id": "ev_ml_job_dataworks",
+              "source_text": "Machine Learning Engineer, DataWorks, 2018-2021",
+              "span": {
+                "start": 290,
+                "end": 337
+              },
+              "lines": {
+                "start": 8,
+                "end": 8
+              }
+            }
+          ],
+          "confidence": 0.94
+        }
+      ],
+      "source_evidence": [
+        {
+          "evidence_id": "ev_ml_name",
+          "source_text": "Maya Patel",
+          "span": {
+            "start": 0,
+            "end": 10
+          },
+          "lines": {
+            "start": 1,
+            "end": 1
+          }
+        },
+        {
+          "evidence_id": "ev_ml_title",
+          "source_text": "Machine Learning Engineer",
+          "span": {
+            "start": 11,
+            "end": 36
+          },
+          "lines": {
+            "start": 2,
+            "end": 2
+          }
+        },
+        {
+          "evidence_id": "ev_ml_skills",
+          "source_text": "Skills: Python, TensorFlow, Kubernetes, Google Cloud Platform (GCP), Go, Spark, MLOps.",
+          "span": {
+            "start": 38,
+            "end": 124
+          },
+          "lines": {
+            "start": 4,
+            "end": 4
+          }
+        },
+        {
+          "evidence_id": "ev_ml_job_cloudscale",
+          "source_text": "Senior ML Engineer, CloudScale AI, 2021-Present",
+          "span": {
+            "start": 136,
+            "end": 183
+          },
+          "lines": {
+            "start": 6,
+            "end": 6
+          }
+        },
+        {
+          "evidence_id": "ev_ml_highlight_cloudscale",
+          "source_text": "Built TensorFlow training pipelines in Python and deployed model serving workloads on Kubernetes and GCP.",
+          "span": {
+            "start": 184,
+            "end": 289
+          },
+          "lines": {
+            "start": 7,
+            "end": 7
+          }
+        },
+        {
+          "evidence_id": "ev_ml_job_dataworks",
+          "source_text": "Machine Learning Engineer, DataWorks, 2018-2021",
+          "span": {
+            "start": 290,
+            "end": 337
+          },
+          "lines": {
+            "start": 8,
+            "end": 8
+          }
+        },
+        {
+          "evidence_id": "ev_ml_highlight_dataworks",
+          "source_text": "Developed Go services for feature ingestion and batch prediction.",
+          "span": {
+            "start": 338,
+            "end": 403
+          },
+          "lines": {
+            "start": 9,
+            "end": 9
+          }
+        },
+        {
+          "evidence_id": "ev_ml_education",
+          "source_text": "PhD in Computer Science, University of Illinois, 2018",
+          "span": {
+            "start": 414,
+            "end": 467
+          },
+          "lines": {
+            "start": 11,
+            "end": 11
+          }
+        },
+        {
+          "evidence_id": "ev_ml_certification",
+          "source_text": "Google Professional Machine Learning Engineer, Google Cloud, 2022",
+          "span": {
+            "start": 483,
+            "end": 548
+          },
+          "lines": {
+            "start": 13,
+            "end": 13
+          }
+        },
+        {
+          "evidence_id": "ev_ml_project",
+          "source_text": "Realtime Fraud Detection: Python and TensorFlow system with Kubernetes inference services.",
+          "span": {
+            "start": 558,
+            "end": 648
+          },
+          "lines": {
+            "start": 15,
+            "end": 15
+          }
+        }
+      ],
+      "uncertainty": [],
+      "metadata": {
+        "fixture_source_id": "ml-engineer-golden-resume"
+      }
+    }
+  }
+}
