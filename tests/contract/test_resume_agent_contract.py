@@ -64,6 +64,17 @@ def assert_proposal_handoff(test_case: unittest.TestCase, result: dict, proposal
     test_case.assertNotIn("working_resume", serialized)
 
 
+def assert_fact_proposals_have_verification_state(test_case: unittest.TestCase, result: dict) -> None:
+    allowed_states = set(SURFACE["verification_states"])
+    facts = result.get("fact_proposals", [])
+    test_case.assertTrue(facts)
+    for fact in facts:
+        with test_case.subTest(fact=fact.get("fact_id")):
+            test_case.assertIn("verification_state", fact)
+            test_case.assertIn(fact["verification_state"], allowed_states)
+            test_case.assertEqual(fact["verification_state"], "inferred")
+
+
 class ResumeAgentSurfaceManifestTests(unittest.TestCase):
     def test_manifest_declares_exact_public_functions(self):
         self.assertEqual(PUBLIC_FUNCTIONS, (
@@ -84,6 +95,8 @@ class ResumeAgentSurfaceManifestTests(unittest.TestCase):
                 required_fields = set(surface["output_contract"]["required_fields"])
                 self.assertTrue({"schema_version", "proposal_type", "uncertainty", "requires_validation"} <= required_fields)
                 self.assertIn("must_not_include", surface["output_contract"])
+        rewrite = surfaces["proposeRewrite"]["output_contract"]
+        self.assertIn("reason", rewrite["operation_fields"])
 
 
 class ResumeAgentProposalContractTests(unittest.TestCase):
@@ -95,6 +108,7 @@ class ResumeAgentProposalContractTests(unittest.TestCase):
         assert_proposal_handoff(self, result, "resume_semantic_extraction")
         self.assertIn("fact_proposals", result)
         self.assertIn("source_evidence", result)
+        assert_fact_proposals_have_verification_state(self, result)
         serialized = json.dumps(result, sort_keys=True).lower()
         self.assertIn("react", serialized)
         self.assertIn("api", serialized)
@@ -138,6 +152,7 @@ class ResumeAgentProposalContractTests(unittest.TestCase):
         answer = "Yes. I have about six years of AWS experience, mainly EC2, S3, Lambda, RDS, and IAM."
         result = maybe_await(self.agent.interpretUserAnswer(answer, context))
         assert_proposal_handoff(self, result, "answer_interpretation")
+        assert_fact_proposals_have_verification_state(self, result)
         serialized = json.dumps(result, sort_keys=True).lower()
         self.assertIn("aws", serialized)
         self.assertRegex(serialized, r"\bsix\b|\b6\b")
@@ -152,6 +167,7 @@ class ResumeAgentProposalContractTests(unittest.TestCase):
         answer = "Yes, around five years. I've built and maintained GraphQL APIs in production."
         result = maybe_await(self.agent.interpretUserAnswer(answer, context))
         assert_proposal_handoff(self, result, "answer_interpretation")
+        assert_fact_proposals_have_verification_state(self, result)
         serialized = json.dumps(result, sort_keys=True).lower()
         self.assertIn("graphql", serialized)
         self.assertRegex(serialized, r"\bfive\b|\b5\b")
@@ -162,6 +178,7 @@ class ResumeAgentProposalContractTests(unittest.TestCase):
         answer = "I've designed APIs and application architecture for more than ten years, but I haven't had Staff Engineer as my formal title."
         result = maybe_await(self.agent.interpretUserAnswer(answer, context))
         assert_proposal_handoff(self, result, "answer_interpretation")
+        assert_fact_proposals_have_verification_state(self, result)
         serialized = json.dumps(result, sort_keys=True).lower()
         self.assertIn("architecture", serialized)
         self.assertIn("api", serialized)
@@ -200,6 +217,7 @@ class ResumeAgentProposalContractTests(unittest.TestCase):
                     "requirements_targeted",
                     "terminology_changes",
                     "provenance",
+                    "reason",
                     "status",
                 ]:
                     self.assertIn(field, operation)
@@ -229,6 +247,7 @@ class ResumeAgentProposalContractTests(unittest.TestCase):
 # Bridge the private adapter seam tests into the current static PR/future gate
 # module list until tools/run_tests.py is approved to include it directly.
 from tests.contract.test_resume_agent_adapter_contract import (  # noqa: E402,F401
+    ResumeAgentAnthropicAdapterContractTests,
     ResumeAgentAdapterContractTests,
     ResumeAgentDeterministicFakeAdapterContractTests,
     ResumeAgentSchemaValidatorContractTests,

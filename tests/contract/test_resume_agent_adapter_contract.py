@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import unittest
 import json
+import sys
 import tempfile
+import types
 from pathlib import Path
 
 from resume_agent._adapters import (
@@ -283,6 +285,105 @@ class ResumeAgentDeterministicFakeAdapterContractTests(unittest.TestCase):
             create_live_model_adapter(env={"RESUME_AGENT_ALLOW_LIVE": "1"}, agent_config={"model": "raw-dict"})
 
 
+class ResumeAgentAnthropicAdapterContractTests(unittest.TestCase):
+    def setUp(self):
+        self.previous_anthropic = sys.modules.get("anthropic")
+        self.stub = _install_anthropic_stub()
+
+    def tearDown(self):
+        if self.previous_anthropic is None:
+            sys.modules.pop("anthropic", None)
+        else:
+            sys.modules["anthropic"] = self.previous_anthropic
+
+    def live_adapter(self):
+        return create_live_model_adapter(
+            env={"RESUME_AGENT_ALLOW_LIVE": "1", "ANTHROPIC_API_KEY": "test-key"},
+            agent_config=resolve_agent_config({"agent": {"timeout_ms": 1234, "max_retries": 3}}).config,
+            output_schemas={TEST_SCHEMA_ID: TEST_SCHEMA},
+        )
+
+    def test_missing_api_key_returns_typed_provider_error_before_sdk_construction(self):
+        with self.assertRaises(AdapterProviderError) as missing_key:
+            create_live_model_adapter(env={"RESUME_AGENT_ALLOW_LIVE": "1"})
+
+        self.assertEqual(missing_key.exception.details["reason"], "live_adapter_missing_api_key")
+        self.assertEqual(self.stub.clients, [])
+
+    def test_gate_profile_blocks_live_even_when_smoke_and_api_key_are_set(self):
+        with self.assertRaises(LiveAdapterConstructionBlockedError):
+            create_live_model_adapter(
+                env={
+                    "RESUME_AGENT_ALLOW_LIVE": "1",
+                    "RESUME_AGENT_LIVE_SMOKE": "1",
+                    "ANTHROPIC_API_KEY": "test-key",
+                    "RESUME_AGENT_GATE_PROFILE": "1",
+                }
+            )
+        self.assertEqual(self.stub.clients, [])
+
+    def test_success_uses_configured_model_client_options_output_config_and_metadata(self):
+        self.stub.next_response = _stub_response(
+            output=VALID_PAYLOAD,
+            stop_reason="end_turn",
+            retries=1,
+            usage=types.SimpleNamespace(input_tokens=11, output_tokens=7),
+        )
+
+        result = self.live_adapter().complete(request())
+
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(result.payload, VALID_PAYLOAD)
+        self.assertEqual(result.adapter_id, "resume-agent-anthropic-claude")
+        self.assertEqual(result.model_id, "claude-sonnet-4-6")
+        self.assertEqual(result.runtime_config["provider"], "anthropic")
+        self.assertEqual(result.runtime_config["temperature"], 0)
+        self.assertEqual(result.retries, 1)
+        self.assertEqual(result.usage["input_tokens"], 11)
+        client = self.stub.clients[-1]
+        self.assertEqual(client.kwargs["api_key"], "test-key")
+        self.assertEqual(client.kwargs["timeout"], 1.234)
+        self.assertEqual(client.kwargs["max_retries"], 3)
+        params = client.last_create_kwargs
+        self.assertEqual(params["model"], "claude-sonnet-4-6")
+        self.assertEqual(params["temperature"], 0)
+        self.assertEqual(params["output_config"]["format"]["type"], "json_schema")
+        self.assertEqual(params["output_config"]["format"]["schema"], TEST_SCHEMA)
+
+    def test_out_of_schema_anthropic_payload_is_revalidated_as_schema_invalid(self):
+        self.stub.next_response = _stub_response(output={"schema_version": TEST_SCHEMA_ID})
+
+        result = self.live_adapter().complete(request())
+
+        self.assertEqual(result.status, "error")
+        self.assertEqual(result.error.type, "schema_invalid")
+        self.assertIn(("missing_field", "proposal_type"), {(item.get("code"), item.get("field_path")) for item in result.error.violations})
+
+    def test_refusal_stop_reason_maps_to_refused(self):
+        self.stub.next_response = _stub_response(output=VALID_PAYLOAD, stop_reason="refusal", retries=2)
+
+        result = self.live_adapter().complete(request())
+
+        self.assertEqual(result.status, "error")
+        self.assertEqual(result.error.type, "refused")
+        self.assertEqual(result.retries, 2)
+
+    def test_anthropic_exception_mapping_is_class_based_and_wording_independent(self):
+        cases = [
+            (self.stub.APITimeoutError("provider said bananas"), "timeout"),
+            (self.stub.RateLimitError("provider said bananas"), "provider_error"),
+            (self.stub.APIConnectionError("provider said bananas"), "provider_error"),
+            (self.stub.APIStatusError("provider said bananas", status_code=503), "provider_error"),
+            (RuntimeError("provider said bananas"), "provider_error"),
+        ]
+        for exc, expected_type in cases:
+            with self.subTest(exc=exc.__class__.__name__):
+                self.stub.next_exception = exc
+                result = self.live_adapter().complete(request())
+                self.assertEqual(result.status, "error")
+                self.assertEqual(result.error.type, expected_type)
+
+
 class ResumeAgentSchemaValidatorContractTests(unittest.TestCase):
     def test_validator_reports_structured_violation_list_content(self):
         payload = {
@@ -345,6 +446,59 @@ def _fake_fixture_envelope(payload):
             "payload": payload,
         },
     }
+
+
+def _install_anthropic_stub():
+    class APITimeoutError(Exception):
+        pass
+
+    class RateLimitError(Exception):
+        pass
+
+    class APIConnectionError(Exception):
+        pass
+
+    class APIStatusError(Exception):
+        def __init__(self, message, *, status_code):
+            super().__init__(message)
+            self.status_code = status_code
+
+    stub = types.ModuleType("anthropic")
+    stub.APITimeoutError = APITimeoutError
+    stub.RateLimitError = RateLimitError
+    stub.APIConnectionError = APIConnectionError
+    stub.APIStatusError = APIStatusError
+    stub.next_response = _stub_response(output=VALID_PAYLOAD)
+    stub.next_exception = None
+    stub.clients = []
+
+    class Anthropic:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+            self.last_create_kwargs = {}
+            self.messages = types.SimpleNamespace(create=self.create)
+            stub.clients.append(self)
+
+        def create(self, **kwargs):
+            self.last_create_kwargs = kwargs
+            if stub.next_exception is not None:
+                exc = stub.next_exception
+                stub.next_exception = None
+                raise exc
+            return stub.next_response
+
+    stub.Anthropic = Anthropic
+    sys.modules["anthropic"] = stub
+    return stub
+
+
+def _stub_response(*, output, stop_reason="end_turn", retries=0, usage=None):
+    return types.SimpleNamespace(
+        output=output,
+        stop_reason=stop_reason,
+        retries=retries,
+        usage=usage if usage is not None else {"input_tokens": 1, "output_tokens": 1},
+    )
 
 
 if __name__ == "__main__":

@@ -121,6 +121,7 @@ def _proposal_fact(
         "text": text,
         "normalized_terms": terms,
         "source_evidence_ids": [evidence_id],
+        "verification_state": "inferred",
         "confidence": confidence,
         "review_required": True,
     }
@@ -818,6 +819,7 @@ def proposeRewrite(context: dict[str, Any]) -> dict[str, Any]:
             "grounding": "allowed_facts",
             "review_required": True,
         },
+        "reason": "Use supplied allowed facts and selected terminology to propose a reviewable replacement.",
         "status": "proposed",
     }
     result.update({"operations": [operation]})

@@ -4,14 +4,14 @@ level: task
 title: "agent config block: schema validation, defaults, run-manifest config hash"
 short_code: "RKIT-T-0089"
 created_at: 2026-08-16T19:46:40.588276+00:00
-updated_at: 2026-08-17T16:06:37.402320+00:00
+updated_at: 2026-08-17T16:15:13.528976+00:00
 parent: resume-agent-proposal-model
 blocked_by: [RKIT-T-0087, RKIT-T-0088]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0016
 ## Objective **[REQUIRED]**
 
 Add the schema-validated `agent` block to workspace `config.json` per RKIT-A-0003 item 3: `{model, schema_mode, timeout_ms, max_retries, cost_ceiling}` validated at load by a schema shipped in resume-agent; unknown keys FAIL validation (config strictness per RKIT-A-0006 decision 6 — consistent with the guardrails.*/matching.*/resume.*/workflow.* namespace discipline); documented defaults apply when the block is absent; the validated block's stable hash is exposed for the workflow run manifest and participates in the run-manifest config hash.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

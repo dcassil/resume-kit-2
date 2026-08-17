@@ -208,38 +208,15 @@ class ValidatingModelAdapter:
         return AdapterCompletion(payload={"value": value})
 
 
-class _PlaceholderLiveModelAdapter(ValidatingModelAdapter):
-    def __init__(
-        self,
-        *,
-        adapter_id: str = "resume-agent-live-placeholder",
-        adapter_version: str = "0.0.0",
-        agent_config: AgentConfig | None = None,
-        output_schemas: JsonSchemaRegistry | None = None,
-    ) -> None:
-        resolved_agent_config = agent_config or resolve_agent_config({}).config
-        super().__init__(
-            adapter_id=adapter_id,
-            adapter_version=adapter_version,
-            model_id=resolved_agent_config.model,
-            agent_config=resolved_agent_config,
-            runtime_config={"live_adapter_status": "not_implemented"},
-            output_schemas=output_schemas,
-        )
-
-    def _complete_unchecked(self, _request: AdapterRequest) -> AdapterCompletion:
-        raise AdapterProviderError("Live resume-agent adapter is not implemented yet.")
-
-
 def create_live_model_adapter(
     *,
     env: Mapping[str, str] | None = None,
-    adapter_id: str = "resume-agent-live-placeholder",
-    adapter_version: str = "0.0.0",
+    adapter_id: str = "resume-agent-anthropic-claude",
+    adapter_version: str = "0.1.0",
     agent_config: AgentConfig | None = None,
     output_schemas: JsonSchemaRegistry | None = None,
 ) -> ModelAdapter:
-    """Construct the future live adapter only when explicitly opted in.
+    """Construct the Anthropic live adapter only when explicitly opted in.
 
     Official gates are safe by default: absent RESUME_AGENT_ALLOW_LIVE=1, live
     construction is blocked. RESUME_AGENT_GATE_PROFILE=1 always blocks live
@@ -259,10 +236,20 @@ def create_live_model_adapter(
         )
     if agent_config is not None and not isinstance(agent_config, AgentConfig):
         raise TypeError("agent_config must be a validated AgentConfig.")
-    return _PlaceholderLiveModelAdapter(
+    api_key = environment.get("ANTHROPIC_API_KEY", "")
+    if not api_key.strip():
+        raise AdapterProviderError(
+            "Anthropic live adapter requires ANTHROPIC_API_KEY.",
+            details={"reason": "live_adapter_missing_api_key", "provider": "anthropic"},
+        )
+
+    from ._anthropic_adapter import AnthropicClaudeAdapter
+
+    return AnthropicClaudeAdapter(
         adapter_id=adapter_id,
         adapter_version=adapter_version,
         agent_config=agent_config or resolve_agent_config({}).config,
+        api_key=api_key,
         output_schemas=output_schemas,
     )
 

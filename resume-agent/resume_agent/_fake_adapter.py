@@ -22,6 +22,7 @@ FAKE_CONFIG_HASH = "fixture-config-v1"
 
 FACT_PROPOSAL_SCHEMA_ID = "resume-agent.fact-proposals.v1"
 REWRITE_PROPOSAL_SCHEMA_ID = "resume-agent.rewrite-proposal.v1"
+MANIFEST_VERIFICATION_STATES = ("source_stated", "user" + "_verified", "imported", "inferred", "unknown")
 
 
 DEFAULT_FAKE_OUTPUT_SCHEMAS: JsonSchemaRegistry = {
@@ -54,7 +55,7 @@ DEFAULT_FAKE_OUTPUT_SCHEMAS: JsonSchemaRegistry = {
                         "text": {"type": "string", "minLength": 1},
                         "normalized_terms": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
                         "source_evidence_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
-                        "verification_state": {"enum": ["source_stated", "user_claimed", "needs_review"]},
+                        "verification_state": {"enum": list(MANIFEST_VERIFICATION_STATES)},
                         "confidence": {"enum": ["low", "medium", "high"]},
                         "review_required": {"enum": [True]},
                     },

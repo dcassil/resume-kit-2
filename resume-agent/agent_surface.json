@@ -253,6 +253,7 @@
           "requirements_targeted",
           "terminology_changes",
           "provenance",
+          "reason",
           "status"
         ],
         "must_not_include": [
