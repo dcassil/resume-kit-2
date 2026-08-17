@@ -4,14 +4,14 @@ level: task
 title: "Anthropic Claude adapter (opt-in live), agent_surface drift fixes (reason, verification_state) — close-out"
 short_code: "RKIT-T-0090"
 created_at: 2026-08-16T19:46:40.646046+00:00
-updated_at: 2026-08-17T16:15:13.826607+00:00
+updated_at: 2026-08-17T16:25:15.849712+00:00
 parent: resume-agent-proposal-model
 blocked_by: [RKIT-T-0087, RKIT-T-0088, RKIT-T-0089]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0016
 ## Objective **[REQUIRED]**
 
 Ship the live path and close the manifest drift: (1) the Anthropic Claude `ModelAdapter` via the official `anthropic` Python SDK — configurable model with Sonnet-class default, structured output via the configured schema mode, timeout/retry from config, retries surfaced in result metadata, an opt-in NON-GATING live smoke check, and the SDK a dependency of the live path only (fake constructs with no API key/network); (2) `resume-agent/agent_surface.json` drift fixes — `operation_fields` gains section-4.5-mandatory `reason` (~:246-257; today the guardrail grep can never catch operations shipping without one) and fact-proposal DTOs emit a `verification_state` from the declared set (~:27-33) as suggestions requiring resume-core validation — with strengthened contract assertions per RKIT-A-0006.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
