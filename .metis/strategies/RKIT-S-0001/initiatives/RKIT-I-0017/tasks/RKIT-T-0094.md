@@ -4,14 +4,14 @@ level: task
 title: "Model-sourced uncertainty/confidence mapping + TEST_SPEC generalization goldens — close-out"
 short_code: "RKIT-T-0094"
 created_at: 2026-08-17T16:26:27.104094+00:00
-updated_at: 2026-08-17T16:51:15.931591+00:00
+updated_at: 2026-08-17T16:58:27.284050+00:00
 parent: resume-agent-model-based-resume
 blocked_by: [RKIT-T-0091, RKIT-T-0092, RKIT-T-0093]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0017
 ## Objective **[REQUIRED]**
 
 Finish the honesty conversion and pin the generalization bar: (1) uncertainty and confidence are MODEL-SOURCED proposal-DTO fields end-to-end — the "ambiguous|various|several" keyword grep (audit refs __init__.py:406-413) and the hardcoded "high"/"medium" confidence strings (:73-92) are deleted; items the model marks uncertain surface with explicit uncertainty fields rather than being dropped. (2) `resume-agent/TEST_SPEC.md` (unprotected) is strengthened so a keyword matcher can no longer pass it: fixture-token assertions (:43, :57-58 refs) augmented/replaced with the non-fixture golden inputs and generalization assertions, each spec item naming its covering test. Initiative close-out with mutation probes.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

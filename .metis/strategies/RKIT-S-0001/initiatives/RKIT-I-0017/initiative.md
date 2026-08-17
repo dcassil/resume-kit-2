@@ -4,14 +4,14 @@ level: initiative
 title: "Resume-Agent Model-Based Resume and Job Semantic Extraction"
 short_code: "RKIT-I-0017"
 created_at: 2026-08-13T20:41:37.214449+00:00
-updated_at: 2026-08-17T16:28:08.166646+00:00
+updated_at: 2026-08-17T16:58:31.083405+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0016]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
