@@ -4,14 +4,14 @@ level: task
 title: "Equivalence handoff E2E: proposal to resume-core validation, boundary tests"
 short_code: "RKIT-T-0105"
 created_at: 2026-08-17T19:08:37.942769+00:00
-updated_at: 2026-08-17T19:20:27.116797+00:00
+updated_at: 2026-08-17T19:27:19.520099+00:00
 parent: resume-agent-semantic-equivalence
 blocked_by: [RKIT-T-0104]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0020
 ## Objective
 
 Prove the handoff chain the initiative's E2E requirement demands: a `proposeEquivalences` proposal (fixture-pinned fake adapter) flows to resume-core validation, and only AFTER validation does any relationship exist anywhere — plus boundary tests pinning that resume-agent never imports/calls resume-core or career-store and proposals never carry persisted-relationship or official-truth markers.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

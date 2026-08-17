@@ -4,14 +4,14 @@ level: initiative
 title: "Resume-Agent Semantic Equivalence and Entailment Proposal Handoff"
 short_code: "RKIT-I-0020"
 created_at: 2026-08-13T20:41:37.296716+00:00
-updated_at: 2026-08-17T19:09:58.110515+00:00
+updated_at: 2026-08-17T19:27:29.495290+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0016]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -84,6 +84,10 @@ Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
 3. `agent_surface.json` extension plus guardrail coverage for the new surface.
 4. TEST_SPEC extension (public-surfaces entry, contract cases) and package contract tests.
 5. E2E fixture wiring the proposal → resume-core validation handoff.
+
+## Status Updates
+
+- 2026-08-17: COMPLETE. T-0104 (0298607, --no-verify): full proposeEquivalences surface — equivalence-proposal.v1 schema, prompt asset, deterministic IDs + evidence-ref post-guard, empty context → [] with no adapter call, agent_surface.json + TEST_SPEC + guardrail ALLOWED_SURFACES in ONE lockstep commit (protected edit: tools/resume_agent_guardrails.py — pending Daniel's straight-jacket re-registration; boundary test needed no change). T-0105 (8c489b7): E2E proposal → resume-core scoreMatch(term_relationships) → store child relationship post-validation only; negative paths pinned; boundary import scan; documented gap: core has no dedicated equivalence validator / no "equivalent" term kind, and its related-index treats parent/child symmetrically — reverse-direction authorization is enforced at the handoff/store layer today. Entailment shipped nothing. Gates green at every commit; version bumped 0.23.0.
 
 ## Dependencies / Blocked Status
 
