@@ -1099,27 +1099,31 @@ def _unique_text(items: list[str]) -> list[str]:
 
 
 def _core_operation(operation: JsonObject) -> JsonObject:
-    # Compatibility shim (RKIT-I-0001/T-0005): ResumeChangeOperation now requires
-    # schema_version, op, reason, and provenance as structural fields. The fake
-    # proposal adapter emits operation_type/facts_used/provenance-dict; forward and
-    # derive the canonical fields so the grounded operation validates on its merits.
-    # Proper reason/provenance emission is owned by the resume-agent/resume-cli
-    # tailoring initiatives (RKIT-I-0016/0038); revisit when they land.
-    fact_ids = list(operation.get("facts_used", []))
-    op_type = str(operation.get("operation_type", "replace_text"))
-    verb = "replace" if op_type in {"replace_text", "replace"} else op_type
+    # Compatibility shim for older aliases while resume-agent now emits the
+    # section 4.5 fields directly.
+    fact_ids = list(operation.get("linked_fact_ids") or operation.get("factIds") or operation.get("facts_used") or [])
+    requirement_ids = list(
+        operation.get("linked_requirement_ids")
+        or operation.get("requirementIds")
+        or operation.get("requirements_targeted")
+        or []
+    )
+    verb = str(operation.get("op") or operation.get("operation_type") or "rewrite")
+    provenance = operation.get("provenance")
+    if not isinstance(provenance, list):
+        provenance = [{"kind": "fact", "ref": fid} for fid in fact_ids]
     return {
-        "schema_version": "resume-change-operation.v1",
+        "schema_version": str(operation.get("schema_version") or "resume-change-operation.v1"),
         "operation_id": str(operation.get("operation_id", "op_proposed")),
         "status": str(operation.get("status", "proposed")),
         "op": verb,
-        "path": _target_path(str(operation.get("target_path", ""))),
+        "path": _target_path(str(operation.get("path") or operation.get("target_path") or "")),
         "before": operation.get("before"),
         "after": operation.get("after"),
         "reason": str(operation.get("reason") or "Grounded rewrite aligning the bullet to job terminology using allowed facts."),
         "linked_fact_ids": fact_ids,
-        "linked_requirement_ids": list(operation.get("requirements_targeted", [])),
-        "provenance": [{"kind": "fact", "ref": fid} for fid in fact_ids],
+        "linked_requirement_ids": requirement_ids,
+        "provenance": provenance,
         "metadata": {"agent_operation": operation},
     }
 

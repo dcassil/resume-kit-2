@@ -1,0 +1,136 @@
+{
+  "fixture_id": "resume-agent-rewrite-smoke-api-responsive",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Pinned to the CLI smoke tailoring rewrite input after stable fact normalization.",
+    "Emits a 4.5-shaped operation that validateChange accepts and carries final-grounding support facts for the smoke resume."
+  ],
+  "comment": "RKIT-T-0099 smoke fixture. The file name is the sha256 key for the request tuple.",
+  "data": {
+    "key": {
+      "sha256": "2ee69c10f526f2b368c5c4956cf98e4d0e6a63869c83a17cfb088d6b4801dd35",
+      "prompt_template_id": "resume-agent.rewrite-proposal@v1",
+      "output_schema_id": "resume-agent.rewrite-proposal.v1",
+      "canonical_input_json": "{\"allowed_facts\":[{\"fact_id\":\"fact_saas\",\"normalized_terms\":[\"domain\",\"products\",\"saas\",\"saas products\"],\"text\":\"SaaS products\",\"verification_state\":\"source_stated\"},{\"fact_id\":\"fact_years_software\",\"normalized_terms\":[\"12\",\"12 years\",\"12 years of software development\",\"development\",\"experience\",\"of\",\"software\",\"software development\",\"years\"],\"text\":\"12 years of software development\",\"verification_state\":\"source_stated\"},{\"fact_id\":\"fact_leadership\",\"normalized_terms\":[\"developers\",\"experience\",\"leadership\",\"led\",\"led a small team of three developers\",\"of\",\"small\",\"team\",\"team leadership\",\"three\",\"three developers\"],\"text\":\"Led a small team of three developers\",\"verification_state\":\"source_stated\"},{\"fact_id\":\"fact_responsive\",\"normalized_terms\":[\"apps\",\"experience\",\"responsive\",\"responsive web apps\",\"web\"],\"text\":\"responsive web apps\",\"verification_state\":\"source_stated\"},{\"fact_id\":\"fact_api\",\"normalized_terms\":[\"api\",\"api design\",\"design\",\"experience\",\"rest\",\"rest api design\"],\"text\":\"REST API design\",\"verification_state\":\"source_stated\"},{\"fact_id\":\"fact_software_development\",\"normalized_terms\":[\"development\",\"experience\",\"software\",\"software development\"],\"text\":\"software development\",\"verification_state\":\"source_stated\"},{\"fact_id\":\"fact_workflow\",\"normalized_terms\":[\"automation\",\"experience\",\"workflow\",\"workflow automation\"],\"text\":\"workflow automation\",\"verification_state\":\"source_stated\"},{\"fact_id\":\"fact_aws_six_years_services\",\"normalized_terms\":[\"about\",\"about six years of aws experience using ec2 s3 lambda rds and iam\",\"and\",\"aws\",\"ec2\",\"experience\",\"iam\",\"lambda\",\"of\",\"rds\",\"s3\",\"six\",\"six years\",\"skill\",\"using\",\"years\"],\"text\":\"About six years of AWS experience using EC2, S3, Lambda, RDS, and IAM\",\"verification_state\":\"user_verified\"},{\"fact_id\":\"fact_azure\",\"normalized_terms\":[\"azure\",\"skill\"],\"text\":\"Azure\",\"verification_state\":\"source_stated\"},{\"fact_id\":\"fact_node\",\"normalized_terms\":[\"js\",\"node\",\"node js\",\"skill\"],\"text\":\"Node.js\",\"verification_state\":\"source_stated\"},{\"fact_id\":\"fact_postgresql\",\"normalized_terms\":[\"postgresql\",\"skill\"],\"text\":\"PostgreSQL\",\"verification_state\":\"source_stated\"},{\"fact_id\":\"fact_react\",\"normalized_terms\":[\"react\",\"skill\"],\"text\":\"React\",\"verification_state\":\"source_stated\"},{\"fact_id\":\"fact_typescript\",\"normalized_terms\":[\"skill\",\"typescript\"],\"text\":\"TypeScript\",\"verification_state\":\"source_stated\"}],\"length_constraints\":{\"max_chars\":180},\"original_text\":\"Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting.\",\"prohibited_additions\":[\"Staff Software Engineer\",\"20 million users\",\"30 engineers\",\"GraphQL\"],\"requirement_ids\":[\"req_years\",\"req_react\",\"req_typescript\",\"req_api\",\"req_responsive\",\"req_saas\",\"req_aws\",\"req_graphql\",\"req_leadership\"],\"schema_id\":\"resume-agent.rewrite-proposal.v1\",\"target_path\":\"/sections/1/items/0/bullets/1\",\"voice_constraints\":{\"style\":\"concise\"}}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.rewrite-proposal.v1",
+      "proposal_type": "rewrite_proposal",
+      "requires_validation": true,
+      "uncertainty": [],
+      "operations": [
+        {
+          "schema_version": "resume-change-operation.v1",
+          "operation_id": "op_smoke_api_responsive_rewrite",
+          "status": "proposed",
+          "op": "rewrite",
+          "operation_type": "rewrite",
+          "path": "/sections/1/items/0/bullets/1",
+          "target_path": "/sections/1/items/0/bullets/1",
+          "reason": "Use supplied API, responsive design, SaaS, and workflow facts to align the selected bullet without adding unsupported claims.",
+          "before": "Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting.",
+          "after": "Designed REST API and responsive design patterns for SaaS workflow automation.",
+          "linked_requirement_ids": [
+            "req_api",
+            "req_responsive",
+            "req_saas"
+          ],
+          "linked_fact_ids": [
+            "fact_api",
+            "fact_responsive",
+            "fact_saas",
+            "fact_workflow",
+            "fact_years_software",
+            "fact_leadership"
+          ],
+          "requirementIds": [
+            "req_api",
+            "req_responsive",
+            "req_saas"
+          ],
+          "factIds": [
+            "fact_api",
+            "fact_responsive",
+            "fact_saas",
+            "fact_workflow",
+            "fact_years_software",
+            "fact_leadership"
+          ],
+          "provenance": [
+            {
+              "source": "allowed_fact",
+              "text": "REST API design",
+              "fact_id": "fact_api"
+            },
+            {
+              "source": "allowed_fact",
+              "text": "responsive web apps",
+              "fact_id": "fact_responsive"
+            },
+            {
+              "source": "allowed_fact",
+              "text": "SaaS products",
+              "fact_id": "fact_saas"
+            },
+            {
+              "source": "allowed_fact",
+              "text": "workflow automation",
+              "fact_id": "fact_workflow"
+            },
+            {
+              "source": "allowed_fact",
+              "text": "12 years of software development",
+              "fact_id": "fact_years_software"
+            },
+            {
+              "source": "allowed_fact",
+              "text": "Led a small team of three developers",
+              "fact_id": "fact_leadership"
+            }
+          ],
+          "confidence": 0.89,
+          "grounding": [
+            {
+              "term": "REST API",
+              "claim": "REST API design",
+              "fact_id": "fact_api",
+              "span": {
+                "start": 9,
+                "end": 17
+              }
+            },
+            {
+              "term": "responsive design",
+              "claim": "responsive web apps",
+              "fact_id": "fact_responsive",
+              "span": {
+                "start": 22,
+                "end": 39
+              }
+            },
+            {
+              "term": "SaaS",
+              "claim": "SaaS products",
+              "fact_id": "fact_saas",
+              "span": {
+                "start": 53,
+                "end": 57
+              }
+            },
+            {
+              "term": "workflow automation",
+              "claim": "workflow automation",
+              "fact_id": "fact_workflow",
+              "span": {
+                "start": 58,
+                "end": 77
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

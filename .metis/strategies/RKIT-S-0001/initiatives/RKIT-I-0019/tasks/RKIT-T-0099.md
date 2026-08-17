@@ -4,14 +4,14 @@ level: task
 title: "proposeRewrite through adapter with fact-mapped output; template path deleted; grounding post-guard"
 short_code: "RKIT-T-0099"
 created_at: 2026-08-17T17:23:40.540901+00:00
-updated_at: 2026-08-17T17:23:40.540901+00:00
+updated_at: 2026-08-17T17:32:53.042698+00:00
 parent: resume-agent-grounded-rewrite
-blocked_by: ["RKIT-T-0098"]
+blocked_by: [RKIT-T-0098]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0019
 ## Objective **[REQUIRED]**
 
 Close the rewrite Honesty Gate defect: today the "after" text is `f"Built {', '.join(unique_phrases)}."` keyword salad (audit ref :739) and the generator inserts EVERY non-blocked job-terminology term regardless of fact support (:723-727 — verified: API-fact-only input still added "responsive design"). After this task: `proposeRewrite` runs through the adapter with the T-0098 fact-mapped schema; a DETERMINISTIC post-guard rejects any operation whose added terms lack a fact mapping or whose cited fact ids fall outside the allowed set; the template-concatenation path and insert-everything loop are DELETED.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria **[REQUIRED]**
 
@@ -54,4 +56,4 @@ RKIT-T-0098. Serial.
 
 ## Status Updates **[REQUIRED]**
 
-*To be added during implementation*
+- 2026-08-17: T-0098 committed (rewrite-proposal.v1 w/ 4.5 dual-alias fields + required grounding map, typed input contract, 3 fixtures; gates 510/smoke/verify green). Codex launched: proposeRewrite rewire, deterministic grounding guard (map coverage + allowed-set check), template/insertion-loop deletion, responsive-design regression, smoke tailoring fixture pinning + validateChange compatibility.

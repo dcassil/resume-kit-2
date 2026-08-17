@@ -214,7 +214,7 @@
     },
     {
       "name": "proposeRewrite",
-      "description": "Return ResumeChangeOperation proposals grounded in allowed facts, selected requirements, target terminology, and prohibited additions. Must never return a mutated full resume.",
+      "description": "Return adapter-sourced ResumeChangeOperation proposals grounded in allowed facts, selected requirements, target paths, and prohibited additions. Must never return a mutated full resume.",
       "input_contract": {
         "required": [
           "context"
@@ -224,8 +224,8 @@
             "type": "object",
             "required": [
               "original_text",
+              "target_path",
               "allowed_facts",
-              "job_terminology",
               "requirements",
               "prohibited_additions",
               "length_constraints",
@@ -245,15 +245,21 @@
         ],
         "operation_fields": [
           "operation_id",
+          "schema_version",
+          "op",
           "operation_type",
+          "path",
           "target_path",
           "before",
           "after",
-          "facts_used",
-          "requirements_targeted",
-          "terminology_changes",
+          "linked_fact_ids",
+          "linked_requirement_ids",
+          "factIds",
+          "requirementIds",
           "provenance",
           "reason",
+          "confidence",
+          "grounding",
           "status"
         ],
         "must_not_include": [

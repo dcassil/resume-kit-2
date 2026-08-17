@@ -5,7 +5,7 @@
   "reviewed": true,
   "expected_observations": [
     "Smoke RESOLVE_GAPS AWS answer is interpreted through the adapter.",
-    "Model confidence replaces the former unscored answer-interpretation placeholder."
+    "Model confidence is adapter-sourced for answer interpretation."
   ],
   "comment": "Pinned to the CLI smoke AWS answer and generated question input.",
   "data": {

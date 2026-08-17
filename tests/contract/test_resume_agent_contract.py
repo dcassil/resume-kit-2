@@ -107,6 +107,51 @@ def _answer_interpretation_fixture_envelope(key_hash: str, request, payload: dic
     }
 
 
+def _fake_adapter_fixture_envelope(fixture_id: str, key_hash: str, request, payload: dict, observations: list[str]) -> dict:
+    return {
+        "fixture_id": fixture_id,
+        "schema_version": "resume-agent.fake-adapter-fixture.v1",
+        "config_hash": "fixture-config-v1",
+        "reviewed": True,
+        "expected_observations": observations,
+        "comment": "Temporary fixture created inside the public contract test.",
+        "data": {
+            "key": {
+                "sha256": key_hash,
+                "prompt_template_id": request.prompt_template_id,
+                "output_schema_id": request.output_schema_id,
+                "canonical_input_json": json.dumps(
+                    request.input_payload,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    ensure_ascii=False,
+                ),
+            },
+            "payload": payload,
+        },
+    }
+
+
+REWRITE_API_ONLY_CONTEXT = {
+    "original_text": "Built web applications.",
+    "target_path": "/experience/0/bullets/0",
+    "allowed_facts": [
+        {
+            "fact_id": "fact_api",
+            "text": "Designed REST API architecture for customer-facing SaaS products.",
+            "verification_state": "source_stated",
+            "evidence_id": "ev_api",
+        },
+    ],
+    "requirement_ids": ["req_api"],
+    "job_terminology": ["API architecture", "responsive design"],
+    "requirements": [{"requirement_id": "req_api", "source_text": "API architecture/design"}],
+    "prohibited_additions": ["GraphQL", "AWS", "responsive design"],
+    "length_constraints": {"max_chars": 150},
+    "voice_constraints": {},
+}
+
+
 def load_agent_module(test_case: unittest.TestCase):
     try:
         module = importlib.import_module("resume_agent")
@@ -152,7 +197,6 @@ def assert_answer_fact_proposals_have_model_confidence(test_case: unittest.TestC
         with test_case.subTest(fact=fact.get("fact_id")):
             test_case.assertIsInstance(fact.get("model_confidence"), (int, float))
             test_case.assertEqual(fact.get("confidence"), fact.get("model_confidence"))
-            test_case.assertNotEqual(fact.get("confidence"), "unscored")
             test_case.assertNotIn("confidence_source", fact)
 
 
@@ -712,29 +756,16 @@ class ResumeAgentProposalContractTests(unittest.TestCase):
             "\"DynamoDB\"",
             "\"EC2\", \"S3\", \"Lambda\", \"RDS\", \"IAM\"",
             "confidence_source",
-            "placeholder_unscored",
+            "Built {",
+            "unique_phrases",
+            "terminology_changes",
         ]
         for fragment in deleted_fragments:
             with self.subTest(fragment=fragment):
                 self.assertNotIn(fragment, source)
 
     def test_rewrite_proposals_are_resume_change_operations_grounded_in_allowed_facts(self):
-        context = {
-            "original_text": "Built web applications.",
-            "allowed_facts": [
-                {"fact_id": "fact_api", "text": "API design experience", "verification_state": "source_stated"},
-                {"fact_id": "fact_responsive", "text": "responsive web applications", "verification_state": "source_stated"},
-            ],
-            "job_terminology": ["API architecture", "responsive design"],
-            "requirements": [
-                {"requirement_id": "req_api", "source_text": "API architecture/design"},
-                {"requirement_id": "req_responsive", "source_text": "responsive design"},
-            ],
-            "prohibited_additions": ["AWS", "GraphQL", "Staff Software Engineer", "20 million users", "30 engineers"],
-            "length_constraints": {"max_chars": 160},
-            "voice_constraints": {"tense": "past", "style": "concise"},
-        }
-        result = maybe_await(self.agent.proposeRewrite(context))
+        result = maybe_await(self.agent.proposeRewrite(REWRITE_API_ONLY_CONTEXT))
         assert_proposal_handoff(self, result, "rewrite_proposal")
         operations = result.get("operations", [])
         self.assertTrue(operations)
@@ -743,23 +774,115 @@ class ResumeAgentProposalContractTests(unittest.TestCase):
                 for field in [
                     "operation_id",
                     "operation_type",
+                    "op",
                     "target_path",
+                    "path",
                     "before",
                     "after",
-                    "facts_used",
-                    "requirements_targeted",
-                    "terminology_changes",
+                    "linked_fact_ids",
+                    "linked_requirement_ids",
+                    "factIds",
+                    "requirementIds",
                     "provenance",
                     "reason",
+                    "confidence",
+                    "grounding",
                     "status",
                 ]:
                     self.assertIn(field, operation)
+                self.assertEqual(operation["operation_type"], "rewrite")
+                self.assertEqual(operation["op"], "rewrite")
+                self.assertEqual(operation["target_path"], "/experience/0/bullets/0")
+                self.assertEqual(operation["linked_fact_ids"], ["fact_api"])
+                self.assertEqual(operation["factIds"], ["fact_api"])
+                self.assertIsInstance(operation["confidence"], float)
                 self.assertNotEqual(operation["status"], "applied")
         serialized = json.dumps(result, sort_keys=True).lower()
         self.assertNotIn("aws", serialized)
         self.assertNotIn("graphql", serialized)
         self.assertNotIn("staff software engineer", serialized)
         self.assertNotRegex(serialized, r"\b20 million\b|\b30 engineers\b")
+
+    def test_api_fact_only_rewrite_never_adds_responsive_design(self):
+        result = maybe_await(self.agent.proposeRewrite(REWRITE_API_ONLY_CONTEXT))
+
+        self.assertNotEqual(result.get("status"), "error")
+        serialized = json.dumps(result, sort_keys=True).lower()
+        self.assertNotIn("responsive design", serialized)
+        self.assertIn("rest api architecture", serialized)
+
+    def test_rewrite_grounding_post_guard_rejects_missing_added_term_map_entry(self):
+        context = {
+            **REWRITE_API_ONLY_CONTEXT,
+            "requirement_ids": ["req_api", "req_graphql"],
+            "requirements": [
+                {"requirement_id": "req_api", "source_text": "API architecture/design"},
+                {"requirement_id": "req_graphql", "source_text": "GraphQL APIs"},
+            ],
+            "length_constraints": {"max_chars": 180},
+            "prohibited_additions": [],
+        }
+
+        result = maybe_await(self.agent.proposeRewrite(context))
+
+        self.assertEqual(result.get("status"), "error")
+        self.assertEqual(result.get("error", {}).get("type"), "guard_error")
+        self.assertNotIn("operations", result)
+        violation_codes = {item.get("code") for item in result.get("error", {}).get("violations", [])}
+        self.assertIn("ungrounded_added_content", violation_codes)
+
+    def test_rewrite_grounding_post_guard_rejects_out_of_allowed_fact_id(self):
+        from resume_agent._fake_adapter import DeterministicFakeAdapter, deterministic_fake_key
+        from resume_agent._rewrite_requests import build_rewrite_request
+        from resume_agent._adapters import AdapterRequest
+
+        request = build_rewrite_request(REWRITE_API_ONLY_CONTEXT)
+        self.assertIsInstance(request, AdapterRequest)
+        payload = copy.deepcopy(fixture_payload("resume-agent-rewrite-grounded-api-only"))
+        operation = payload["operations"][0]
+        operation["linked_fact_ids"] = ["fact_external"]
+        operation["factIds"] = ["fact_external"]
+        operation["provenance"][0]["fact_id"] = "fact_external"
+        operation["grounding"][0]["fact_id"] = "fact_external"
+        key_hash = deterministic_fake_key(request.prompt_template_id, request.output_schema_id, request.input_payload)
+
+        with tempfile.TemporaryDirectory() as temp:
+            fixture_dir = Path(temp)
+            (fixture_dir / f"{key_hash}.json").write_text(
+                json.dumps(
+                    _fake_adapter_fixture_envelope(
+                        "resume-agent-rewrite-out-of-allowed-fact-in-test",
+                        key_hash,
+                        request,
+                        payload,
+                        ["Schema-valid rewrite cites a fact id outside the allowed set."],
+                    )
+                ),
+                encoding="utf-8",
+            )
+            result = maybe_await(
+                self.agent.proposeRewrite({**REWRITE_API_ONLY_CONTEXT, "_adapter": DeterministicFakeAdapter(fixture_dir=fixture_dir)})
+            )
+
+        self.assertEqual(result.get("status"), "error")
+        self.assertEqual(result.get("error", {}).get("type"), "guard_error")
+        violation_codes = {item.get("code") for item in result.get("error", {}).get("violations", [])}
+        self.assertIn("fact_id_not_allowed", violation_codes)
+        self.assertIn("ungrounded_added_content", violation_codes)
+
+    def test_rewrite_adapter_failure_returns_typed_error_without_template_fallback(self):
+        from resume_agent._fake_adapter import DeterministicFakeAdapter
+
+        with tempfile.TemporaryDirectory() as temp:
+            result = maybe_await(
+                self.agent.proposeRewrite({**REWRITE_API_ONLY_CONTEXT, "_adapter": DeterministicFakeAdapter(fixture_dir=Path(temp))})
+            )
+
+        self.assertEqual(result.get("status"), "error")
+        self.assertEqual(result.get("error", {}).get("type"), "provider_error")
+        self.assertNotIn("operations", result)
+        self.assertNotIn("proposals", result)
+        self.assertNotIn("Built ", json.dumps(result, sort_keys=True))
 
     def test_malformed_or_empty_inputs_return_typed_errors_without_tracebacks(self):
         invalid_calls = [

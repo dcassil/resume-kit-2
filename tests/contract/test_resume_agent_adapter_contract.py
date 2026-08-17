@@ -636,6 +636,30 @@ class ResumeAgentRewriteSchemaContractTests(unittest.TestCase):
         self.assertEqual(first.input_payload["length_constraints"], {"max_chars": 150})
         self.assertEqual(first.input_payload["prohibited_additions"], ["GraphQL", "AWS", "responsive design"])
 
+    def test_rewrite_request_builder_omits_volatile_fact_evidence_from_adapter_key(self):
+        request = build_rewrite_request(
+            {
+                **REWRITE_SEED_INPUT,
+                "allowed_facts": [
+                    {
+                        **REWRITE_SEED_INPUT["allowed_facts"][0],
+                        "evidence": [
+                            {
+                                "evidence_id": "ev_runtime",
+                                "text": "Runtime evidence text.",
+                                "observed_at": "2026-08-17T17:38:05Z",
+                                "metadata": {"createdAt": "2026-08-17T17:38:05Z"},
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+
+        self.assertIsInstance(request, AdapterRequest)
+        self.assertNotIn("evidence", request.input_payload["allowed_facts"][0])
+        self.assertEqual(request.input_payload["allowed_facts"][0]["fact_id"], "fact_api")
+
     def test_rewrite_prompt_asset_uses_id_at_version_convention(self):
         self.assertEqual(REWRITE_PROPOSAL_PROMPT_TEMPLATE_ID, "resume-agent.rewrite-proposal@v1")
         prompt = rewrite_prompt_template_text(REWRITE_PROPOSAL_PROMPT_TEMPLATE_ID)

@@ -1,9 +1,8 @@
 """Public proposal surface for resume-agent.
 
-Extraction, clarification-question, and answer-interpretation confidence and
-uncertainty are adapter-sourced. Rewrite helpers remain deterministic
-placeholders until RKIT-I-0019 adapter backing lands; any confidence they emit is
-explicitly marked unscored.
+Extraction, clarification-question, answer-interpretation, and rewrite
+confidence and uncertainty are adapter-sourced. Public outputs remain proposals
+that require downstream validation before any resume mutation.
 """
 
 from __future__ import annotations
@@ -27,18 +26,10 @@ from ._agent_config import (
 from ._extraction_requests import build_job_extraction_request, build_resume_extraction_request
 from ._fake_adapter import DeterministicFakeAdapter
 from ._interview_requests import build_answer_interpretation_request, build_question_request
+from ._rewrite_requests import build_rewrite_request
 
 
 SCHEMA_VERSION = "resume-agent.proposal.v1"
-
-_TERM_SUPPORT_VARIANTS = {
-    "api architecture": ("api architecture", "api design", "rest api design", "rest apis"),
-    "responsive design": ("responsive design", "responsive web applications", "responsive web apps"),
-    "technical leadership": ("technical leadership", "team leadership", "led a small team", "code review", "delivery planning"),
-    "leadership": ("leadership", "team leadership", "led a small team", "code review", "delivery planning"),
-    "node.js": ("node", "node js", "nodejs"),
-    "postgresql": ("postgres", "postgresql"),
-}
 
 __all__ = [
     "AGENT_CONFIG_DEFAULTS",
@@ -148,11 +139,6 @@ def _context_snippets(context: dict[str, Any]) -> list[str]:
     if not isinstance(snippets, list):
         return []
     return [_clean_text(str(item)) for item in snippets if _clean_text(str(item))]
-
-
-def _is_blocked(value: str, blocked: list[str]) -> bool:
-    lowered = value.lower()
-    return any(item and item.lower() in lowered for item in blocked)
 
 
 def extractResumeSemantics(rawText: str, context: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -841,131 +827,148 @@ def proposeRewrite(context: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(context, dict):
         return _error("schema_error", "context must be an object.")
 
-    required = {
-        "original_text",
-        "allowed_facts",
-        "job_terminology",
-        "requirements",
-        "prohibited_additions",
-        "length_constraints",
-        "voice_constraints",
-    }
-    missing = sorted(name for name in required if name not in context)
-    if missing:
-        return _error("schema_error", f"context is missing required fields: {', '.join(missing)}.")
+    try:
+        request = build_rewrite_request(context)
+        if isinstance(request, dict):
+            return request
+        adapter = _rewrite_adapter(context)
+    except AgentConfigValidationError as exc:
+        return {"status": "error", "error": {"type": "schema_error", "message": str(exc), "violations": exc.errors}}
 
-    original = _clean_text(context.get("original_text"))
-    allowed_facts = context.get("allowed_facts")
-    job_terms = context.get("job_terminology")
-    requirements = context.get("requirements")
-    blocked = context.get("prohibited_additions")
-    length_constraints = context.get("length_constraints")
+    completion = adapter.complete(request)
+    if completion.status != "ok":
+        return _adapter_error(completion)
 
-    if not original or not isinstance(allowed_facts, list) or not isinstance(job_terms, list) or not isinstance(requirements, list):
-        return _error("validation_error", "context fields have invalid proposal input shapes.")
-    if not isinstance(blocked, list):
-        blocked = []
-    if not isinstance(length_constraints, dict):
-        length_constraints = {}
+    payload = completion.payload or {}
+    guard_error = _rewrite_grounding_guard_error(payload, request.input_payload)
+    if guard_error:
+        _copy_adapter_metadata(guard_error, completion)
+        return guard_error
 
-    blocked_text = [_clean_text(item) for item in blocked if _clean_text(item)]
-    usable_terms = [
-        _clean_text(term)
-        for term in job_terms
-        if _clean_text(term) and not _is_blocked(_clean_text(term), blocked_text)
-    ]
-    usable_facts = [
-        fact
-        for fact in allowed_facts
-        if isinstance(fact, dict)
-        and _clean_text(fact.get("fact_id"))
-        and _clean_text(fact.get("text"))
-        and not _is_blocked(_clean_text(fact.get("text")), blocked_text)
-    ]
-    usable_terms = [term for term in usable_terms if _term_supported_by_facts(term, usable_facts)]
-
-    fact_ids = [str(fact["fact_id"]) for fact in usable_facts]
-    requirement_ids = [
-        str(requirement.get("requirement_id"))
-        for requirement in requirements
-        if isinstance(requirement, dict) and _clean_text(requirement.get("requirement_id"))
-    ]
-
-    phrases: list[str] = []
-    lowered_original = original.lower()
-    for term in usable_terms:
-        if term.lower() not in lowered_original:
-            phrases.append(term)
-    for fact in usable_facts:
-        fact_text = _clean_text(fact.get("text"))
-        if not _contains_years(fact_text) and not any(term.lower() in fact_text.lower() for term in usable_terms):
-            phrases.append(fact_text)
-
-    unique_phrases: list[str] = []
-    for phrase in phrases:
-        if phrase and phrase.lower() not in {item.lower() for item in unique_phrases}:
-            unique_phrases.append(phrase)
-
-    if unique_phrases:
-        after = f"Built {', '.join(unique_phrases)}."
-    else:
-        after = original
-
-    max_chars = length_constraints.get("max_chars")
-    if isinstance(max_chars, int) and max_chars > 20 and len(after) > max_chars:
-        after = after[: max_chars - 1].rsplit(" ", 1)[0].rstrip(" ,.;") + "."
-
-    result = _base("rewrite_proposal")
-    if after == original:
-        result["uncertainty"].append(
-            {
-                "type": "no_safe_change",
-                "message": "No grounded terminology change was available from the supplied facts.",
-            }
-        )
-
-    operation = {
-        "operation_id": _stable_id("op", original + "=>" + after),
-        "operation_type": "replace_text",
-        "target_path": context.get("target_path", "experience[0].bullets[0]"),
-        "before": original,
-        "after": after,
-        "facts_used": fact_ids,
-        "requirements_targeted": requirement_ids,
-        "terminology_changes": [
-            {"term": term, "action": "include"} for term in usable_terms if term.lower() in after.lower()
-        ],
-        "provenance": {
-            "source": "resume-agent",
-            "grounding": "allowed_facts",
-            "review_required": True,
-        },
-        "reason": "Use supplied allowed facts and selected terminology to propose a reviewable replacement.",
-        "status": "proposed",
-    }
-    result.update({"operations": [operation]})
-    result["proposals"] = [operation]
+    result = dict(payload)
+    operations = [dict(operation) for operation in payload.get("operations", []) if isinstance(operation, dict)]
+    result["operations"] = operations
+    result["proposals"] = operations
+    _copy_adapter_metadata(result, completion)
     return result
 
 
-def _term_supported_by_facts(term: str, facts: list[dict[str, Any]]) -> bool:
-    variants = _TERM_SUPPORT_VARIANTS.get(term.casefold(), (term,))
-    return any(_fact_supports_term(fact, variants) for fact in facts)
+def _rewrite_adapter(context: dict[str, Any]) -> ModelAdapter:
+    injected = context.get("_adapter")
+    if injected is not None:
+        return injected
+    return DeterministicFakeAdapter(agent_config=require_agent_config(context))
 
 
-def _fact_supports_term(fact: dict[str, Any], variants: tuple[str, ...]) -> bool:
-    segments = [_clean_text(fact.get("text"))]
-    terms = fact.get("normalized_terms")
-    if isinstance(terms, list):
-        segments.extend(_clean_text(term) for term in terms if isinstance(term, str))
-    evidence = fact.get("evidence")
-    if isinstance(evidence, list):
-        for item in evidence:
-            if isinstance(item, dict):
-                segments.append(_clean_text(item.get("text")))
-    text = " ".join(segment for segment in segments if segment)
-    return any(_term_in_text(variant, text) for variant in variants)
+def _rewrite_grounding_guard_error(payload: dict[str, Any], input_payload: dict[str, Any]) -> dict[str, Any]:
+    allowed_fact_ids = {
+        _clean_text(fact.get("fact_id"))
+        for fact in input_payload.get("allowed_facts", [])
+        if isinstance(fact, dict) and _clean_text(fact.get("fact_id"))
+    }
+    violations: list[dict[str, Any]] = []
+    for index, operation in enumerate(payload.get("operations", [])):
+        if not isinstance(operation, dict):
+            continue
+        field_prefix = f"operations/{index}"
+        violations.extend(_rewrite_out_of_allowed_fact_violations(operation, allowed_fact_ids, field_prefix))
+        violations.extend(_rewrite_added_content_violations(operation, allowed_fact_ids, field_prefix))
+    if not violations:
+        return {}
+    return {
+        "status": "error",
+        "error": {
+            "type": "guard_error",
+            "message": "Rewrite proposal failed deterministic grounding checks.",
+            "violations": violations,
+        },
+    }
 
 
-def _contains_years(text: str) -> bool:
-    return bool(re.search(r"\b\d+\+?\s*years?\b|\b(one|two|three|four|five|six|seven|eight|nine|ten)\s+years?\b", text, re.IGNORECASE))
+def _rewrite_out_of_allowed_fact_violations(
+    operation: dict[str, Any],
+    allowed_fact_ids: set[str],
+    field_prefix: str,
+) -> list[dict[str, Any]]:
+    cited: list[tuple[str, str]] = []
+    for field in ["linked_fact_ids", "factIds"]:
+        value = operation.get(field, [])
+        if isinstance(value, list):
+            cited.extend((field, _clean_text(item)) for item in value if _clean_text(item))
+    for index, entry in enumerate(operation.get("grounding", [])):
+        if isinstance(entry, dict):
+            cited.append((f"grounding/{index}/fact_id", _clean_text(entry.get("fact_id"))))
+    for index, entry in enumerate(operation.get("provenance", [])):
+        if isinstance(entry, dict):
+            cited.append((f"provenance/{index}/fact_id", _clean_text(entry.get("fact_id"))))
+
+    violations: list[dict[str, Any]] = []
+    for field_path, fact_id in cited:
+        if fact_id and fact_id not in allowed_fact_ids:
+            violations.append(
+                {
+                    "code": "fact_id_not_allowed",
+                    "message": "Rewrite operation cites a fact_id that was not supplied as an allowed fact.",
+                    "severity": "error",
+                    "field_path": f"{field_prefix}/{field_path}",
+                    "details": {"fact_id": fact_id},
+                }
+            )
+    return violations
+
+
+def _rewrite_added_content_violations(
+    operation: dict[str, Any],
+    allowed_fact_ids: set[str],
+    field_prefix: str,
+) -> list[dict[str, Any]]:
+    before_tokens = set(_rewrite_guard_tokens(_clean_text(operation.get("before"))))
+    after_tokens = set(_rewrite_guard_tokens(_clean_text(operation.get("after"))))
+    added_tokens = after_tokens - before_tokens - _REWRITE_GUARD_FILLER_TOKENS
+    if not added_tokens:
+        return []
+
+    covered_tokens: set[str] = set()
+    for entry in operation.get("grounding", []):
+        if not isinstance(entry, dict):
+            continue
+        fact_id = _clean_text(entry.get("fact_id"))
+        if fact_id not in allowed_fact_ids:
+            continue
+        covered_tokens.update(_rewrite_guard_tokens(_clean_text(entry.get("term"))))
+        covered_tokens.update(_rewrite_guard_tokens(_clean_text(entry.get("claim"))))
+
+    uncovered = sorted(added_tokens - covered_tokens)
+    if not uncovered:
+        return []
+    return [
+        {
+            "code": "ungrounded_added_content",
+            "message": "Every added term or claim token must be covered by a grounding entry with an allowed fact_id.",
+            "severity": "error",
+            "field_path": f"{field_prefix}/grounding",
+            "details": {"tokens": uncovered},
+        }
+    ]
+
+
+_REWRITE_GUARD_FILLER_TOKENS = {
+    "a",
+    "an",
+    "and",
+    "as",
+    "at",
+    "by",
+    "for",
+    "in",
+    "of",
+    "on",
+    "or",
+    "the",
+    "to",
+    "with",
+}
+
+
+def _rewrite_guard_tokens(value: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", value.casefold())

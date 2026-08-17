@@ -103,9 +103,6 @@ def _normalize_allowed_facts(value: Any) -> list[JsonObject]:
         normalized_terms = _normalize_string_list(item.get("normalized_terms", []))
         if normalized_terms:
             fact["normalized_terms"] = normalized_terms
-        evidence = item.get("evidence")
-        if isinstance(evidence, list):
-            fact["evidence"] = evidence
         facts.append(fact)
     return facts
 
