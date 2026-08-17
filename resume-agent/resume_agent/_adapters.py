@@ -7,7 +7,8 @@ import os
 from dataclasses import dataclass, field
 from typing import Any, Literal, Mapping, Protocol
 
-from ._agent_config import AgentConfig, resolve_agent_config
+from ._agent_config import AgentConfig, resolve_agent_config, stable_agent_config_hash
+from ._call_audit import CallAuditSink, InMemoryCallAuditSink, build_call_audit_record
 from ._schema_validation import JsonObject, JsonSchemaRegistry, validate_schema_id
 
 
@@ -158,16 +159,22 @@ class ValidatingModelAdapter:
         agent_config: AgentConfig | None = None,
         runtime_config: Mapping[str, Any] | None = None,
         output_schemas: JsonSchemaRegistry | None = None,
+        call_audit_sink: CallAuditSink | None = None,
     ) -> None:
         self.adapter_id = adapter_id
         self.adapter_version = adapter_version
         self.model_id = model_id
+        self._agent_config = agent_config or resolve_agent_config({}).config
+        self._config_hash = stable_agent_config_hash(self._agent_config)
         base_runtime_config = agent_config.to_dict() if agent_config is not None else {}
         base_runtime_config.update(runtime_config or {})
         self.runtime_config = base_runtime_config
         self.output_schemas = dict(output_schemas or {})
+        self.call_audit_sink = call_audit_sink if call_audit_sink is not None else InMemoryCallAuditSink()
+        self._call_audit_sequence = 0
 
     def complete(self, request: AdapterRequest) -> AdapterResult:
+        sequence = self._next_call_audit_sequence()
         retries = 0
         usage: JsonObject = {}
         try:
@@ -177,7 +184,7 @@ class ValidatingModelAdapter:
             violations = validate_schema_id(completion.payload, request.output_schema_id, self.output_schemas)
             if violations:
                 raise AdapterSchemaInvalidError(violations)
-            return AdapterResult.ok(
+            result = AdapterResult.ok(
                 payload=completion.payload,
                 adapter_id=self.adapter_id,
                 adapter_version=self.adapter_version,
@@ -187,7 +194,7 @@ class ValidatingModelAdapter:
                 usage=usage,
             )
         except Exception as exc:  # noqa: BLE001 - adapter seam must normalize every failure.
-            return AdapterResult.failed(
+            result = AdapterResult.failed(
                 error=_failure_from_exception(exc),
                 adapter_id=self.adapter_id,
                 adapter_version=self.adapter_version,
@@ -196,6 +203,16 @@ class ValidatingModelAdapter:
                 retries=_retry_count(exc, retries),
                 usage=_usage_counts(exc, usage),
             )
+        self.call_audit_sink.record(
+            build_call_audit_record(
+                request=request,
+                result=result,
+                output_schemas=self.output_schemas,
+                config_hash=self._config_hash,
+                sequence=sequence,
+            )
+        )
+        return result
 
     def _complete_unchecked(self, request: AdapterRequest) -> AdapterCompletion | JsonObject:
         raise NotImplementedError
@@ -207,6 +224,10 @@ class ValidatingModelAdapter:
             return AdapterCompletion(payload=value)
         return AdapterCompletion(payload={"value": value})
 
+    def _next_call_audit_sequence(self) -> int:
+        self._call_audit_sequence += 1
+        return self._call_audit_sequence
+
 
 def create_live_model_adapter(
     *,
@@ -215,6 +236,7 @@ def create_live_model_adapter(
     adapter_version: str = "0.1.0",
     agent_config: AgentConfig | None = None,
     output_schemas: JsonSchemaRegistry | None = None,
+    call_audit_sink: CallAuditSink | None = None,
 ) -> ModelAdapter:
     """Construct the Anthropic live adapter only when explicitly opted in.
 
@@ -251,6 +273,7 @@ def create_live_model_adapter(
         agent_config=agent_config or resolve_agent_config({}).config,
         api_key=api_key,
         output_schemas=output_schemas,
+        call_audit_sink=call_audit_sink,
     )
 
 

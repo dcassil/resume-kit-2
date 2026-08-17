@@ -11,6 +11,7 @@ from typing import Any, Mapping
 
 from ._adapters import AdapterCompletion, AdapterProviderError, AdapterRequest, ValidatingModelAdapter
 from ._agent_config import AgentConfig, resolve_agent_config
+from ._call_audit import CallAuditSink
 from ._extraction_schemas import EXTRACTION_OUTPUT_SCHEMAS
 from ._interview_schemas import INTERVIEW_OUTPUT_SCHEMAS
 from ._rewrite_schemas import REWRITE_OUTPUT_SCHEMAS, REWRITE_PROPOSAL_SCHEMA_ID
@@ -126,6 +127,7 @@ class DeterministicFakeAdapter(ValidatingModelAdapter):
         fixture_dir: Path | str | None = None,
         agent_config: AgentConfig | None = None,
         output_schemas: JsonSchemaRegistry | None = None,
+        call_audit_sink: CallAuditSink | None = None,
     ) -> None:
         self.fixture_dir = Path(fixture_dir) if fixture_dir is not None else default_fake_fixture_dir()
         if agent_config is not None and not isinstance(agent_config, AgentConfig):
@@ -141,6 +143,7 @@ class DeterministicFakeAdapter(ValidatingModelAdapter):
             agent_config=resolved_agent_config,
             runtime_config={"fixture_dir": str(self.fixture_dir), "key_algorithm": "sha256:v1"},
             output_schemas=schemas,
+            call_audit_sink=call_audit_sink,
         )
 
     def _complete_unchecked(self, request: AdapterRequest) -> AdapterCompletion:

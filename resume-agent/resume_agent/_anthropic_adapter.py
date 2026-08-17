@@ -26,6 +26,7 @@ from ._adapters import (
     ValidatingModelAdapter,
 )
 from ._agent_config import DEFAULT_AGENT_SCHEMA_MODE, AgentConfig
+from ._call_audit import CallAuditSink
 from ._schema_validation import JsonObject, JsonSchemaRegistry
 
 
@@ -41,6 +42,7 @@ class AnthropicClaudeAdapter(ValidatingModelAdapter):
         agent_config: AgentConfig,
         api_key: str,
         output_schemas: JsonSchemaRegistry | None = None,
+        call_audit_sink: CallAuditSink | None = None,
     ) -> None:
         if not isinstance(agent_config, AgentConfig):
             raise TypeError("agent_config must be a validated AgentConfig.")
@@ -74,6 +76,7 @@ class AnthropicClaudeAdapter(ValidatingModelAdapter):
             agent_config=agent_config,
             runtime_config=runtime_config,
             output_schemas=output_schemas,
+            call_audit_sink=call_audit_sink,
         )
 
     def _complete_unchecked(self, request: AdapterRequest) -> AdapterCompletion:

@@ -134,6 +134,27 @@ Grounding, DTO, and constraint battery:
 - Missing fact IDs, requirement IDs, target paths, or grounding metadata block operation use.
 - Agent uncertainty is preserved and visible to validators.
 
+### Call-audit records
+
+- Every `ValidatingModelAdapter.complete` call emits one package-owned audit record with exactly `call_id`, `adapter_id`, `adapter_version`, `model_id`, `prompt_hash`, `schema_hash`, `config_hash`, `retry_count`, `outcome`, `timestamps`, and `usage`.
+- Outcomes use the closed adapter taxonomy: `ok`, `timeout`, `schema_invalid`, `refused`, `provider_error`.
+- Fake-adapter records are deterministic: no wall-clock or random ids enter the fake audit path; identical fake inputs on fresh adapters serialize to byte-identical full records, while distinct inputs produce distinct `call_id`s.
+- Prompt hashes come from versioned prompt assets when available; schema hashes use canonical schema JSON; config hashes use `stable_agent_config_hash`.
+- Audit emission is owned by the base validating adapter chokepoint so fake and live adapters cannot bypass it by overriding `_complete_unchecked`.
+
+Call-audit covering tests:
+
+- `test_every_adapter_call_emits_record_for_ok_and_all_failure_taxonomies`
+- `test_identical_fake_inputs_on_fresh_adapters_yield_byte_identical_records`
+- `test_distinct_fake_inputs_yield_distinct_call_ids`
+- `test_complete_chokepoint_emits_when_subclass_overrides_unchecked_completion`
+- `test_record_self_validation_reports_missing_field_as_typed_error`
+- `test_hashes_use_prompt_asset_schema_and_stable_agent_config_hash`
+- `test_fake_success_carries_metadata_and_seed_payload`
+- `test_deliberately_broken_in_test_fixture_returns_schema_invalid`
+- `test_success_uses_configured_model_client_options_output_config_and_metadata`
+- `test_refusal_stop_reason_maps_to_refused`
+
 ## Determinism Strategy
 
 Because language models may vary, official tests should stabilize behavior through:

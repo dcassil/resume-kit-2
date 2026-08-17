@@ -4,20 +4,20 @@ level: initiative
 title: "Resume-Agent Auditability, Determinism, and Evaluation Fixtures"
 short_code: "RKIT-I-0021"
 created_at: 2026-08-13T20:41:37.326228+00:00
-updated_at: 2026-08-13T20:41:37.326228+00:00
+updated_at: 2026-08-17T18:40:23.676994+00:00
 parent: resume-kit-2-full-product-buildout
-blocked_by: ["RKIT-I-0016"]
+blocked_by: [RKIT-I-0016]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/discovery"
+  - "#phase/active"
 
 
 exit_criteria_met: false
 estimated_complexity: M
 strategy_id: RKIT-S-0001
-initiative_id: NULL
+initiative_id: resume-agent-auditability
 ---
 
 # Resume-Agent Auditability, Determinism, and Evaluation Fixtures Initiative
@@ -83,6 +83,10 @@ Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
 3. Failure-taxonomy and reconstruction tests (Audit Gate check).
 4. Golden eval fixture format, rubrics, and the opt-in harness runner.
 5. Capture/quarantine/promotion tooling for record/replay with gate-safety tests.
+
+## Status Updates
+
+- 2026-08-17: Decomposed into RKIT-T-0101 (call-audit record/sink/emission, opus+high) → RKIT-T-0102 (agent-metadata manifest block + defined-location contract test + TEST_SPEC :91 + Audit Gate reconstruction, opus+high) → RKIT-T-0103 (golden eval fixtures + opt-in harness + capture/quarantine/promotion, opus+medium), serial chain. Grounding checks done: workflow manifest already carries `agent_model_config` (workflow/schemas.py:59) and `audit_refs` (:73) — T-0102 reuses (no new manifest field, no protected edit); resume_agent guardrail surface untouched (metadata exposed through existing channels, surface advertisement deferred to approval batch if needed). T-0101 dispatched to codex.
 
 ## Dependencies / Blocked Status
 

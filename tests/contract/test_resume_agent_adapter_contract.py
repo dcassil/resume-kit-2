@@ -51,6 +51,7 @@ from resume_agent._rewrite_requests import (
     prompt_template_text as rewrite_prompt_template_text,
 )
 from resume_agent._schema_validation import validate_json_schema, validate_schema_id
+from tests.unit.test_resume_agent_call_audit_unit import ResumeAgentCallAuditUnitTests  # bridge into gated contract module
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -324,7 +325,8 @@ class ResumeAgentDeterministicFakeAdapterContractTests(unittest.TestCase):
         self.assertTrue((FAKE_FIXTURES / f"{REWRITE_SEED_KEY}.json").is_file())
 
     def test_fake_success_carries_metadata_and_seed_payload(self):
-        result = DeterministicFakeAdapter(fixture_dir=FAKE_FIXTURES).complete(self.fake_request())
+        adapter = DeterministicFakeAdapter(fixture_dir=FAKE_FIXTURES)
+        result = adapter.complete(self.fake_request())
 
         self.assertEqual(result.status, "ok")
         self.assertEqual(result.adapter_id, "resume-agent-deterministic-fake")
@@ -334,6 +336,9 @@ class ResumeAgentDeterministicFakeAdapterContractTests(unittest.TestCase):
         self.assertEqual(result.usage["fixture_hits"], 1)
         self.assertEqual(result.payload["proposal_type"], "resume_semantic_extraction")
         self.assertTrue(result.payload["requires_validation"])
+        self.assertEqual(len(adapter.call_audit_sink.records), 1)
+        self.assertEqual(adapter.call_audit_sink.records[0]["outcome"], "ok")
+        self.assertEqual(adapter.call_audit_sink.records[0]["retry_count"], 0)
 
     def test_fake_result_is_byte_deterministic_for_identical_requests(self):
         adapter = DeterministicFakeAdapter(fixture_dir=FAKE_FIXTURES)
@@ -367,12 +372,15 @@ class ResumeAgentDeterministicFakeAdapterContractTests(unittest.TestCase):
             fixture_path = temp_dir / f"{FACT_SEED_KEY}.json"
             fixture_path.write_text(json.dumps(_fake_fixture_envelope({"schema_version": FACT_PROPOSAL_SCHEMA_ID}), indent=2), encoding="utf-8")
 
-            result = DeterministicFakeAdapter(fixture_dir=temp_dir).complete(self.fake_request())
+            adapter = DeterministicFakeAdapter(fixture_dir=temp_dir)
+            result = adapter.complete(self.fake_request())
 
         self.assertEqual(result.status, "error")
         self.assertEqual(result.error.type, "schema_invalid")
         self.assertIn(("missing_field", "proposal_type"), {(item.get("code"), item.get("field_path")) for item in result.error.violations})
         self.assertIn(("missing_field", "fact_proposals"), {(item.get("code"), item.get("field_path")) for item in result.error.violations})
+        self.assertEqual(adapter.call_audit_sink.records[0]["outcome"], "schema_invalid")
+        self.assertEqual(adapter.call_audit_sink.records[0]["retry_count"], 0)
 
     def test_all_official_fake_fixtures_self_validate_against_shared_schema_validator(self):
         failures = validate_fake_fixture_dir(FAKE_FIXTURES)
@@ -859,7 +867,8 @@ class ResumeAgentAnthropicAdapterContractTests(unittest.TestCase):
             usage=types.SimpleNamespace(input_tokens=11, output_tokens=7),
         )
 
-        result = self.live_adapter().complete(request())
+        adapter = self.live_adapter()
+        result = adapter.complete(request())
 
         self.assertEqual(result.status, "ok")
         self.assertEqual(result.payload, VALID_PAYLOAD)
@@ -878,6 +887,8 @@ class ResumeAgentAnthropicAdapterContractTests(unittest.TestCase):
         self.assertEqual(params["temperature"], 0)
         self.assertEqual(params["output_config"]["format"]["type"], "json_schema")
         self.assertEqual(params["output_config"]["format"]["schema"], TEST_SCHEMA)
+        self.assertEqual(adapter.call_audit_sink.records[0]["outcome"], "ok")
+        self.assertEqual(adapter.call_audit_sink.records[0]["retry_count"], 1)
 
     def test_out_of_schema_anthropic_payload_is_revalidated_as_schema_invalid(self):
         self.stub.next_response = _stub_response(output={"schema_version": TEST_SCHEMA_ID})
@@ -891,11 +902,14 @@ class ResumeAgentAnthropicAdapterContractTests(unittest.TestCase):
     def test_refusal_stop_reason_maps_to_refused(self):
         self.stub.next_response = _stub_response(output=VALID_PAYLOAD, stop_reason="refusal", retries=2)
 
-        result = self.live_adapter().complete(request())
+        adapter = self.live_adapter()
+        result = adapter.complete(request())
 
         self.assertEqual(result.status, "error")
         self.assertEqual(result.error.type, "refused")
         self.assertEqual(result.retries, 2)
+        self.assertEqual(adapter.call_audit_sink.records[0]["outcome"], "refused")
+        self.assertEqual(adapter.call_audit_sink.records[0]["retry_count"], 2)
 
     def test_anthropic_exception_mapping_is_class_based_and_wording_independent(self):
         cases = [
