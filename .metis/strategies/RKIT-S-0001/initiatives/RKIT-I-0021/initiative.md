@@ -4,14 +4,14 @@ level: initiative
 title: "Resume-Agent Auditability, Determinism, and Evaluation Fixtures"
 short_code: "RKIT-I-0021"
 created_at: 2026-08-13T20:41:37.326228+00:00
-updated_at: 2026-08-17T18:40:23.676994+00:00
+updated_at: 2026-08-17T19:07:52.616373+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0016]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -87,6 +87,7 @@ Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
 ## Status Updates
 
 - 2026-08-17: Decomposed into RKIT-T-0101 (call-audit record/sink/emission, opus+high) → RKIT-T-0102 (agent-metadata manifest block + defined-location contract test + TEST_SPEC :91 + Audit Gate reconstruction, opus+high) → RKIT-T-0103 (golden eval fixtures + opt-in harness + capture/quarantine/promotion, opus+medium), serial chain. Grounding checks done: workflow manifest already carries `agent_model_config` (workflow/schemas.py:59) and `audit_refs` (:73) — T-0102 reuses (no new manifest field, no protected edit); resume_agent guardrail surface untouched (metadata exposed through existing channels, surface advertisement deferred to approval batch if needed). T-0101 dispatched to codex.
+- 2026-08-17 (later): ALL THREE TASKS COMPLETE — T-0101 (6d4d94c), T-0102 (fa172a3), T-0103 (cfcdbca). All six initiative requirements satisfied: (1) defined manifest location = agent_model_config five-field block + contract test; (2) every adapter call emits an audit record incl. all four failure taxonomies; (3) byte-identical records under the fake adapter (independently probed); (4) golden fixtures per surface + opt-in non-gating harness; (5) quarantine + explicit human promotion with --replace guard; (6) Audit Gate reconstruction test recovers full identity + failure history. Zero protected-file edits. Gates green at every commit. Initiative complete; version bumped to 0.22.0.
 
 ## Dependencies / Blocked Status
 
