@@ -4,14 +4,14 @@ level: task
 title: "Truthful manifest policy statement, parity test, TEST_SPEC strengthening"
 short_code: "RKIT-T-0107"
 created_at: 2026-08-17T19:29:02.815521+00:00
-updated_at: 2026-08-17T19:38:29.419657+00:00
+updated_at: 2026-08-17T19:44:45.337422+00:00
 parent: add-career-mcp-policy-scope-and
 blocked_by: [RKIT-T-0106]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0012
 ## Objective
 
 Close the audit's tool_surface.json:21 contract-misalignment finding permanently (R5/R6): the canonical manifest gains a policy block stating EXACTLY the v1 posture (single-user local; mutations gated on host-mediated confirmation; NO scope enforcement), a parity test asserts statement↔behavior agreement so the manifest can never overstate again, and career-mcp/TEST_SPEC.md is strengthened so any future manifest policy claim requires corresponding executable tests.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

@@ -4,14 +4,14 @@ level: initiative
 title: "Add Career-MCP Policy, Scope, and Confirmation Enforcement"
 short_code: "RKIT-I-0012"
 created_at: 2026-08-13T20:41:37.084689+00:00
-updated_at: 2026-08-17T19:30:18.461377+00:00
+updated_at: 2026-08-17T19:44:54.605896+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0010]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -60,6 +60,10 @@ Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
 
 ### Blocked Status
 - Yes (blocked_by: ["RKIT-I-0010"]).
+
+## Status Updates
+
+- 2026-08-17: COMPLETE. T-0106 (ebe141a): pure evaluate_policy w/ classification derived from manifest mutates flags; call_tool gates after validation/before dispatch (store-spy zero-call proof, independently probed); confirmed arg on all 4 mutating schemas (byte-copy via sync tool, consumed-arguments covered); get_unverified flag policy-computed; context echo/parameter REMOVED (no schema, no semantics). T-0107 (c68b6d5): exact gated_tools parity test, access-control vocabulary scan (sole exception: role fact-type enum), per-gated-tool behavioral rejection loop, TEST_SPEC binding claims-require-tests rule; both mutation probes failed named tests. tool_surface.json:21 misalignment closed permanently. Zero protected edits; gates green throughout; version bumped 0.24.0.
 
 ## Detailed Design **[REQUIRED]**
 
