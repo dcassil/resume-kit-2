@@ -387,6 +387,87 @@ class ResumeAgentProposalContractTests(unittest.TestCase):
         self.assertNotIn("score_impact", serialized)
         self.assertNotRegex(result.get("question", "").lower(), r"anything else|tell me about your background")
 
+    def test_clarification_question_filters_verified_fact_targets_before_adapter_request(self):
+        from resume_agent._fake_adapter import DeterministicFakeAdapter
+
+        class RecordingAdapter:
+            def __init__(self):
+                self.requests = []
+                self.delegate = DeterministicFakeAdapter()
+
+            def complete(self, request):
+                self.requests.append(request)
+                return self.delegate.complete(request)
+
+        adapter = RecordingAdapter()
+        context = {
+            "selected_requirement_ids": ["req_aws"],
+            "topic": "AWS",
+            "target_fact_ids": ["fact_verified", "fact_cloud"],
+            "already_verified_fact_ids": ["fact_verified"],
+            "context_snippets": ["Preferred: AWS production experience."],
+            "_adapter": adapter,
+        }
+        result = maybe_await(self.agent.generateClarificationQuestion(context))
+
+        assert_proposal_handoff(self, result, "clarification_question")
+        self.assertEqual(len(adapter.requests), 1)
+        self.assertEqual(adapter.requests[0].input_payload["target_ids"]["fact_ids"], ["fact_cloud"])
+        self.assertEqual(result.get("target_fact_ids"), ["fact_cloud"])
+        self.assertNotIn("fact_verified", json.dumps(result.get("target_ids"), sort_keys=True))
+        self.assertNotIn("fact_verified", json.dumps(result.get("proposals"), sort_keys=True))
+
+    def test_clarification_question_returns_no_question_without_adapter_when_all_fact_targets_verified(self):
+        class RaisingAdapter:
+            def complete(self, request):
+                raise AssertionError("adapter should not be called for fully verified fact targets")
+
+        context = {
+            "selected_requirement_ids": ["req_aws"],
+            "topic": "AWS",
+            "target_fact_ids": ["fact_verified"],
+            "already_verified_fact_ids": ["fact_verified"],
+            "_adapter": RaisingAdapter(),
+        }
+        result = maybe_await(self.agent.generateClarificationQuestion(context))
+
+        assert_proposal_handoff(self, result, "clarification_question")
+        self.assertEqual(result.get("status"), "ok")
+        self.assertFalse(result.get("question_needed"))
+        self.assertEqual(result.get("proposals"), [])
+        self.assertNotIn("question", result)
+        self.assertEqual(result.get("target_fact_ids"), [])
+
+    def test_clarification_question_adapter_failure_returns_typed_error_without_canned_fallback(self):
+        context = {
+            "selected_requirement_ids": ["req_unpinned"],
+            "topic": "Unpinned specialty",
+            "already_verified_fact_ids": [],
+        }
+        result = maybe_await(self.agent.generateClarificationQuestion(context))
+
+        self.assertEqual(result.get("status"), "error")
+        self.assertEqual(result.get("error", {}).get("type"), "provider_error")
+        self.assertNotIn("question", result)
+        self.assertNotIn("proposals", result)
+
+    def test_canned_clarification_question_literals_are_deleted_from_production_code(self):
+        source = (ROOT / "resume-agent" / "resume_agent" / "__init__.py").read_text(encoding="utf-8")
+        deleted_literals = [
+            " ".join(["What AWS services have you used professionally, and", "for roughly how many years?"]),
+            " ".join(["Have you built or maintained GraphQL APIs in production, and", "for roughly how many years?"]),
+            " ".join(
+                [
+                    "What API or application architecture have you designed, and",
+                    "what was your role in that work?",
+                ]
+            ),
+        ]
+
+        for literal in deleted_literals:
+            with self.subTest(literal=literal):
+                self.assertNotIn(literal, source)
+
     def test_answer_interpretation_keeps_aws_six_years_as_proposal_not_final_verification(self):
         context = {"selected_requirement_ids": ["req_aws"], "topic": "AWS"}
         answer = "Yes. I have about six years of AWS experience, mainly EC2, S3, Lambda, RDS, and IAM."

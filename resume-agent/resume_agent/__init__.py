@@ -1,9 +1,9 @@
 """Public proposal surface for resume-agent.
 
-Extraction confidence and uncertainty are adapter-sourced. Clarification,
-answer-interpretation, and rewrite helpers are deterministic placeholders until
-RKIT-I-0018/RKIT-I-0019 adapter backing lands; any confidence they emit is
-explicitly marked unscored.
+Extraction confidence and uncertainty are adapter-sourced. Clarification
+questions are adapter-phrased for code-selected targets. Answer-interpretation
+and rewrite helpers are deterministic placeholders until RKIT-I-0018/RKIT-I-0019
+adapter backing lands; any confidence they emit is explicitly marked unscored.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ from ._agent_config import (
 )
 from ._extraction_requests import build_job_extraction_request, build_resume_extraction_request
 from ._fake_adapter import DeterministicFakeAdapter
+from ._interview_requests import build_question_request
 
 
 SCHEMA_VERSION = "resume-agent.proposal.v1"
@@ -158,6 +159,24 @@ def _selected_ids(context: dict[str, Any]) -> list[str]:
     if not isinstance(selected, list):
         return []
     return [str(item) for item in selected if _clean_text(str(item))]
+
+
+def _selected_fact_ids(context: dict[str, Any]) -> list[str]:
+    target_ids = context.get("target_ids")
+    if isinstance(target_ids, dict):
+        explicit = target_ids.get("fact_ids", [])
+    else:
+        explicit = context.get("target_fact_ids", context.get("selected_fact_ids", []))
+    if not isinstance(explicit, list):
+        return []
+    return [str(item) for item in explicit if _clean_text(str(item))]
+
+
+def _context_snippets(context: dict[str, Any]) -> list[str]:
+    snippets = context.get("context_snippets", [])
+    if not isinstance(snippets, list):
+        return []
+    return [_clean_text(str(item)) for item in snippets if _clean_text(str(item))]
 
 
 def _mentioned_terms(text: str, terms: list[str]) -> list[str]:
@@ -560,28 +579,79 @@ def generateClarificationQuestion(context: dict[str, Any]) -> dict[str, Any]:
     already = context.get("already_verified_fact_ids", [])
     if not isinstance(already, list):
         already = []
+    verified_ids = {str(item) for item in already if _clean_text(str(item))}
 
-    topic_lower = topic.lower()
-    if "aws" in topic_lower:
-        question = "What AWS services have you used professionally, and for roughly how many years?"
-    elif "graphql" in topic_lower:
-        question = "Have you built or maintained GraphQL APIs in production, and for roughly how many years?"
-    elif "architecture" in topic_lower or "api" in topic_lower:
-        question = "What API or application architecture have you designed, and what was your role in that work?"
-    else:
-        question = f"What direct experience do you have with {topic}, and what evidence should be considered?"
+    fact_targets = _selected_fact_ids(context)
+    filtered_requirement_ids = [requirement_id for requirement_id in selected if requirement_id not in verified_ids]
+    filtered_fact_ids = [fact_id for fact_id in fact_targets if fact_id not in verified_ids]
+    if fact_targets and not filtered_fact_ids:
+        result = _base("clarification_question")
+        result.update(
+            {
+                "status": "ok",
+                "question_needed": False,
+                "selected_requirement_ids": filtered_requirement_ids,
+                "target_ids": {"requirement_ids": filtered_requirement_ids, "fact_ids": []},
+                "target_fact_ids": [],
+                "topic": topic,
+                "already_verified_fact_ids": [str(item) for item in already],
+                "rationale": "All selected fact targets are already verified.",
+            }
+        )
+        return result
 
+    target_ids = {"requirement_ids": filtered_requirement_ids, "fact_ids": filtered_fact_ids}
+    try:
+        request = build_question_request(topic, target_ids, _context_snippets(context))
+        adapter = _question_generation_adapter(context)
+    except AgentConfigValidationError as exc:
+        return {"status": "error", "error": {"type": "schema_error", "message": str(exc), "violations": exc.errors}}
+
+    completion = adapter.complete(request)
+    if completion.status != "ok":
+        return _adapter_error(completion)
+
+    payload = completion.payload or {}
+    question = _clean_text(payload.get("question"))
+    payload_targets = payload.get("target_ids") if isinstance(payload.get("target_ids"), dict) else target_ids
+    question_id = _stable_id("question", f"{topic}:{payload_targets}:{question}")
     result = _base("clarification_question")
     result.update(
         {
-            "proposals": [{"question": question, "selected_requirement_ids": selected, "topic": topic}],
+            "status": "ok",
+            "question_needed": True,
+            "proposals": [
+                {
+                    "proposal_id": question_id,
+                    "question_id": question_id,
+                    "question": question,
+                    "selected_requirement_ids": list(payload_targets.get("requirement_ids", [])),
+                    "target_ids": payload_targets,
+                    "topic": topic,
+                    "rationale": payload.get("rationale"),
+                    "requires_validation": payload.get("requires_validation", True),
+                    "confidence": payload.get("confidence"),
+                }
+            ],
+            "question_id": question_id,
             "question": question,
-            "selected_requirement_ids": selected,
+            "selected_requirement_ids": list(payload_targets.get("requirement_ids", [])),
+            "target_ids": payload_targets,
+            "target_fact_ids": list(payload_targets.get("fact_ids", [])),
             "topic": topic,
             "already_verified_fact_ids": [str(item) for item in already],
+            "rationale": payload.get("rationale"),
+            "confidence": payload.get("confidence"),
         }
     )
     return result
+
+
+def _question_generation_adapter(context: dict[str, Any]) -> ModelAdapter:
+    injected = context.get("_adapter")
+    if injected is not None:
+        return injected
+    return DeterministicFakeAdapter(agent_config=require_agent_config(context))
 
 
 def interpretUserAnswer(answer: str, context: dict[str, Any]) -> dict[str, Any]:

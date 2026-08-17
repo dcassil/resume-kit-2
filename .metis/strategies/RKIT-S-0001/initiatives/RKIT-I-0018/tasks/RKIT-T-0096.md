@@ -4,14 +4,14 @@ level: task
 title: "generateClarificationQuestion via adapter: verified-ids pre-filter, typed no-question result"
 short_code: "RKIT-T-0096"
 created_at: 2026-08-17T16:59:31.417619+00:00
-updated_at: 2026-08-17T16:59:31.417619+00:00
+updated_at: 2026-08-17T17:06:38.624330+00:00
 parent: resume-agent-targeted-interview
-blocked_by: ["RKIT-T-0095"]
+blocked_by: [RKIT-T-0095]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0018
 ## Objective **[REQUIRED]**
 
 Close the Persistence Gate violation and retire the canned questions: `generateClarificationQuestion` currently echoes `already_verified_fact_ids` back and re-asks the identical canned question (audit refs __init__.py:535-537, :556), and its three question strings are keyed on "aws"/"graphql"/"architecture" substrings (:539-547). After this task: a DETERMINISTIC pre-filter drops targets present in `already_verified_fact_ids` BEFORE any model call; an empty remainder short-circuits to a typed no-question-needed result (no adapter call at all); the surviving targets go to the model for phrasing via the T-0095 builder — any topic, the code-owned caller picks WHAT to ask, the agent only phrases it.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria **[REQUIRED]**
 
@@ -54,4 +56,4 @@ RKIT-T-0095. Serial.
 
 ## Status Updates **[REQUIRED]**
 
-*To be added during implementation*
+- 2026-08-17: T-0095 committed (interview schemas w/ required polarity + canonical resolution states, prompt assets, 7 fixtures incl. denial/qualified/Terraform; gates 482/smoke/verify green). Codex launched: code-owned verified-ids pre-filter before any model call, typed no-question short-circuit, canned-question deletion, persistence battery.

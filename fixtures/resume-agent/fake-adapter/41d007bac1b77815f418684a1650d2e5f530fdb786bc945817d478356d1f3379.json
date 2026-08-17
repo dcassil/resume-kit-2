@@ -1,0 +1,32 @@
+{
+  "fixture_id": "resume-agent-question-generation-aws-requirement-only",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Question generation supports the current CLI context shape with only a selected AWS requirement target."
+  ],
+  "comment": "RKIT-T-0096 fixture for generateClarificationQuestion's adapter-backed public surface.",
+  "data": {
+    "key": {
+      "sha256": "41d007bac1b77815f418684a1650d2e5f530fdb786bc945817d478356d1f3379",
+      "prompt_template_id": "resume-agent.question-generation@v1",
+      "output_schema_id": "resume-agent.question-generation.v1",
+      "canonical_input_json": "{\"context_snippets\":[],\"schema_id\":\"resume-agent.question-generation.v1\",\"target_ids\":{\"fact_ids\":[],\"requirement_ids\":[\"req_aws\"]},\"topic\":\"AWS\"}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.question-generation.v1",
+      "proposal_type": "question_generation",
+      "requires_validation": true,
+      "question": "What AWS experience can you confirm for this requirement, including services used and production context?",
+      "target_ids": {
+        "requirement_ids": [
+          "req_aws"
+        ],
+        "fact_ids": []
+      },
+      "rationale": "The selected AWS requirement needs a concise confirmation question without adding unrelated topics.",
+      "confidence": 0.89
+    }
+  }
+}
