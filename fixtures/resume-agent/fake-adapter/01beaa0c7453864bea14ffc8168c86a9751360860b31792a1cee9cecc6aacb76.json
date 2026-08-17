@@ -1,0 +1,75 @@
+{
+  "fixture_id": "resume-agent-rewrite-constraint-voice-violation",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Schema-valid rewrite starts with present-tense Designs despite a past-tense constraint.",
+    "Grounding is complete so the deterministic voice post-check is the rejecting path."
+  ],
+  "comment": "RKIT-T-0100 voice-violating fixture; file name is the sha256 key for the request tuple.",
+  "data": {
+    "key": {
+      "sha256": "01beaa0c7453864bea14ffc8168c86a9751360860b31792a1cee9cecc6aacb76",
+      "prompt_template_id": "resume-agent.rewrite-proposal@v1",
+      "output_schema_id": "resume-agent.rewrite-proposal.v1",
+      "canonical_input_json": "{\"allowed_facts\":[{\"evidence_id\":\"ev_api\",\"fact_id\":\"fact_api\",\"text\":\"Designed REST API architecture for customer-facing SaaS products.\",\"verification_state\":\"source_stated\"}],\"length_constraints\":{\"max_chars\":150},\"original_text\":\"Built web applications.\",\"prohibited_additions\":[\"AWS\",\"GraphQL\",\"team leadership\"],\"requirement_ids\":[\"req_api\"],\"schema_id\":\"resume-agent.rewrite-proposal.v1\",\"target_path\":\"/experience/0/bullets/0\",\"voice_constraints\":{\"person\":\"first-person-implied\",\"tense\":\"past\"}}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.rewrite-proposal.v1",
+      "proposal_type": "rewrite_proposal",
+      "requires_validation": true,
+      "uncertainty": [],
+      "operations": [
+        {
+          "schema_version": "resume-change-operation.v1",
+          "operation_id": "op_constraint_voice_present_tense",
+          "status": "proposed",
+          "op": "rewrite",
+          "operation_type": "rewrite",
+          "path": "/experience/0/bullets/0",
+          "target_path": "/experience/0/bullets/0",
+          "reason": "Deliberately violates the requested past-tense voice constraint while remaining fact-mapped.",
+          "before": "Built web applications.",
+          "after": "Designs REST API architecture for customer-facing SaaS products.",
+          "linked_requirement_ids": [
+            "req_api"
+          ],
+          "linked_fact_ids": [
+            "fact_api"
+          ],
+          "requirementIds": [
+            "req_api"
+          ],
+          "factIds": [
+            "fact_api"
+          ],
+          "provenance": [
+            {
+              "source": "allowed_fact",
+              "text": "Designed REST API architecture for customer-facing SaaS products.",
+              "fact_id": "fact_api",
+              "evidence_id": "ev_api",
+              "span": {
+                "start": 0,
+                "end": 62
+              }
+            }
+          ],
+          "confidence": 0.84,
+          "grounding": [
+            {
+              "term": "Designs REST API architecture for customer-facing SaaS products",
+              "claim": "Designed REST API architecture for customer-facing SaaS products.",
+              "fact_id": "fact_api",
+              "span": {
+                "start": 0,
+                "end": 61
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

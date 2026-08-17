@@ -1,0 +1,98 @@
+{
+  "fixture_id": "resume-agent-rewrite-prohibited-addition-grounded",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Schema-valid rewrite adds GraphQL while GraphQL is listed in prohibited_additions.",
+    "Grounding is complete so the deterministic prohibited-addition check names the banned term."
+  ],
+  "comment": "RKIT-T-0100 prohibited-addition fixture; file name is the sha256 key for the request tuple.",
+  "data": {
+    "key": {
+      "sha256": "c86921879d410b346c7455d24dff4333c642e84ce26fc6d448ac3d653286aec9",
+      "prompt_template_id": "resume-agent.rewrite-proposal@v1",
+      "output_schema_id": "resume-agent.rewrite-proposal.v1",
+      "canonical_input_json": "{\"allowed_facts\":[{\"evidence_id\":\"ev_api\",\"fact_id\":\"fact_api\",\"text\":\"Designed REST API architecture for customer-facing SaaS products.\",\"verification_state\":\"source_stated\"},{\"evidence_id\":\"ev_graphql\",\"fact_id\":\"fact_graphql\",\"text\":\"Designed GraphQL APIs for customer-facing products.\",\"verification_state\":\"source_stated\"}],\"length_constraints\":{\"max_chars\":180},\"original_text\":\"Built web applications.\",\"prohibited_additions\":[\"GraphQL\"],\"requirement_ids\":[\"req_api\",\"req_graphql\"],\"schema_id\":\"resume-agent.rewrite-proposal.v1\",\"target_path\":\"/experience/0/bullets/0\",\"voice_constraints\":{}}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.rewrite-proposal.v1",
+      "proposal_type": "rewrite_proposal",
+      "requires_validation": true,
+      "uncertainty": [],
+      "operations": [
+        {
+          "schema_version": "resume-change-operation.v1",
+          "operation_id": "op_constraint_prohibited_graphql",
+          "status": "proposed",
+          "op": "rewrite",
+          "operation_type": "rewrite",
+          "path": "/experience/0/bullets/0",
+          "target_path": "/experience/0/bullets/0",
+          "reason": "Deliberately adds a prohibited GraphQL term even though supplied facts could ground it.",
+          "before": "Built web applications.",
+          "after": "Designed REST API architecture and GraphQL APIs for customer-facing SaaS products.",
+          "linked_requirement_ids": [
+            "req_api",
+            "req_graphql"
+          ],
+          "linked_fact_ids": [
+            "fact_api",
+            "fact_graphql"
+          ],
+          "requirementIds": [
+            "req_api",
+            "req_graphql"
+          ],
+          "factIds": [
+            "fact_api",
+            "fact_graphql"
+          ],
+          "provenance": [
+            {
+              "source": "allowed_fact",
+              "text": "Designed REST API architecture for customer-facing SaaS products.",
+              "fact_id": "fact_api",
+              "evidence_id": "ev_api",
+              "span": {
+                "start": 0,
+                "end": 62
+              }
+            },
+            {
+              "source": "allowed_fact",
+              "text": "Designed GraphQL APIs for customer-facing products.",
+              "fact_id": "fact_graphql",
+              "evidence_id": "ev_graphql",
+              "span": {
+                "start": 0,
+                "end": 47
+              }
+            }
+          ],
+          "confidence": 0.84,
+          "grounding": [
+            {
+              "term": "REST API architecture",
+              "claim": "Designed REST API architecture for customer-facing SaaS products.",
+              "fact_id": "fact_api",
+              "span": {
+                "start": 9,
+                "end": 30
+              }
+            },
+            {
+              "term": "GraphQL APIs",
+              "claim": "Designed GraphQL APIs for customer-facing products.",
+              "fact_id": "fact_graphql",
+              "span": {
+                "start": 35,
+                "end": 47
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

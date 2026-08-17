@@ -151,6 +151,57 @@ REWRITE_API_ONLY_CONTEXT = {
     "voice_constraints": {},
 }
 
+REWRITE_API_FACT = {
+    "fact_id": "fact_api",
+    "text": "Designed REST API architecture for customer-facing SaaS products.",
+    "verification_state": "source_stated",
+    "evidence_id": "ev_api",
+}
+
+REWRITE_DOCS_FACT = {
+    "fact_id": "fact_docs",
+    "text": "Wrote concise API documentation for partner developers.",
+    "verification_state": "source_stated",
+    "evidence_id": "ev_docs",
+}
+
+REWRITE_GRAPHQL_FACT = {
+    "fact_id": "fact_graphql",
+    "text": "Designed GraphQL APIs for customer-facing products.",
+    "verification_state": "source_stated",
+    "evidence_id": "ev_graphql",
+}
+
+REWRITE_VOICE_VIOLATION_CONTEXT = {
+    "original_text": "Built web applications.",
+    "target_path": "/experience/0/bullets/0",
+    "allowed_facts": [REWRITE_API_FACT],
+    "requirement_ids": ["req_api"],
+    "voice_constraints": {"tense": "past", "person": "first-person-implied"},
+    "length_constraints": {"max_chars": 150},
+    "prohibited_additions": ["AWS", "GraphQL", "team leadership"],
+}
+
+REWRITE_LENGTH_VIOLATION_CONTEXT = {
+    "original_text": "Built web applications.",
+    "target_path": "/experience/0/bullets/0",
+    "allowed_facts": [REWRITE_API_FACT, REWRITE_DOCS_FACT],
+    "requirement_ids": ["req_api", "req_docs"],
+    "voice_constraints": {"tense": "past", "person": "first-person-implied"},
+    "length_constraints": {"max_chars": 70},
+    "prohibited_additions": ["AWS", "GraphQL", "team leadership"],
+}
+
+REWRITE_PROHIBITED_ADDITION_CONTEXT = {
+    "original_text": "Built web applications.",
+    "target_path": "/experience/0/bullets/0",
+    "allowed_facts": [REWRITE_API_FACT, REWRITE_GRAPHQL_FACT],
+    "requirement_ids": ["req_api", "req_graphql"],
+    "voice_constraints": {},
+    "length_constraints": {"max_chars": 180},
+    "prohibited_additions": ["GraphQL"],
+}
+
 
 def load_agent_module(test_case: unittest.TestCase):
     try:
@@ -224,6 +275,16 @@ def assert_job_requirement_proposals_have_model_evidence(test_case: unittest.Tes
             test_case.assertEqual(requirement.get("confidence"), requirement.get("model_confidence"))
             for field in ["classification", "seniority", "industries", "domains"]:
                 test_case.assertIn(field, requirement)
+
+
+def assert_rewrite_constraint_error(test_case: unittest.TestCase, result: dict, expected_code: str) -> list[dict]:
+    test_case.assertEqual(result.get("status"), "error")
+    test_case.assertEqual(result.get("error", {}).get("type"), "constraint_error")
+    test_case.assertNotIn("operations", result)
+    violations = result.get("error", {}).get("violations", [])
+    test_case.assertTrue(violations)
+    test_case.assertIn(expected_code, {item.get("code") for item in violations})
+    return violations
 
 
 class ResumeAgentSurfaceManifestTests(unittest.TestCase):
@@ -759,6 +820,10 @@ class ResumeAgentProposalContractTests(unittest.TestCase):
             "Built {",
             "unique_phrases",
             "terminology_changes",
+            "[:max_chars]",
+            "[: max_chars]",
+            "after[:",
+            "after_text[:",
         ]
         for fragment in deleted_fragments:
             with self.subTest(fragment=fragment):
@@ -869,6 +934,34 @@ class ResumeAgentProposalContractTests(unittest.TestCase):
         violation_codes = {item.get("code") for item in result.get("error", {}).get("violations", [])}
         self.assertIn("fact_id_not_allowed", violation_codes)
         self.assertIn("ungrounded_added_content", violation_codes)
+
+    def test_rewrite_voice_constraint_post_check_rejects_present_tense_fixture(self):
+        result = maybe_await(self.agent.proposeRewrite(REWRITE_VOICE_VIOLATION_CONTEXT))
+
+        violations = assert_rewrite_constraint_error(self, result, "voice_tense_not_past")
+        self.assertIn(
+            {"tense": "past", "leading_verb": "designs"},
+            [item.get("details") for item in violations],
+        )
+
+    def test_rewrite_length_constraint_post_check_rejects_over_limit_fixture_without_truncation(self):
+        payload = fixture_payload("resume-agent-rewrite-constraint-length-violation")
+        operation = payload["operations"][0]
+        self.assertGreater(len(operation["after"]), REWRITE_LENGTH_VIOLATION_CONTEXT["length_constraints"]["max_chars"])
+
+        result = maybe_await(self.agent.proposeRewrite(REWRITE_LENGTH_VIOLATION_CONTEXT))
+
+        violations = assert_rewrite_constraint_error(self, result, "length_max_chars_exceeded")
+        length_details = [item.get("details", {}) for item in violations if item.get("code") == "length_max_chars_exceeded"]
+        self.assertEqual(length_details[0]["max_chars"], 70)
+        self.assertGreater(length_details[0]["actual_chars"], length_details[0]["max_chars"])
+
+    def test_rewrite_prohibited_addition_post_check_rejects_grounded_banned_term_fixture(self):
+        result = maybe_await(self.agent.proposeRewrite(REWRITE_PROHIBITED_ADDITION_CONTEXT))
+
+        violations = assert_rewrite_constraint_error(self, result, "prohibited_addition")
+        terms = {item.get("details", {}).get("term") for item in violations}
+        self.assertIn("GraphQL", terms)
 
     def test_rewrite_adapter_failure_returns_typed_error_without_template_fallback(self):
         from resume_agent._fake_adapter import DeterministicFakeAdapter

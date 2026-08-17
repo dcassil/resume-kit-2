@@ -4,14 +4,14 @@ level: task
 title: "Voice/length constraint plumbing + grounding/DTO/constraint batteries + TEST_SPEC reason fix — close-out"
 short_code: "RKIT-T-0100"
 created_at: 2026-08-17T17:23:40.603493+00:00
-updated_at: 2026-08-17T17:23:40.603493+00:00
+updated_at: 2026-08-17T17:43:59.438644+00:00
 parent: resume-agent-grounded-rewrite
-blocked_by: ["RKIT-T-0098", "RKIT-T-0099"]
+blocked_by: [RKIT-T-0098, RKIT-T-0099]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0019
 ## Objective **[REQUIRED]**
 
 Finish the constraint honesty and pin the spec: (1) `voice_constraints` — currently required in input then never referenced (audit ref :682) — enter the prompt contract AND get deterministic post-checks where checkable (tense/person heuristics); length limits are a generation parameter with a deterministic post-check that REJECTS (typed error), never truncates (:743-745's naive truncation dies); the prohibited-additions substring filter (:301-303) stops being the only defense — prohibited additions enter the prompt contract and the T-0099 grounding guard's term analysis covers paraphrase-adjacent cases via the fact-mapping requirement. (2) `resume-agent/TEST_SPEC.md`: `reason` added to the rewrite-return list (the :66-67 omission that licensed the drift), fixture-phrase grounding checks replaced with fact-mapping assertions, voice/length constraint assertions added (currently zero coverage). Initiative close-out.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria **[REQUIRED]**
 
@@ -52,4 +54,4 @@ RKIT-T-0098/0099. Final task; after: initiative → completed, bump 0.21.0, push
 
 ## Status Updates **[REQUIRED]**
 
-*To be added during implementation*
+- 2026-08-17: T-0099 committed (adapter-backed proposeRewrite, template/insertion/truncation/fabricated-target deleted, grounding guard w/ token-based added-content detection + allowed-set check, responsive-design regression, volatile-evidence key stabilization, validateChange-compatible ops; gates 515/smoke/verify green; driver probed missing-target typed error). Codex launched on the close-out: deterministic voice/length post-checks, prohibited-addition defense-in-depth, TEST_SPEC reason fix + constraint assertions, mutation probes.

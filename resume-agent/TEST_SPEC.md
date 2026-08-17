@@ -103,10 +103,20 @@ Non-fixture interview goldens:
 
 - Accept context containing original text, allowed facts, job terminology, requirements, prohibited additions, and length/voice constraints.
 - Return `ResumeChangeOperation` proposals only.
-- Include candidate text, facts used, requirements targeted, terminology changes, and uncertainty where applicable.
+- Include candidate text (`before`/`after`), facts used (`factIds`/`linked_fact_ids`), requirements targeted (`requirementIds`/`linked_requirement_ids`), non-empty `reason`, provenance, grounding map entries, model confidence, and uncertainty where applicable.
 - Propose responsive terminology alignment without unsupported scope.
 - Propose API-design emphasis only when verified facts support it.
 - Propose AWS/GraphQL additions only where supplied verified facts and selection rules allow.
+
+Grounding, DTO, and constraint battery:
+
+- Rewrite DTO shape: `test_rewrite_proposals_are_resume_change_operations_grounded_in_allowed_facts` asserts emitted operations include in-enum verbs, target path, facts, requirements, provenance, `reason`, confidence, grounding, and proposed status. `test_rewrite_schema_enforces_operation_verb_reason_and_provenance_array` asserts malformed verbs, empty `reason`, and missing provenance fail schema validation.
+- Fact-mapping grounding: `test_rewrite_golden_fixture_is_api_fact_only_with_full_grounding_map` asserts every added API term is mapped to an allowed fact. `test_rewrite_grounding_post_guard_rejects_missing_added_term_map_entry` rejects schema-valid output whose added GraphQL term lacks a grounding map entry. `test_rewrite_grounding_post_guard_rejects_out_of_allowed_fact_id` rejects output that cites a fact id outside the supplied allowed set.
+- Audit counterexample: `test_api_fact_only_rewrite_never_adds_responsive_design` asserts an API-fact-only rewrite does not add responsive design.
+- Voice constraints: `test_rewrite_constraint_fixture_carries_voice_and_length_inputs` asserts the constraint-carrying golden includes voice input, and `test_rewrite_voice_constraint_post_check_rejects_present_tense_fixture` asserts a past-tense request rejects a present-tense leading verb with a typed constraint error.
+- Length constraints: `test_rewrite_constraint_fixture_carries_voice_and_length_inputs` asserts the passing golden stays within `max_chars`, and `test_rewrite_length_constraint_post_check_rejects_over_limit_fixture_without_truncation` asserts over-limit generated text is rejected with a typed constraint error rather than shortened.
+- Prohibited additions: `test_rewrite_prompt_asset_uses_id_at_version_convention` asserts the prompt contract carries `prohibited_additions`; `test_rewrite_prohibited_addition_post_check_rejects_grounded_banned_term_fixture` asserts a grounded but prohibited added term is rejected with a typed constraint error naming the term.
+- Deleted legacy generation paths: `test_topic_substring_interpretation_and_service_list_are_deleted_from_production_code` asserts the template concatenation, insert-everything, and truncation idioms remain absent from production rewrite code.
 
 ### Forbidden proposals
 

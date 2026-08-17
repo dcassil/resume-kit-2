@@ -840,6 +840,11 @@ def proposeRewrite(context: dict[str, Any]) -> dict[str, Any]:
         return _adapter_error(completion)
 
     payload = completion.payload or {}
+    constraint_error = _rewrite_constraint_error(payload, request.input_payload)
+    if constraint_error:
+        _copy_adapter_metadata(constraint_error, completion)
+        return constraint_error
+
     guard_error = _rewrite_grounding_guard_error(payload, request.input_payload)
     if guard_error:
         _copy_adapter_metadata(guard_error, completion)
@@ -858,6 +863,172 @@ def _rewrite_adapter(context: dict[str, Any]) -> ModelAdapter:
     if injected is not None:
         return injected
     return DeterministicFakeAdapter(agent_config=require_agent_config(context))
+
+
+def _rewrite_constraint_error(payload: dict[str, Any], input_payload: dict[str, Any]) -> dict[str, Any]:
+    length_constraints = input_payload.get("length_constraints", {})
+    voice_constraints = input_payload.get("voice_constraints", {})
+    prohibited_additions = [
+        _clean_text(term) for term in input_payload.get("prohibited_additions", []) if _clean_text(term)
+    ]
+    violations: list[dict[str, Any]] = []
+    for index, operation in enumerate(payload.get("operations", [])):
+        if not isinstance(operation, dict):
+            continue
+        field_prefix = f"operations/{index}"
+        violations.extend(_rewrite_length_constraint_violations(operation, length_constraints, field_prefix))
+        violations.extend(_rewrite_voice_constraint_violations(operation, voice_constraints, field_prefix))
+        violations.extend(_rewrite_prohibited_addition_violations(operation, prohibited_additions, field_prefix))
+    if not violations:
+        return {}
+    return {
+        "status": "error",
+        "error": {
+            "type": "constraint_error",
+            "message": "Rewrite proposal failed deterministic constraint checks.",
+            "violations": violations,
+        },
+    }
+
+
+def _rewrite_length_constraint_violations(
+    operation: dict[str, Any],
+    length_constraints: Any,
+    field_prefix: str,
+) -> list[dict[str, Any]]:
+    if not isinstance(length_constraints, dict):
+        return []
+    max_chars = length_constraints.get("max_chars")
+    if not isinstance(max_chars, int) or max_chars < 0:
+        return []
+    after = _clean_text(operation.get("after"))
+    if len(after) <= max_chars:
+        return []
+    return [
+        {
+            "code": "length_max_chars_exceeded",
+            "message": "Rewrite after text exceeds the requested max_chars constraint.",
+            "severity": "error",
+            "field_path": f"{field_prefix}/after",
+            "details": {"max_chars": max_chars, "actual_chars": len(after)},
+        }
+    ]
+
+
+def _rewrite_voice_constraint_violations(
+    operation: dict[str, Any],
+    voice_constraints: Any,
+    field_prefix: str,
+) -> list[dict[str, Any]]:
+    if not isinstance(voice_constraints, dict):
+        return []
+    after = _clean_text(operation.get("after"))
+    violations: list[dict[str, Any]] = []
+
+    # Deterministic checks: max_chars, prohibited lexical additions, explicit
+    # first-person pronouns, and a small leading-present-tense verb heuristic.
+    # Model-trusted checks: style/tone, non-leading tense, and broader person
+    # adherence not reducible to explicit pronouns.
+    tense = _clean_text(voice_constraints.get("tense")).casefold().replace("_", "-")
+    if tense in {"past", "past-tense"}:
+        leading = _rewrite_leading_word(after)
+        if leading in _REWRITE_PRESENT_TENSE_LEADING_VERBS or leading.endswith("ing"):
+            violations.append(
+                {
+                    "code": "voice_tense_not_past",
+                    "message": "Rewrite after text appears to start with a present-tense verb despite a past-tense constraint.",
+                    "severity": "error",
+                    "field_path": f"{field_prefix}/after",
+                    "details": {"tense": "past", "leading_verb": leading},
+                }
+            )
+
+    person = _clean_text(voice_constraints.get("person")).casefold().replace("_", "-")
+    if person in {"third", "third-person", "third-person-implied", "first-person-implied"}:
+        pronouns = sorted(set(_REWRITE_FIRST_PERSON_PRONOUN_RE.findall(after.casefold())))
+        if pronouns:
+            code = "voice_person_first_person" if person.startswith("third") else "voice_person_explicit_pronoun"
+            violations.append(
+                {
+                    "code": code,
+                    "message": "Rewrite after text uses explicit first-person pronouns despite the requested person constraint.",
+                    "severity": "error",
+                    "field_path": f"{field_prefix}/after",
+                    "details": {"person": person, "pronouns": pronouns},
+                }
+            )
+
+    return violations
+
+
+def _rewrite_prohibited_addition_violations(
+    operation: dict[str, Any],
+    prohibited_additions: list[str],
+    field_prefix: str,
+) -> list[dict[str, Any]]:
+    before = _clean_text(operation.get("before"))
+    after = _clean_text(operation.get("after"))
+    violations: list[dict[str, Any]] = []
+    for term in prohibited_additions:
+        if _term_in_text(term, after) and not _term_in_text(term, before):
+            violations.append(
+                {
+                    "code": "prohibited_addition",
+                    "message": "Rewrite after text adds a prohibited term.",
+                    "severity": "error",
+                    "field_path": f"{field_prefix}/after",
+                    "details": {"term": term},
+                }
+            )
+    return violations
+
+
+def _rewrite_leading_word(value: str) -> str:
+    match = re.search(r"[A-Za-z]+", value)
+    return match.group(0).casefold() if match else ""
+
+
+_REWRITE_PRESENT_TENSE_LEADING_VERBS = {
+    "architect",
+    "architects",
+    "build",
+    "builds",
+    "collaborate",
+    "collaborates",
+    "coordinate",
+    "coordinates",
+    "create",
+    "creates",
+    "deliver",
+    "delivers",
+    "design",
+    "designs",
+    "develop",
+    "develops",
+    "drive",
+    "drives",
+    "implement",
+    "implements",
+    "improve",
+    "improves",
+    "lead",
+    "leads",
+    "maintain",
+    "maintains",
+    "manage",
+    "manages",
+    "own",
+    "owns",
+    "support",
+    "supports",
+    "use",
+    "uses",
+    "will",
+    "write",
+    "writes",
+}
+
+_REWRITE_FIRST_PERSON_PRONOUN_RE = re.compile(r"\b(i|me|my|mine|our|ours|us|we)\b")
 
 
 def _rewrite_grounding_guard_error(payload: dict[str, Any], input_payload: dict[str, Any]) -> dict[str, Any]:

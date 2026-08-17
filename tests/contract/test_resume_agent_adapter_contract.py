@@ -116,6 +116,28 @@ REWRITE_SEED_TEMPLATE = "resume-agent.rewrite-proposal@v1"
 REWRITE_SEED_KEY = "d898ee31dbf64bcb90f68b1f62120fbb421919dc0d1e1715a211e6ecc462f0bd"
 REWRITE_UNGROUNDED_KEY = "713064319164024237f6c2774b37c5708f40964418ea93e82ff626855ca8c315"
 REWRITE_CONSTRAINT_KEY = "b666300532211f6c9b04556d780c25b81ce44a5c2cc97138fd92be3dfc2e6452"
+REWRITE_VOICE_VIOLATION_KEY = "01beaa0c7453864bea14ffc8168c86a9751360860b31792a1cee9cecc6aacb76"
+REWRITE_LENGTH_VIOLATION_KEY = "a37c27267a497b3913d26c6fb25a3c48a57cef469540be4be00ac30a2497220a"
+REWRITE_PROHIBITED_ADDITION_KEY = "c86921879d410b346c7455d24dff4333c642e84ce26fc6d448ac3d653286aec9"
+
+REWRITE_API_FACT = {
+    "fact_id": "fact_api",
+    "text": "Designed REST API architecture for customer-facing SaaS products.",
+    "verification_state": "source_stated",
+    "evidence_id": "ev_api",
+}
+REWRITE_DOCS_FACT = {
+    "fact_id": "fact_docs",
+    "text": "Wrote concise API documentation for partner developers.",
+    "verification_state": "source_stated",
+    "evidence_id": "ev_docs",
+}
+REWRITE_GRAPHQL_FACT = {
+    "fact_id": "fact_graphql",
+    "text": "Designed GraphQL APIs for customer-facing products.",
+    "verification_state": "source_stated",
+    "evidence_id": "ev_graphql",
+}
 
 LEGACY_RESUME_FIXTURE = """
 Daniel Candidate
@@ -574,6 +596,9 @@ class ResumeAgentRewriteSchemaContractTests(unittest.TestCase):
             "resume-agent-rewrite-grounded-api-only",
             "resume-agent-rewrite-ungrounded-missing-map-entry",
             "resume-agent-rewrite-constraint-golden",
+            "resume-agent-rewrite-constraint-voice-violation",
+            "resume-agent-rewrite-constraint-length-violation",
+            "resume-agent-rewrite-prohibited-addition-grounded",
         ]:
             with self.subTest(fixture_id=fixture_id):
                 payload = _fixture_payload(fixture_id)
@@ -666,6 +691,9 @@ class ResumeAgentRewriteSchemaContractTests(unittest.TestCase):
 
         self.assertIn("Return only JSON", prompt)
         self.assertIn("grounding", prompt)
+        self.assertIn("voice_constraints", prompt)
+        self.assertIn("length_constraints", prompt)
+        self.assertIn("prohibited_additions", prompt)
 
     def test_rewrite_golden_fixture_is_api_fact_only_with_full_grounding_map(self):
         payload = _fixture_payload("resume-agent-rewrite-grounded-api-only")
@@ -700,6 +728,27 @@ class ResumeAgentRewriteSchemaContractTests(unittest.TestCase):
         self.assertLessEqual(len(operation["after"]), 140)
         self.assertEqual({entry["fact_id"] for entry in operation["grounding"]}, {"fact_api", "fact_docs"})
 
+    def test_rewrite_constraint_violation_fixtures_pin_checkable_failures(self):
+        cases = [
+            (
+                REWRITE_VOICE_VIOLATION_KEY,
+                {"voice_constraints": {"person": "first-person-implied", "tense": "past"}},
+                "Designs REST API architecture",
+            ),
+            (REWRITE_LENGTH_VIOLATION_KEY, {"length_constraints": {"max_chars": 70}}, "concise API documentation"),
+            (REWRITE_PROHIBITED_ADDITION_KEY, {"prohibited_additions": ["GraphQL"]}, "GraphQL APIs"),
+        ]
+
+        for key, expected_input, expected_after in cases:
+            with self.subTest(key=key):
+                fixture = json.loads((FAKE_FIXTURES / f"{key}.json").read_text(encoding="utf-8"))
+                canonical_input = json.loads(fixture["data"]["key"]["canonical_input_json"])
+                operation = fixture["data"]["payload"]["operations"][0]
+                for field, value in expected_input.items():
+                    self.assertEqual(canonical_input[field], value)
+                self.assertIn(expected_after, operation["after"])
+                self.assertTrue(operation["grounding"])
+
     def test_rewrite_fixtures_are_retrievable_by_deterministic_requests(self):
         contexts = [
             REWRITE_SEED_INPUT,
@@ -724,6 +773,33 @@ class ResumeAgentRewriteSchemaContractTests(unittest.TestCase):
                 "voice_constraints": {"tense": "past", "style": "concise", "person": "first-person-implied"},
                 "length_constraints": {"max_chars": 140},
                 "prohibited_additions": ["AWS", "GraphQL", "team leadership"],
+            },
+            {
+                "original_text": "Built web applications.",
+                "target_path": "/experience/0/bullets/0",
+                "allowed_facts": [REWRITE_API_FACT],
+                "requirement_ids": ["req_api"],
+                "voice_constraints": {"tense": "past", "person": "first-person-implied"},
+                "length_constraints": {"max_chars": 150},
+                "prohibited_additions": ["AWS", "GraphQL", "team leadership"],
+            },
+            {
+                "original_text": "Built web applications.",
+                "target_path": "/experience/0/bullets/0",
+                "allowed_facts": [REWRITE_API_FACT, REWRITE_DOCS_FACT],
+                "requirement_ids": ["req_api", "req_docs"],
+                "voice_constraints": {"tense": "past", "person": "first-person-implied"},
+                "length_constraints": {"max_chars": 70},
+                "prohibited_additions": ["AWS", "GraphQL", "team leadership"],
+            },
+            {
+                "original_text": "Built web applications.",
+                "target_path": "/experience/0/bullets/0",
+                "allowed_facts": [REWRITE_API_FACT, REWRITE_GRAPHQL_FACT],
+                "requirement_ids": ["req_api", "req_graphql"],
+                "voice_constraints": {},
+                "length_constraints": {"max_chars": 180},
+                "prohibited_additions": ["GraphQL"],
             },
         ]
         adapter = DeterministicFakeAdapter(fixture_dir=FAKE_FIXTURES)
