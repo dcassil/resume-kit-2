@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import copy
+import json
+import os
 import re
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from . import policy
@@ -58,6 +61,31 @@ SENSITIVE_ARGUMENT_KEYS = {
     "token",
     "transaction_result",
 }
+
+
+class JsonlAuditSink:
+    """Append-only callable audit sink for ``AuditEvent`` records.
+
+    The sink contract accepts either a callable ``sink(event)`` or a list-like
+    object with ``append(event)`` through ``emit_audit_event``. Read events are
+    exactly ``{"tool": str, "status": str}``. Mutation events contain
+    ``operation_id``, ``timestamp``, ``tool``, ``is_mutation``, ``status``,
+    ``args_redacted``, ``affected_fact_ids``, ``resulting_verification_state``,
+    ``conflict_flag``, and ``confirmation_required``; non-ok mutation events
+    also include ``error_type``. This sink writes one JSON object per line to a
+    caller-supplied path, opens the file in append mode for each event, flushes
+    and fsyncs the handle, and performs no work at import or construction time.
+    """
+
+    def __init__(self, path: str | Path) -> None:
+        self.path = Path(path)
+
+    def __call__(self, event: JsonObject) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with self.path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(event, sort_keys=True, separators=(",", ":")) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
 
 
 def default_operation_id() -> str:
@@ -168,6 +196,7 @@ def _error_type(result: JsonObject) -> str:
 
 __all__ = [
     "GENERIC_STORE_ERROR_MESSAGE",
+    "JsonlAuditSink",
     "PERSISTENCE_LEAK_PATTERNS",
     "build_audit_event",
     "default_operation_id",

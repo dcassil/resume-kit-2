@@ -4,14 +4,14 @@ level: task
 title: "JSONL sink option, sink contract docs, audit reconstruction E2E, TEST_SPEC coverage"
 short_code: "RKIT-T-0109"
 created_at: 2026-08-17T19:46:33.860201+00:00
-updated_at: 2026-08-17T19:46:33.860201+00:00
+updated_at: 2026-08-17T19:56:25.397434+00:00
 parent: implement-career-mcp-mutation
-blocked_by: ["RKIT-T-0108"]
+blocked_by: [RKIT-T-0108]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0013
 ## Objective
 
 Finish RKIT-I-0013 (R5/R6): an append-only JSONL sink option for CLI/host use, the sink contract documented as package surface for workflow's run-manifest consumption, and the executable reconstruction proof — from the audit stream ALONE, determine which facts changed and their resulting verification states — making TEST_SPEC.md:111-118's audit E2E line executable for the first time.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -53,4 +55,5 @@ Recommended Agent: opus + medium
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-17: Loaded task and Straight Jacket instructions. Verified current protected-file state: only the expected pre-existing `tools/resume_agent_guardrails.py` checksum mismatch. Inspected `career_mcp/audit.py`, `career_mcp.__init__`, `career-mcp/TEST_SPEC.md`, real-store mutation paths, and existing contract tests. Decision: document sink contract in TEST_SPEC and `JsonlAuditSink` docstring; defer manifest metadata because `tool_surface.json` has no natural audit-sink slot.
+- 2026-08-17: Implemented `JsonlAuditSink`, added an append-only JSONL sink contract test, added real-store audit reconstruction E2E including JSONL round trip/read-event guard/rejected verify guard, and updated `career-mcp/TEST_SPEC.md`. Focused checks passed: `python3 -m unittest tests.contract.test_career_mcp_contract.CareerMcpAuditContractTests` and `python3 -m unittest tests.e2e.test_career_mcp_audit_reconstruction_e2e`.

@@ -11,6 +11,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tests.e2e.test_career_mcp_audit_reconstruction_e2e import CareerMcpAuditReconstructionE2ETests  # bridge into gated contract module
+
 
 ROOT = Path(__file__).resolve().parents[2]
 SURFACE = json.loads((ROOT / "career-mcp" / "career_mcp" / "tool_surface.json").read_text(encoding="utf-8"))
@@ -1105,6 +1107,24 @@ class CareerMcpAuditContractTests(unittest.TestCase):
                     policy_decision=None,
                 )
                 self.assertEqual("is_mutation" in event, policy_module.tool_mutates(tool["name"]))
+
+    def test_jsonl_audit_sink_is_callable_append_only_jsonl(self):
+        career_mcp = importlib.import_module("career_mcp")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "audit" / "events.jsonl"
+            sink = career_mcp.audit.JsonlAuditSink(path)
+
+            sink({"tool": "career.search_facts", "status": "ok"})
+            sink({"tool": "career.get_fact", "status": "error"})
+
+            self.assertTrue(callable(sink))
+            self.assertEqual(
+                [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()],
+                [
+                    {"tool": "career.search_facts", "status": "ok"},
+                    {"tool": "career.get_fact", "status": "error"},
+                ],
+            )
 
 
 class CareerMcpRealStoreContractTests(unittest.TestCase):

@@ -74,12 +74,15 @@ Tests should treat MCP as an adapter with:
 - `call_tool` must have one audit emit site after handled result construction; covered by `test_call_tool_has_single_audit_emit_site`.
 - Read audit events must remain exactly `{tool, status}` for success and error results; covered by `test_read_audit_events_keep_exact_two_key_shape_for_success_and_error`.
 - Mutating audit events must carry the full RKIT-A-0002 item 5 shape with deterministic test seams for operation id and timestamp; covered by `test_successful_mutation_audit_event_has_exact_full_shape_without_error_type`.
+- AuditEvent field set: read events are exactly `{tool, status}`. Mutation events include `operation_id`, `timestamp`, `tool`, `is_mutation`, `status`, `args_redacted`, `affected_fact_ids`, `resulting_verification_state`, `conflict_flag`, and `confirmation_required`; non-ok mutation events additionally include `error_type`.
+- Sink semantics: `emit_audit_event` accepts either a callable `sink(event)` or a list-like sink with `append(event)`. `JsonlAuditSink` is a callable append-only JSONL sink for a caller-supplied path: one JSON object per line, append mode only, flushes the write, and has no import-time side effects; covered by `test_jsonl_audit_sink_is_callable_append_only_jsonl`.
 - Policy-rejected mutations must emit full mutation audit events with `is_mutation: true`, empty affected ids, `error_type: policy_error`, and `confirmation_required: true`; covered by `test_policy_rejected_mutation_emits_full_mutation_audit_event`.
 - Validation and store errors from mutating tools must converge through the same full audit shape without persistence details; covered by `test_validation_error_mutation_emits_full_mutation_audit_event` and `test_store_error_mutation_emits_full_event_without_persistence_details`.
 - Mutation metadata must come from the typed result envelope and policy decision, not a store re-query; covered by `test_mutating_tool_audit_metadata_is_fed_from_result_envelope`.
 - Audit argument redaction must reuse the envelope persistence scrub rules and strip sensitive/internal argument keys while preserving benign text; covered by `test_audit_redaction_strips_sensitive_argument_values_and_keeps_benign_message`.
 - Audit events must be JSON round-trippable and omit store-internal identifiers; covered by `test_audit_events_are_json_round_trippable_and_omit_store_internal_identifiers`.
 - Audit `is_mutation` must reuse the runtime policy manifest classification rather than a parallel tool list; covered by `test_audit_mutation_flag_reuses_policy_manifest_classification`.
+- The real-store audit stream must be sufficient, by itself, to reconstruct changed fact IDs and resulting verification states while ignored read events stay `{tool, status}`; covered by `test_audit_stream_reconstructs_changed_facts_and_states_without_store_access` and `test_jsonl_audit_sink_round_trip_reconstructs_changed_facts_and_states`.
 
 ### Search behavior
 
@@ -144,4 +147,4 @@ The E2E fixture must prove:
 - MCP search results align with store service results,
 - MCP supports targeted gap resolution,
 - verified facts learned through user answers are reusable,
-- audit can identify which MCP operations changed career knowledge.
+- audit can identify which MCP operations changed career knowledge; covered by `test_audit_stream_reconstructs_changed_facts_and_states_without_store_access` and `test_jsonl_audit_sink_round_trip_reconstructs_changed_facts_and_states`.

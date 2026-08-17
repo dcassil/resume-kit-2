@@ -4,14 +4,14 @@ level: task
 title: "AuditEvent shape, single emit site, envelope-fed mutation metadata, redaction"
 short_code: "RKIT-T-0108"
 created_at: 2026-08-17T19:46:33.789751+00:00
-updated_at: 2026-08-17T19:47:36.689563+00:00
+updated_at: 2026-08-17T19:56:25.044668+00:00
 parent: implement-career-mcp-mutation
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0013
 ## Objective
 
 Replace career-mcp's two-field `{tool, status}` audit payload with the full RKIT-A-0002 item 5 AuditEvent for every mutating call — including rejected and errored mutations — emitted from ONE site at the end of `call_tool`, with metadata read from the typed result envelope (never re-queried from the store) and arguments redacted through the shared strip rules. Reads stay minimal `{tool, status}`.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
