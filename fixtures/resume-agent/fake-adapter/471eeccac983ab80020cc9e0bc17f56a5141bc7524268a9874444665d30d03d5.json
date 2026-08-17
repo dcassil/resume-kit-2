@@ -1,0 +1,88 @@
+{
+  "fixture_id": "resume-agent-answer-interpretation-aws-affirmed-smoke",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Smoke RESOLVE_GAPS AWS answer is interpreted through the adapter.",
+    "Model confidence replaces the former unscored answer-interpretation placeholder."
+  ],
+  "comment": "Pinned to the CLI smoke AWS answer and generated question input.",
+  "data": {
+    "key": {
+      "sha256": "471eeccac983ab80020cc9e0bc17f56a5141bc7524268a9874444665d30d03d5",
+      "prompt_template_id": "resume-agent.answer-interpretation@v1",
+      "output_schema_id": "resume-agent.answer-interpretation.v1",
+      "canonical_input_json": "{\"answer_text\":\"Yes. I have about six years of AWS experience, mainly EC2, S3, Lambda, RDS, and IAM.\",\"question\":\"What AWS experience can you confirm for this requirement, including services used and production context?\",\"schema_id\":\"resume-agent.answer-interpretation.v1\",\"topic\":\"AWS\"}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.answer-interpretation.v1",
+      "proposal_type": "answer_interpretation",
+      "requires_validation": true,
+      "polarity": "affirmed",
+      "requirementResolutions": [
+        {
+          "requirement_id": "req_aws",
+          "suggested_state": "possible_match",
+          "confidence": 0.92,
+          "hedge_or_qualifier": "about six years",
+          "evidence": [
+            {
+              "evidence_id": "ev_answer_aws_affirmed_smoke",
+              "source_text": "Yes. I have about six years of AWS experience, mainly EC2, S3, Lambda, RDS, and IAM.",
+              "span": {
+                "start": 0,
+                "end": 86
+              }
+            }
+          ]
+        }
+      ],
+      "factProposals": [
+        {
+          "fact_id": "fact_aws_six_years_services",
+          "category": "skill",
+          "text": "About six years of AWS experience using EC2, S3, Lambda, RDS, and IAM",
+          "normalized_terms": [
+            "aws",
+            "six years",
+            "ec2",
+            "s3",
+            "lambda",
+            "rds",
+            "iam"
+          ],
+          "source_evidence_ids": [
+            "ev_answer_aws_affirmed_smoke"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_answer_aws_affirmed_smoke",
+              "source_text": "Yes. I have about six years of AWS experience, mainly EC2, S3, Lambda, RDS, and IAM.",
+              "span": {
+                "start": 0,
+                "end": 86
+              }
+            }
+          ],
+          "verification_state": "inferred",
+          "confidence": 0.92,
+          "hedge_or_qualifier": "about six years"
+        }
+      ],
+      "evidenceProposals": [
+        {
+          "evidence_id": "ev_answer_aws_affirmed_smoke",
+          "kind": "user_answer",
+          "text": "Yes. I have about six years of AWS experience, mainly EC2, S3, Lambda, RDS, and IAM.",
+          "span": {
+            "start": 0,
+            "end": 86
+          },
+          "confidence": 1.0
+        }
+      ],
+      "uncertainty": []
+    }
+  }
+}

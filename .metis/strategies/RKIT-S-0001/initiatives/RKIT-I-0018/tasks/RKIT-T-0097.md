@@ -4,14 +4,14 @@ level: task
 title: "interpretUserAnswer via adapter: section-8 schema, polarity + denied-claim post-guard, negation/persistence batteries — close-out"
 short_code: "RKIT-T-0097"
 created_at: 2026-08-17T16:59:31.475797+00:00
-updated_at: 2026-08-17T16:59:31.475797+00:00
+updated_at: 2026-08-17T17:13:15.776639+00:00
 parent: resume-agent-targeted-interview
-blocked_by: ["RKIT-T-0095", "RKIT-T-0096"]
+blocked_by: [RKIT-T-0095, RKIT-T-0096]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0018
 ## Objective **[REQUIRED]**
 
 Close the Honesty Gate violation: today "No, I have never used AWS professionally" produces a POSITIVE fact proposal "AWS experience" with suggested_state possible_match (audit refs __init__.py:594-601, :623-633 — no negation gating), interpretation only covers three topic substrings with a 7-item AWS list (:594-621, :595). After this task: `interpretUserAnswer` runs through the adapter emitting the section 8 schema for ARBITRARY topics; the model classifies polarity; a DETERMINISTIC post-validation guard rejects any payload containing a positive fact proposal for a claim classified as denied (belt and suspenders — the Honesty Gate cannot rest on the model alone). Denials produce an explicit-absence requirement resolution and ZERO positive fact proposals. Initiative close-out.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria **[REQUIRED]**
 
@@ -55,4 +57,4 @@ RKIT-T-0095/0096. Final task; after: initiative → completed, bump 0.20.0, push
 
 ## Status Updates **[REQUIRED]**
 
-*To be added during implementation*
+- 2026-08-17: T-0096 committed (verified-ids pre-filter before any model call, typed no-question short-circuit — driver probed full-overlap → question_needed:false with no adapter call; canned questions deleted; gates 486/smoke/verify green). Codex launched on the Honesty Gate close-out: adapter-backed interpretation, deterministic denied-claim post-guard, negation battery, hedge preservation, TEST_SPEC batteries.

@@ -1,0 +1,56 @@
+{
+  "fixture_id": "resume-agent-answer-interpretation-graphql-denied-havent",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Bare contraction denial yields explicit absence and no positive fact proposal."
+  ],
+  "comment": "Negation battery fixture for RKIT-T-0097.",
+  "data": {
+    "key": {
+      "sha256": "e6fad3e0e9585830a17ea9b0a7fcfb42f28eb87d5f15de9d6a03514656f1a21c",
+      "prompt_template_id": "resume-agent.answer-interpretation@v1",
+      "output_schema_id": "resume-agent.answer-interpretation.v1",
+      "canonical_input_json": "{\"answer_text\":\"I haven't\",\"question\":\"Have you built GraphQL APIs in production?\",\"schema_id\":\"resume-agent.answer-interpretation.v1\",\"topic\":\"GraphQL\"}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.answer-interpretation.v1",
+      "proposal_type": "answer_interpretation",
+      "requires_validation": true,
+      "polarity": "denied",
+      "requirementResolutions": [
+        {
+          "requirement_id": "req_graphql",
+          "suggested_state": "explicitly_missing",
+          "confidence": 0.94,
+          "hedge_or_qualifier": null,
+          "evidence": [
+            {
+              "evidence_id": "ev_answer_graphql_denied_havent",
+              "source_text": "I haven't",
+              "span": {
+                "start": 0,
+                "end": 10
+              }
+            }
+          ]
+        }
+      ],
+      "factProposals": [],
+      "evidenceProposals": [
+        {
+          "evidence_id": "ev_answer_graphql_denied_havent",
+          "kind": "user_answer",
+          "text": "I haven't",
+          "span": {
+            "start": 0,
+            "end": 10
+          },
+          "confidence": 1.0
+        }
+      ],
+      "uncertainty": []
+    }
+  }
+}

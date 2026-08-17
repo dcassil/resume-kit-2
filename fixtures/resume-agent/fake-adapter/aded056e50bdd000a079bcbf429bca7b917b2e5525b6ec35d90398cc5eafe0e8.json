@@ -1,0 +1,56 @@
+{
+  "fixture_id": "resume-agent-answer-interpretation-terraform-denied-school-only",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "School-only answer denies professional-use coverage and yields no positive fact proposal."
+  ],
+  "comment": "Negation battery fixture for RKIT-T-0097.",
+  "data": {
+    "key": {
+      "sha256": "aded056e50bdd000a079bcbf429bca7b917b2e5525b6ec35d90398cc5eafe0e8",
+      "prompt_template_id": "resume-agent.answer-interpretation@v1",
+      "output_schema_id": "resume-agent.answer-interpretation.v1",
+      "canonical_input_json": "{\"answer_text\":\"Only in school\",\"question\":\"What Terraform infrastructure-as-code experience do you have?\",\"schema_id\":\"resume-agent.answer-interpretation.v1\",\"topic\":\"Terraform\"}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.answer-interpretation.v1",
+      "proposal_type": "answer_interpretation",
+      "requires_validation": true,
+      "polarity": "denied",
+      "requirementResolutions": [
+        {
+          "requirement_id": "req_terraform",
+          "suggested_state": "explicitly_missing",
+          "confidence": 0.9,
+          "hedge_or_qualifier": "only in school",
+          "evidence": [
+            {
+              "evidence_id": "ev_answer_terraform_denied_school_only",
+              "source_text": "Only in school",
+              "span": {
+                "start": 0,
+                "end": 14
+              }
+            }
+          ]
+        }
+      ],
+      "factProposals": [],
+      "evidenceProposals": [
+        {
+          "evidence_id": "ev_answer_terraform_denied_school_only",
+          "kind": "user_answer",
+          "text": "Only in school",
+          "span": {
+            "start": 0,
+            "end": 14
+          },
+          "confidence": 1.0
+        }
+      ],
+      "uncertainty": []
+    }
+  }
+}

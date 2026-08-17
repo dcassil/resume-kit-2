@@ -183,7 +183,8 @@ def _resolve(workspace: Path, answer: str) -> JsonObject:
     match_result = _match(workspace)["match_result"]
     context = _resolution_context(match_result, _all_facts(workspace))
     question = generateClarificationQuestion(context)
-    interpretation = interpretUserAnswer(answer, context)
+    interpretation_context = {**context, "question": question.get("question")}
+    interpretation = interpretUserAnswer(answer, interpretation_context)
     store = openCareerStore(str(_paths(workspace)["career_db"]))
     stored_facts = []
     for proposal in _fact_proposals(interpretation, context):

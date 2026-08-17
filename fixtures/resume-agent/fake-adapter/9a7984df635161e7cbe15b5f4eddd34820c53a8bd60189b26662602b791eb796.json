@@ -1,0 +1,56 @@
+{
+  "fixture_id": "resume-agent-answer-interpretation-kubernetes-denied-not-professionally",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Professional-use denial yields explicit absence and no positive fact proposal."
+  ],
+  "comment": "Negation battery fixture for RKIT-T-0097.",
+  "data": {
+    "key": {
+      "sha256": "9a7984df635161e7cbe15b5f4eddd34820c53a8bd60189b26662602b791eb796",
+      "prompt_template_id": "resume-agent.answer-interpretation@v1",
+      "output_schema_id": "resume-agent.answer-interpretation.v1",
+      "canonical_input_json": "{\"answer_text\":\"Not professionally\",\"question\":\"Have you used Kubernetes professionally?\",\"schema_id\":\"resume-agent.answer-interpretation.v1\",\"topic\":\"Kubernetes\"}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.answer-interpretation.v1",
+      "proposal_type": "answer_interpretation",
+      "requires_validation": true,
+      "polarity": "denied",
+      "requirementResolutions": [
+        {
+          "requirement_id": "req_kubernetes",
+          "suggested_state": "explicitly_missing",
+          "confidence": 0.91,
+          "hedge_or_qualifier": "not professionally",
+          "evidence": [
+            {
+              "evidence_id": "ev_answer_kubernetes_denied_not_professionally",
+              "source_text": "Not professionally",
+              "span": {
+                "start": 0,
+                "end": 18
+              }
+            }
+          ]
+        }
+      ],
+      "factProposals": [],
+      "evidenceProposals": [
+        {
+          "evidence_id": "ev_answer_kubernetes_denied_not_professionally",
+          "kind": "user_answer",
+          "text": "Not professionally",
+          "span": {
+            "start": 0,
+            "end": 18
+          },
+          "confidence": 1.0
+        }
+      ],
+      "uncertainty": []
+    }
+  }
+}

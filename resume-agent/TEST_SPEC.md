@@ -65,15 +65,39 @@ Golden matrix and covering tests:
 - Avoid broad fishing expeditions.
 - Avoid asking again about facts already verified unless new specificity is required.
 
+Persistence battery and covering tests:
+
+- Partial verified-target filtering: `test_clarification_question_filters_verified_fact_targets_before_adapter_request` asserts verified fact ids are removed before the adapter request and never return in question proposals.
+- Fully verified-target short-circuit: `test_clarification_question_returns_no_question_without_adapter_when_all_fact_targets_verified` asserts no adapter call and no question when the selected fact target is already verified.
+- Adapter failure: `test_clarification_question_adapter_failure_returns_typed_error_without_canned_fallback` asserts a typed provider error and no fallback question.
+- Deleted canned questions: `test_canned_clarification_question_literals_are_deleted_from_production_code` asserts the legacy string table is absent from production code.
+
 ### Answer interpretation
 
-- Interpret AWS answer into fact/evidence proposals with about six years and listed AWS services.
-- Interpret GraphQL answer into verified-use proposals with around five years and production API context where supported.
-- Interpret architecture answer into architecture/API-design fact proposals and explicit non-Staff-title information.
-- Keep proposals structured.
-- Until RKIT-I-0018 adapter backing lands, any emitted confidence field is the explicit placeholder `unscored`, covered by `test_answer_interpretation_keeps_aws_six_years_as_proposal_not_final_verification`.
+- Interpret answers through the answer-interpretation adapter request builder and section-8 schema (`polarity`, `requirementResolutions`, `factProposals`, `evidenceProposals`).
+- Map adapter payloads into public proposal aliases while preserving canonical suggested states, model confidence, evidence links, `verification_state`, and `hedge_or_qualifier`.
+- Denied answers produce zero positive fact proposals and an explicit-absence requirement resolution (`explicitly_missing`); absence is a resolution concern, not a verification state.
+- A deterministic post-guard rejects a schema-valid adapter payload when `polarity == denied` still includes a positive fact proposal, returning a typed `schema_invalid` error with no partial interpretation.
+- Qualified answers preserve hedges and remain partial/hedged; they are never flattened into unqualified positives.
+- Arbitrary topics route through the adapter; production code must not reintroduce topic-substring interpretation or the hardcoded AWS service list.
 - Do not directly persist anything.
 - Do not mark verification final without store/core validation.
+
+Negation battery and covering tests:
+
+- Verified AWS defect regression: `test_verified_aws_denial_regression_emits_explicit_absence_without_positive_fact` covers fixture `resume-agent-answer-interpretation-aws-denial` for "No, I have never used AWS professionally".
+- Multiple denial phrasings: `test_answer_interpretation_negation_battery_denials_are_explicit_absence_only` covers `resume-agent-answer-interpretation-graphql-denied-havent`, `resume-agent-answer-interpretation-kubernetes-denied-not-professionally`, and `resume-agent-answer-interpretation-terraform-denied-school-only`.
+- Denied-positive post-guard: `test_answer_interpretation_denied_positive_fact_post_guard_blocks_payload` creates a deliberately inconsistent in-test fixture and asserts typed rejection.
+- Qualified hedge preservation: `test_answer_interpretation_qualified_graphql_preserves_hedge_and_partial_resolution` covers fixture `resume-agent-answer-interpretation-graphql-qualified`.
+- Non-fixture/arbitrary topic golden: `test_answer_interpretation_handles_arbitrary_terraform_topic_via_adapter` covers fixture `resume-agent-answer-interpretation-terraform-affirmed`.
+- Adapter failure: `test_answer_interpretation_adapter_failure_returns_typed_error_without_partial_interpretation` asserts no partial proposals on fixture miss.
+- Deleted legacy interpretation paths: `test_topic_substring_interpretation_and_service_list_are_deleted_from_production_code` asserts the old substring interpreter and AWS service-list snippets are absent.
+
+Non-fixture interview goldens:
+
+- ML-engineer resume and Python+Spark / GraphQL+API jobs exercise extraction with skills and requirements outside the original AWS/GraphQL/architecture canned set.
+- Terraform question+answer fixtures (`resume-agent-question-generation-terraform`, `resume-agent-answer-interpretation-terraform-affirmed`) prove interview support for an arbitrary topic selected by code.
+- The smoke AWS answer fixture `resume-agent-answer-interpretation-aws-affirmed-smoke` is pinned to the generated CLI question text used by `RESOLVE_GAPS`.
 
 ### Rewrite proposals
 

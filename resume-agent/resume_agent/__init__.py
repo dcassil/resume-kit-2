@@ -1,9 +1,9 @@
 """Public proposal surface for resume-agent.
 
-Extraction confidence and uncertainty are adapter-sourced. Clarification
-questions are adapter-phrased for code-selected targets. Answer-interpretation
-and rewrite helpers are deterministic placeholders until RKIT-I-0018/RKIT-I-0019
-adapter backing lands; any confidence they emit is explicitly marked unscored.
+Extraction, clarification-question, and answer-interpretation confidence and
+uncertainty are adapter-sourced. Rewrite helpers remain deterministic
+placeholders until RKIT-I-0019 adapter backing lands; any confidence they emit is
+explicitly marked unscored.
 """
 
 from __future__ import annotations
@@ -26,11 +26,10 @@ from ._agent_config import (
 )
 from ._extraction_requests import build_job_extraction_request, build_resume_extraction_request
 from ._fake_adapter import DeterministicFakeAdapter
-from ._interview_requests import build_question_request
+from ._interview_requests import build_answer_interpretation_request, build_question_request
 
 
 SCHEMA_VERSION = "resume-agent.proposal.v1"
-UNSCORED_CONFIDENCE = "unscored"
 
 _TERM_SUPPORT_VARIANTS = {
     "api architecture": ("api architecture", "api design", "rest api design", "rest apis"),
@@ -110,34 +109,6 @@ def _evidence(text: str, snippet: str, prefix: str) -> dict[str, Any]:
     }
 
 
-def _contains(text: str, pattern: str) -> bool:
-    return re.search(pattern, text, re.IGNORECASE) is not None
-
-
-def _proposal_fact(
-    text: str,
-    category: str,
-    terms: list[str],
-    evidence_id: str,
-    confidence: str = UNSCORED_CONFIDENCE,
-    extra: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    proposal = {
-        "fact_id": _stable_id("fact", f"{category}:{text}"),
-        "category": category,
-        "text": text,
-        "normalized_terms": terms,
-        "source_evidence_ids": [evidence_id],
-        "verification_state": "inferred",
-        "confidence": confidence,
-        "confidence_source": "placeholder_unscored",
-        "review_required": True,
-    }
-    if extra:
-        proposal.update(extra)
-    return proposal
-
-
 def _unique(values: list[str]) -> list[str]:
     seen: set[str] = set()
     unique_values: list[str] = []
@@ -177,14 +148,6 @@ def _context_snippets(context: dict[str, Any]) -> list[str]:
     if not isinstance(snippets, list):
         return []
     return [_clean_text(str(item)) for item in snippets if _clean_text(str(item))]
-
-
-def _mentioned_terms(text: str, terms: list[str]) -> list[str]:
-    found: list[str] = []
-    for term in terms:
-        if re.search(rf"\b{re.escape(term)}\b", text, re.IGNORECASE):
-            found.append(term)
-    return found
 
 
 def _is_blocked(value: str, blocked: list[str]) -> bool:
@@ -655,7 +618,7 @@ def _question_generation_adapter(context: dict[str, Any]) -> ModelAdapter:
 
 
 def interpretUserAnswer(answer: str, context: dict[str, Any]) -> dict[str, Any]:
-    """Interpret a user answer into structured proposals."""
+    """Interpret a user answer into adapter-sourced structured proposals."""
 
     text = _clean_text(answer)
     if not text:
@@ -668,100 +631,208 @@ def interpretUserAnswer(answer: str, context: dict[str, Any]) -> dict[str, Any]:
     if not selected or not topic:
         return _error("validation_error", "context must include requirement IDs and a topic.")
 
-    result = _base("answer_interpretation")
-    evidence_id = _stable_id("answer_ev", text)
-    topic_lower = topic.lower()
+    question = _interpretation_question(context, topic)
+    try:
+        request = build_answer_interpretation_request(question, text, topic)
+        adapter = _answer_interpretation_adapter(context)
+    except AgentConfigValidationError as exc:
+        return {"status": "error", "error": {"type": "schema_error", "message": str(exc), "violations": exc.errors}}
 
-    evidence = [
+    completion = adapter.complete(request)
+    if completion.status != "ok":
+        return _adapter_error(completion)
+
+    payload = completion.payload or {}
+    guard_error = _denied_positive_fact_guard_error(payload, topic, selected, completion)
+    if guard_error is not None:
+        return guard_error
+
+    return _answer_interpretation_payload_to_proposals(payload, selected, topic, question, completion)
+
+
+def _interpretation_question(context: dict[str, Any], topic: str) -> str:
+    for key in ("question", "question_text", "prompt"):
+        question = _clean_text(context.get(key))
+        if question:
+            return question
+    return f"What can you confirm about {topic}?"
+
+
+def _answer_interpretation_adapter(context: dict[str, Any]) -> ModelAdapter:
+    injected = context.get("_adapter")
+    if injected is not None:
+        return injected
+    return DeterministicFakeAdapter(agent_config=require_agent_config(context))
+
+
+def _denied_positive_fact_guard_error(
+    payload: dict[str, Any],
+    topic: str,
+    selected_requirement_ids: list[str],
+    completion: Any,
+) -> dict[str, Any] | None:
+    if payload.get("polarity") != "denied":
+        return None
+    fact_proposals = [item for item in payload.get("factProposals", []) if isinstance(item, dict)]
+    if not fact_proposals:
+        return None
+    violations = [
         {
-            "evidence_id": evidence_id,
-            "kind": "user_answer",
-            "text": text,
-            "selected_requirement_ids": selected,
+            "code": "denied_positive_fact_proposal",
+            "field_path": f"factProposals/{index}",
+            "message": "Denied answer interpretation emitted a positive fact proposal.",
+            "severity": "error",
+            "details": {
+                "topic": topic,
+                "selected_requirement_ids": selected_requirement_ids,
+                "fact_id": fact.get("fact_id"),
+            },
         }
+        for index, fact in enumerate(fact_proposals)
     ]
-    facts: list[dict[str, Any]] = []
-    relationships: list[dict[str, Any]] = []
-    resolutions: list[dict[str, Any]] = []
-    negatives: list[dict[str, Any]] = []
+    result = {
+        "status": "error",
+        "error": {
+            "type": "schema_invalid",
+            "message": "Denied answer interpretation failed the positive-claim guard.",
+            "violations": violations,
+            "details": {"reason": "denied_positive_fact_guard", "topic": topic},
+        },
+    }
+    _copy_adapter_metadata(result, completion)
+    return result
 
-    if "aws" in topic_lower:
-        services = _mentioned_terms(text, ["EC2", "S3", "Lambda", "RDS", "IAM", "CloudFront", "DynamoDB"])
-        fact_text = "AWS experience"
-        if services:
-            fact_text = f"{fact_text}, including {', '.join(services)}"
-        facts.append(_proposal_fact(fact_text, "skill", ["aws", *[service.lower() for service in services]], evidence_id))
-    elif "graphql" in topic_lower:
-        terms = ["graphql"]
-        if _contains(text, r"\bproduction\b"):
-            terms.append("production")
-        fact_text = "GraphQL API experience"
-        if "production" in terms:
-            fact_text = f"{fact_text}, production context"
-        facts.append(_proposal_fact(fact_text, "skill", terms, evidence_id))
-    elif "architecture" in topic_lower or "api" in topic_lower:
-        terms = ["architecture"]
-        if _contains(text, r"\bapis?\b"):
-            terms.append("api")
-        fact_text = "Architecture experience"
-        if "api" in terms:
-            fact_text = "API and application architecture experience"
-        facts.append(_proposal_fact(fact_text, "experience", terms, evidence_id))
 
-    if _contains(text, r"\bnot\b|\bhaven't\b|\bhave not\b|\bno\b"):
-        if _contains(text, r"\bstaff\b"):
-            negatives.append(
-                {
-                    "fact_id": _stable_id("negative", "staff-title"),
-                    "topic": "staff title",
-                    "text": "not a formal title",
-                    "source_evidence_ids": [evidence_id],
-                    "review_required": True,
-                }
-            )
-
-    for fact in facts:
-        relationships.append(
-            {
-                "relationship_id": _stable_id("rel", fact["fact_id"] + ":" + ",".join(selected)),
-                "fact_id": fact["fact_id"],
-                "requirement_ids": selected,
-                "relationship": "supports_review",
-            }
-        )
-
-    for requirement_id in selected:
-        resolutions.append(
-            {
-                "requirement_id": requirement_id,
-                "supporting_fact_ids": [fact["fact_id"] for fact in facts],
-                "suggested_state": "possible_match" if facts else "unknown",
-                "review_required": True,
-            }
-        )
-
+def _answer_interpretation_payload_to_proposals(
+    payload: dict[str, Any],
+    selected_requirement_ids: list[str],
+    topic: str,
+    question: str,
+    completion: Any,
+) -> dict[str, Any]:
+    result = _base("answer_interpretation")
+    facts = [_mapped_interpretation_fact(item) for item in payload.get("factProposals", []) if isinstance(item, dict)]
+    facts = [item for item in facts if item]
+    fact_ids = [str(fact["fact_id"]) for fact in facts if _clean_text(fact.get("fact_id"))]
+    resolutions = [
+        _mapped_requirement_resolution(item, fact_ids)
+        for item in payload.get("requirementResolutions", [])
+        if isinstance(item, dict)
+    ]
+    resolutions = [item for item in resolutions if item]
+    evidence = [
+        _mapped_answer_evidence(item, selected_requirement_ids)
+        for item in payload.get("evidenceProposals", [])
+        if isinstance(item, dict)
+    ]
+    evidence = [item for item in evidence if item]
+    relationships = [
+        {
+            "relationship_id": _stable_id("rel", f"{fact_id}:{','.join(selected_requirement_ids)}"),
+            "fact_id": fact_id,
+            "requirement_ids": selected_requirement_ids,
+            "relationship": "supports_review",
+        }
+        for fact_id in fact_ids
+    ]
     result.update(
         {
-            "outcome": _answer_outcome(text),
-            "proposals": facts + resolutions + negatives,
+            "status": "ok",
+            "outcome": payload.get("polarity"),
+            "polarity": payload.get("polarity"),
+            "question": question,
+            "topic": topic,
+            "proposals": facts + resolutions,
             "requirement_resolution_proposals": resolutions,
             "fact_proposals": facts,
             "evidence_proposals": evidence,
             "relationship_proposals": relationships,
-            "explicit_negative_facts": negatives,
+            "explicit_negative_facts": [],
+            "requirementResolutions": payload.get("requirementResolutions", []),
+            "factProposals": payload.get("factProposals", []),
+            "evidenceProposals": payload.get("evidenceProposals", []),
+            "uncertainty": payload.get("uncertainty", []),
+            "model_metadata": {
+                "adapter_id": getattr(completion, "adapter_id", None),
+                "adapter_version": getattr(completion, "adapter_version", None),
+                "model_id": getattr(completion, "model_id", None),
+            },
         }
     )
+    _copy_adapter_metadata(result, completion)
     return result
 
 
-def _answer_outcome(text: str) -> str:
-    affirmative = _contains(text, r"\b(yes|i have|i've|i used|built|designed|maintained|worked)\b")
-    denied = _contains(text, r"\b(incorrect|no|not|never|haven't|have not|did nothing|did not|don't|do not)\b")
-    if affirmative:
-        return "affirmed"
-    if denied:
-        return "denied"
-    return "unclear"
+def _mapped_interpretation_fact(item: dict[str, Any]) -> dict[str, Any]:
+    fact_id = _clean_text(item.get("fact_id"))
+    text = _clean_text(item.get("text"))
+    if not fact_id or not text:
+        return {}
+    confidence = item.get("confidence")
+    proposal = {
+        "fact_id": fact_id,
+        "category": _clean_text(item.get("category")) or "experience",
+        "text": text,
+        "normalized_terms": _unique([str(term) for term in item.get("normalized_terms", []) if _clean_text(str(term))]),
+        "source_evidence_ids": [str(evidence_id) for evidence_id in item.get("source_evidence_ids", []) if _clean_text(str(evidence_id))],
+        "evidence": [_answer_evidence_ref(evidence) for evidence in item.get("evidence", []) if isinstance(evidence, dict)],
+        "verification_state": item.get("verification_state"),
+        "confidence": confidence,
+        "model_confidence": confidence,
+        "hedge_or_qualifier": item.get("hedge_or_qualifier"),
+        "review_required": True,
+    }
+    return proposal
+
+
+def _mapped_requirement_resolution(item: dict[str, Any], supporting_fact_ids: list[str]) -> dict[str, Any]:
+    requirement_id = _clean_text(item.get("requirement_id"))
+    if not requirement_id:
+        return {}
+    confidence = item.get("confidence")
+    return {
+        "requirement_id": requirement_id,
+        "supporting_fact_ids": list(supporting_fact_ids),
+        "suggested_state": item.get("suggested_state"),
+        "confidence": confidence,
+        "model_confidence": confidence,
+        "hedge_or_qualifier": item.get("hedge_or_qualifier"),
+        "evidence": [_answer_evidence_ref(evidence) for evidence in item.get("evidence", []) if isinstance(evidence, dict)],
+        "review_required": True,
+    }
+
+
+def _mapped_answer_evidence(item: dict[str, Any], selected_requirement_ids: list[str]) -> dict[str, Any]:
+    evidence_id = _clean_text(item.get("evidence_id"))
+    text = _clean_text(item.get("text"))
+    if not evidence_id or not text:
+        return {}
+    return {
+        "evidence_id": evidence_id,
+        "kind": item.get("kind"),
+        "text": text,
+        "snippet": text,
+        "span": item.get("span"),
+        "confidence": item.get("confidence"),
+        "selected_requirement_ids": selected_requirement_ids,
+    }
+
+
+def _answer_evidence_ref(item: dict[str, Any]) -> dict[str, Any]:
+    source_text = _clean_text(item.get("source_text"))
+    return {
+        "evidence_id": _clean_text(item.get("evidence_id")),
+        "source_text": source_text,
+        "text": source_text,
+        "snippet": source_text,
+        "span": item.get("span"),
+    }
+
+
+def _copy_adapter_metadata(result: dict[str, Any], completion: Any) -> None:
+    for field in ["adapter_id", "adapter_version", "model_id", "runtime_config", "retries", "usage"]:
+        if hasattr(completion, field):
+            result[field] = getattr(completion, field)
 
 
 def proposeRewrite(context: dict[str, Any]) -> dict[str, Any]:

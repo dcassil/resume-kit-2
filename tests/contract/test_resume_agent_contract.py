@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import importlib
 import inspect
 import json
@@ -73,6 +74,39 @@ def maybe_await(value):
     return value
 
 
+def fixture_payload(fixture_id: str) -> dict:
+    for path in sorted((ROOT / "fixtures" / "resume-agent" / "fake-adapter").glob("*.json")):
+        fixture = json.loads(path.read_text(encoding="utf-8"))
+        if fixture.get("fixture_id") == fixture_id:
+            return fixture["data"]["payload"]
+    raise AssertionError(f"Missing fake adapter fixture {fixture_id}.")
+
+
+def _answer_interpretation_fixture_envelope(key_hash: str, request, payload: dict) -> dict:
+    return {
+        "fixture_id": "resume-agent-answer-interpretation-denied-guard-in-test",
+        "schema_version": "resume-agent.fake-adapter-fixture.v1",
+        "config_hash": "fixture-config-v1",
+        "reviewed": True,
+        "expected_observations": ["Deliberately inconsistent denied payload for post-guard coverage."],
+        "comment": "Temporary fixture created inside the public contract test.",
+        "data": {
+            "key": {
+                "sha256": key_hash,
+                "prompt_template_id": request.prompt_template_id,
+                "output_schema_id": request.output_schema_id,
+                "canonical_input_json": json.dumps(
+                    request.input_payload,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    ensure_ascii=False,
+                ),
+            },
+            "payload": payload,
+        },
+    }
+
+
 def load_agent_module(test_case: unittest.TestCase):
     try:
         module = importlib.import_module("resume_agent")
@@ -109,6 +143,17 @@ def assert_fact_proposals_have_verification_state(test_case: unittest.TestCase, 
             test_case.assertIn("verification_state", fact)
             test_case.assertIn(fact["verification_state"], allowed_states)
             test_case.assertEqual(fact["verification_state"], "inferred")
+
+
+def assert_answer_fact_proposals_have_model_confidence(test_case: unittest.TestCase, result: dict) -> None:
+    facts = result.get("fact_proposals", [])
+    test_case.assertTrue(facts)
+    for fact in facts:
+        with test_case.subTest(fact=fact.get("fact_id")):
+            test_case.assertIsInstance(fact.get("model_confidence"), (int, float))
+            test_case.assertEqual(fact.get("confidence"), fact.get("model_confidence"))
+            test_case.assertNotEqual(fact.get("confidence"), "unscored")
+            test_case.assertNotIn("confidence_source", fact)
 
 
 def assert_resume_fact_proposals_have_model_evidence(test_case: unittest.TestCase, result: dict) -> None:
@@ -469,11 +514,16 @@ class ResumeAgentProposalContractTests(unittest.TestCase):
                 self.assertNotIn(literal, source)
 
     def test_answer_interpretation_keeps_aws_six_years_as_proposal_not_final_verification(self):
-        context = {"selected_requirement_ids": ["req_aws"], "topic": "AWS"}
+        context = {
+            "selected_requirement_ids": ["req_aws"],
+            "topic": "AWS",
+            "question": "What AWS experience can you confirm for this requirement, including services used and production context?",
+        }
         answer = "Yes. I have about six years of AWS experience, mainly EC2, S3, Lambda, RDS, and IAM."
         result = maybe_await(self.agent.interpretUserAnswer(answer, context))
         assert_proposal_handoff(self, result, "answer_interpretation")
         assert_fact_proposals_have_verification_state(self, result)
+        assert_answer_fact_proposals_have_model_confidence(self, result)
         serialized = json.dumps(result, sort_keys=True).lower()
         self.assertIn("aws", serialized)
         self.assertRegex(serialized, r"\bsix\b|\b6\b")
@@ -482,33 +532,191 @@ class ResumeAgentProposalContractTests(unittest.TestCase):
         self.assertNotIn("ten years", serialized)
         self.assertNotIn("final_verification_state", serialized)
         self.assertNotIn("persisted", serialized)
-        for fact in result.get("fact_proposals", []):
-            self.assertEqual(fact.get("confidence"), "unscored")
-            self.assertEqual(fact.get("confidence_source"), "placeholder_unscored")
-            self.assertNotIn("model_confidence", fact)
 
-    def test_answer_interpretation_preserves_graphql_production_context(self):
-        context = {"selected_requirement_ids": ["req_graphql"], "topic": "GraphQL"}
-        answer = "Yes, around five years. I've built and maintained GraphQL APIs in production."
+    def test_verified_aws_denial_regression_emits_explicit_absence_without_positive_fact(self):
+        context = {
+            "selected_requirement_ids": ["req_aws"],
+            "topic": "AWS",
+            "question": "What AWS services have you used professionally?",
+        }
+        result = maybe_await(self.agent.interpretUserAnswer("No, I have never used AWS professionally", context))
+
+        assert_proposal_handoff(self, result, "answer_interpretation")
+        self.assertEqual(result.get("polarity"), "denied")
+        self.assertEqual(result.get("fact_proposals"), [])
+        self.assertEqual(result.get("requirement_resolution_proposals", [])[0].get("suggested_state"), "explicitly_missing")
+        self.assertEqual(result.get("requirement_resolution_proposals", [])[0].get("supporting_fact_ids"), [])
+
+    def test_answer_interpretation_negation_battery_denials_are_explicit_absence_only(self):
+        cases = [
+            (
+                "graphql_havent",
+                "I haven't",
+                {
+                    "selected_requirement_ids": ["req_graphql"],
+                    "topic": "GraphQL",
+                    "question": "Have you built GraphQL APIs in production?",
+                },
+            ),
+            (
+                "kubernetes_not_professionally",
+                "Not professionally",
+                {
+                    "selected_requirement_ids": ["req_kubernetes"],
+                    "topic": "Kubernetes",
+                    "question": "Have you used Kubernetes professionally?",
+                },
+            ),
+            (
+                "terraform_school_only",
+                "Only in school",
+                {
+                    "selected_requirement_ids": ["req_terraform"],
+                    "topic": "Terraform",
+                    "question": "What Terraform infrastructure-as-code experience do you have?",
+                },
+            ),
+        ]
+
+        for name, answer, context in cases:
+            with self.subTest(name=name):
+                result = maybe_await(self.agent.interpretUserAnswer(answer, context))
+                assert_proposal_handoff(self, result, "answer_interpretation")
+                self.assertEqual(result.get("polarity"), "denied")
+                self.assertEqual(result.get("fact_proposals"), [])
+                self.assertTrue(result.get("evidence_proposals"))
+                states = {item.get("suggested_state") for item in result.get("requirement_resolution_proposals", [])}
+                self.assertEqual(states, {"explicitly_missing"})
+
+    def test_answer_interpretation_denied_positive_fact_post_guard_blocks_payload(self):
+        from resume_agent._fake_adapter import DeterministicFakeAdapter, deterministic_fake_key
+        from resume_agent._interview_requests import build_answer_interpretation_request
+
+        answer = "No, I have never used AWS professionally"
+        context = {
+            "selected_requirement_ids": ["req_aws"],
+            "topic": "AWS",
+            "question": "What AWS services have you used professionally?",
+        }
+        request = build_answer_interpretation_request(context["question"], answer, context["topic"])
+        key_hash = deterministic_fake_key(request.prompt_template_id, request.output_schema_id, request.input_payload)
+        payload = fixture_payload("resume-agent-answer-interpretation-aws-denial")
+        inconsistent = copy.deepcopy(payload)
+        inconsistent["factProposals"] = [
+            {
+                "fact_id": "fact_aws_inconsistent_positive",
+                "category": "skill",
+                "text": "AWS professional experience",
+                "normalized_terms": ["aws"],
+                "source_evidence_ids": ["ev_answer_aws_denial"],
+                "evidence": [
+                    {
+                        "evidence_id": "ev_answer_aws_denial",
+                        "source_text": answer,
+                        "span": {"start": 0, "end": 40},
+                    }
+                ],
+                "verification_state": "inferred",
+                "confidence": 0.88,
+                "hedge_or_qualifier": None,
+            }
+        ]
+
+        with tempfile.TemporaryDirectory(prefix="resume-agent-denied-guard-") as temp:
+            fixture_dir = Path(temp)
+            fixture = _answer_interpretation_fixture_envelope(key_hash, request, inconsistent)
+            (fixture_dir / f"{key_hash}.json").write_text(json.dumps(fixture), encoding="utf-8")
+            result = maybe_await(
+                self.agent.interpretUserAnswer(answer, {**context, "_adapter": DeterministicFakeAdapter(fixture_dir=fixture_dir)})
+            )
+
+        self.assertEqual(result.get("status"), "error")
+        self.assertEqual(result.get("error", {}).get("type"), "schema_invalid")
+        self.assertEqual(result.get("error", {}).get("details", {}).get("reason"), "denied_positive_fact_guard")
+        self.assertNotIn("fact_proposals", result)
+        self.assertNotIn("proposals", result)
+
+    def test_answer_interpretation_qualified_graphql_preserves_hedge_and_partial_resolution(self):
+        context = {
+            "selected_requirement_ids": ["req_graphql"],
+            "topic": "GraphQL",
+            "question": "Have you built GraphQL APIs in production?",
+        }
+        answer = "Yes, but only internal tools"
         result = maybe_await(self.agent.interpretUserAnswer(answer, context))
         assert_proposal_handoff(self, result, "answer_interpretation")
         assert_fact_proposals_have_verification_state(self, result)
+        assert_answer_fact_proposals_have_model_confidence(self, result)
+        self.assertEqual(result.get("polarity"), "qualified")
+        resolution = result.get("requirement_resolution_proposals", [])[0]
+        fact = result.get("fact_proposals", [])[0]
+        self.assertEqual(resolution.get("suggested_state"), "possible_match")
+        self.assertEqual(resolution.get("hedge_or_qualifier"), "only internal tools")
+        self.assertEqual(fact.get("hedge_or_qualifier"), "only internal tools")
         serialized = json.dumps(result, sort_keys=True).lower()
         self.assertIn("graphql", serialized)
-        self.assertRegex(serialized, r"\bfive\b|\b5\b")
-        self.assertIn("production", serialized)
+        self.assertIn("internal tools", serialized)
 
     def test_answer_interpretation_records_architecture_without_staff_title_inflation(self):
-        context = {"selected_requirement_ids": ["req_architecture"], "topic": "architecture"}
-        answer = "I've designed APIs and application architecture for more than ten years, but I haven't had Staff Engineer as my formal title."
+        context = {
+            "selected_requirement_ids": ["req_api_architecture"],
+            "topic": "API architecture",
+            "question": "What API or application architecture have you designed?",
+        }
+        answer = "Yes, I designed REST API architecture for customer-facing SaaS products."
         result = maybe_await(self.agent.interpretUserAnswer(answer, context))
         assert_proposal_handoff(self, result, "answer_interpretation")
         assert_fact_proposals_have_verification_state(self, result)
+        assert_answer_fact_proposals_have_model_confidence(self, result)
         serialized = json.dumps(result, sort_keys=True).lower()
         self.assertIn("architecture", serialized)
         self.assertIn("api", serialized)
-        self.assertRegex(serialized, r"not.*staff|staff.*not|explicit_negative")
         self.assertNotIn("staff_title_employment_history", serialized)
+
+    def test_answer_interpretation_handles_arbitrary_terraform_topic_via_adapter(self):
+        context = {
+            "selected_requirement_ids": ["req_terraform"],
+            "topic": "Terraform",
+            "question": "What Terraform infrastructure-as-code experience do you have?",
+        }
+        answer = "I used Terraform to manage GCP infrastructure modules for internal platform environments."
+        result = maybe_await(self.agent.interpretUserAnswer(answer, context))
+
+        assert_proposal_handoff(self, result, "answer_interpretation")
+        assert_fact_proposals_have_verification_state(self, result)
+        assert_answer_fact_proposals_have_model_confidence(self, result)
+        serialized = json.dumps(result, sort_keys=True).lower()
+        self.assertIn("terraform", serialized)
+        self.assertIn("gcp infrastructure", serialized)
+
+    def test_answer_interpretation_adapter_failure_returns_typed_error_without_partial_interpretation(self):
+        context = {
+            "selected_requirement_ids": ["req_unpinned"],
+            "topic": "Unpinned answer topic",
+            "question": "What can you confirm about this unpinned answer topic?",
+        }
+        result = maybe_await(self.agent.interpretUserAnswer("Yes, I have done that.", context))
+
+        self.assertEqual(result.get("status"), "error")
+        self.assertEqual(result.get("error", {}).get("type"), "provider_error")
+        self.assertNotIn("fact_proposals", result)
+        self.assertNotIn("proposals", result)
+
+    def test_topic_substring_interpretation_and_service_list_are_deleted_from_production_code(self):
+        source = (ROOT / "resume-agent" / "resume_agent" / "__init__.py").read_text(encoding="utf-8")
+
+        deleted_fragments = [
+            "topic_lower",
+            "_mentioned_terms",
+            "\"CloudFront\"",
+            "\"DynamoDB\"",
+            "\"EC2\", \"S3\", \"Lambda\", \"RDS\", \"IAM\"",
+            "confidence_source",
+            "placeholder_unscored",
+        ]
+        for fragment in deleted_fragments:
+            with self.subTest(fragment=fragment):
+                self.assertNotIn(fragment, source)
 
     def test_rewrite_proposals_are_resume_change_operations_grounded_in_allowed_facts(self):
         context = {
@@ -576,6 +784,7 @@ from tests.contract.test_resume_agent_adapter_contract import (  # noqa: E402,F4
     ResumeAgentAdapterContractTests,
     ResumeAgentDeterministicFakeAdapterContractTests,
     ResumeAgentExtractionSchemaContractTests,
+    ResumeAgentInterviewSchemaContractTests,
     ResumeAgentSchemaValidatorContractTests,
 )
 
