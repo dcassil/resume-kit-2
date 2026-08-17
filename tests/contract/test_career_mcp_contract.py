@@ -27,6 +27,31 @@ STORE_RELATIONSHIP_TYPES = set(STORE_SURFACE["relationship_types"])
 STORE_RESOLUTION_STATES = set(STORE_SURFACE["resolution_states"])
 STORE_SURFACE_NAMES = {surface["name"] for surface in STORE_SURFACE["surfaces"]}
 FIXED_TIME = "2026-01-01T00:00:00Z"
+FIXED_OPERATION_ID = "00000000-0000-4000-8000-000000000108"
+MUTATION_AUDIT_KEYS = {
+    "operation_id",
+    "timestamp",
+    "tool",
+    "is_mutation",
+    "status",
+    "args_redacted",
+    "affected_fact_ids",
+    "resulting_verification_state",
+    "conflict_flag",
+    "confirmation_required",
+}
+STORE_INTERNAL_AUDIT_TOKENS = (
+    "raw_sql",
+    "transaction_result",
+    "normalized_terms_json",
+    "metadata_json",
+    "evidence_json",
+    "fact_ids_json",
+    "evidence_ids_json",
+    "merged_into_fact_id",
+    "sqlite_schema",
+    "schema_migrations",
+)
 
 
 def store_rejection(operation: str, fact_id: str, code: str, field_path: str, allowed_values: set[str] | None = None):
@@ -307,6 +332,16 @@ def call_tool(adapter, name: str, arguments: dict):
 
 def confirmed(arguments: dict) -> dict:
     return {**arguments, "confirmed": True}
+
+
+def audited_adapter(store=None, sink=None):
+    career_mcp = importlib.import_module("career_mcp")
+    return career_mcp.create_career_mcp(
+        store=store if store is not None else FakeCareerStore(),
+        audit_sink=sink if sink is not None else [],
+        operation_id_provider=lambda: FIXED_OPERATION_ID,
+        timestamp_provider=lambda: FIXED_TIME,
+    )
 
 
 def load_career_modules(test_case: unittest.TestCase):
@@ -838,6 +873,238 @@ class CareerMcpAdapterContractTests(unittest.TestCase):
         self.assertEqual(result["status"], "ok")
         self.assertTrue(result["facts"])
         self.assertTrue(all(fact["confirmation_required"] is False for fact in result["facts"]))
+
+
+class CareerMcpAuditContractTests(unittest.TestCase):
+    def test_call_tool_has_single_audit_emit_site(self):
+        career_mcp = importlib.import_module("career_mcp")
+        source = inspect.getsource(career_mcp.CareerMcpAdapter.call_tool)
+
+        self.assertEqual(source.count("self._record_audit("), 1)
+
+    def test_read_audit_events_keep_exact_two_key_shape_for_success_and_error(self):
+        sink: list[dict] = []
+        adapter = audited_adapter(sink=sink)
+
+        ok = call_tool(adapter, "career.search_facts", {"query": "React", "limit": 1})
+        error = call_tool(adapter, "career.get_fact", {"fact_id": "fact_missing"})
+
+        self.assertEqual(ok["status"], "ok")
+        self.assertEqual(error["status"], "error")
+        self.assertEqual(sink, [
+            {"tool": "career.search_facts", "status": "ok"},
+            {"tool": "career.get_fact", "status": "error"},
+        ])
+
+    def test_successful_mutation_audit_event_has_exact_full_shape_without_error_type(self):
+        sink: list[dict] = []
+        adapter = audited_adapter(sink=sink)
+
+        result = call_tool(
+            adapter,
+            "career.propose_fact",
+            confirmed({"type": "skill", "text": "Rust", "source": "agent_interpretation"}),
+        )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(len(sink), 1)
+        event = sink[0]
+        self.assertEqual(set(event), MUTATION_AUDIT_KEYS)
+        self.assertEqual(event["operation_id"], FIXED_OPERATION_ID)
+        self.assertEqual(event["timestamp"], FIXED_TIME)
+        self.assertEqual(event["tool"], "career.propose_fact")
+        self.assertTrue(event["is_mutation"])
+        self.assertEqual(event["status"], "ok")
+        self.assertEqual(event["affected_fact_ids"], [result["fact_id"]])
+        self.assertEqual(event["resulting_verification_state"], result["verification_state"])
+        self.assertFalse(event["conflict_flag"])
+        self.assertTrue(event["confirmation_required"])
+        self.assertEqual(json.loads(json.dumps(event)), event)
+
+    def test_policy_rejected_mutation_emits_full_mutation_audit_event(self):
+        sink: list[dict] = []
+        adapter = audited_adapter(sink=sink)
+
+        result = call_tool(
+            adapter,
+            "career.propose_fact",
+            {"type": "skill", "text": "AWS experience", "source": "agent_interpretation"},
+        )
+
+        self.assertEqual(result["status"], "rejected")
+        self.assertEqual(len(sink), 1)
+        event = sink[0]
+        self.assertEqual(set(event), MUTATION_AUDIT_KEYS | {"error_type"})
+        self.assertEqual(event["tool"], "career.propose_fact")
+        self.assertTrue(event["is_mutation"])
+        self.assertEqual(event["status"], "rejected")
+        self.assertEqual(event["affected_fact_ids"], [])
+        self.assertEqual(event["error_type"], "policy_error")
+        self.assertTrue(event["confirmation_required"])
+        self.assertEqual(event["resulting_verification_state"], "unknown")
+        self.assertEqual(json.loads(json.dumps(event)), event)
+
+    def test_validation_error_mutation_emits_full_mutation_audit_event(self):
+        sink: list[dict] = []
+        adapter = audited_adapter(sink=sink)
+
+        result = call_tool(
+            adapter,
+            "career.add_relationship",
+            {"from_fact_id": "fact_aws", "to_fact_id": "fact_azure", "relationship_type": "sibling"},
+        )
+
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(len(sink), 1)
+        event = sink[0]
+        self.assertEqual(set(event), MUTATION_AUDIT_KEYS | {"error_type"})
+        self.assertEqual(event["tool"], "career.add_relationship")
+        self.assertTrue(event["is_mutation"])
+        self.assertEqual(event["affected_fact_ids"], [])
+        self.assertEqual(event["error_type"], "validation_error")
+        self.assertTrue(event["confirmation_required"])
+
+    def test_store_error_mutation_emits_full_event_without_persistence_details(self):
+        class RaisingStore(FakeCareerStore):
+            def upsertFact(self, fact: dict, evidence=None, source=None, policy=None, dedupe_key=None):
+                self.calls.append(("upsertFact", {"fact": fact, "evidence": evidence, "source": source, "policy": policy}))
+                raise RuntimeError("UNIQUE constraint failed: facts.fact_id")
+
+        sink: list[dict] = []
+        adapter = audited_adapter(store=RaisingStore(), sink=sink)
+
+        result = call_tool(
+            adapter,
+            "career.propose_fact",
+            confirmed({"type": "skill", "text": "Rust", "source": "agent_interpretation"}),
+        )
+
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(result["error"]["message"], "Career store operation failed.")
+        event = sink[0]
+        self.assertEqual(set(event), MUTATION_AUDIT_KEYS | {"error_type"})
+        self.assertEqual(event["error_type"], "store_error")
+        serialized = json.dumps(event, sort_keys=True).lower()
+        self.assertNotRegex(serialized, r"\b(sqlite|select|insert|update|delete|traceback|constraint|facts\.fact_id)\b")
+
+    def test_mutating_tool_audit_metadata_is_fed_from_result_envelope(self):
+        cases = [
+            (
+                "career.propose_fact",
+                confirmed({"type": "skill", "text": "Rust", "source": "agent_interpretation"}),
+                None,
+            ),
+            (
+                "career.add_evidence",
+                confirmed({"fact_id": "fact_aws", "evidence": {"source": "user_answer", "text": "AWS evidence"}}),
+                None,
+            ),
+            (
+                "career.verify_fact",
+                confirmed({
+                    "fact_id": "fact_aws",
+                    "verification_state": "user_verified",
+                    "confirmation": {
+                        "factId": "fact_aws",
+                        "outcome": "affirmed",
+                        "provenance": [{"source": "user_answer", "text": "Yes, six years."}],
+                    },
+                }),
+                None,
+            ),
+            (
+                "career.add_relationship",
+                confirmed({"from_fact_id": "fact_aws", "to_fact_id": "fact_azure", "relationship_type": "related"}),
+                ["fact_aws", "fact_azure"],
+            ),
+        ]
+
+        for tool, arguments, expected_ids in cases:
+            with self.subTest(tool=tool):
+                sink: list[dict] = []
+                adapter = audited_adapter(sink=sink)
+
+                result = call_tool(adapter, tool, arguments)
+
+                self.assertEqual(result["status"], "ok", result)
+                self.assertEqual(len(sink), 1)
+                event = sink[0]
+                self.assertEqual(event["affected_fact_ids"], expected_ids or result["affected_fact_ids"])
+                self.assertEqual(event["resulting_verification_state"], result["verification_state"])
+                self.assertEqual(event["conflict_flag"], bool(result["conflicts"]))
+                self.assertEqual(event["confirmation_required"], result["confirmation_required"])
+
+    def test_audit_redaction_strips_sensitive_argument_values_and_keeps_benign_message(self):
+        sink: list[dict] = []
+        adapter = audited_adapter(sink=sink)
+        secret = "planted-secret-value-0108"
+        benign = "benign plain message survives verbatim"
+
+        result = call_tool(
+            adapter,
+            "career.propose_fact",
+            confirmed({
+                "type": "skill",
+                "text": "Rust",
+                "source": "agent_interpretation",
+                "evidence": {
+                    "source": "user_answer",
+                    "text": benign,
+                    "contact_data": secret,
+                    "raw_sql": f"select * from facts where secret = '{secret}'",
+                },
+            }),
+        )
+
+        self.assertEqual(result["status"], "ok")
+        serialized = json.dumps(sink[0], sort_keys=True)
+        self.assertNotIn(secret, serialized)
+        self.assertNotIn("contact_data", serialized)
+        self.assertNotIn("raw_sql", serialized)
+        self.assertIn(benign, serialized)
+
+    def test_audit_events_are_json_round_trippable_and_omit_store_internal_identifiers(self):
+        sink: list[dict] = []
+        adapter = audited_adapter(sink=sink)
+
+        call_tool(
+            adapter,
+            "career.propose_fact",
+            confirmed({
+                "type": "skill",
+                "text": "Rust",
+                "source": "agent_interpretation",
+                "evidence": {
+                    "source": "user_answer",
+                    "text": "plain evidence",
+                    "transaction_result": {"raw_sql": "select * from facts"},
+                },
+            }),
+        )
+
+        event = sink[0]
+        self.assertEqual(json.loads(json.dumps(event)), event)
+        serialized = json.dumps(event, sort_keys=True).lower()
+        for token in STORE_INTERNAL_AUDIT_TOKENS:
+            with self.subTest(token=token):
+                self.assertNotIn(token, serialized)
+
+    def test_audit_mutation_flag_reuses_policy_manifest_classification(self):
+        career_mcp = importlib.import_module("career_mcp")
+        policy_module = importlib.import_module("career_mcp.policy")
+
+        for tool in SURFACE["tools"]:
+            with self.subTest(tool=tool["name"]):
+                result = {"tool": tool["name"], "status": "ok"}
+                event = career_mcp.audit.build_audit_event(
+                    tool=tool["name"],
+                    result=result,
+                    arguments={},
+                    operation_id=FIXED_OPERATION_ID,
+                    timestamp=FIXED_TIME,
+                    policy_decision=None,
+                )
+                self.assertEqual("is_mutation" in event, policy_module.tool_mutates(tool["name"]))
 
 
 class CareerMcpRealStoreContractTests(unittest.TestCase):

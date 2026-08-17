@@ -19,7 +19,7 @@ from career_store import (
     VERIFICATION_TRANSITION_MATRIX,
 )
 
-from . import policy
+from . import audit, policy
 
 
 JsonObject = dict[str, Any]
@@ -31,29 +31,9 @@ class StoreContractError(Exception):
 ERROR_TYPES = {"validation_error", "policy_error", "not_found", "store_error", "unknown_tool"}
 REJECTION_STATUSES = {"error", "rejected"}
 NOT_FOUND_REASON_CODES = {"not_found", "unknown_fact_id"}
-GENERIC_STORE_ERROR_MESSAGE = "Career store operation failed."
+GENERIC_STORE_ERROR_MESSAGE = audit.GENERIC_STORE_ERROR_MESSAGE
 UNVERIFIED_VERIFICATION_STATES = ("unknown", "inferred")
-SQL_IDENTIFIER_PATTERN = r'(?:[A-Za-z_][A-Za-z0-9_]*|"[^"]+"|`[^`]+`|\[[^\]]+\])'
-PERSISTENCE_LEAK_PATTERNS = (
-    re.compile(r"\b" + "insert" + r"\s+" + "into" + r"\b", re.IGNORECASE),
-    re.compile(r"\b" + "update" + r"\s+" + SQL_IDENTIFIER_PATTERN + r"\s+" + "set" + r"\b", re.IGNORECASE),
-    re.compile(r"\b" + "delete" + r"\s+" + "from" + r"\b", re.IGNORECASE),
-    re.compile(r"\b" + "select" + r"\b[\s\S]{0,240}?\b" + "from" + r"\b", re.IGNORECASE),
-    re.compile(r"\bsqlite3\.[A-Za-z_][A-Za-z0-9_.]*", re.IGNORECASE),
-    re.compile(r"\bsqlite(?:3)?\s+(?:OperationalError|IntegrityError|DatabaseError|ProgrammingError|Error)\b", re.IGNORECASE),
-    re.compile(r"\b(?:UNIQUE|FOREIGN\s+KEY|CHECK|NOT\s+NULL)\s+constraint\s+failed\b", re.IGNORECASE),
-    re.compile(r"\bno\s+such\s+(?:table|column)\b", re.IGNORECASE),
-    re.compile(
-        r"\b(?:facts|evidence|relationships|conflicts|interactions|migrations)\."
-        r"(?:[A-Za-z_][A-Za-z0-9_]*)\b",
-        re.IGNORECASE,
-    ),
-    re.compile(
-        r"\b(?:sqlite_schema|schema_migrations|fact_merges|job_matches|raw_sql|transaction_result|"
-        r"normalized_terms_json|metadata_json|evidence_json|fact_ids_json|evidence_ids_json|merged_into_fact_id)\b",
-        re.IGNORECASE,
-    ),
-)
+PERSISTENCE_LEAK_PATTERNS = audit.PERSISTENCE_LEAK_PATTERNS
 POLICY_REASON_CODES = {
     "confirmation_required",
     "disallowed_verification_transition",
@@ -94,10 +74,19 @@ HANDLER_BY_TOOL = {
 class CareerMcpAdapter:
     """Narrow tool adapter over an injected career-store service."""
 
-    def __init__(self, store: Any, policy: JsonObject | None = None, audit_sink: Any = None) -> None:
+    def __init__(
+        self,
+        store: Any,
+        policy: JsonObject | None = None,
+        audit_sink: Any = None,
+        operation_id_provider: Any = audit.default_operation_id,
+        timestamp_provider: Any = audit.default_timestamp_utc,
+    ) -> None:
         self._store = store
         self._policy = policy or {}
         self._audit_sink = audit_sink
+        self._operation_id_provider = operation_id_provider
+        self._timestamp_provider = timestamp_provider
         self._tools = _load_tools()
         self._tool_by_name = {tool["name"]: tool for tool in self._tools}
 
@@ -105,45 +94,49 @@ class CareerMcpAdapter:
         return [dict(tool) for tool in self._tools]
 
     async def call_tool(self, name: str, arguments: JsonObject | None) -> JsonObject:
+        operation_id = self._operation_id_provider()
+        timestamp = self._timestamp_provider()
+        arguments = arguments or {}
+        policy_decision: policy.PolicyDecision | None = None
+        if name in self._tool_by_name:
+            confirmed = bool(arguments.get("confirmed", False))
+            policy_decision = policy.evaluate_policy(name, arguments, confirmed=confirmed)
+
         if name not in self._tool_by_name:
             result = _tool_result(name, "error", error={"type": "unknown_tool", "message": "Unknown career tool."})
-            self._record_audit(name, result)
-            return result
-        arguments = arguments or {}
-        validation_error = _validate(arguments, self._tool_by_name[name]["input_schema"])
-        if validation_error:
-            result = _tool_result(name, "error", error={"type": "validation_error", "message": validation_error})
-            self._record_audit(name, result)
-            return result
-        _assert_consumed_arguments(name, arguments)
-        confirmed = bool(arguments.get("confirmed", False))
-        policy_decision = policy.evaluate_policy(name, arguments, confirmed=confirmed)
-        if not policy_decision.allowed:
-            result = _tool_result(
-                name,
-                "rejected",
-                data={
-                    "confirmation_required": policy_decision.requires_confirmation,
-                    "confirmed": confirmed,
-                },
-                error={
-                    "type": "policy_error",
-                    "reason": policy_decision.reason,
-                    "message": policy_decision.reason or "Policy rejected career tool call.",
-                },
-            )
-            self._record_audit(name, result)
-            return result
-        try:
-            handler = getattr(self, HANDLER_BY_TOOL[name])
-            payload = await handler(name, arguments)
-            result = _normalize_tool_result(name, payload)
-            _apply_policy_decision(result, policy_decision, confirmed=confirmed)
-        except AssertionError:
-            raise
-        except Exception as exc:
-            result = _tool_result(name, "error", error={"type": _exception_type(exc), "message": _safe_message(exc)})
-        self._record_audit(name, result)
+        else:
+            validation_error = _validate(arguments, self._tool_by_name[name]["input_schema"])
+            if validation_error:
+                result = _tool_result(name, "error", error={"type": "validation_error", "message": validation_error})
+            else:
+                _assert_consumed_arguments(name, arguments)
+                confirmed = bool(arguments.get("confirmed", False))
+                assert policy_decision is not None
+                if not policy_decision.allowed:
+                    result = _tool_result(
+                        name,
+                        "rejected",
+                        data={
+                            "confirmation_required": policy_decision.requires_confirmation,
+                            "confirmed": confirmed,
+                        },
+                        error={
+                            "type": "policy_error",
+                            "reason": policy_decision.reason,
+                            "message": policy_decision.reason or "Policy rejected career tool call.",
+                        },
+                    )
+                else:
+                    try:
+                        handler = getattr(self, HANDLER_BY_TOOL[name])
+                        payload = await handler(name, arguments)
+                        result = _normalize_tool_result(name, payload)
+                        _apply_policy_decision(result, policy_decision, confirmed=confirmed)
+                    except AssertionError:
+                        raise
+                    except Exception as exc:
+                        result = _tool_result(name, "error", error={"type": _exception_type(exc), "message": _safe_message(exc)})
+        self._record_audit(name, result, arguments, operation_id, timestamp, policy_decision)
         return result
 
     def _surface(self, tool: str) -> Any:
@@ -232,7 +225,7 @@ class CareerMcpAdapter:
                 policy=self._policy,
             )
         )
-        return _mutation(value)
+        return _mutation(value, affected_fact_ids=[arguments["from_fact_id"], arguments["to_fact_id"]])
 
     async def _handle_matching(self, tool: str, arguments: JsonObject) -> JsonObject:
         value = await _maybe_await(self._surface(tool)(arguments["requirements"], policy=self._policy))
@@ -262,18 +255,40 @@ class CareerMcpAdapter:
         facts = sorted(facts_by_id.values(), key=lambda fact: str(fact.get("fact_id", "")))[:limit]
         return {"status": "ok", "facts": [_unverified_fact(fact) for fact in facts]}
 
-    def _record_audit(self, name: str, result: JsonObject) -> None:
-        if self._audit_sink is None:
-            return
-        event = {"tool": name, "status": result.get("status")}
-        if callable(self._audit_sink):
-            self._audit_sink(event)
-        elif hasattr(self._audit_sink, "append"):
-            self._audit_sink.append(event)
+    def _record_audit(
+        self,
+        name: str,
+        result: JsonObject,
+        arguments: JsonObject,
+        operation_id: str,
+        timestamp: str,
+        policy_decision: policy.PolicyDecision | None,
+    ) -> None:
+        event = audit.build_audit_event(
+            tool=name,
+            result=result,
+            arguments=arguments,
+            operation_id=operation_id,
+            timestamp=timestamp,
+            policy_decision=policy_decision,
+        )
+        audit.emit_audit_event(self._audit_sink, event)
 
 
-def create_career_mcp(store: Any, policy: JsonObject | None = None, audit_sink: Any = None) -> CareerMcpAdapter:
-    return CareerMcpAdapter(store=store, policy=policy, audit_sink=audit_sink)
+def create_career_mcp(
+    store: Any,
+    policy: JsonObject | None = None,
+    audit_sink: Any = None,
+    operation_id_provider: Any = audit.default_operation_id,
+    timestamp_provider: Any = audit.default_timestamp_utc,
+) -> CareerMcpAdapter:
+    return CareerMcpAdapter(
+        store=store,
+        policy=policy,
+        audit_sink=audit_sink,
+        operation_id_provider=operation_id_provider,
+        timestamp_provider=timestamp_provider,
+    )
 
 
 async def _maybe_await(value: Any) -> Any:
@@ -480,18 +495,21 @@ def _evidence_summary(fact: JsonObject) -> list[JsonObject]:
     return summaries
 
 
-def _mutation(value: Any) -> JsonObject:
+def _mutation(value: Any, affected_fact_ids: list[str] | None = None) -> JsonObject:
     value = dict(value or {})
     status = "ok" if value.get("status") not in REJECTION_STATUSES else str(value.get("status"))
     error = _store_rejection_error(value) if status != "ok" else None
+    fact_id = str(value.get("fact_id", ""))
+    affected = affected_fact_ids if affected_fact_ids is not None else ([fact_id] if fact_id else [])
     payload = {
         "status": status,
         "mutation_status": value.get("mutation_status", value.get("status", "noop")),
-        "fact_id": value.get("fact_id", ""),
+        "fact_id": fact_id,
         "verification_state": value.get("verification_state", "unknown"),
         "conflicts": value.get("conflicts", []),
         "confirmation_required": bool(value.get("confirmation_required", False)),
         "audit": value.get("audit", {}),
+        "affected_fact_ids": [str(item) for item in affected if str(item)] if status == "ok" else [],
     }
     if error is not None:
         payload["error"] = error
@@ -679,9 +697,7 @@ def _exception_type(exc: Exception) -> str:
 
 
 def _safe_text_message(text: str) -> str:
-    if any(pattern.search(text) for pattern in PERSISTENCE_LEAK_PATTERNS):
-        return GENERIC_STORE_ERROR_MESSAGE
-    return text
+    return audit.safe_text_message(text)
 
 
 def _safe_message(exc: Exception) -> str:

@@ -39,6 +39,10 @@ def evaluate_policy(tool: str, arguments: JsonObject, confirmed: bool) -> Policy
     return PolicyDecision(allowed=True, requires_confirmation=True)
 
 
+def tool_mutates(tool: str) -> bool:
+    return bool(_tool_mutation_map().get(tool, False))
+
+
 def _tool_mutation_map() -> dict[str, bool]:
     global _TOOL_MUTATION_MAP
     if _TOOL_MUTATION_MAP is None:
@@ -52,4 +56,4 @@ def _tool_mutation_map() -> dict[str, bool]:
     return dict(_TOOL_MUTATION_MAP)
 
 
-__all__ = ["PolicyDecision", "evaluate_policy"]
+__all__ = ["PolicyDecision", "evaluate_policy", "tool_mutates"]

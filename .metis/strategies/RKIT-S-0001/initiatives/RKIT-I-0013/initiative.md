@@ -4,20 +4,20 @@ level: initiative
 title: "Implement Career-MCP Mutation Audit and Operation Traceability"
 short_code: "RKIT-I-0013"
 created_at: 2026-08-13T20:41:37.110612+00:00
-updated_at: 2026-08-13T20:41:37.110612+00:00
+updated_at: 2026-08-17T19:47:36.297608+00:00
 parent: resume-kit-2-full-product-buildout
-blocked_by: ["RKIT-I-0010"]
+blocked_by: [RKIT-I-0010]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/discovery"
+  - "#phase/active"
 
 
 exit_criteria_met: false
 estimated_complexity: M
 strategy_id: RKIT-S-0001
-initiative_id: NULL
+initiative_id: implement-career-mcp-mutation
 ---
 
 # Implement Career-MCP Mutation Audit and Operation Traceability Initiative

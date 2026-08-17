@@ -69,6 +69,18 @@ Tests should treat MCP as an adapter with:
 - The manifest must avoid permission-model vocabulary beyond the fact type enum value `role`; covered by `test_manifest_has_no_access_control_vocabulary_outside_fact_type_role`.
 - Any policy claim in `tool_surface.json` MUST have named executable tests; covered by `test_manifest_policy_statement_matches_runtime_confirmation_policy`, `test_manifest_policy_block_declares_exact_runtime_gated_tool_set`, `test_manifest_declared_gated_tools_reject_unconfirmed_minimal_valid_mutations`, and `test_manifest_has_no_access_control_vocabulary_outside_fact_type_role`.
 
+### Audit events
+
+- `call_tool` must have one audit emit site after handled result construction; covered by `test_call_tool_has_single_audit_emit_site`.
+- Read audit events must remain exactly `{tool, status}` for success and error results; covered by `test_read_audit_events_keep_exact_two_key_shape_for_success_and_error`.
+- Mutating audit events must carry the full RKIT-A-0002 item 5 shape with deterministic test seams for operation id and timestamp; covered by `test_successful_mutation_audit_event_has_exact_full_shape_without_error_type`.
+- Policy-rejected mutations must emit full mutation audit events with `is_mutation: true`, empty affected ids, `error_type: policy_error`, and `confirmation_required: true`; covered by `test_policy_rejected_mutation_emits_full_mutation_audit_event`.
+- Validation and store errors from mutating tools must converge through the same full audit shape without persistence details; covered by `test_validation_error_mutation_emits_full_mutation_audit_event` and `test_store_error_mutation_emits_full_event_without_persistence_details`.
+- Mutation metadata must come from the typed result envelope and policy decision, not a store re-query; covered by `test_mutating_tool_audit_metadata_is_fed_from_result_envelope`.
+- Audit argument redaction must reuse the envelope persistence scrub rules and strip sensitive/internal argument keys while preserving benign text; covered by `test_audit_redaction_strips_sensitive_argument_values_and_keeps_benign_message`.
+- Audit events must be JSON round-trippable and omit store-internal identifiers; covered by `test_audit_events_are_json_round_trippable_and_omit_store_internal_identifiers`.
+- Audit `is_mutation` must reuse the runtime policy manifest classification rather than a parallel tool list; covered by `test_audit_mutation_flag_reuses_policy_manifest_classification`.
+
 ### Search behavior
 
 - `career.search_facts` returns matching facts for React/API/responsive terms.
