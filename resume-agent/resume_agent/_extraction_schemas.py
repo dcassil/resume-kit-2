@@ -11,6 +11,7 @@ RESUME_EXTRACTION_SCHEMA_ID = "resume-agent.resume-extraction.v1"
 JOB_EXTRACTION_SCHEMA_ID = "resume-agent.job-extraction.v1"
 
 CONFIDENCE_SCHEMA: JsonObject = {"type": "number", "minimum": 0}
+UNCERTAINTY_SCHEMA: JsonObject = {"type": "object"}
 
 LINE_RANGE_SCHEMA: JsonObject = {
     "type": "object",
@@ -52,6 +53,7 @@ EXTRACTED_VALUE_SCHEMA: JsonObject = {
         "normalized": {"type": "string", "minLength": 1},
         "evidence": {"type": "array", "minItems": 1, "items": EVIDENCE_REF_SCHEMA},
         "confidence": CONFIDENCE_SCHEMA,
+        "uncertainty": UNCERTAINTY_SCHEMA,
     },
     "additionalProperties": False,
 }
@@ -65,6 +67,7 @@ SKILL_SCHEMA: JsonObject = {
         "normalized_terms": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
         "evidence": {"type": "array", "minItems": 1, "items": EVIDENCE_REF_SCHEMA},
         "confidence": CONFIDENCE_SCHEMA,
+        "uncertainty": UNCERTAINTY_SCHEMA,
     },
     "additionalProperties": False,
 }
@@ -77,6 +80,7 @@ HIGHLIGHT_SCHEMA: JsonObject = {
         "normalized_terms": {"type": "array", "items": {"type": "string", "minLength": 1}},
         "evidence": {"type": "array", "minItems": 1, "items": EVIDENCE_REF_SCHEMA},
         "confidence": CONFIDENCE_SCHEMA,
+        "uncertainty": UNCERTAINTY_SCHEMA,
     },
     "additionalProperties": False,
 }
@@ -92,6 +96,7 @@ EMPLOYMENT_SCHEMA: JsonObject = {
         "current": {"type": "boolean"},
         "evidence": {"type": "array", "minItems": 1, "items": EVIDENCE_REF_SCHEMA},
         "confidence": CONFIDENCE_SCHEMA,
+        "uncertainty": UNCERTAINTY_SCHEMA,
     },
     "additionalProperties": False,
 }
@@ -108,6 +113,7 @@ EXPERIENCE_SCHEMA: JsonObject = {
         "skills": {"type": "array", "items": {"type": "string", "minLength": 1}},
         "evidence": {"type": "array", "minItems": 1, "items": EVIDENCE_REF_SCHEMA},
         "confidence": CONFIDENCE_SCHEMA,
+        "uncertainty": UNCERTAINTY_SCHEMA,
     },
     "additionalProperties": False,
 }
@@ -122,6 +128,7 @@ EDUCATION_SCHEMA: JsonObject = {
         "graduation_date": {"type": ["string", "null"]},
         "evidence": {"type": "array", "minItems": 1, "items": EVIDENCE_REF_SCHEMA},
         "confidence": CONFIDENCE_SCHEMA,
+        "uncertainty": UNCERTAINTY_SCHEMA,
     },
     "additionalProperties": False,
 }
@@ -135,6 +142,7 @@ CERTIFICATION_SCHEMA: JsonObject = {
         "date": {"type": ["string", "null"]},
         "evidence": {"type": "array", "minItems": 1, "items": EVIDENCE_REF_SCHEMA},
         "confidence": CONFIDENCE_SCHEMA,
+        "uncertainty": UNCERTAINTY_SCHEMA,
     },
     "additionalProperties": False,
 }
@@ -148,6 +156,7 @@ PROJECT_SCHEMA: JsonObject = {
         "skills": {"type": "array", "items": {"type": "string", "minLength": 1}},
         "evidence": {"type": "array", "minItems": 1, "items": EVIDENCE_REF_SCHEMA},
         "confidence": CONFIDENCE_SCHEMA,
+        "uncertainty": UNCERTAINTY_SCHEMA,
     },
     "additionalProperties": False,
 }
@@ -182,6 +191,7 @@ REQUIREMENT_SCHEMA: JsonObject = {
         "domains": {"type": "array", "items": EXTRACTED_VALUE_SCHEMA},
         "evidence": {"type": "array", "minItems": 1, "items": EVIDENCE_REF_SCHEMA},
         "confidence": CONFIDENCE_SCHEMA,
+        "uncertainty": UNCERTAINTY_SCHEMA,
     },
     "additionalProperties": False,
 }
@@ -196,6 +206,7 @@ TERM_SCHEMA: JsonObject = {
         "weight": {"type": "number", "minimum": 0},
         "evidence": {"type": "array", "minItems": 1, "items": EVIDENCE_REF_SCHEMA},
         "confidence": CONFIDENCE_SCHEMA,
+        "uncertainty": UNCERTAINTY_SCHEMA,
     },
     "additionalProperties": False,
 }

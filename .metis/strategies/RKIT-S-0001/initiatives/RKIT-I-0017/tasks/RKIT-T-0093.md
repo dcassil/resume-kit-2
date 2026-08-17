@@ -4,14 +4,14 @@ level: task
 title: "Job extraction through ModelAdapter; fix unknown-skill drop and co-requirement deletion; classification proposals"
 short_code: "RKIT-T-0093"
 created_at: 2026-08-17T16:26:27.045942+00:00
-updated_at: 2026-08-17T16:43:58.166648+00:00
+updated_at: 2026-08-17T16:51:15.583267+00:00
 parent: resume-agent-model-based-resume
 blocked_by: [RKIT-T-0091, RKIT-T-0092]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0017
 ## Objective **[REQUIRED]**
 
 Rewire `extractJobSemantics` to the ModelAdapter and delete the closed job engine: `_requirement_concepts` 11-concept lexicon (audit refs __init__.py:247-262), the unknown-skill fallback that fires only when NO known concept matched (:268-269 — verified: "Python" silently vanished from "5+ years with Python, Spark..."), the req_api-deleted-when-req_graphql-matches hack (:266-267), hardcoded industries ['SaaS'] (:514), two-string domains (:515), six-word seniority regex (:513), comma-split title/company parsing (:434-441). Requirement-classification proposals (vision section 8) are part of job extraction output.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

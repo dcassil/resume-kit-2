@@ -284,7 +284,13 @@
               }
             }
           ],
-          "confidence": 0.94
+          "confidence": 0.94,
+          "uncertainty": {
+            "code": "preferred_scope_sparse",
+            "message": "Preferred Kubernetes requirement is source-grounded but the one-line source does not specify depth or environment.",
+            "source": "model",
+            "requires_review": true
+          }
         }
       ],
       "terminology": [
@@ -456,7 +462,16 @@
           }
         }
       ],
-      "uncertainty": [],
+      "uncertainty": [
+        {
+          "requirement_id": "req_kubernetes",
+          "code": "preferred_scope_sparse",
+          "message": "Preferred Kubernetes requirement is source-grounded but the one-line source does not specify depth or environment.",
+          "source_evidence_ids": [
+            "ev_python_spark_kubernetes"
+          ]
+        }
+      ],
       "metadata": {
         "fixture_source_id": "python-spark-golden-job"
       }

@@ -282,6 +282,30 @@ class ResumeAgentProposalContractTests(unittest.TestCase):
                 with self.subTest(source_id=source_id, skill=skill_name):
                     self.assertIn(skill_name, requirement_text)
 
+    def test_job_extraction_preserves_model_sourced_confidence_values(self):
+        result = maybe_await(self.agent.extractJobSemantics(PYTHON_SPARK_JOB, {"source_id": "python-spark-golden-job"}))
+        assert_proposal_handoff(self, result, "job_semantic_extraction")
+
+        by_id = {requirement.get("requirement_id"): requirement for requirement in result.get("requirement_proposals", [])}
+        self.assertEqual(by_id["req_python_spark_years"].get("confidence"), 0.94)
+        self.assertEqual(by_id["req_python_spark_years"].get("model_confidence"), 0.94)
+        self.assertIsInstance(by_id["req_python_spark_years"].get("confidence"), (int, float))
+
+    def test_job_extraction_surfaces_model_marked_uncertain_requirement(self):
+        result = maybe_await(self.agent.extractJobSemantics(PYTHON_SPARK_JOB, {"source_id": "python-spark-golden-job"}))
+        assert_proposal_handoff(self, result, "job_semantic_extraction")
+
+        by_id = {requirement.get("requirement_id"): requirement for requirement in result.get("requirement_proposals", [])}
+        kubernetes = by_id.get("req_kubernetes")
+        self.assertIsNotNone(kubernetes)
+        self.assertEqual(kubernetes.get("concept"), "Kubernetes")
+        self.assertEqual(kubernetes.get("uncertainty", {}).get("code"), "preferred_scope_sparse")
+        self.assertTrue(kubernetes.get("uncertainty", {}).get("requires_review"))
+        self.assertIn(
+            "req_kubernetes",
+            {item.get("requirement_id") for item in result.get("uncertainty", []) if isinstance(item, dict)},
+        )
+
     def test_job_extraction_public_goldens_preserve_co_required_concepts(self):
         python_spark = maybe_await(self.agent.extractJobSemantics(PYTHON_SPARK_JOB, {"source_id": "python-spark-golden-job"}))
         python_spark_text = json.dumps(python_spark.get("requirement_proposals", []), sort_keys=True).lower()
@@ -377,6 +401,10 @@ class ResumeAgentProposalContractTests(unittest.TestCase):
         self.assertNotIn("ten years", serialized)
         self.assertNotIn("final_verification_state", serialized)
         self.assertNotIn("persisted", serialized)
+        for fact in result.get("fact_proposals", []):
+            self.assertEqual(fact.get("confidence"), "unscored")
+            self.assertEqual(fact.get("confidence_source"), "placeholder_unscored")
+            self.assertNotIn("model_confidence", fact)
 
     def test_answer_interpretation_preserves_graphql_production_context(self):
         context = {"selected_requirement_ids": ["req_graphql"], "topic": "GraphQL"}

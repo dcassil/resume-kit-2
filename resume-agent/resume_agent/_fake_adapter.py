@@ -57,7 +57,7 @@ DEFAULT_FAKE_OUTPUT_SCHEMAS: JsonSchemaRegistry = {
                         "normalized_terms": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
                         "source_evidence_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
                         "verification_state": {"enum": list(MANIFEST_VERIFICATION_STATES)},
-                        "confidence": {"enum": ["low", "medium", "high"]},
+                        "confidence": {"type": "string", "minLength": 1},
                         "review_required": {"enum": [True]},
                     },
                     "additionalProperties": False,

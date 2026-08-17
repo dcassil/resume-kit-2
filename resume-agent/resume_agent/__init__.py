@@ -1,4 +1,10 @@
-"""Public proposal surface for resume-agent."""
+"""Public proposal surface for resume-agent.
+
+Extraction confidence and uncertainty are adapter-sourced. Clarification,
+answer-interpretation, and rewrite helpers are deterministic placeholders until
+RKIT-I-0018/RKIT-I-0019 adapter backing lands; any confidence they emit is
+explicitly marked unscored.
+"""
 
 from __future__ import annotations
 
@@ -23,6 +29,7 @@ from ._fake_adapter import DeterministicFakeAdapter
 
 
 SCHEMA_VERSION = "resume-agent.proposal.v1"
+UNSCORED_CONFIDENCE = "unscored"
 
 _TERM_SUPPORT_VARIANTS = {
     "api architecture": ("api architecture", "api design", "rest api design", "rest apis"),
@@ -111,7 +118,7 @@ def _proposal_fact(
     category: str,
     terms: list[str],
     evidence_id: str,
-    confidence: str = "medium",
+    confidence: str = UNSCORED_CONFIDENCE,
     extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     proposal = {
@@ -122,6 +129,7 @@ def _proposal_fact(
         "source_evidence_ids": [evidence_id],
         "verification_state": "inferred",
         "confidence": confidence,
+        "confidence_source": "placeholder_unscored",
         "review_required": True,
     }
     if extra:
@@ -333,6 +341,7 @@ def _append_model_fact(
     }
     if extra:
         proposal.update({key: value for key, value in extra.items() if value is not None})
+    _copy_model_uncertainty(proposal, item)
     facts.append(proposal)
 
 
@@ -454,12 +463,13 @@ def _model_requirement_to_proposal(item: dict[str, Any]) -> dict[str, Any]:
         "model_confidence": confidence,
         "review_required": True,
     }
+    _copy_model_uncertainty(proposal, item)
     return proposal
 
 
 def _requirement_classification_proposal(requirement: dict[str, Any]) -> dict[str, Any]:
     confidence = requirement.get("model_confidence")
-    return {
+    proposal = {
         "proposal_id": _stable_id(
             "req_class",
             ":".join(
@@ -479,6 +489,8 @@ def _requirement_classification_proposal(requirement: dict[str, Any]) -> dict[st
         "model_confidence": confidence,
         "requires_validation": True,
     }
+    _copy_model_uncertainty(proposal, requirement)
+    return proposal
 
 
 def _model_term_to_proposal(item: dict[str, Any]) -> dict[str, Any]:
@@ -489,7 +501,7 @@ def _model_term_to_proposal(item: dict[str, Any]) -> dict[str, Any]:
     if not surface or not canonical or not evidence:
         return {}
     confidence = item.get("confidence")
-    return {
+    proposal = {
         "surface": surface,
         "canonical": canonical,
         "source": item.get("source"),
@@ -499,6 +511,13 @@ def _model_term_to_proposal(item: dict[str, Any]) -> dict[str, Any]:
         "confidence": confidence,
         "model_confidence": confidence,
     }
+    _copy_model_uncertainty(proposal, item)
+    return proposal
+
+
+def _copy_model_uncertainty(proposal: dict[str, Any], item: dict[str, Any]) -> None:
+    if "uncertainty" in item:
+        proposal["uncertainty"] = item["uncertainty"]
 
 
 def _job_source_evidence(payload: dict[str, Any], requirements: list[dict[str, Any]]) -> list[dict[str, Any]]:

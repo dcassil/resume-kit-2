@@ -34,7 +34,7 @@
             "ev_resume_api_architecture"
           ],
           "verification_state": "source_stated",
-          "confidence": "high",
+          "confidence": "unscored",
           "review_required": true
         }
       ],
