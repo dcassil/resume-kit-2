@@ -230,6 +230,7 @@ class ResumeAgentProposalContractTests(unittest.TestCase):
 # module list until tools/run_tests.py is approved to include it directly.
 from tests.contract.test_resume_agent_adapter_contract import (  # noqa: E402,F401
     ResumeAgentAdapterContractTests,
+    ResumeAgentDeterministicFakeAdapterContractTests,
     ResumeAgentSchemaValidatorContractTests,
 )
 

@@ -1,8 +1,9 @@
-"""Provider-neutral adapter DTOs and typed failure mapping."""
+"""Provider-neutral proposal adapter DTOs, typed failures, and live construction guard."""
 
 from __future__ import annotations
 
 import copy
+import os
 from dataclasses import dataclass, field
 from typing import Any, Literal, Mapping, Protocol
 
@@ -132,6 +133,12 @@ class AdapterRefusalError(Exception):
 
 
 class AdapterProviderError(Exception):
+    def __init__(self, message: str = "", *, details: Mapping[str, Any] | None = None):
+        super().__init__(message)
+        self.details = dict(details or {})
+
+
+class LiveAdapterConstructionBlockedError(AdapterProviderError):
     pass
 
 
@@ -197,6 +204,64 @@ class ValidatingModelAdapter:
         return AdapterCompletion(payload={"value": value})
 
 
+class _PlaceholderLiveModelAdapter(ValidatingModelAdapter):
+    def __init__(
+        self,
+        *,
+        adapter_id: str = "resume-agent-live-placeholder",
+        adapter_version: str = "0.0.0",
+        model_id: str = "unconfigured-live-model",
+        runtime_config: Mapping[str, Any] | None = None,
+        output_schemas: JsonSchemaRegistry | None = None,
+    ) -> None:
+        super().__init__(
+            adapter_id=adapter_id,
+            adapter_version=adapter_version,
+            model_id=model_id,
+            runtime_config=runtime_config or {"live_adapter_status": "not_implemented"},
+            output_schemas=output_schemas,
+        )
+
+    def _complete_unchecked(self, _request: AdapterRequest) -> AdapterCompletion:
+        raise AdapterProviderError("Live resume-agent adapter is not implemented yet.")
+
+
+def create_live_model_adapter(
+    *,
+    env: Mapping[str, str] | None = None,
+    adapter_id: str = "resume-agent-live-placeholder",
+    adapter_version: str = "0.0.0",
+    model_id: str = "unconfigured-live-model",
+    runtime_config: Mapping[str, Any] | None = None,
+    output_schemas: JsonSchemaRegistry | None = None,
+) -> ModelAdapter:
+    """Construct the future live adapter only when explicitly opted in.
+
+    Official gates are safe by default: absent RESUME_AGENT_ALLOW_LIVE=1, live
+    construction is blocked. RESUME_AGENT_GATE_PROFILE=1 always blocks live
+    construction so protected gate scripts do not need parameter plumbing.
+    """
+
+    environment = env or os.environ
+    if environment.get("RESUME_AGENT_GATE_PROFILE") == "1" or environment.get("RESUME_AGENT_ALLOW_LIVE") != "1":
+        raise LiveAdapterConstructionBlockedError(
+            "Live resume-agent adapter construction is blocked. Set RESUME_AGENT_ALLOW_LIVE=1 outside "
+            "RESUME_AGENT_GATE_PROFILE=1 to opt in.",
+            details={
+                "reason": "live_adapter_requires_explicit_opt_in",
+                "allow_env": "RESUME_AGENT_ALLOW_LIVE",
+                "gate_env": "RESUME_AGENT_GATE_PROFILE",
+            },
+        )
+    return _PlaceholderLiveModelAdapter(
+        adapter_id=adapter_id,
+        adapter_version=adapter_version,
+        model_id=model_id,
+        runtime_config=runtime_config,
+        output_schemas=output_schemas,
+    )
+
+
 def _failure_from_exception(exc: Exception) -> AdapterFailure:
     if isinstance(exc, AdapterSchemaInvalidError):
         return AdapterFailure(
@@ -209,7 +274,11 @@ def _failure_from_exception(exc: Exception) -> AdapterFailure:
     if isinstance(exc, AdapterRefusalError):
         return AdapterFailure(type="refused", message=str(exc) or "Adapter refused the request.")
     if isinstance(exc, AdapterProviderError):
-        return AdapterFailure(type="provider_error", message=str(exc) or "Adapter provider failed.")
+        return AdapterFailure(
+            type="provider_error",
+            message=str(exc) or "Adapter provider failed.",
+            details=copy.deepcopy(exc.details),
+        )
     return AdapterFailure(type="provider_error", message=str(exc) or exc.__class__.__name__)
 
 
@@ -233,6 +302,8 @@ __all__ = [
     "AdapterRequest",
     "AdapterResult",
     "AdapterSchemaInvalidError",
+    "LiveAdapterConstructionBlockedError",
     "ModelAdapter",
     "ValidatingModelAdapter",
+    "create_live_model_adapter",
 ]

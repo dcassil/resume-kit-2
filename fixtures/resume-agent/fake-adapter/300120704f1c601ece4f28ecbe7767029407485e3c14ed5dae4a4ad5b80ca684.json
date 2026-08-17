@@ -1,0 +1,53 @@
+{
+  "fixture_id": "resume-agent-fake-fact-proposals-seed",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Fact-proposal-shaped fake output for the resume semantic extraction adapter seam.",
+    "Payload is grounded only in the supplied canonical input text and remains a proposal requiring validation."
+  ],
+  "comment": "Seed fixture for RKIT-I-0017 prompt/schema work. The file name is the sha256 key for the request tuple.",
+  "data": {
+    "key": {
+      "sha256": "300120704f1c601ece4f28ecbe7767029407485e3c14ed5dae4a4ad5b80ca684",
+      "prompt_template_id": "resume-agent.extract-resume-semantics.v1",
+      "output_schema_id": "resume-agent.fact-proposals.v1",
+      "canonical_input_json": "{\"resume_text\":\"Daniel Candidate\\nSoftware Engineer\\nBuilt React and TypeScript front ends and designed REST API architecture for SaaS products.\"}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.fact-proposals.v1",
+      "proposal_type": "resume_semantic_extraction",
+      "requires_validation": true,
+      "uncertainty": [],
+      "fact_proposals": [
+        {
+          "fact_id": "fact_react_typescript_api",
+          "category": "technical_skill",
+          "text": "React, TypeScript, and REST API architecture experience",
+          "normalized_terms": [
+            "react",
+            "typescript",
+            "api architecture"
+          ],
+          "source_evidence_ids": [
+            "ev_resume_api_architecture"
+          ],
+          "verification_state": "source_stated",
+          "confidence": "high",
+          "review_required": true
+        }
+      ],
+      "source_evidence": [
+        {
+          "evidence_id": "ev_resume_api_architecture",
+          "text": "Built React and TypeScript front ends and designed REST API architecture for SaaS products.",
+          "span": {
+            "start": 35,
+            "end": 123
+          }
+        }
+      ]
+    }
+  }
+}

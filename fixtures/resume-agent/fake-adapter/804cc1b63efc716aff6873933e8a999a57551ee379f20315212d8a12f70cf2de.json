@@ -1,0 +1,58 @@
+{
+  "fixture_id": "resume-agent-fake-rewrite-proposal-seed",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Rewrite-shaped fake output for the proposal adapter seam.",
+    "Payload uses only allowed facts and remains unapplied until downstream validation."
+  ],
+  "comment": "Seed fixture for RKIT-I-0019 prompt/schema work. The file name is the sha256 key for the request tuple.",
+  "data": {
+    "key": {
+      "sha256": "804cc1b63efc716aff6873933e8a999a57551ee379f20315212d8a12f70cf2de",
+      "prompt_template_id": "resume-agent.propose-rewrite.v1",
+      "output_schema_id": "resume-agent.rewrite-proposal.v1",
+      "canonical_input_json": "{\"allowed_facts\":[{\"fact_id\":\"fact_api\",\"text\":\"API design experience\",\"verification_state\":\"source_stated\"},{\"fact_id\":\"fact_responsive\",\"text\":\"responsive web applications\",\"verification_state\":\"source_stated\"}],\"job_terminology\":[\"API architecture\",\"responsive design\"],\"length_constraints\":{\"max_chars\":160},\"original_text\":\"Built web applications.\",\"requirements\":[{\"requirement_id\":\"req_api\",\"source_text\":\"API architecture/design\"},{\"requirement_id\":\"req_responsive\",\"source_text\":\"responsive design\"}],\"voice_constraints\":{\"style\":\"concise\",\"tense\":\"past\"}}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.rewrite-proposal.v1",
+      "proposal_type": "rewrite_proposal",
+      "requires_validation": true,
+      "uncertainty": [],
+      "operations": [
+        {
+          "operation_id": "op_api_responsive_rewrite",
+          "operation_type": "replace_text",
+          "target_path": "experience/0/bullets/0",
+          "before": "Built web applications.",
+          "after": "Designed responsive web applications and API architecture for SaaS products.",
+          "facts_used": [
+            "fact_api",
+            "fact_responsive"
+          ],
+          "requirements_targeted": [
+            "req_api",
+            "req_responsive"
+          ],
+          "terminology_changes": [
+            {
+              "from": "web applications",
+              "to": "responsive web applications"
+            },
+            {
+              "from": "API design",
+              "to": "API architecture"
+            }
+          ],
+          "provenance": {
+            "adapter_id": "resume-agent-deterministic-fake",
+            "fixture_key": "804cc1b63efc716aff6873933e8a999a57551ee379f20315212d8a12f70cf2de"
+          },
+          "reason": "Use validated source facts to target API architecture and responsive design terminology.",
+          "status": "proposed"
+        }
+      ]
+    }
+  }
+}
