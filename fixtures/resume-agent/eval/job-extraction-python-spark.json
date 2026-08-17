@@ -1,0 +1,49 @@
+{
+  "fixture_id": "resume-agent-eval-job-extraction-python-spark",
+  "surface": "job-extraction",
+  "prompt_template_id": "resume-agent.job-extraction@v1",
+  "output_schema_id": "resume-agent.job-extraction.v1",
+  "input": {
+    "job_text": "Senior Data Platform Engineer\nDataLake Systems\nRequirements:\n- 5+ years with Python, Spark, and distributed data processing.\n- Build production ETL pipelines on cloud infrastructure.\nPreferred:\n- Kubernetes experience.\n",
+    "schema_id": "resume-agent.job-extraction.v1",
+    "source": {
+      "kind": "raw_text",
+      "sha256": "563a9713425490c98979e39171da72dc049ff095796454d6d5a0f40a08997f5d",
+      "source_id": "python-spark-golden-job"
+    }
+  },
+  "rubric": [
+    {
+      "id": "job-extraction-schema-fields",
+      "check": "schema_fields_populated",
+      "points": 1,
+      "paths": [
+        "/schema_version",
+        "/job_id",
+        "/requirements",
+        "/preferred",
+        "/source_evidence"
+      ]
+    },
+    {
+      "id": "job-extraction-required-terms",
+      "check": "required_terms",
+      "points": 2,
+      "terms": [
+        "python",
+        "spark",
+        "distributed data processing",
+        "kubernetes"
+      ]
+    },
+    {
+      "id": "job-extraction-forbidden-inventions",
+      "check": "forbidden_terms_absent",
+      "points": 1,
+      "terms": [
+        "graphql",
+        "react"
+      ]
+    }
+  ]
+}

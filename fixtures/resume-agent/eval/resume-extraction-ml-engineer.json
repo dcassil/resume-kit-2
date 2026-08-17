@@ -1,0 +1,50 @@
+{
+  "fixture_id": "resume-agent-eval-resume-extraction-ml-engineer",
+  "surface": "resume-extraction",
+  "prompt_template_id": "resume-agent.resume-extraction@v1",
+  "output_schema_id": "resume-agent.resume-extraction.v1",
+  "input": {
+    "resume_text": "Maya Patel\nMachine Learning Engineer\n\nSkills: Python, TensorFlow, Kubernetes, Google Cloud Platform (GCP), Go, Spark, MLOps.\nExperience\nSenior ML Engineer, CloudScale AI, 2021-Present\nBuilt TensorFlow training pipelines in Python and deployed model serving workloads on Kubernetes and GCP.\nMachine Learning Engineer, DataWorks, 2018-2021\nDeveloped Go services for feature ingestion and batch prediction.\nEducation\nPhD in Computer Science, University of Illinois, 2018\nCertifications\nGoogle Professional Machine Learning Engineer, Google Cloud, 2022\nProjects\nRealtime Fraud Detection: Python and TensorFlow system with Kubernetes inference services.\n",
+    "schema_id": "resume-agent.resume-extraction.v1",
+    "source": {
+      "kind": "raw_text",
+      "sha256": "b158bcf22b36d4aee8b06d308c752bba80951ee16236b244c7ce1113a9ec71a0",
+      "source_id": "ml-engineer-golden-resume"
+    }
+  },
+  "rubric": [
+    {
+      "id": "resume-extraction-schema-fields",
+      "check": "schema_fields_populated",
+      "points": 1,
+      "paths": [
+        "/schema_version",
+        "/resume_id",
+        "/skills",
+        "/experience",
+        "/source_evidence"
+      ]
+    },
+    {
+      "id": "resume-extraction-required-terms",
+      "check": "required_terms",
+      "points": 2,
+      "terms": [
+        "python",
+        "tensorflow",
+        "kubernetes",
+        "gcp"
+      ]
+    },
+    {
+      "id": "resume-extraction-forbidden-inventions",
+      "check": "forbidden_terms_absent",
+      "points": 1,
+      "terms": [
+        "aws",
+        "graphql",
+        "staff engineer"
+      ]
+    }
+  ]
+}

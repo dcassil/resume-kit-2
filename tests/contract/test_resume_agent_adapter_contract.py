@@ -52,6 +52,7 @@ from resume_agent._rewrite_requests import (
 )
 from resume_agent._schema_validation import validate_json_schema, validate_schema_id
 from tests.unit.test_resume_agent_call_audit_unit import ResumeAgentCallAuditUnitTests  # bridge into gated contract module
+from tests.unit.test_resume_agent_eval_harness_unit import ResumeAgentEvalHarnessUnitTests  # bridge into gated contract module
 
 
 ROOT = Path(__file__).resolve().parents[2]

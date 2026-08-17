@@ -1,0 +1,42 @@
+{
+  "fixture_id": "resume-agent-eval-answer-interpretation-terraform",
+  "surface": "answer-interpretation",
+  "prompt_template_id": "resume-agent.answer-interpretation@v1",
+  "output_schema_id": "resume-agent.answer-interpretation.v1",
+  "input": {
+    "answer_text": "I used Terraform to manage GCP infrastructure modules for internal platform environments.",
+    "question": "What Terraform infrastructure-as-code experience do you have?",
+    "schema_id": "resume-agent.answer-interpretation.v1",
+    "topic": "Terraform"
+  },
+  "rubric": [
+    {
+      "id": "answer-interpretation-schema-fields",
+      "check": "schema_fields_populated",
+      "points": 1,
+      "paths": [
+        "/schema_version",
+        "/polarity",
+        "/requirementResolutions",
+        "/factProposals",
+        "/evidenceProposals"
+      ]
+    },
+    {
+      "id": "answer-interpretation-affirmed",
+      "check": "json_pointer_equals",
+      "points": 1,
+      "path": "/polarity",
+      "expected": "affirmed"
+    },
+    {
+      "id": "answer-interpretation-required-terms",
+      "check": "required_terms",
+      "points": 1,
+      "terms": [
+        "terraform",
+        "gcp"
+      ]
+    }
+  ]
+}

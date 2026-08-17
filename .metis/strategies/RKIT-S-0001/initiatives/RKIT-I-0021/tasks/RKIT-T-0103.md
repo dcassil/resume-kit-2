@@ -4,14 +4,14 @@ level: task
 title: "Golden eval fixtures, opt-in eval harness, capture/quarantine/promotion"
 short_code: "RKIT-T-0103"
 created_at: 2026-08-17T18:37:55.952646+00:00
-updated_at: 2026-08-17T18:37:55.952646+00:00
+updated_at: 2026-08-17T18:58:03.832678+00:00
 parent: resume-agent-auditability
-blocked_by: ["RKIT-T-0102"]
+blocked_by: [RKIT-T-0102]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0021
 ## Objective
 
 Build the opt-in, NON-GATING live eval tier per RKIT-A-0003 item 4: golden eval fixtures (inputs + expected-output rubrics) for the extraction, interview, and rewrite surfaces (equivalences deepens when I-0020 lands), an eval harness runner that scores the live adapter against the rubrics and emits a report artifact, and a record/replay capture path where live outputs land in QUARANTINE and become pinned `DeterministicFakeAdapter` fixtures only through explicit human promotion.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -54,4 +56,4 @@ Recommended Agent: opus + medium
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-17: Added `resume-agent/tools/eval_harness.py`, five golden eval fixtures under `fixtures/resume-agent/eval/`, quarantine gitignore, bridged unit coverage in `tests/unit/test_resume_agent_eval_harness_unit.py`, and TEST_SPEC eval documentation. Next: run focused tests and required gates.

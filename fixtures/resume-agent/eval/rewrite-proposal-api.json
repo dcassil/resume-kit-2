@@ -1,0 +1,74 @@
+{
+  "fixture_id": "resume-agent-eval-rewrite-proposal-api",
+  "surface": "rewrite-proposal",
+  "prompt_template_id": "resume-agent.rewrite-proposal@v1",
+  "output_schema_id": "resume-agent.rewrite-proposal.v1",
+  "input": {
+    "allowed_facts": [
+      {
+        "evidence_id": "ev_api",
+        "fact_id": "fact_api",
+        "text": "Designed REST API architecture for customer-facing SaaS products.",
+        "verification_state": "source_stated"
+      }
+    ],
+    "length_constraints": {
+      "max_chars": 150
+    },
+    "original_text": "Built web applications.",
+    "prohibited_additions": [
+      "AWS",
+      "GraphQL",
+      "team leadership"
+    ],
+    "requirement_ids": [
+      "req_api"
+    ],
+    "schema_id": "resume-agent.rewrite-proposal.v1",
+    "target_path": "/experience/0/bullets/0",
+    "voice_constraints": {
+      "person": "first-person-implied",
+      "tense": "past"
+    }
+  },
+  "rubric": [
+    {
+      "id": "rewrite-proposal-schema-fields",
+      "check": "schema_fields_populated",
+      "points": 1,
+      "paths": [
+        "/schema_version",
+        "/operations"
+      ]
+    },
+    {
+      "id": "rewrite-proposal-required-term",
+      "check": "required_terms",
+      "points": 1,
+      "terms": [
+        "rest api architecture"
+      ]
+    },
+    {
+      "id": "rewrite-proposal-grounding",
+      "check": "grounding_terms",
+      "points": 2,
+      "entries": [
+        {
+          "term": "REST API architecture",
+          "fact_id": "fact_api"
+        }
+      ]
+    },
+    {
+      "id": "rewrite-proposal-forbidden-additions",
+      "check": "forbidden_terms_absent",
+      "points": 1,
+      "terms": [
+        "aws",
+        "graphql",
+        "team leadership"
+      ]
+    }
+  ]
+}

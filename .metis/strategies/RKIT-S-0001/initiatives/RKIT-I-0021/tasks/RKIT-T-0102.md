@@ -4,14 +4,14 @@ level: task
 title: "Agent-metadata manifest block, defined-location contract test, TEST_SPEC :91, reconstruction"
 short_code: "RKIT-T-0102"
 created_at: 2026-08-17T18:37:55.889471+00:00
-updated_at: 2026-08-17T18:47:56.320617+00:00
+updated_at: 2026-08-17T18:58:03.401986+00:00
 parent: resume-agent-auditability
 blocked_by: [RKIT-T-0101]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0021
 ## Objective
 
 Close the resume-agent TEST_SPEC Determinism Strategy (:91) enforceability gap: expose ONE package-owned agent-metadata structure (adapter id/version, model id, config hash, prompt-template versions), define WHERE it lives in the workflow run manifest, assert that location with a contract test, and prove the Audit Gate: from a run manifest plus call-audit records, the exact adapter/model/config/prompt identity and failure history of an agent-involved run are recoverable.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

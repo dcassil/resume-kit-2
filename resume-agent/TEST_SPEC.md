@@ -155,6 +155,26 @@ Call-audit covering tests:
 - `test_success_uses_configured_model_client_options_output_config_and_metadata`
 - `test_refusal_stop_reason_maps_to_refused`
 
+### Opt-in eval harness and record/replay
+
+Golden live-eval fixtures live under `fixtures/resume-agent/eval/`, distinct from `fixtures/resume-agent/fake-adapter/`. Each eval fixture is a JSON object with exactly the public harness contract fields `{fixture_id, surface, prompt_template_id, output_schema_id, input, rubric}`. `input` is the deterministic adapter input payload for the named prompt/schema pair. `rubric` is a non-empty list of graded, machine-checkable criteria; each item has `id`, `check`, and positive integer `points`, with check data such as `paths`, `terms`, `path`/`expected`, or grounding `entries`. Rubrics must use deterministic code checks only: required terms, absent forbidden terms, populated schema fields, exact JSON-pointer values, and grounding term/fact pairs. Prose-only rubric items are not valid eval fixtures.
+
+The opt-in harness is `resume-agent/tools/eval_harness.py`. It runs only outside the protected gate profile and only with the same live opt-ins as `live_smoke.py`: `RESUME_AGENT_LIVE_SMOKE=1`, `RESUME_AGENT_ALLOW_LIVE=1`, and `ANTHROPIC_API_KEY`. `RESUME_AGENT_GATE_PROFILE=1` hard-blocks the harness and capture wrapper before adapter construction regardless of other flags. The harness scores live adapter outputs with deterministic rubric code and writes a JSON report artifact to a caller-specified path, defaulting to `build/resume-agent/eval-report.json`, outside `fixtures/`. Eval score is reported as data only; official gates must not consume it as pass/fail.
+
+All harness adapter calls inject a collecting call-audit sink. The report writes sibling call-audit JSON records under the report directory and references each record by `call_id` and path.
+
+Capture mode wraps the live adapter and writes candidate replay fixtures only under `fixtures/resume-agent/quarantine/`, keyed by the same `deterministic_fake_key(prompt_template_id, output_schema_id, canonical_input)` used by `DeterministicFakeAdapter`. The quarantine directory is gitignored and is not a fixture source. Pinned fake-adapter fixtures remain only under `fixtures/resume-agent/fake-adapter/`, which is the only default source `DeterministicFakeAdapter` reads. Promotion is explicit via `eval_harness.py promote <key>`; it converts a quarantine candidate into fake-adapter fixture format and refuses to overwrite an existing pinned fixture without `--replace`.
+
+Eval harness covering tests:
+
+- `test_eval_fixtures_cover_each_landed_surface_with_machine_checkable_rubrics`
+- `test_gate_profile_blocks_entrypoint_and_capture_wrapper_before_adapter_construction`
+- `test_capture_writes_only_under_quarantine`
+- `test_promote_refuses_overwrite_without_replace`
+- `test_eval_report_references_call_audit_records`
+- `test_eval_harness_import_isolated_from_gate_modules_and_has_no_side_effects`
+- `test_default_report_path_is_outside_fixtures`
+
 ## Determinism Strategy
 
 Because language models may vary, official tests should stabilize behavior through:

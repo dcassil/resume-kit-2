@@ -1,0 +1,51 @@
+{
+  "fixture_id": "resume-agent-eval-question-generation-terraform",
+  "surface": "question-generation",
+  "prompt_template_id": "resume-agent.question-generation@v1",
+  "output_schema_id": "resume-agent.question-generation.v1",
+  "input": {
+    "context_snippets": [
+      "Preferred: Terraform infrastructure-as-code experience."
+    ],
+    "schema_id": "resume-agent.question-generation.v1",
+    "target_ids": {
+      "fact_ids": [
+        "fact_iac"
+      ],
+      "requirement_ids": [
+        "req_terraform"
+      ]
+    },
+    "topic": "Terraform"
+  },
+  "rubric": [
+    {
+      "id": "question-generation-schema-fields",
+      "check": "schema_fields_populated",
+      "points": 1,
+      "paths": [
+        "/schema_version",
+        "/question",
+        "/target_ids/requirement_ids",
+        "/rationale"
+      ]
+    },
+    {
+      "id": "question-generation-topic-term",
+      "check": "required_terms",
+      "points": 1,
+      "terms": [
+        "terraform"
+      ]
+    },
+    {
+      "id": "question-generation-selected-topic-only",
+      "check": "forbidden_terms_absent",
+      "points": 1,
+      "terms": [
+        "aws",
+        "graphql"
+      ]
+    }
+  ]
+}
