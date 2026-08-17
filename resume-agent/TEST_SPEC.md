@@ -10,6 +10,7 @@ Relevant public surfaces:
 - `extractJobSemantics(rawJobText)`
 - `generateClarificationQuestion(context)`
 - `interpretUserAnswer(answer, context)`
+- `proposeEquivalences(context)`
 - `proposeRewrite(context)`
 
 ## Expected Structure
@@ -21,6 +22,7 @@ Tests should isolate the agent behind deterministic fixtures and schema validato
 - extraction proposal adapters
 - question generation
 - answer interpretation
+- semantic equivalence proposals
 - rewrite proposal generation
 - uncertainty/confidence handling
 - forbidden-addition filters
@@ -98,6 +100,30 @@ Non-fixture interview goldens:
 - ML-engineer resume and Python+Spark / GraphQL+API jobs exercise extraction with skills and requirements outside the original AWS/GraphQL/architecture canned set.
 - Terraform question+answer fixtures (`resume-agent-question-generation-terraform`, `resume-agent-answer-interpretation-terraform-affirmed`) prove interview support for an arbitrary topic selected by code.
 - The smoke AWS answer fixture `resume-agent-answer-interpretation-aws-affirmed-smoke` is pinned to the generated CLI question text used by `RESOLVE_GAPS`.
+
+### Semantic equivalence proposals
+
+- Accept context containing code-selected candidate pairs, supplied evidence, and optional alias-miss or direction hints.
+- Return a list of proposal DTOs with exactly `id`, `term_a`, `term_b`, `direction`, `rationale`, `evidence_refs`, `confidence`, and `requires_validation`.
+- Mark every proposal with `requires_validation: true`; proposal output never becomes relationship authority by itself.
+- Use only the direction vocabulary `equivalent`, `narrower_than`, and `broader_than`.
+- Cite only `evidence_refs` that resolve into the supplied context.
+- Empty candidate context returns `[]` and does not call the adapter.
+- Identical inputs produce deterministic proposal ids.
+- Alias-miss candidate pairs such as "responsive web apps" and "responsive design" produce proposals.
+- Subsumption candidates preserve asymmetry such as React being `narrower_than` JavaScript framework experience.
+
+DTO, grounding, and empty-context battery:
+
+- DTO shape: `test_equivalence_proposals_are_exact_dtos_requiring_validation` asserts exact DTO keys, `requires_validation: true`, direction vocabulary, non-empty rationale, numeric confidence, and no relationship-authority fields.
+- Schema vocabulary: `test_equivalence_schema_rejects_bad_direction_requires_validation_and_extra_fields` asserts schema validation rejects malformed direction, false validation requirement, empty evidence, and extra fields.
+- Evidence resolution: `test_equivalence_post_guard_rejects_unresolved_evidence_refs` asserts a schema-valid adapter payload citing missing evidence is rejected with a typed guard error and no partial proposals.
+- Empty context: `test_equivalence_empty_candidate_context_returns_empty_list_without_adapter_call` asserts empty candidate context returns `[]` and the injected adapter sink has zero records.
+- Deterministic ids: `test_equivalence_ids_are_deterministic_for_identical_inputs` asserts identical inputs produce identical SHA-style proposal ids and replace model-supplied ids.
+- Alias-miss golden: `test_equivalence_alias_miss_fixture_produces_proposal` covers fixture `resume-agent-equivalence-alias-responsive`.
+- Subsumption golden: `test_equivalence_subsumption_fixture_preserves_direction` covers fixture `resume-agent-equivalence-subsumption-react-js-framework`.
+- Call audit: `test_equivalence_adapter_call_emits_audit_record` asserts the adapter chokepoint records one equivalence call.
+- Adapter failure: `test_equivalence_adapter_failure_returns_typed_error_without_partial_proposals` asserts no partial proposals on fixture miss.
 
 ### Rewrite proposals
 

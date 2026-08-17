@@ -1,0 +1,33 @@
+{
+  "fixture_id": "resume-agent-equivalence-subsumption-react-js-framework",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "React is proposed as narrower than JavaScript framework experience."
+  ],
+  "comment": "Pinned fake-adapter output for asymmetric equivalence proposal coverage.",
+  "data": {
+    "key": {
+      "sha256": "f3c5eefeb5bd0c0bca731148da2c8075a3806c7d2cb690706526137af114c128",
+      "prompt_template_id": "resume-agent.equivalence-proposal@v1",
+      "output_schema_id": "resume-agent.equivalence-proposal.v1",
+      "canonical_input_json": "{\"candidates\":[{\"candidate_id\":\"candidate_1\",\"direction_hint\":\"narrower_than\",\"evidence_refs\":[\"ev_resume_react\",\"ev_job_js_framework\"],\"term_a\":\"React\",\"term_b\":\"JavaScript framework experience\"}],\"evidence\":[{\"evidence_id\":\"ev_resume_react\",\"source\":\"resume\",\"text\":\"Experience building React and TypeScript front ends.\"},{\"evidence_id\":\"ev_job_js_framework\",\"source\":\"job\",\"text\":\"Requires JavaScript framework experience for frontend applications.\"}],\"schema_id\":\"resume-agent.equivalence-proposal.v1\"}"
+    },
+    "payload": [
+      {
+        "id": "model_supplied_subsumption_react",
+        "term_a": "React",
+        "term_b": "JavaScript framework experience",
+        "direction": "narrower_than",
+        "rationale": "React is a specific JavaScript framework, so a supported React claim can satisfy the broader framework-experience concept asymmetrically.",
+        "evidence_refs": [
+          "ev_resume_react",
+          "ev_job_js_framework"
+        ],
+        "confidence": 0.92,
+        "requires_validation": true
+      }
+    ]
+  }
+}

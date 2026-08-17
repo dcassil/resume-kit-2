@@ -20,6 +20,7 @@ ALLOWED_SURFACES = {
     "extractJobSemantics",
     "generateClarificationQuestion",
     "interpretUserAnswer",
+    "proposeEquivalences",
     "proposeRewrite",
 }
 
@@ -244,7 +245,7 @@ def scan_text(path: Path, text: str) -> list[Failure]:
                     Failure(
                         path,
                         f"Potential public proposal function '{function_name}' is not in resume-agent/TEST_SPEC.md.",
-                        "Keep public API to extractResumeSemantics, extractJobSemantics, generateClarificationQuestion, interpretUserAnswer, and proposeRewrite; make helpers private.",
+                        "Keep public API to extractResumeSemantics, extractJobSemantics, generateClarificationQuestion, interpretUserAnswer, proposeEquivalences, and proposeRewrite; make helpers private.",
                         line_for_offset(text, match.start()),
                     )
                 )

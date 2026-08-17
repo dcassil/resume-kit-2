@@ -12,6 +12,7 @@ from typing import Any, Mapping
 from ._adapters import AdapterCompletion, AdapterProviderError, AdapterRequest, ValidatingModelAdapter
 from ._agent_config import AgentConfig, resolve_agent_config
 from ._call_audit import CallAuditSink
+from ._equivalence_schemas import EQUIVALENCE_OUTPUT_SCHEMAS
 from ._extraction_schemas import EXTRACTION_OUTPUT_SCHEMAS
 from ._interview_schemas import INTERVIEW_OUTPUT_SCHEMAS
 from ._rewrite_schemas import REWRITE_OUTPUT_SCHEMAS, REWRITE_PROPOSAL_SCHEMA_ID
@@ -91,6 +92,7 @@ DEFAULT_FAKE_OUTPUT_SCHEMAS: JsonSchemaRegistry = {
 DEFAULT_FAKE_OUTPUT_SCHEMAS.update(EXTRACTION_OUTPUT_SCHEMAS)
 DEFAULT_FAKE_OUTPUT_SCHEMAS.update(INTERVIEW_OUTPUT_SCHEMAS)
 DEFAULT_FAKE_OUTPUT_SCHEMAS.update(REWRITE_OUTPUT_SCHEMAS)
+DEFAULT_FAKE_OUTPUT_SCHEMAS.update(EQUIVALENCE_OUTPUT_SCHEMAS)
 
 
 @dataclass(frozen=True)
@@ -100,7 +102,7 @@ class FakeFixture:
     prompt_template_id: str
     output_schema_id: str
     canonical_input_json: str
-    payload: JsonObject
+    payload: Any
 
 
 def default_fake_fixture_dir() -> Path:
@@ -229,9 +231,9 @@ def _read_fixture(path: Path) -> FakeFixture:
         )
     key = data.get("key")
     payload = data.get("payload")
-    if not isinstance(key, dict) or not isinstance(payload, dict):
+    if not isinstance(key, dict):
         raise AdapterProviderError(
-            f"Deterministic fake fixture data requires object key and payload: {path}.",
+            f"Deterministic fake fixture data requires object key: {path}.",
             details={"reason": "deterministic_fake_invalid_data", "path": str(path)},
         )
     key_hash = key.get("sha256")

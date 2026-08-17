@@ -202,15 +202,71 @@ REWRITE_PROHIBITED_ADDITION_CONTEXT = {
     "prohibited_additions": ["GraphQL"],
 }
 
+EQUIVALENCE_ALIAS_CONTEXT = {
+    "candidate_pairs": [
+        {
+            "term_a": "responsive web apps",
+            "term_b": "responsive design",
+            "evidence_refs": ["ev_resume_responsive", "ev_job_responsive"],
+        }
+    ],
+    "evidence": [
+        {
+            "evidence_id": "ev_resume_responsive",
+            "source": "resume",
+            "text": "Experience building React and TypeScript front ends, REST APIs, and responsive web applications.",
+        },
+        {
+            "evidence_id": "ev_job_responsive",
+            "source": "job",
+            "text": "Required: React, TypeScript, API architecture/design, responsive design.",
+        },
+    ],
+}
+
+EQUIVALENCE_SUBSUMPTION_CONTEXT = {
+    "candidate_pairs": [
+        {
+            "term_a": "React",
+            "term_b": "JavaScript framework experience",
+            "direction_hint": "narrower_than",
+            "evidence_refs": ["ev_resume_react", "ev_job_js_framework"],
+        }
+    ],
+    "evidence": [
+        {
+            "evidence_id": "ev_resume_react",
+            "source": "resume",
+            "text": "Experience building React and TypeScript front ends.",
+        },
+        {
+            "evidence_id": "ev_job_js_framework",
+            "source": "job",
+            "text": "Requires JavaScript framework experience for frontend applications.",
+        },
+    ],
+}
+
+EQUIVALENCE_DTO_FIELDS = {
+    "id",
+    "term_a",
+    "term_b",
+    "direction",
+    "rationale",
+    "evidence_refs",
+    "confidence",
+    "requires_validation",
+}
+
 
 def load_agent_module(test_case: unittest.TestCase):
     try:
         module = importlib.import_module("resume_agent")
     except ModuleNotFoundError as exc:
         test_case.fail(
-            "Expected importable package 'resume_agent'. Implement the five proposal functions from "
+            "Expected importable package 'resume_agent'. Implement the proposal functions from "
             "resume-agent/TEST_SPEC.md: extractResumeSemantics, extractJobSemantics, "
-            "generateClarificationQuestion, interpretUserAnswer, and proposeRewrite."
+            "generateClarificationQuestion, interpretUserAnswer, proposeEquivalences, and proposeRewrite."
         )
         raise exc
     for function_name in PUBLIC_FUNCTIONS:
@@ -294,6 +350,7 @@ class ResumeAgentSurfaceManifestTests(unittest.TestCase):
             "extractJobSemantics",
             "generateClarificationQuestion",
             "interpretUserAnswer",
+            "proposeEquivalences",
             "proposeRewrite",
         ))
 
@@ -829,6 +886,116 @@ class ResumeAgentProposalContractTests(unittest.TestCase):
             with self.subTest(fragment=fragment):
                 self.assertNotIn(fragment, source)
 
+    def test_equivalence_proposals_are_exact_dtos_requiring_validation(self):
+        result = maybe_await(self.agent.proposeEquivalences(EQUIVALENCE_ALIAS_CONTEXT))
+
+        self.assertIsInstance(result, list)
+        self.assertTrue(result)
+        proposal = result[0]
+        self.assertEqual(set(proposal), EQUIVALENCE_DTO_FIELDS)
+        self.assertEqual(proposal["term_a"], "responsive web apps")
+        self.assertEqual(proposal["term_b"], "responsive design")
+        self.assertIn(proposal["direction"], {"equivalent", "narrower_than", "broader_than"})
+        self.assertEqual(proposal["direction"], "equivalent")
+        self.assertTrue(proposal["requires_validation"])
+        self.assertTrue(proposal["rationale"])
+        self.assertIsInstance(proposal["confidence"], (int, float))
+        self.assertTrue(set(proposal["evidence_refs"]) <= {"ev_resume_responsive", "ev_job_responsive"})
+        serialized = json.dumps(result, sort_keys=True).lower()
+        for forbidden in ["persisted_relationship", "official_truth", "final_verification_state", "sqlite"]:
+            self.assertNotIn(forbidden, serialized)
+
+    def test_equivalence_empty_candidate_context_returns_empty_list_without_adapter_call(self):
+        from resume_agent._fake_adapter import DeterministicFakeAdapter
+
+        adapter = DeterministicFakeAdapter()
+        result = maybe_await(self.agent.proposeEquivalences({"candidate_pairs": [], "evidence": [], "_adapter": adapter}))
+
+        self.assertEqual(result, [])
+        self.assertEqual(adapter.call_audit_sink.records, [])
+
+    def test_equivalence_ids_are_deterministic_for_identical_inputs(self):
+        first = maybe_await(self.agent.proposeEquivalences(EQUIVALENCE_ALIAS_CONTEXT))
+        second = maybe_await(self.agent.proposeEquivalences(copy.deepcopy(EQUIVALENCE_ALIAS_CONTEXT)))
+
+        self.assertEqual(first, second)
+        self.assertRegex(first[0]["id"], r"^equiv_[0-9a-f]{10}$")
+        self.assertNotEqual(first[0]["id"], fixture_payload("resume-agent-equivalence-alias-responsive")[0]["id"])
+
+    def test_equivalence_alias_miss_fixture_produces_proposal(self):
+        result = maybe_await(self.agent.proposeEquivalences(EQUIVALENCE_ALIAS_CONTEXT))
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["direction"], "equivalent")
+        self.assertIn("responsive web apps", json.dumps(result, sort_keys=True).lower())
+        self.assertIn("responsive design", json.dumps(result, sort_keys=True).lower())
+
+    def test_equivalence_subsumption_fixture_preserves_direction(self):
+        result = maybe_await(self.agent.proposeEquivalences(EQUIVALENCE_SUBSUMPTION_CONTEXT))
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["term_a"], "React")
+        self.assertEqual(result[0]["term_b"], "JavaScript framework experience")
+        self.assertEqual(result[0]["direction"], "narrower_than")
+
+    def test_equivalence_post_guard_rejects_unresolved_evidence_refs(self):
+        from resume_agent._adapters import AdapterRequest
+        from resume_agent._equivalence_requests import build_equivalence_request
+        from resume_agent._fake_adapter import DeterministicFakeAdapter, deterministic_fake_key
+
+        request = build_equivalence_request(EQUIVALENCE_ALIAS_CONTEXT)
+        self.assertIsInstance(request, AdapterRequest)
+        payload = copy.deepcopy(fixture_payload("resume-agent-equivalence-alias-responsive"))
+        payload[0]["evidence_refs"] = ["ev_external"]
+        key_hash = deterministic_fake_key(request.prompt_template_id, request.output_schema_id, request.input_payload)
+
+        with tempfile.TemporaryDirectory() as temp:
+            fixture_dir = Path(temp)
+            (fixture_dir / f"{key_hash}.json").write_text(
+                json.dumps(
+                    _fake_adapter_fixture_envelope(
+                        "resume-agent-equivalence-unresolved-evidence-in-test",
+                        key_hash,
+                        request,
+                        payload,
+                        ["Schema-valid equivalence proposal cites evidence outside the supplied context."],
+                    )
+                ),
+                encoding="utf-8",
+            )
+            result = maybe_await(
+                self.agent.proposeEquivalences({**EQUIVALENCE_ALIAS_CONTEXT, "_adapter": DeterministicFakeAdapter(fixture_dir=fixture_dir)})
+            )
+
+        self.assertEqual(result.get("status"), "error")
+        self.assertEqual(result.get("error", {}).get("type"), "guard_error")
+        self.assertNotIsInstance(result, list)
+        violation_codes = {item.get("code") for item in result.get("error", {}).get("violations", [])}
+        self.assertIn("evidence_ref_not_supplied", violation_codes)
+
+    def test_equivalence_adapter_failure_returns_typed_error_without_partial_proposals(self):
+        from resume_agent._fake_adapter import DeterministicFakeAdapter
+
+        with tempfile.TemporaryDirectory() as temp:
+            result = maybe_await(
+                self.agent.proposeEquivalences({**EQUIVALENCE_ALIAS_CONTEXT, "_adapter": DeterministicFakeAdapter(fixture_dir=Path(temp))})
+            )
+
+        self.assertEqual(result.get("status"), "error")
+        self.assertEqual(result.get("error", {}).get("type"), "provider_error")
+        self.assertNotIsInstance(result, list)
+
+    def test_equivalence_adapter_call_emits_audit_record(self):
+        from resume_agent._fake_adapter import DeterministicFakeAdapter
+
+        adapter = DeterministicFakeAdapter()
+        result = maybe_await(self.agent.proposeEquivalences({**EQUIVALENCE_ALIAS_CONTEXT, "_adapter": adapter}))
+
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(adapter.call_audit_sink.records), 1)
+        self.assertEqual(adapter.call_audit_sink.records[0]["outcome"], "ok")
+        self.assertIn("schema_hash", adapter.call_audit_sink.records[0])
+
     def test_rewrite_proposals_are_resume_change_operations_grounded_in_allowed_facts(self):
         result = maybe_await(self.agent.proposeRewrite(REWRITE_API_ONLY_CONTEXT))
         assert_proposal_handoff(self, result, "rewrite_proposal")
@@ -983,6 +1150,8 @@ class ResumeAgentProposalContractTests(unittest.TestCase):
             (self.agent.extractJobSemantics, [""]),
             (self.agent.generateClarificationQuestion, [{"selected_requirement_ids": [], "topic": ""}]),
             (self.agent.interpretUserAnswer, ["", {"selected_requirement_ids": ["req_aws"], "topic": "AWS"}]),
+            (self.agent.proposeEquivalences, [None]),
+            (self.agent.proposeEquivalences, [{"candidate_pairs": "responsive"}]),
             (self.agent.proposeRewrite, [{"original_text": "Built apps."}]),
         ]
         for function, args in invalid_calls:

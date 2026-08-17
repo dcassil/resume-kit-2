@@ -29,6 +29,12 @@ from resume_agent._fake_adapter import (
     deterministic_fake_key,
     validate_fake_fixture_dir,
 )
+from resume_agent._equivalence_requests import (
+    EQUIVALENCE_PROPOSAL_PROMPT_TEMPLATE_ID,
+    build_equivalence_request,
+    prompt_template_text as equivalence_prompt_template_text,
+)
+from resume_agent._equivalence_schemas import EQUIVALENCE_DIRECTIONS, EQUIVALENCE_PROPOSAL_SCHEMA_ID
 from resume_agent._extraction_requests import (
     JOB_EXTRACTION_PROMPT_TEMPLATE_ID,
     RESUME_EXTRACTION_PROMPT_TEMPLATE_ID,
@@ -121,6 +127,8 @@ REWRITE_CONSTRAINT_KEY = "b666300532211f6c9b04556d780c25b81ce44a5c2cc97138fd92be
 REWRITE_VOICE_VIOLATION_KEY = "01beaa0c7453864bea14ffc8168c86a9751360860b31792a1cee9cecc6aacb76"
 REWRITE_LENGTH_VIOLATION_KEY = "a37c27267a497b3913d26c6fb25a3c48a57cef469540be4be00ac30a2497220a"
 REWRITE_PROHIBITED_ADDITION_KEY = "c86921879d410b346c7455d24dff4333c642e84ce26fc6d448ac3d653286aec9"
+EQUIVALENCE_ALIAS_KEY = "a888566faad91409430fd859392fc9839577dcdd99290e08e02803f8245864d6"
+EQUIVALENCE_SUBSUMPTION_KEY = "f3c5eefeb5bd0c0bca731148da2c8075a3806c7d2cb690706526137af114c128"
 
 REWRITE_API_FACT = {
     "fact_id": "fact_api",
@@ -139,6 +147,51 @@ REWRITE_GRAPHQL_FACT = {
     "text": "Designed GraphQL APIs for customer-facing products.",
     "verification_state": "source_stated",
     "evidence_id": "ev_graphql",
+}
+
+EQUIVALENCE_ALIAS_CONTEXT = {
+    "candidate_pairs": [
+        {
+            "term_a": "responsive web apps",
+            "term_b": "responsive design",
+            "evidence_refs": ["ev_resume_responsive", "ev_job_responsive"],
+        }
+    ],
+    "evidence": [
+        {
+            "evidence_id": "ev_resume_responsive",
+            "source": "resume",
+            "text": "Experience building React and TypeScript front ends, REST APIs, and responsive web applications.",
+        },
+        {
+            "evidence_id": "ev_job_responsive",
+            "source": "job",
+            "text": "Required: React, TypeScript, API architecture/design, responsive design.",
+        },
+    ],
+}
+
+EQUIVALENCE_SUBSUMPTION_CONTEXT = {
+    "candidate_pairs": [
+        {
+            "term_a": "React",
+            "term_b": "JavaScript framework experience",
+            "direction_hint": "narrower_than",
+            "evidence_refs": ["ev_resume_react", "ev_job_js_framework"],
+        }
+    ],
+    "evidence": [
+        {
+            "evidence_id": "ev_resume_react",
+            "source": "resume",
+            "text": "Experience building React and TypeScript front ends.",
+        },
+        {
+            "evidence_id": "ev_job_js_framework",
+            "source": "job",
+            "text": "Requires JavaScript framework experience for frontend applications.",
+        },
+    ],
 }
 
 LEGACY_RESUME_FIXTURE = """
@@ -821,6 +874,136 @@ class ResumeAgentRewriteSchemaContractTests(unittest.TestCase):
                 result = adapter.complete(request)
                 self.assertEqual(result.status, "ok")
                 self.assertTrue(result.payload["requires_validation"])
+
+
+class ResumeAgentEquivalenceSchemaContractTests(unittest.TestCase):
+    def test_equivalence_schema_id_is_registered_with_fake_adapter_validator(self):
+        self.assertIn(EQUIVALENCE_PROPOSAL_SCHEMA_ID, DEFAULT_FAKE_OUTPUT_SCHEMAS)
+
+        for fixture_id in [
+            "resume-agent-equivalence-alias-responsive",
+            "resume-agent-equivalence-subsumption-react-js-framework",
+        ]:
+            with self.subTest(fixture_id=fixture_id):
+                payload = _fixture_payload(fixture_id)
+                self.assertEqual(validate_schema_id(payload, EQUIVALENCE_PROPOSAL_SCHEMA_ID, DEFAULT_FAKE_OUTPUT_SCHEMAS), [])
+
+    def test_equivalence_schema_rejects_bad_direction_requires_validation_and_extra_fields(self):
+        payload = copy.deepcopy(_fixture_payload("resume-agent-equivalence-alias-responsive"))
+        proposal = payload[0]
+        proposal["direction"] = "related"
+        proposal["requires_validation"] = False
+        proposal["evidence_refs"] = []
+        proposal["relationship_type"] = "equivalent"
+
+        violations = validate_schema_id(payload, EQUIVALENCE_PROPOSAL_SCHEMA_ID, DEFAULT_FAKE_OUTPUT_SCHEMAS)
+        pairs = {(item.get("code"), item.get("field_path")) for item in violations}
+
+        self.assertIn(("invalid_enum", "0/direction"), pairs)
+        self.assertIn(("invalid_enum", "0/requires_validation"), pairs)
+        self.assertIn(("min_items", "0/evidence_refs"), pairs)
+        self.assertIn(("additional_property", "0/relationship_type"), pairs)
+
+    def test_equivalence_request_builder_is_deterministic_and_carries_candidate_context(self):
+        first = build_equivalence_request(EQUIVALENCE_ALIAS_CONTEXT)
+        second = build_equivalence_request(EQUIVALENCE_ALIAS_CONTEXT)
+        changed = build_equivalence_request(
+            {
+                **EQUIVALENCE_ALIAS_CONTEXT,
+                "candidate_pairs": [
+                    {
+                        "term_a": "adaptive layouts",
+                        "term_b": "responsive design",
+                        "evidence_refs": ["ev_resume_responsive", "ev_job_responsive"],
+                    }
+                ],
+            }
+        )
+
+        self.assertIsInstance(first, AdapterRequest)
+        self.assertEqual(first, second)
+        self.assertNotEqual(first.input_payload, changed.input_payload)
+        self.assertEqual(first.prompt_template_id, EQUIVALENCE_PROPOSAL_PROMPT_TEMPLATE_ID)
+        self.assertEqual(first.output_schema_id, EQUIVALENCE_PROPOSAL_SCHEMA_ID)
+        self.assertEqual(first.input_payload["schema_id"], EQUIVALENCE_PROPOSAL_SCHEMA_ID)
+        self.assertEqual(first.input_payload["candidates"][0]["term_a"], "responsive web apps")
+        self.assertEqual(first.input_payload["candidates"][0]["evidence_refs"], ["ev_resume_responsive", "ev_job_responsive"])
+        self.assertEqual(first.input_payload["evidence"][0]["evidence_id"], "ev_resume_responsive")
+
+    def test_equivalence_request_builder_reports_typed_field_errors(self):
+        cases = [
+            ("context", None),
+            ("candidate_pairs", {"candidate_pairs": "responsive"}),
+            (
+                "candidates/0/evidence_refs",
+                {
+                    "candidate_pairs": [{"term_a": "React", "term_b": "JavaScript framework experience", "evidence_refs": ["missing"]}],
+                    "evidence": [],
+                },
+            ),
+            (
+                "candidates/0/direction_hint",
+                {
+                    **EQUIVALENCE_SUBSUMPTION_CONTEXT,
+                    "candidate_pairs": [
+                        {
+                            "term_a": "React",
+                            "term_b": "JavaScript framework experience",
+                            "direction_hint": "related",
+                            "evidence_refs": ["ev_resume_react", "ev_job_js_framework"],
+                        }
+                    ],
+                },
+            ),
+        ]
+
+        for expected_field, context in cases:
+            with self.subTest(expected_field=expected_field):
+                result = build_equivalence_request(context)
+                self.assertIsInstance(result, dict)
+                self.assertEqual(result["status"], "error")
+                self.assertEqual(result["error"]["type"], "validation_error")
+                self.assertEqual(result["error"]["field_path"], expected_field)
+
+    def test_equivalence_prompt_asset_uses_id_at_version_convention(self):
+        self.assertEqual(EQUIVALENCE_PROPOSAL_PROMPT_TEMPLATE_ID, "resume-agent.equivalence-proposal@v1")
+        prompt = equivalence_prompt_template_text(EQUIVALENCE_PROPOSAL_PROMPT_TEMPLATE_ID)
+
+        self.assertIn("Return only JSON", prompt)
+        self.assertIn("evidence_refs", prompt)
+        self.assertIn("narrower_than", prompt)
+        self.assertIn("requires_validation", prompt)
+
+    def test_equivalence_golden_fixtures_are_retrievable_by_deterministic_requests(self):
+        cases = [
+            (EQUIVALENCE_ALIAS_CONTEXT, EQUIVALENCE_ALIAS_KEY, "equivalent"),
+            (EQUIVALENCE_SUBSUMPTION_CONTEXT, EQUIVALENCE_SUBSUMPTION_KEY, "narrower_than"),
+        ]
+        adapter = DeterministicFakeAdapter(fixture_dir=FAKE_FIXTURES)
+
+        for context, expected_key, expected_direction in cases:
+            request = build_equivalence_request(context)
+            self.assertIsInstance(request, AdapterRequest)
+            key = deterministic_fake_key(request.prompt_template_id, request.output_schema_id, request.input_payload)
+            with self.subTest(key=key):
+                self.assertEqual(key, expected_key)
+                result = adapter.complete(request)
+                self.assertEqual(result.status, "ok")
+                self.assertEqual(result.payload[0]["direction"], expected_direction)
+                self.assertTrue(result.payload[0]["requires_validation"])
+                self.assertEqual(set(result.payload[0]), {
+                    "id",
+                    "term_a",
+                    "term_b",
+                    "direction",
+                    "rationale",
+                    "evidence_refs",
+                    "confidence",
+                    "requires_validation",
+                })
+
+    def test_equivalence_direction_vocabulary_is_closed(self):
+        self.assertEqual(set(EQUIVALENCE_DIRECTIONS), {"equivalent", "narrower_than", "broader_than"})
 
 
 class ResumeAgentAnthropicAdapterContractTests(unittest.TestCase):

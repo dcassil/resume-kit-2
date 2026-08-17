@@ -1,6 +1,6 @@
 """Public proposal surface for resume-agent.
 
-Extraction, clarification-question, answer-interpretation, and rewrite
+Extraction, clarification-question, answer-interpretation, equivalence, and rewrite
 confidence and uncertainty are adapter-sourced. Public outputs remain proposals
 that require downstream validation before any resume mutation.
 """
@@ -24,6 +24,8 @@ from ._agent_config import (
     stable_agent_config_hash,
 )
 from ._extraction_requests import build_job_extraction_request, build_resume_extraction_request
+from ._equivalence_requests import build_equivalence_request, equivalence_evidence_ids, has_equivalence_candidates
+from ._equivalence_schemas import EQUIVALENCE_DIRECTIONS
 from ._fake_adapter import DeterministicFakeAdapter
 from ._interview_requests import build_answer_interpretation_request, build_question_request
 from ._rewrite_requests import build_rewrite_request
@@ -41,6 +43,7 @@ __all__ = [
     "extractJobSemantics",
     "generateClarificationQuestion",
     "interpretUserAnswer",
+    "proposeEquivalences",
     "proposeRewrite",
     "require_agent_config",
     "resolve_agent_config",
@@ -188,6 +191,128 @@ def _adapter_error(completion: Any) -> dict[str, Any]:
         if hasattr(completion, field):
             result[field] = getattr(completion, field)
     return result
+
+
+def proposeEquivalences(context: dict[str, Any]) -> list[dict[str, Any]] | dict[str, Any]:
+    """Return code-selected semantic equivalence proposals for downstream validation."""
+
+    if not isinstance(context, dict):
+        return _error("validation_error", "context must be an object.")
+
+    request = build_equivalence_request(context)
+    if isinstance(request, dict):
+        return request
+    if not has_equivalence_candidates(context):
+        return []
+
+    try:
+        adapter = _equivalence_adapter(context)
+    except AgentConfigValidationError as exc:
+        return {"status": "error", "error": {"type": "schema_error", "message": str(exc), "violations": exc.errors}}
+
+    completion = adapter.complete(request)
+    if completion.status != "ok":
+        return _adapter_error(completion)
+
+    payload = completion.payload if isinstance(completion.payload, list) else []
+    guard_error = _equivalence_guard_error(payload, equivalence_evidence_ids(context))
+    if guard_error:
+        _copy_adapter_metadata(guard_error, completion)
+        return guard_error
+
+    return [_mapped_equivalence_proposal(proposal) for proposal in payload if isinstance(proposal, dict)]
+
+
+def _equivalence_adapter(context: dict[str, Any]) -> ModelAdapter:
+    injected = context.get("_adapter")
+    if injected is not None:
+        return injected
+    return DeterministicFakeAdapter(agent_config=require_agent_config(context))
+
+
+def _equivalence_guard_error(payload: list[Any], evidence_ids: set[str]) -> dict[str, Any]:
+    violations: list[dict[str, Any]] = []
+    for index, proposal in enumerate(payload):
+        field_prefix = f"{index}"
+        if not isinstance(proposal, dict):
+            violations.append(
+                {
+                    "code": "invalid_proposal",
+                    "message": "Equivalence proposal must be an object.",
+                    "severity": "error",
+                    "field_path": field_prefix,
+                }
+            )
+            continue
+        direction = proposal.get("direction")
+        if direction not in EQUIVALENCE_DIRECTIONS:
+            violations.append(
+                {
+                    "code": "invalid_direction",
+                    "message": "Equivalence direction is outside the allowed vocabulary.",
+                    "severity": "error",
+                    "field_path": f"{field_prefix}/direction",
+                    "details": {"allowed": list(EQUIVALENCE_DIRECTIONS), "observed": direction},
+                }
+            )
+        if proposal.get("requires_validation") is not True:
+            violations.append(
+                {
+                    "code": "requires_validation_not_true",
+                    "message": "Equivalence proposal must require downstream validation.",
+                    "severity": "error",
+                    "field_path": f"{field_prefix}/requires_validation",
+                }
+            )
+        refs = proposal.get("evidence_refs")
+        if not isinstance(refs, list) or not refs:
+            violations.append(
+                {
+                    "code": "missing_evidence_refs",
+                    "message": "Equivalence proposal must cite at least one supplied evidence ref.",
+                    "severity": "error",
+                    "field_path": f"{field_prefix}/evidence_refs",
+                }
+            )
+            continue
+        unresolved = sorted({_clean_text(ref) for ref in refs if _clean_text(ref)} - evidence_ids)
+        if unresolved:
+            violations.append(
+                {
+                    "code": "evidence_ref_not_supplied",
+                    "message": "Equivalence proposal cites evidence_refs that were not supplied in context.",
+                    "severity": "error",
+                    "field_path": f"{field_prefix}/evidence_refs",
+                    "details": {"evidence_refs": unresolved},
+                }
+            )
+    if not violations:
+        return {}
+    return {
+        "status": "error",
+        "error": {
+            "type": "guard_error",
+            "message": "Equivalence proposal failed deterministic evidence checks.",
+            "violations": violations,
+        },
+    }
+
+
+def _mapped_equivalence_proposal(proposal: dict[str, Any]) -> dict[str, Any]:
+    term_a = _clean_text(proposal.get("term_a"))
+    term_b = _clean_text(proposal.get("term_b"))
+    direction = _clean_text(proposal.get("direction"))
+    evidence_refs = [_clean_text(ref) for ref in proposal.get("evidence_refs", []) if _clean_text(ref)]
+    return {
+        "id": _stable_id("equiv", f"{term_a}:{term_b}:{direction}:{'|'.join(evidence_refs)}"),
+        "term_a": term_a,
+        "term_b": term_b,
+        "direction": direction,
+        "rationale": _clean_text(proposal.get("rationale")),
+        "evidence_refs": evidence_refs,
+        "confidence": proposal.get("confidence"),
+        "requires_validation": True,
+    }
 
 
 def _resume_extraction_payload_to_proposals(payload: dict[str, Any]) -> dict[str, Any]:

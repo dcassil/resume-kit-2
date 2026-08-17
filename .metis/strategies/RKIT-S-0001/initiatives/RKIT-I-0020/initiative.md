@@ -4,20 +4,20 @@ level: initiative
 title: "Resume-Agent Semantic Equivalence and Entailment Proposal Handoff"
 short_code: "RKIT-I-0020"
 created_at: 2026-08-13T20:41:37.296716+00:00
-updated_at: 2026-08-13T20:41:37.296716+00:00
+updated_at: 2026-08-17T19:09:58.110515+00:00
 parent: resume-kit-2-full-product-buildout
-blocked_by: ["RKIT-I-0016"]
+blocked_by: [RKIT-I-0016]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/discovery"
+  - "#phase/active"
 
 
 exit_criteria_met: false
 estimated_complexity: M
 strategy_id: RKIT-S-0001
-initiative_id: NULL
+initiative_id: resume-agent-semantic-equivalence
 ---
 
 # Resume-Agent Semantic Equivalence and Entailment Proposal Handoff Initiative

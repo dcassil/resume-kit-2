@@ -9,6 +9,7 @@
       "extractJobSemantics",
       "generateClarificationQuestion",
       "interpretUserAnswer",
+      "proposeEquivalences",
       "proposeRewrite"
     ],
     "style": "Functions may be synchronous or asynchronous. Every function returns schema-constrained proposal DTOs, never authoritative domain objects."
@@ -209,6 +210,56 @@
           "user_verified_authority",
           "sqlite",
           "staff_title_employment_history"
+        ]
+      }
+    },
+    {
+      "name": "proposeEquivalences",
+      "description": "Return adapter-sourced semantic equivalence proposal DTOs for code-selected candidate pairs. Each proposal requires downstream validation before any relationship can be used.",
+      "input_contract": {
+        "required": [
+          "context"
+        ],
+        "properties": {
+          "context": {
+            "type": "object",
+            "required": [
+              "candidate_pairs",
+              "evidence"
+            ]
+          }
+        }
+      },
+      "output_contract": {
+        "proposal_type": "equivalence_proposal",
+        "required_fields": [
+          "schema_version",
+          "proposal_type",
+          "proposals",
+          "uncertainty",
+          "requires_validation"
+        ],
+        "dto_fields": [
+          "id",
+          "term_a",
+          "term_b",
+          "direction",
+          "rationale",
+          "evidence_refs",
+          "confidence",
+          "requires_validation"
+        ],
+        "directions": [
+          "equivalent",
+          "narrower_than",
+          "broader_than"
+        ],
+        "must_not_include": [
+          "persisted_relationship",
+          "official_truth",
+          "final_verification_state",
+          "sqlite",
+          "relationship_authority"
         ]
       }
     },

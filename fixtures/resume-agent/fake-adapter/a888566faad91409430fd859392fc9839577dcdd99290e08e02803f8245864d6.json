@@ -1,0 +1,33 @@
+{
+  "fixture_id": "resume-agent-equivalence-alias-responsive",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Alias-miss pair responsive web apps and responsive design produces an equivalent proposal."
+  ],
+  "comment": "Pinned fake-adapter output for semantic equivalence proposal coverage.",
+  "data": {
+    "key": {
+      "sha256": "a888566faad91409430fd859392fc9839577dcdd99290e08e02803f8245864d6",
+      "prompt_template_id": "resume-agent.equivalence-proposal@v1",
+      "output_schema_id": "resume-agent.equivalence-proposal.v1",
+      "canonical_input_json": "{\"candidates\":[{\"candidate_id\":\"candidate_1\",\"evidence_refs\":[\"ev_resume_responsive\",\"ev_job_responsive\"],\"term_a\":\"responsive web apps\",\"term_b\":\"responsive design\"}],\"evidence\":[{\"evidence_id\":\"ev_resume_responsive\",\"source\":\"resume\",\"text\":\"Experience building React and TypeScript front ends, REST APIs, and responsive web applications.\"},{\"evidence_id\":\"ev_job_responsive\",\"source\":\"job\",\"text\":\"Required: React, TypeScript, API architecture/design, responsive design.\"}],\"schema_id\":\"resume-agent.equivalence-proposal.v1\"}"
+    },
+    "payload": [
+      {
+        "id": "model_supplied_alias_responsive",
+        "term_a": "responsive web apps",
+        "term_b": "responsive design",
+        "direction": "equivalent",
+        "rationale": "The resume phrase describes building applications that adapt to screen sizes, matching the job wording for responsive design.",
+        "evidence_refs": [
+          "ev_resume_responsive",
+          "ev_job_responsive"
+        ],
+        "confidence": 0.9,
+        "requires_validation": true
+      }
+    ]
+  }
+}

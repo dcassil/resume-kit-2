@@ -26,7 +26,7 @@ class AdapterRequest:
 
 @dataclass(frozen=True)
 class AdapterCompletion:
-    payload: JsonObject
+    payload: Any
     retries: int = 0
     usage: JsonObject = field(default_factory=dict)
 
@@ -56,14 +56,14 @@ class AdapterResult:
     runtime_config: JsonObject
     retries: int
     usage: JsonObject
-    payload: JsonObject | None = None
+    payload: Any | None = None
     error: AdapterFailure | None = None
 
     @classmethod
     def ok(
         cls,
         *,
-        payload: JsonObject,
+        payload: Any,
         adapter_id: str,
         adapter_version: str,
         model_id: str,
@@ -220,7 +220,7 @@ class ValidatingModelAdapter:
     def _normalize_completion(self, value: AdapterCompletion | JsonObject) -> AdapterCompletion:
         if isinstance(value, AdapterCompletion):
             return value
-        if isinstance(value, dict):
+        if isinstance(value, (dict, list)):
             return AdapterCompletion(payload=value)
         return AdapterCompletion(payload={"value": value})
 

@@ -130,13 +130,13 @@ def _user_content(request: AdapterRequest) -> str:
     return f"{request.prompt}\n\nRespond only with JSON matching schema {request.output_schema_id}.\nInput JSON:\n{payload}"
 
 
-def _parsed_payload(response: Any) -> JsonObject:
-    direct = _mapping_value(getattr(response, "output", None)) or _mapping_value(getattr(response, "parsed", None))
+def _parsed_payload(response: Any) -> Any:
+    direct = _json_value(getattr(response, "output", None)) or _json_value(getattr(response, "parsed", None))
     if direct is not None:
         return direct
 
     if isinstance(response, Mapping):
-        direct = _mapping_value(response.get("output")) or _mapping_value(response.get("parsed"))
+        direct = _json_value(response.get("output")) or _json_value(response.get("parsed"))
         if direct is not None:
             return direct
         content = response.get("content")
@@ -150,15 +150,15 @@ def _parsed_payload(response: Any) -> JsonObject:
                 return block_payload
 
     raise AdapterProviderError(
-        "Anthropic response did not contain a JSON object payload.",
+        "Anthropic response did not contain a JSON payload.",
         details={"reason": "anthropic_missing_structured_payload"},
     )
 
 
-def _payload_from_block(block: Any) -> JsonObject | None:
+def _payload_from_block(block: Any) -> Any | None:
     for field_name in ("input", "json", "parsed"):
         value = block.get(field_name) if isinstance(block, Mapping) else getattr(block, field_name, None)
-        mapped = _mapping_value(value)
+        mapped = _json_value(value)
         if mapped is not None:
             return mapped
 
@@ -171,15 +171,17 @@ def _payload_from_block(block: Any) -> JsonObject | None:
                 "Anthropic response text was not valid JSON.",
                 details={"reason": "anthropic_invalid_json_payload", "line": exc.lineno, "column": exc.colno},
             ) from exc
-        mapped = _mapping_value(loaded)
+        mapped = _json_value(loaded)
         if mapped is not None:
             return mapped
     return None
 
 
-def _mapping_value(value: Any) -> JsonObject | None:
+def _json_value(value: Any) -> Any | None:
     if isinstance(value, Mapping):
         return dict(value)
+    if isinstance(value, list):
+        return list(value)
     return None
 
 
