@@ -4,14 +4,14 @@ level: task
 title: "Section-4.5 rewrite operation schema, input-contract validation (typed missing-target error), fake fixtures"
 short_code: "RKIT-T-0098"
 created_at: 2026-08-17T17:23:40.476835+00:00
-updated_at: 2026-08-17T17:23:40.476835+00:00
+updated_at: 2026-08-17T17:25:01.145049+00:00
 parent: resume-agent-grounded-rewrite
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0019
 ## Objective **[REQUIRED]**
 
 Land the rewrite substrate: (1) a rewrite-proposal output schema whose operations are FULL section 4.5 `ResumeChangeOperation` shapes — `operation_type ∈ replace|rewrite|insert|remove|move` (retiring `replace_text`), mandatory non-empty `reason`, `requirementIds`, `factIds`, `provenance: ProvenanceRef[]` pointing at licensing evidence, `confidence`, `status: proposed` — PLUS a fact-mapping structure: every added claim/term maps to a licensing fact id (the T-0099 post-guard enforces it deterministically). (2) Input-contract validation: code supplies original text, MANDATORY valid `target_path` (typed input error if absent/malformed — the fabricated `experience[0].bullets[0]` default at audit ref :759 dies), allowed facts with ids, requirement ids, voice/length constraints, prohibited additions. (3) Prompt template asset + builder. (4) Fake fixtures: grounded rewrite golden (every added term fact-mapped), an ungrounded fixture (added term without fact mapping — for the post-guard test), and a constraint-carrying golden.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria **[REQUIRED]**
 
@@ -53,4 +55,4 @@ None within I-0019 (first task). Serial chain T-0098→0099→0100.
 
 ## Status Updates **[REQUIRED]**
 
-*To be added during implementation*
+- 2026-08-17: I-0018 complete (v0.20.0 pushed b4c319b — both gate violations closed). I-0019 decomposed T-0098..0100 (serial). Codex launched on the substrate: rewrite-proposal.v1 schema (full 4.5 ops + required grounding map; schema-valid/guard-violating split documented), input contract w/ typed missing-target error, prompt asset + builder, grounded/ungrounded/constraint fixtures.

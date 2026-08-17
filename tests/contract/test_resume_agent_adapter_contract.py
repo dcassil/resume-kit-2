@@ -45,6 +45,11 @@ from resume_agent._interview_requests import (
     prompt_template_text as interview_prompt_template_text,
 )
 from resume_agent._interview_schemas import ANSWER_INTERPRETATION_SCHEMA_ID, QUESTION_GENERATION_SCHEMA_ID
+from resume_agent._rewrite_requests import (
+    REWRITE_PROPOSAL_PROMPT_TEMPLATE_ID,
+    build_rewrite_request,
+    prompt_template_text as rewrite_prompt_template_text,
+)
 from resume_agent._schema_validation import validate_json_schema, validate_schema_id
 
 
@@ -93,20 +98,24 @@ FACT_SEED_KEY = "300120704f1c601ece4f28ecbe7767029407485e3c14ed5dae4a4ad5b80ca68
 
 REWRITE_SEED_INPUT = {
     "original_text": "Built web applications.",
+    "target_path": "/experience/0/bullets/0",
     "allowed_facts": [
-        {"fact_id": "fact_api", "text": "API design experience", "verification_state": "source_stated"},
-        {"fact_id": "fact_responsive", "text": "responsive web applications", "verification_state": "source_stated"},
+        {
+            "fact_id": "fact_api",
+            "text": "Designed REST API architecture for customer-facing SaaS products.",
+            "verification_state": "source_stated",
+            "evidence_id": "ev_api",
+        },
     ],
-    "job_terminology": ["API architecture", "responsive design"],
-    "requirements": [
-        {"requirement_id": "req_api", "source_text": "API architecture/design"},
-        {"requirement_id": "req_responsive", "source_text": "responsive design"},
-    ],
-    "length_constraints": {"max_chars": 160},
-    "voice_constraints": {"style": "concise", "tense": "past"},
+    "requirement_ids": ["req_api"],
+    "voice_constraints": {},
+    "length_constraints": {"max_chars": 150},
+    "prohibited_additions": ["GraphQL", "AWS", "responsive design"],
 }
-REWRITE_SEED_TEMPLATE = "resume-agent.propose-rewrite.v1"
-REWRITE_SEED_KEY = "804cc1b63efc716aff6873933e8a999a57551ee379f20315212d8a12f70cf2de"
+REWRITE_SEED_TEMPLATE = "resume-agent.rewrite-proposal@v1"
+REWRITE_SEED_KEY = "d898ee31dbf64bcb90f68b1f62120fbb421919dc0d1e1715a211e6ecc462f0bd"
+REWRITE_UNGROUNDED_KEY = "713064319164024237f6c2774b37c5708f40964418ea93e82ff626855ca8c315"
+REWRITE_CONSTRAINT_KEY = "b666300532211f6c9b04556d780c25b81ce44a5c2cc97138fd92be3dfc2e6452"
 
 LEGACY_RESUME_FIXTURE = """
 Daniel Candidate
@@ -283,8 +292,10 @@ class ResumeAgentDeterministicFakeAdapterContractTests(unittest.TestCase):
 
     def test_seed_fixture_keys_are_stable_hashes_of_template_schema_and_canonical_input(self):
         self.assertEqual(deterministic_fake_key(FACT_SEED_TEMPLATE, FACT_PROPOSAL_SCHEMA_ID, FACT_SEED_INPUT), FACT_SEED_KEY)
+        rewrite_request = build_rewrite_request(REWRITE_SEED_INPUT)
+        self.assertIsInstance(rewrite_request, AdapterRequest)
         self.assertEqual(
-            deterministic_fake_key(REWRITE_SEED_TEMPLATE, REWRITE_PROPOSAL_SCHEMA_ID, REWRITE_SEED_INPUT),
+            deterministic_fake_key(REWRITE_SEED_TEMPLATE, REWRITE_PROPOSAL_SCHEMA_ID, rewrite_request.input_payload),
             REWRITE_SEED_KEY,
         )
         self.assertTrue((FAKE_FIXTURES / f"{FACT_SEED_KEY}.json").is_file())
@@ -553,6 +564,154 @@ class ResumeAgentInterviewSchemaContractTests(unittest.TestCase):
         self.assertIn("Terraform", question["question"])
         self.assertEqual(answer["polarity"], "affirmed")
         self.assertIn("terraform", json.dumps(answer["factProposals"], sort_keys=True).lower())
+
+
+class ResumeAgentRewriteSchemaContractTests(unittest.TestCase):
+    def test_rewrite_schema_id_is_registered_with_fake_adapter_validator(self):
+        self.assertIn(REWRITE_PROPOSAL_SCHEMA_ID, DEFAULT_FAKE_OUTPUT_SCHEMAS)
+
+        for fixture_id in [
+            "resume-agent-rewrite-grounded-api-only",
+            "resume-agent-rewrite-ungrounded-missing-map-entry",
+            "resume-agent-rewrite-constraint-golden",
+        ]:
+            with self.subTest(fixture_id=fixture_id):
+                payload = _fixture_payload(fixture_id)
+                self.assertEqual(validate_schema_id(payload, REWRITE_PROPOSAL_SCHEMA_ID, DEFAULT_FAKE_OUTPUT_SCHEMAS), [])
+
+    def test_rewrite_schema_enforces_operation_verb_reason_and_provenance_array(self):
+        payload = copy.deepcopy(_fixture_payload("resume-agent-rewrite-grounded-api-only"))
+        operation = payload["operations"][0]
+        operation["op"] = "replace_text"
+        operation["operation_type"] = "replace_text"
+        operation["reason"] = ""
+        del operation["provenance"]
+
+        violations = validate_schema_id(payload, REWRITE_PROPOSAL_SCHEMA_ID, DEFAULT_FAKE_OUTPUT_SCHEMAS)
+        pairs = {(item.get("code"), item.get("field_path")) for item in violations}
+
+        self.assertIn(("invalid_enum", "operations/0/op"), pairs)
+        self.assertIn(("invalid_enum", "operations/0/operation_type"), pairs)
+        self.assertIn(("min_length", "operations/0/reason"), pairs)
+        self.assertIn(("missing_field", "operations/0/provenance"), pairs)
+
+    def test_rewrite_schema_requires_provenance_to_be_an_array(self):
+        payload = copy.deepcopy(_fixture_payload("resume-agent-rewrite-grounded-api-only"))
+        payload["operations"][0]["provenance"] = {"source": "allowed_fact", "text": "not an array"}
+
+        violations = validate_schema_id(payload, REWRITE_PROPOSAL_SCHEMA_ID, DEFAULT_FAKE_OUTPUT_SCHEMAS)
+
+        self.assertIn(("invalid_type", "operations/0/provenance"), {(item.get("code"), item.get("field_path")) for item in violations})
+
+    def test_rewrite_input_contract_reports_typed_field_errors(self):
+        base = copy.deepcopy(REWRITE_SEED_INPUT)
+        cases = [
+            ("target_path", {key: value for key, value in base.items() if key != "target_path"}),
+            ("target_path", {**base, "target_path": "experience[0].bullets[0]"}),
+            ("allowed_facts", {**base, "allowed_facts": []}),
+        ]
+
+        for expected_field, context in cases:
+            with self.subTest(expected_field=expected_field, context=context):
+                result = build_rewrite_request(context)
+                self.assertIsInstance(result, dict)
+                self.assertEqual(result["status"], "error")
+                self.assertEqual(result["error"]["type"], "validation_error")
+                self.assertEqual(result["error"]["field_path"], expected_field)
+
+    def test_rewrite_request_builder_is_deterministic_and_carries_contract_inputs(self):
+        first = build_rewrite_request(REWRITE_SEED_INPUT)
+        second = build_rewrite_request(REWRITE_SEED_INPUT)
+        changed = build_rewrite_request({**REWRITE_SEED_INPUT, "target_path": "/experience/0/bullets/1"})
+
+        self.assertIsInstance(first, AdapterRequest)
+        self.assertEqual(first, second)
+        self.assertNotEqual(first.input_payload, changed.input_payload)
+        self.assertEqual(first.prompt_template_id, REWRITE_PROPOSAL_PROMPT_TEMPLATE_ID)
+        self.assertEqual(first.output_schema_id, REWRITE_PROPOSAL_SCHEMA_ID)
+        self.assertEqual(first.input_payload["schema_id"], REWRITE_PROPOSAL_SCHEMA_ID)
+        self.assertEqual(first.input_payload["target_path"], "/experience/0/bullets/0")
+        self.assertEqual(first.input_payload["allowed_facts"][0]["fact_id"], "fact_api")
+        self.assertEqual(first.input_payload["requirement_ids"], ["req_api"])
+        self.assertEqual(first.input_payload["length_constraints"], {"max_chars": 150})
+        self.assertEqual(first.input_payload["prohibited_additions"], ["GraphQL", "AWS", "responsive design"])
+
+    def test_rewrite_prompt_asset_uses_id_at_version_convention(self):
+        self.assertEqual(REWRITE_PROPOSAL_PROMPT_TEMPLATE_ID, "resume-agent.rewrite-proposal@v1")
+        prompt = rewrite_prompt_template_text(REWRITE_PROPOSAL_PROMPT_TEMPLATE_ID)
+
+        self.assertIn("Return only JSON", prompt)
+        self.assertIn("grounding", prompt)
+
+    def test_rewrite_golden_fixture_is_api_fact_only_with_full_grounding_map(self):
+        payload = _fixture_payload("resume-agent-rewrite-grounded-api-only")
+        operation = payload["operations"][0]
+
+        self.assertEqual(operation["op"], "rewrite")
+        self.assertEqual(operation["operation_type"], "rewrite")
+        self.assertEqual(operation["path"], operation["target_path"])
+        self.assertEqual(operation["linked_requirement_ids"], operation["requirementIds"])
+        self.assertEqual(operation["linked_fact_ids"], operation["factIds"])
+        self.assertEqual(operation["linked_fact_ids"], ["fact_api"])
+        self.assertNotRegex(operation["after"].lower(), r"\bgraphql\b|\baws\b|\bresponsive design\b")
+        self.assertEqual({entry["term"] for entry in operation["grounding"]}, {"REST API architecture"})
+        self.assertEqual({entry["fact_id"] for entry in operation["grounding"]}, {"fact_api"})
+
+    def test_rewrite_ungrounded_fixture_is_schema_valid_but_missing_added_term_mapping(self):
+        payload = _fixture_payload("resume-agent-rewrite-ungrounded-missing-map-entry")
+        operation = payload["operations"][0]
+
+        self.assertEqual(validate_schema_id(payload, REWRITE_PROPOSAL_SCHEMA_ID, DEFAULT_FAKE_OUTPUT_SCHEMAS), [])
+        self.assertIn("GraphQL APIs", operation["after"])
+        self.assertNotIn("GraphQL APIs", {entry["term"] for entry in operation["grounding"]})
+
+    def test_rewrite_constraint_fixture_carries_voice_and_length_inputs(self):
+        path = FAKE_FIXTURES / f"{REWRITE_CONSTRAINT_KEY}.json"
+        fixture = json.loads(path.read_text(encoding="utf-8"))
+        canonical_input = json.loads(fixture["data"]["key"]["canonical_input_json"])
+        operation = fixture["data"]["payload"]["operations"][0]
+
+        self.assertEqual(canonical_input["voice_constraints"], {"person": "first-person-implied", "style": "concise", "tense": "past"})
+        self.assertEqual(canonical_input["length_constraints"], {"max_chars": 140})
+        self.assertLessEqual(len(operation["after"]), 140)
+        self.assertEqual({entry["fact_id"] for entry in operation["grounding"]}, {"fact_api", "fact_docs"})
+
+    def test_rewrite_fixtures_are_retrievable_by_deterministic_requests(self):
+        contexts = [
+            REWRITE_SEED_INPUT,
+            {
+                **REWRITE_SEED_INPUT,
+                "requirement_ids": ["req_api", "req_graphql"],
+                "length_constraints": {"max_chars": 180},
+                "prohibited_additions": [],
+            },
+            {
+                **REWRITE_SEED_INPUT,
+                "allowed_facts": [
+                    *REWRITE_SEED_INPUT["allowed_facts"],
+                    {
+                        "fact_id": "fact_docs",
+                        "text": "Wrote concise API documentation for partner developers.",
+                        "verification_state": "source_stated",
+                        "evidence_id": "ev_docs",
+                    },
+                ],
+                "requirement_ids": ["req_api", "req_docs"],
+                "voice_constraints": {"tense": "past", "style": "concise", "person": "first-person-implied"},
+                "length_constraints": {"max_chars": 140},
+                "prohibited_additions": ["AWS", "GraphQL", "team leadership"],
+            },
+        ]
+        adapter = DeterministicFakeAdapter(fixture_dir=FAKE_FIXTURES)
+
+        for context in contexts:
+            request = build_rewrite_request(context)
+            self.assertIsInstance(request, AdapterRequest)
+            key = deterministic_fake_key(request.prompt_template_id, request.output_schema_id, request.input_payload)
+            with self.subTest(key=key):
+                result = adapter.complete(request)
+                self.assertEqual(result.status, "ok")
+                self.assertTrue(result.payload["requires_validation"])
 
 
 class ResumeAgentAnthropicAdapterContractTests(unittest.TestCase):

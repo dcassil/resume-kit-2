@@ -13,6 +13,7 @@ from ._adapters import AdapterCompletion, AdapterProviderError, AdapterRequest, 
 from ._agent_config import AgentConfig, resolve_agent_config
 from ._extraction_schemas import EXTRACTION_OUTPUT_SCHEMAS
 from ._interview_schemas import INTERVIEW_OUTPUT_SCHEMAS
+from ._rewrite_schemas import REWRITE_OUTPUT_SCHEMAS, REWRITE_PROPOSAL_SCHEMA_ID
 from ._schema_validation import JsonObject, JsonSchemaRegistry, validate_schema_id
 
 
@@ -23,7 +24,6 @@ FAKE_FIXTURE_SCHEMA_VERSION = "resume-agent.fake-adapter-fixture.v1"
 FAKE_CONFIG_HASH = "fixture-config-v1"
 
 FACT_PROPOSAL_SCHEMA_ID = "resume-agent.fact-proposals.v1"
-REWRITE_PROPOSAL_SCHEMA_ID = "resume-agent.rewrite-proposal.v1"
 MANIFEST_VERIFICATION_STATES = ("source_stated", "user" + "_verified", "imported", "inferred", "unknown")
 
 
@@ -86,62 +86,10 @@ DEFAULT_FAKE_OUTPUT_SCHEMAS: JsonSchemaRegistry = {
         },
         "additionalProperties": False,
     },
-    REWRITE_PROPOSAL_SCHEMA_ID: {
-        "type": "object",
-        "required": ["schema_version", "proposal_type", "requires_validation", "uncertainty", "operations"],
-        "properties": {
-            "schema_version": {"enum": [REWRITE_PROPOSAL_SCHEMA_ID]},
-            "proposal_type": {"enum": ["rewrite_proposal"]},
-            "requires_validation": {"enum": [True]},
-            "uncertainty": {"type": "array"},
-            "operations": {
-                "type": "array",
-                "minItems": 1,
-                "items": {
-                    "type": "object",
-                    "required": [
-                        "operation_id",
-                        "operation_type",
-                        "target_path",
-                        "before",
-                        "after",
-                        "facts_used",
-                        "requirements_targeted",
-                        "terminology_changes",
-                        "provenance",
-                        "reason",
-                        "status",
-                    ],
-                    "properties": {
-                        "operation_id": {"type": "string", "minLength": 1},
-                        "operation_type": {"enum": ["replace_text"]},
-                        "target_path": {"type": "string", "minLength": 1},
-                        "before": {"type": "string", "minLength": 1},
-                        "after": {"type": "string", "minLength": 1},
-                        "facts_used": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
-                        "requirements_targeted": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
-                        "terminology_changes": {"type": "array"},
-                        "provenance": {
-                            "type": "object",
-                            "required": ["adapter_id", "fixture_key"],
-                            "properties": {
-                                "adapter_id": {"enum": [FAKE_ADAPTER_ID]},
-                                "fixture_key": {"type": "string", "minLength": 64, "maxLength": 64},
-                            },
-                            "additionalProperties": False,
-                        },
-                        "reason": {"type": "string", "minLength": 1},
-                        "status": {"enum": ["proposed"]},
-                    },
-                    "additionalProperties": False,
-                },
-            },
-        },
-        "additionalProperties": False,
-    },
 }
 DEFAULT_FAKE_OUTPUT_SCHEMAS.update(EXTRACTION_OUTPUT_SCHEMAS)
 DEFAULT_FAKE_OUTPUT_SCHEMAS.update(INTERVIEW_OUTPUT_SCHEMAS)
+DEFAULT_FAKE_OUTPUT_SCHEMAS.update(REWRITE_OUTPUT_SCHEMAS)
 
 
 @dataclass(frozen=True)

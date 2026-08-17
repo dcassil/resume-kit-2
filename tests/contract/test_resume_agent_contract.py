@@ -785,6 +785,7 @@ from tests.contract.test_resume_agent_adapter_contract import (  # noqa: E402,F4
     ResumeAgentDeterministicFakeAdapterContractTests,
     ResumeAgentExtractionSchemaContractTests,
     ResumeAgentInterviewSchemaContractTests,
+    ResumeAgentRewriteSchemaContractTests,
     ResumeAgentSchemaValidatorContractTests,
 )
 

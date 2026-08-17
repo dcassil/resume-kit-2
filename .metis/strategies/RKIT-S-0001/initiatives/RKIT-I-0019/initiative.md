@@ -4,14 +4,14 @@ level: initiative
 title: "Resume-Agent Grounded Rewrite Proposal Adapter"
 short_code: "RKIT-I-0019"
 created_at: 2026-08-13T20:41:37.268979+00:00
-updated_at: 2026-08-17T17:23:34.501546+00:00
+updated_at: 2026-08-17T17:25:00.831615+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0016]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/decompose"
+  - "#phase/active"
 
 
 exit_criteria_met: false
