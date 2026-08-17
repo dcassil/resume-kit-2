@@ -19,6 +19,8 @@ from career_store import (
     VERIFICATION_TRANSITION_MATRIX,
 )
 
+from . import policy
+
 
 JsonObject = dict[str, Any]
 
@@ -60,10 +62,10 @@ POLICY_REASON_CODES = {
 TOOL_ARGUMENTS = {
     "career.search_facts": {"query", "types", "verification", "limit"},
     "career.get_fact": {"fact_id", "include_conflicts"},
-    "career.propose_fact": {"type", "text", "source", "evidence", "dedupe_key"},
-    "career.add_evidence": {"fact_id", "evidence"},
-    "career.verify_fact": {"fact_id", "verification_state", "confirmation", "evidence_id"},
-    "career.add_relationship": {"from_fact_id", "to_fact_id", "relationship_type", "evidence", "confirmation"},
+    "career.propose_fact": {"type", "text", "source", "evidence", "dedupe_key", "confirmed"},
+    "career.add_evidence": {"fact_id", "evidence", "confirmed"},
+    "career.verify_fact": {"fact_id", "verification_state", "confirmation", "evidence_id", "confirmed"},
+    "career.add_relationship": {"from_fact_id", "to_fact_id", "relationship_type", "evidence", "confirmation", "confirmed"},
     "career.find_matches": {"requirements"},
     "career.get_unverified": {"topic", "limit"},
 }
@@ -102,7 +104,7 @@ class CareerMcpAdapter:
     def list_tools(self) -> list[JsonObject]:
         return [dict(tool) for tool in self._tools]
 
-    async def call_tool(self, name: str, arguments: JsonObject | None, context: JsonObject | None = None) -> JsonObject:
+    async def call_tool(self, name: str, arguments: JsonObject | None) -> JsonObject:
         if name not in self._tool_by_name:
             result = _tool_result(name, "error", error={"type": "unknown_tool", "message": "Unknown career tool."})
             self._record_audit(name, result)
@@ -113,17 +115,34 @@ class CareerMcpAdapter:
             result = _tool_result(name, "error", error={"type": "validation_error", "message": validation_error})
             self._record_audit(name, result)
             return result
+        _assert_consumed_arguments(name, arguments)
+        confirmed = bool(arguments.get("confirmed", False))
+        policy_decision = policy.evaluate_policy(name, arguments, confirmed=confirmed)
+        if not policy_decision.allowed:
+            result = _tool_result(
+                name,
+                "rejected",
+                data={
+                    "confirmation_required": policy_decision.requires_confirmation,
+                    "confirmed": confirmed,
+                },
+                error={
+                    "type": "policy_error",
+                    "reason": policy_decision.reason,
+                    "message": policy_decision.reason or "Policy rejected career tool call.",
+                },
+            )
+            self._record_audit(name, result)
+            return result
         try:
-            _assert_consumed_arguments(name, arguments)
             handler = getattr(self, HANDLER_BY_TOOL[name])
             payload = await handler(name, arguments)
             result = _normalize_tool_result(name, payload)
+            _apply_policy_decision(result, policy_decision, confirmed=confirmed)
         except AssertionError:
             raise
         except Exception as exc:
             result = _tool_result(name, "error", error={"type": _exception_type(exc), "message": _safe_message(exc)})
-        if context is not None and isinstance(result, dict):
-            result.setdefault("context", context)
         self._record_audit(name, result)
         return result
 
@@ -509,7 +528,11 @@ def _normalize_error(error: JsonObject | None) -> JsonObject:
     if error_type not in ERROR_TYPES:
         error_type = "store_error"
     message = _safe_text_message(str(error.get("message") or GENERIC_STORE_ERROR_MESSAGE))
-    return {"type": error_type, "message": message}
+    normalized = {"type": error_type, "message": message}
+    reason = error.get("reason")
+    if isinstance(reason, str) and reason:
+        normalized["reason"] = reason
+    return normalized
 
 
 def _store_rejection_error(value: JsonObject) -> JsonObject:
@@ -603,12 +626,29 @@ def _coherent_matches(value: Any, requirements: list[JsonObject]) -> list[JsonOb
     return [_match(row) for row in rows_by_requirement.values()]
 
 
+def _apply_policy_decision(result: JsonObject, policy_decision: policy.PolicyDecision, confirmed: bool) -> None:
+    if not policy_decision.requires_confirmation:
+        return
+    result["confirmation_required"] = True
+    result["confirmed"] = confirmed
+    data = result.get("data")
+    if isinstance(data, dict):
+        data["confirmation_required"] = True
+        data["confirmed"] = confirmed
+
+
 def _unverified_fact(fact: JsonObject) -> JsonObject:
+    fact_id = str(fact.get("fact_id", ""))
+    policy_decision = policy.evaluate_policy(
+        "career.verify_fact",
+        {"fact_id": fact_id, "verification_state": "user_verified", "confirmation": {}},
+        confirmed=False,
+    )
     return {
-        "fact_id": str(fact.get("fact_id", "")),
+        "fact_id": fact_id,
         "text": str(fact.get("text", "")),
         "verification_state": str(fact.get("verification_state", "unknown")),
-        "confirmation_required": True,
+        "confirmation_required": policy_decision.requires_confirmation,
     }
 
 

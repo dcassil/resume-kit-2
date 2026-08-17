@@ -32,7 +32,7 @@ Tests should treat MCP as an adapter with:
 - argument validation
 - response DTO normalization
 - error mapping
-- authorization/scope policy if added later
+- v1 single-user local policy: mutating tools require explicit host-mediated confirmation; no multi-user authorization layer is advertised
 - store service dependency injection
 
 ## Contract Test Cases
@@ -54,7 +54,17 @@ Tests should treat MCP as an adapter with:
 - Return typed errors without leaking SQL details.
 - Every non-ok result must carry a typed `error: {type, message}` envelope; covered by `test_envelope_helper_refuses_non_ok_without_error_object` and `test_real_store_verify_fact_rejected_dict_has_typed_error_envelope`.
 - Schema-accepted arguments must never be silently dropped by dispatch; covered by `test_consumed_arguments_assertion_catches_planted_dropped_argument`, `test_propose_fact_forwards_dedupe_key_when_store_surface_accepts_it`, `test_real_store_dedupe_key_is_typed_rejected_when_upsert_fact_cannot_honor_it`, `test_real_store_get_fact_include_conflicts_observably_controls_conflict_records`, and `test_real_store_verify_fact_requires_and_forwards_evidence_id_for_source_document_state`.
+- The `confirmed` argument on mutating tools must be schema-declared and consumed by dispatch; covered by `test_write_tool_schemas_accept_explicit_confirmed_argument` and `test_consumed_arguments_assertion_covers_confirmed_argument`.
 - Persistence details in envelope messages must be redacted while ordinary validation messages pass verbatim; covered by `test_raw_sql_fragment_in_envelope_message_is_redacted_without_touching_type_or_data`, `test_sqlite_error_signature_in_envelope_message_is_redacted`, and `test_validation_message_with_plain_update_survives_scrub_verbatim`.
+
+### Confirmation policy
+
+- Policy classification must cover every canonical-manifest tool from the manifest `mutates` flag; covered by `test_policy_classifies_every_manifest_tool_from_mutates_flag`.
+- Unconfirmed mutating tools must return `status: rejected`, `error.type: policy_error`, and `error.reason: confirmation_required` before any store method is called; covered by `test_unconfirmed_mutation_is_policy_rejected_before_store_dispatch`.
+- Confirmed mutating tools must reach the store and expose `confirmation_required: true` plus `confirmed: true`; covered by `test_confirmed_mutation_proceeds_and_exposes_policy_flags`.
+- Read tools must remain callable without `confirmed`; covered by `test_read_tool_does_not_require_confirmation`.
+- `career.get_unverified` must compute each fact's `confirmation_required` flag from policy rather than a constant; covered by `test_get_unverified_confirmation_flag_comes_from_policy`.
+- Any policy claim in `tool_surface.json` must have runtime parity coverage; covered by `test_manifest_policy_statement_matches_runtime_confirmation_policy`.
 
 ### Search behavior
 

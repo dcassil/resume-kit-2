@@ -11,6 +11,11 @@
     ],
     "store_dependency": "A career-store service object is injected into create_career_mcp(store, policy=None, audit_sink=None). MCP code must call store service methods and must not open SQLite or mutate tables directly."
   },
+  "policy": {
+    "model": "single-user-local-v1",
+    "confirmation": "Manifest-declared mutating tools require host-mediated confirmed=true before career-store dispatch.",
+    "scope_enforcement": "none in v1 per RKIT-A-0002 item 2"
+  },
   "mcp_endpoints": [
     {
       "name": "tools/list",
@@ -195,6 +200,11 @@
           },
           "dedupe_key": {
             "type": "string"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "default": false,
+            "description": "Host-mediated user confirmation for this mutating tool call."
           }
         }
       },
@@ -232,6 +242,11 @@
           "evidence": {
             "type": "object",
             "minProperties": 1
+          },
+          "confirmed": {
+            "type": "boolean",
+            "default": false,
+            "description": "Host-mediated user confirmation for this mutating tool call."
           }
         }
       },
@@ -281,6 +296,11 @@
           "evidence_id": {
             "type": "string",
             "description": "Required when the requested verification transition is backed by source-document evidence."
+          },
+          "confirmed": {
+            "type": "boolean",
+            "default": false,
+            "description": "Host-mediated user confirmation for this mutating tool call."
           }
         }
       },
@@ -336,6 +356,11 @@
           },
           "confirmation": {
             "type": "object"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "default": false,
+            "description": "Host-mediated user confirmation for this mutating tool call."
           }
         }
       },

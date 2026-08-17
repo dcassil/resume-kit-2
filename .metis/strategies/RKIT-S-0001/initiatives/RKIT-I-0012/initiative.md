@@ -4,20 +4,20 @@ level: initiative
 title: "Add Career-MCP Policy, Scope, and Confirmation Enforcement"
 short_code: "RKIT-I-0012"
 created_at: 2026-08-13T20:41:37.084689+00:00
-updated_at: 2026-08-13T20:41:37.084689+00:00
+updated_at: 2026-08-17T19:30:18.461377+00:00
 parent: resume-kit-2-full-product-buildout
-blocked_by: ["RKIT-I-0010"]
+blocked_by: [RKIT-I-0010]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/discovery"
+  - "#phase/active"
 
 
 exit_criteria_met: false
 estimated_complexity: M
 strategy_id: RKIT-S-0001
-initiative_id: NULL
+initiative_id: add-career-mcp-policy-scope-and
 ---
 
 # Add Career-MCP Policy, Scope, and Confirmation Enforcement Initiative

@@ -291,7 +291,7 @@ def load_adapter(test_case: unittest.TestCase):
     test_case.assertIn("store", signature.parameters, "create_career_mcp must use injected career-store service dependency.")
     adapter = factory(store=FakeCareerStore())
     test_case.assertTrue(callable(getattr(adapter, "list_tools", None)), "Adapter must expose list_tools().")
-    test_case.assertTrue(callable(getattr(adapter, "call_tool", None)), "Adapter must expose call_tool(name, arguments, context=None).")
+    test_case.assertTrue(callable(getattr(adapter, "call_tool", None)), "Adapter must expose call_tool(name, arguments).")
     return adapter
 
 
@@ -303,6 +303,10 @@ def maybe_await(value):
 
 def call_tool(adapter, name: str, arguments: dict):
     return maybe_await(adapter.call_tool(name, arguments))
+
+
+def confirmed(arguments: dict) -> dict:
+    return {**arguments, "confirmed": True}
 
 
 def load_career_modules(test_case: unittest.TestCase):
@@ -404,6 +408,38 @@ class ToolSurfaceManifestTests(unittest.TestCase):
                     response_fields = set(tool["response_contract"]["required_fields"])
                     self.assertTrue(required <= response_fields)
 
+    def test_write_tool_schemas_accept_explicit_confirmed_argument(self):
+        for tool in SURFACE["tools"]:
+            if tool.get("mutates"):
+                with self.subTest(tool=tool["name"]):
+                    confirmed_schema = tool["input_schema"]["properties"].get("confirmed")
+                    self.assertEqual(confirmed_schema, {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Host-mediated user confirmation for this mutating tool call.",
+                    })
+
+    def test_policy_classifies_every_manifest_tool_from_mutates_flag(self):
+        career_mcp = importlib.import_module("career_mcp")
+        policy = importlib.import_module("career_mcp.policy")
+        self.assertEqual(set(career_mcp.STORE_METHOD_BY_TOOL), set(ALLOWED_TOOLS))
+        for tool in SURFACE["tools"]:
+            name = tool["name"]
+            with self.subTest(tool=name):
+                unconfirmed = policy.evaluate_policy(name, {}, confirmed=False)
+                confirmed_decision = policy.evaluate_policy(name, {}, confirmed=True)
+                if tool.get("mutates"):
+                    self.assertFalse(unconfirmed.allowed)
+                    self.assertTrue(unconfirmed.requires_confirmation)
+                    self.assertEqual(unconfirmed.reason, "confirmation_required")
+                    self.assertTrue(confirmed_decision.allowed)
+                    self.assertTrue(confirmed_decision.requires_confirmation)
+                else:
+                    self.assertTrue(unconfirmed.allowed)
+                    self.assertFalse(unconfirmed.requires_confirmation)
+                    self.assertTrue(confirmed_decision.allowed)
+                    self.assertFalse(confirmed_decision.requires_confirmation)
+
 
 class VerifiedFakeCareerStoreConformanceTests(unittest.TestCase):
     def test_fake_methods_are_exactly_the_adapter_called_store_surface(self):
@@ -483,17 +519,53 @@ class CareerMcpAdapterContractTests(unittest.TestCase):
                 self.assertIn(result["error"]["type"], {"validation_error", "not_found", "policy_error"})
                 self.assertNotRegex(json.dumps(result).lower(), r"\b(sqlite|select|insert|update|delete|traceback)\b")
 
+    def test_unconfirmed_mutation_is_policy_rejected_before_store_dispatch(self):
+        self.adapter._store.calls.clear()  # noqa: SLF001
+
+        result = call_tool(
+            self.adapter,
+            "career.propose_fact",
+            {"type": "skill", "text": "AWS experience", "source": "agent_interpretation"},
+        )
+
+        self.assertEqual(result["status"], "rejected")
+        self.assertEqual(result["error"]["type"], "policy_error")
+        self.assertEqual(result["error"]["reason"], "confirmation_required")
+        self.assertTrue(result["confirmation_required"])
+        self.assertFalse(result["confirmed"])
+        self.assertEqual(self.adapter._store.calls, [])  # noqa: SLF001
+
+    def test_confirmed_mutation_proceeds_and_exposes_policy_flags(self):
+        self.adapter._store.calls.clear()  # noqa: SLF001
+
+        result = call_tool(
+            self.adapter,
+            "career.propose_fact",
+            confirmed({"type": "skill", "text": "AWS experience", "source": "agent_interpretation"}),
+        )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(self.adapter._store.calls[-1][0], "upsertFact")  # noqa: SLF001
+        self.assertTrue(result["confirmation_required"])
+        self.assertTrue(result["confirmed"])
+
+    def test_read_tool_does_not_require_confirmation(self):
+        result = call_tool(self.adapter, "career.search_facts", {"query": "React", "limit": 1})
+
+        self.assertEqual(result["status"], "ok")
+        self.assertNotIn("confirmed", result)
+
     def test_child_parent_relationship_types_are_accepted_and_unadvertised_values_rejected(self):
         for relationship_type in ("child", "parent"):
             with self.subTest(relationship_type=relationship_type):
                 result = call_tool(
                     self.adapter,
                     "career.add_relationship",
-                    {
+                    confirmed({
                         "from_fact_id": "fact_aws",
                         "to_fact_id": "fact_azure",
                         "relationship_type": relationship_type,
-                    },
+                    }),
                 )
                 self.assertEqual(result["status"], "ok", result)
         result = call_tool(
@@ -559,12 +631,12 @@ class CareerMcpAdapterContractTests(unittest.TestCase):
         result = call_tool(
             self.adapter,
             "career.propose_fact",
-            {
+            confirmed({
                 "type": "skill",
                 "text": "AWS experience",
                 "source": "agent_interpretation",
                 "dedupe_key": "proposal:aws",
-            },
+            }),
         )
         self.assertEqual(result["status"], "ok")
         self.assertEqual(self.adapter._store.calls[-1][0], "upsertFact")  # noqa: SLF001
@@ -574,7 +646,7 @@ class CareerMcpAdapterContractTests(unittest.TestCase):
         result = call_tool(
             self.adapter,
             "career.propose_fact",
-            {"type": "skill", "text": "AWS experience", "source": "agent_interpretation"},
+            confirmed({"type": "skill", "text": "AWS experience", "source": "agent_interpretation"}),
         )
         self.assertIn(result["mutation_status"], {"created", "deduped", "updated", "noop"})
         self.assertEqual(result["fact_id"], "fact_aws")
@@ -586,7 +658,7 @@ class CareerMcpAdapterContractTests(unittest.TestCase):
         evidence = call_tool(
             self.adapter,
             "career.add_evidence",
-            {"fact_id": "fact_aws", "evidence": {"source": "user_answer", "text": "about six years of AWS experience"}},
+            confirmed({"fact_id": "fact_aws", "evidence": {"source": "user_answer", "text": "about six years of AWS experience"}}),
         )
         self.assertEqual(evidence["mutation_status"], "updated")
         self.assertIn(evidence["verification_state"], VERIFICATION_STATES)
@@ -594,7 +666,7 @@ class CareerMcpAdapterContractTests(unittest.TestCase):
         verified = call_tool(
             self.adapter,
             "career.verify_fact",
-            {
+            confirmed({
                 "fact_id": "fact_aws",
                 "verification_state": "user_verified",
                 "confirmation": {
@@ -602,10 +674,11 @@ class CareerMcpAdapterContractTests(unittest.TestCase):
                     "outcome": "affirmed",
                     "provenance": [{"source": "user_answer", "text": "Yes, about six years of AWS experience."}],
                 },
-            },
+            }),
         )
         self.assertEqual(verified["verification_state"], "user_verified")
-        self.assertFalse(verified["confirmation_required"])
+        self.assertTrue(verified["confirmation_required"])
+        self.assertTrue(verified["confirmed"])
 
     def test_consumed_arguments_assertion_catches_planted_dropped_argument(self):
         career_mcp = importlib.import_module("career_mcp")
@@ -617,18 +690,32 @@ class CareerMcpAdapterContractTests(unittest.TestCase):
         finally:
             career_mcp.TOOL_ARGUMENTS["career.search_facts"] = original
 
+    def test_consumed_arguments_assertion_covers_confirmed_argument(self):
+        career_mcp = importlib.import_module("career_mcp")
+        original = career_mcp.TOOL_ARGUMENTS["career.propose_fact"]
+        career_mcp.TOOL_ARGUMENTS["career.propose_fact"] = original - {"confirmed"}
+        try:
+            with self.assertRaisesRegex(AssertionError, "validated arguments that dispatch does not consume: confirmed"):
+                call_tool(
+                    self.adapter,
+                    "career.propose_fact",
+                    confirmed({"type": "skill", "text": "AWS experience", "source": "agent_interpretation"}),
+                )
+        finally:
+            career_mcp.TOOL_ARGUMENTS["career.propose_fact"] = original
+
     def test_relationship_creation_preserves_related_vs_equivalent_distinction(self):
         responsive = call_tool(
             self.adapter,
             "career.add_relationship",
-            {"from_fact_id": "fact_responsive", "to_fact_id": "fact_responsive_design", "relationship_type": "alias"},
+            confirmed({"from_fact_id": "fact_responsive", "to_fact_id": "fact_responsive_design", "relationship_type": "alias"}),
         )
         self.assertEqual(responsive["mutation_status"], "created")
 
         azure_aws = call_tool(
             self.adapter,
             "career.add_relationship",
-            {"from_fact_id": "fact_azure", "to_fact_id": "fact_aws", "relationship_type": "related"},
+            confirmed({"from_fact_id": "fact_azure", "to_fact_id": "fact_aws", "relationship_type": "related"}),
         )
         self.assertEqual(azure_aws["mutation_status"], "created")
         self.assertNotEqual(azure_aws.get("relationship_type"), "equivalent")
@@ -735,6 +822,23 @@ class CareerMcpAdapterContractTests(unittest.TestCase):
             self.assertNotEqual(fact.get("verification_state"), "user_verified")
             self.assertTrue(fact.get("confirmation_required"))
 
+    def test_get_unverified_confirmation_flag_comes_from_policy(self):
+        career_mcp = importlib.import_module("career_mcp")
+        original = career_mcp.policy.evaluate_policy
+
+        def allow_without_confirmation(tool, arguments, confirmed):
+            return career_mcp.policy.PolicyDecision(allowed=True, requires_confirmation=False)
+
+        try:
+            career_mcp.policy.evaluate_policy = allow_without_confirmation
+            result = call_tool(self.adapter, "career.get_unverified", {"topic": "architecture", "limit": 5})
+        finally:
+            career_mcp.policy.evaluate_policy = original
+
+        self.assertEqual(result["status"], "ok")
+        self.assertTrue(result["facts"])
+        self.assertTrue(all(fact["confirmation_required"] is False for fact in result["facts"]))
+
 
 class CareerMcpRealStoreContractTests(unittest.TestCase):
     def test_real_store_search_facts_types_experience_excludes_skill_facts(self):
@@ -798,17 +902,17 @@ class CareerMcpRealStoreContractTests(unittest.TestCase):
         created = call_tool(
             adapter,
             "career.propose_fact",
-            {"type": "skill", "text": "Rust", "source": "agent_interpretation"},
+            confirmed({"type": "skill", "text": "Rust", "source": "agent_interpretation"}),
         )
         rejected = call_tool(
             adapter,
             "career.propose_fact",
-            {
+            confirmed({
                 "type": "skill",
                 "text": "Rust",
                 "source": "agent_interpretation",
                 "dedupe_key": "proposal:rust",
-            },
+            }),
         )
 
         self.assertEqual(created["status"], "ok")
@@ -828,12 +932,12 @@ class CareerMcpRealStoreContractTests(unittest.TestCase):
         added = call_tool(
             adapter,
             "career.add_evidence",
-            {"fact_id": created["fact_id"], "evidence": {"source": "user_answer", "text": "I use PostgreSQL."}},
+            confirmed({"fact_id": created["fact_id"], "evidence": {"source": "user_answer", "text": "I use PostgreSQL."}}),
         )
         missing = call_tool(
             adapter,
             "career.add_evidence",
-            {"fact_id": "fact_missing", "evidence": {"source": "user_answer", "text": "Missing fact."}},
+            confirmed({"fact_id": "fact_missing", "evidence": {"source": "user_answer", "text": "Missing fact."}}),
         )
 
         self.assertEqual(added["status"], "ok")
@@ -851,11 +955,11 @@ class CareerMcpRealStoreContractTests(unittest.TestCase):
         result = call_tool(
             adapter,
             "career.verify_fact",
-            {
+            confirmed({
                 "fact_id": created["fact_id"],
                 "verification_state": "imported",
                 "confirmation": confirmation_for_state(created["fact_id"], "imported"),
-            },
+            }),
         )
 
         self.assertEqual(result["status"], "ok")
@@ -875,6 +979,7 @@ class CareerMcpRealStoreContractTests(unittest.TestCase):
                     "fact_id": created["fact_id"],
                     "verification_state": verification_state,
                     "confirmation": confirmation_for_state(created["fact_id"], verification_state),
+                    "confirmed": True,
                 }
                 if verification_state == "source_stated":
                     arguments["evidence_id"] = f"evidence_{verification_state}"
@@ -896,11 +1001,11 @@ class CareerMcpRealStoreContractTests(unittest.TestCase):
         result = call_tool(
             adapter,
             "career.verify_fact",
-            {
+            confirmed({
                 "fact_id": created["fact_id"],
                 "verification_state": "source_stated",
                 "confirmation": confirmation,
-            },
+            }),
         )
 
         assert_typed_error(self, result, "validation_error")
@@ -922,22 +1027,22 @@ class CareerMcpRealStoreContractTests(unittest.TestCase):
         created = call_tool(
             adapter,
             "career.add_relationship",
-            {
+            confirmed({
                 "from_fact_id": frontend["fact_id"],
                 "to_fact_id": react["fact_id"],
                 "relationship_type": "related",
                 "evidence": {"text": "React supports frontend architecture."},
-            },
+            }),
         )
         missing = call_tool(
             adapter,
             "career.add_relationship",
-            {
+            confirmed({
                 "from_fact_id": "fact_missing",
                 "to_fact_id": react["fact_id"],
                 "relationship_type": "related",
                 "evidence": {"text": "Missing source fact."},
-            },
+            }),
         )
 
         self.assertEqual(created["status"], "ok")
@@ -1064,7 +1169,7 @@ class CareerMcpErrorEnvelopeTests(unittest.TestCase):
             result = call_tool(
                 adapter,
                 "career.verify_fact",
-                {
+                confirmed({
                     "fact_id": created["fact_id"],
                     "verification_state": "imported",
                     "confirmation": {
@@ -1072,7 +1177,7 @@ class CareerMcpErrorEnvelopeTests(unittest.TestCase):
                         "outcome": "affirmed",
                         "provenance": [{"source": "user_answer", "text": "Yes."}],
                     },
-                },
+                }),
             )
 
         self.assertEqual(result["tool"], "career.verify_fact")
@@ -1133,12 +1238,12 @@ class CareerMcpErrorEnvelopeTests(unittest.TestCase):
             result = call_tool(
                 adapter,
                 "career.propose_fact",
-                {
+                confirmed({
                     "type": "skill",
                     "text": "Rust",
                     "source": "agent_interpretation",
                     "dedupe_key": "proposal:rust",
-                },
+                }),
             )
 
         self.assertEqual(result["status"], "error")
@@ -1191,21 +1296,21 @@ class CareerMcpErrorEnvelopeTests(unittest.TestCase):
             missing = call_tool(
                 adapter,
                 "career.verify_fact",
-                {
+                confirmed({
                     "fact_id": created["fact_id"],
                     "verification_state": "source_stated",
                     "confirmation": confirmation,
-                },
+                }),
             )
             verified = call_tool(
                 adapter,
                 "career.verify_fact",
-                {
+                confirmed({
                     "fact_id": created["fact_id"],
                     "verification_state": "source_stated",
                     "confirmation": confirmation,
                     "evidence_id": "evidence_resume_pg",
-                },
+                }),
             )
             fetched = store.getFact(created["fact_id"])
 

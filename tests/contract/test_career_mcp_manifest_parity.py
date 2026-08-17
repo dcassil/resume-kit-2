@@ -166,6 +166,20 @@ class CareerMcpManifestParityTests(unittest.TestCase):
             load_json(STORE_SURFACE_PATH),
         )
 
+    def test_manifest_policy_statement_matches_runtime_confirmation_policy(self):
+        career_mcp_policy = importlib.import_module("career_mcp.policy")
+        manifest = load_json(PACKAGE_SURFACE_PATH)
+        statement = manifest.get("policy", {})
+
+        self.assertEqual(statement.get("model"), "single-user-local-v1")
+        self.assertIn("confirmed=true", statement.get("confirmation", ""))
+        self.assertEqual(statement.get("scope_enforcement"), "none in v1 per RKIT-A-0002 item 2")
+
+        for name, tool in manifest_tools_by_name(manifest).items():
+            with self.subTest(tool=name):
+                decision = career_mcp_policy.evaluate_policy(name, {}, confirmed=False)
+                self.assertEqual(decision.requires_confirmation, tool.get("mutates") is True)
+
     def test_store_accepts_every_declared_relationship_type_behaviorally(self):
         career_store = importlib.import_module("career_store")
         declared = set(load_json(STORE_SURFACE_PATH).get("relationship_types", []))
