@@ -17,6 +17,7 @@ from resume_agent._adapters import (
     ValidatingModelAdapter,
     create_live_model_adapter,
 )
+from resume_agent import AGENT_CONFIG_DEFAULTS, resolve_agent_config, stable_agent_config_hash
 from resume_agent._fake_adapter import (
     FACT_PROPOSAL_SCHEMA_ID,
     REWRITE_PROPOSAL_SCHEMA_ID,
@@ -268,6 +269,19 @@ class ResumeAgentDeterministicFakeAdapterContractTests(unittest.TestCase):
         with self.assertRaises(LiveAdapterConstructionBlockedError):
             create_live_model_adapter(env={"RESUME_AGENT_ALLOW_LIVE": "1", "RESUME_AGENT_GATE_PROFILE": "1"})
 
+    def test_public_adapter_construction_paths_do_not_accept_raw_runtime_config_dicts(self):
+        with self.assertRaises(TypeError):
+            DeterministicFakeAdapter(fixture_dir=FAKE_FIXTURES, runtime_config={"model": "raw-dict"})
+
+        with self.assertRaises(TypeError):
+            create_live_model_adapter(env={"RESUME_AGENT_ALLOW_LIVE": "1"}, runtime_config={"model": "raw-dict"})
+
+        with self.assertRaises(TypeError):
+            DeterministicFakeAdapter(fixture_dir=FAKE_FIXTURES, agent_config={"model": "raw-dict"})
+
+        with self.assertRaises(TypeError):
+            create_live_model_adapter(env={"RESUME_AGENT_ALLOW_LIVE": "1"}, agent_config={"model": "raw-dict"})
+
 
 class ResumeAgentSchemaValidatorContractTests(unittest.TestCase):
     def test_validator_reports_structured_violation_list_content(self):
@@ -287,6 +301,30 @@ class ResumeAgentSchemaValidatorContractTests(unittest.TestCase):
         self.assertIn(("min_items", "items"), by_path)
         self.assertIn(("additional_property", "unexpected"), by_path)
         self.assertEqual(by_path[("invalid_enum", "proposal_type")]["details"]["allowed"], ["contract_demo"])
+
+
+class ResumeAgentConfigContractTests(unittest.TestCase):
+    def test_agent_config_defaults_are_documented_and_applied(self):
+        result = resolve_agent_config({})
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.errors, [])
+        self.assertEqual(result.config.to_dict(), AGENT_CONFIG_DEFAULTS)
+
+    def test_unknown_agent_config_key_is_rejected_with_typed_error(self):
+        result = resolve_agent_config({"agent": {"bogus_key": True}})
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.errors[0]["code"], "unknown_agent_config_key")
+        self.assertEqual(result.errors[0]["field_path"], "agent.bogus_key")
+
+    def test_agent_config_hash_is_stable_for_validated_config_and_changes_with_model(self):
+        first = resolve_agent_config({"agent": {"model": "claude-sonnet-4-6"}}).config
+        second = resolve_agent_config({"agent": {"model": "claude-sonnet-4-6"}}).config
+        changed = resolve_agent_config({"agent": {"model": "claude-sonnet-4-6-next"}}).config
+
+        self.assertEqual(stable_agent_config_hash(first), stable_agent_config_hash(second))
+        self.assertNotEqual(stable_agent_config_hash(first), stable_agent_config_hash(changed))
 
 
 def _fake_fixture_envelope(payload):

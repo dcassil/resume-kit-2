@@ -4,14 +4,14 @@ level: task
 title: "agent config block: schema validation, defaults, run-manifest config hash"
 short_code: "RKIT-T-0089"
 created_at: 2026-08-16T19:46:40.588276+00:00
-updated_at: 2026-08-16T19:46:40.588276+00:00
+updated_at: 2026-08-17T16:06:37.402320+00:00
 parent: resume-agent-proposal-model
-blocked_by: ["RKIT-T-0087", "RKIT-T-0088"]
+blocked_by: [RKIT-T-0087, RKIT-T-0088]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0016
 ## Objective **[REQUIRED]**
 
 Add the schema-validated `agent` block to workspace `config.json` per RKIT-A-0003 item 3: `{model, schema_mode, timeout_ms, max_retries, cost_ceiling}` validated at load by a schema shipped in resume-agent; unknown keys FAIL validation (config strictness per RKIT-A-0006 decision 6 — consistent with the guardrails.*/matching.*/resume.*/workflow.* namespace discipline); documented defaults apply when the block is absent; the validated block's stable hash is exposed for the workflow run manifest and participates in the run-manifest config hash.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria **[REQUIRED]**
 
@@ -52,4 +54,4 @@ RKIT-T-0087/0088. Serial.
 
 ## Status Updates **[REQUIRED]**
 
-*To be added during implementation*
+- 2026-08-17: T-0088 committed (fixture-pinned fake, self-validating fixtures, default-safe live guard; gates 458/smoke/verify green; driver probed guard + unknown-key + determinism). Codex launched on the agent config block: strict schema w/ claude-sonnet-4-6 default, stable hash seam, run-manifest config_hash participation (verify-first whether createRun already hashes the whole config), validated-config-only construction path.

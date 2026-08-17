@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from typing import Any, Callable
 
-from .config import resolve_workflow_config as _resolve_workflow_config
+from .config import resolve_workflow_config as _resolve_workflow_config, run_manifest_config_payload as _run_manifest_config_payload
 from .resolution_loop import (
     empty_resolution_loop_state as _empty_resolution_loop_state,
     normalize_resolution_loop_state as _normalize_resolution_loop_state,
@@ -96,10 +96,10 @@ class UnknownRunError(FileNotFoundError):
 
 def createRun(workspace: str | Path, config: JsonObject) -> JsonObject:
     workspace_path = Path(workspace)
-    config_hash = _stable_hash(config)
+    workflow_config = _resolve_workflow_config(config)
+    config_hash = _stable_hash(_run_manifest_config_payload(config, workflow_config.config))
     run_id = _new_run_id(workspace_path, config_hash)
     versions = collectVersions(workspace=workspace_path, config=config)
-    workflow_config = _resolve_workflow_config(config)
     run_state = {
         "run_id": run_id,
         "workspace": str(workspace_path),
@@ -128,6 +128,7 @@ def createRun(workspace: str | Path, config: JsonObject) -> JsonObject:
         "workflow_config": workflow_config.config.to_dict(),
         "workflow_config_errors": list(workflow_config.errors),
         "workflow_config_warnings": list(workflow_config.warnings),
+        "agent_model_config": workflow_config.config.agent_config.to_dict(), "agent_config_hash": workflow_config.config.agent_config_hash,
         "overflow_iteration": 0,
         "render_overflow_state": _empty_render_overflow_state(),
         "render_overflow_blocking_reasons": [],
@@ -135,7 +136,6 @@ def createRun(workspace: str | Path, config: JsonObject) -> JsonObject:
     _persist_run(run_state)
     _index_run(workspace_path, config_hash, run_id)
     return run_state
-
 def getNextCheckpoint(run_state: JsonObject) -> JsonObject:
     working_state = _working_run_state(run_state)
     current = str(working_state.get("current_checkpoint", "INIT"))

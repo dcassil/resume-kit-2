@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from ._adapters import AdapterCompletion, AdapterProviderError, AdapterRequest, ValidatingModelAdapter
+from ._agent_config import AgentConfig, resolve_agent_config
 from ._schema_validation import JsonObject, JsonSchemaRegistry, validate_schema_id
 
 
@@ -170,9 +171,13 @@ class DeterministicFakeAdapter(ValidatingModelAdapter):
         self,
         *,
         fixture_dir: Path | str | None = None,
+        agent_config: AgentConfig | None = None,
         output_schemas: JsonSchemaRegistry | None = None,
     ) -> None:
         self.fixture_dir = Path(fixture_dir) if fixture_dir is not None else default_fake_fixture_dir()
+        if agent_config is not None and not isinstance(agent_config, AgentConfig):
+            raise TypeError("agent_config must be a validated AgentConfig.")
+        resolved_agent_config = agent_config or resolve_agent_config({}).config
         schemas = dict(DEFAULT_FAKE_OUTPUT_SCHEMAS)
         schemas.update(output_schemas or {})
         self._fixtures = _load_fixture_index(self.fixture_dir)
@@ -180,6 +185,7 @@ class DeterministicFakeAdapter(ValidatingModelAdapter):
             adapter_id=FAKE_ADAPTER_ID,
             adapter_version=FAKE_ADAPTER_VERSION,
             model_id=FAKE_MODEL_ID,
+            agent_config=resolved_agent_config,
             runtime_config={"fixture_dir": str(self.fixture_dir), "key_algorithm": "sha256:v1"},
             output_schemas=schemas,
         )

@@ -4,14 +4,14 @@ level: task
 title: "DeterministicFakeAdapter, gate wiring, gate-isolation test"
 short_code: "RKIT-T-0088"
 created_at: 2026-08-16T19:46:40.531655+00:00
-updated_at: 2026-08-16T19:54:40.459309+00:00
+updated_at: 2026-08-17T16:06:37.281422+00:00
 parent: resume-agent-proposal-model
 blocked_by: [RKIT-T-0087]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0016
 ## Objective **[REQUIRED]**
 
 Ship the `DeterministicFakeAdapter` that backs every official gate (RKIT-A-0003 item 4): fixture-pinned outputs keyed by a stable hash of (prompt template id, schema id, canonical input); unknown keys raise a typed error rather than improvising — a fake that fails loudly keeps gates honest. Official suites construct only the fake; a gate-profile test asserts the live adapter cannot be constructed under the gate profile.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

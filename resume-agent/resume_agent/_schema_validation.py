@@ -40,6 +40,10 @@ def validate_json_schema(value: Any, schema: JsonObject, field_path: str = "") -
     if isinstance(max_length, int) and isinstance(value, str) and len(value) > max_length:
         violations.append(_violation("max_length", f"Expected at most {max_length} character(s).", field_path))
 
+    minimum = schema.get("minimum")
+    if isinstance(minimum, (int, float)) and isinstance(value, (int, float)) and not isinstance(value, bool) and value < minimum:
+        violations.append(_violation("minimum", f"Expected at least {minimum}.", field_path, {"minimum": minimum}))
+
     if _is_object_schema(schema) and isinstance(value, dict):
         violations.extend(_object_violations(value, schema, field_path))
 

@@ -6,6 +6,17 @@ import hashlib
 import re
 from typing import Any
 
+from ._agent_config import (
+    AGENT_CONFIG_DEFAULTS,
+    AGENT_CONFIG_SCHEMA,
+    AgentConfig,
+    AgentConfigResult,
+    AgentConfigValidationError,
+    require_agent_config,
+    resolve_agent_config,
+    stable_agent_config_hash,
+)
+
 
 SCHEMA_VERSION = "resume-agent.proposal.v1"
 
@@ -19,11 +30,19 @@ _TERM_SUPPORT_VARIANTS = {
 }
 
 __all__ = [
+    "AGENT_CONFIG_DEFAULTS",
+    "AGENT_CONFIG_SCHEMA",
+    "AgentConfig",
+    "AgentConfigResult",
+    "AgentConfigValidationError",
     "extractResumeSemantics",
     "extractJobSemantics",
     "generateClarificationQuestion",
     "interpretUserAnswer",
     "proposeRewrite",
+    "require_agent_config",
+    "resolve_agent_config",
+    "stable_agent_config_hash",
 ]
 
 

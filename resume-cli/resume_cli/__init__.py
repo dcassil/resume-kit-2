@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from career_store import openCareerStore
-from resume_agent import extractJobSemantics, extractResumeSemantics, generateClarificationQuestion, interpretUserAnswer, proposeRewrite
+from resume_agent import extractJobSemantics, extractResumeSemantics, generateClarificationQuestion, interpretUserAnswer, proposeRewrite, resolve_agent_config
 from resume_core import applyChange, normalizeJobModel, normalizeResume, rankResumeContent, sanitizeText, scoreMatch, validateChange, validateFinalResume, validateGrounding, validateResume
 from resume_render import renderDocx, renderMarkdown, validateRenderedOutput
 from workflow import CHECKPOINT_ORDER, UnknownRunError, createRun, reconstructRunManifest, recordCheckpointResult
@@ -479,7 +479,7 @@ def _operation_ids(items: Any) -> list[str]:
 
 
 def _latest_persisted_run_for_current_config(workspace: Path) -> JsonObject | None:
-    config_hash = _workflow_stable_hash(_config(workspace))
+    config_hash = _workflow_stable_hash(_run_manifest_config_payload(_config(workspace)))
     index = _read_json(workspace / ".workflow" / "runs" / "index.json", {})
     if not isinstance(index, dict):
         return None
@@ -489,6 +489,12 @@ def _latest_persisted_run_for_current_config(workspace: Path) -> JsonObject | No
         return None
     latest = max(persisted, key=_run_sequence_key)
     return {"config_hash": config_hash, "run_id": latest}
+
+
+def _run_manifest_config_payload(config: JsonObject) -> JsonObject:
+    payload = dict(config) if isinstance(config, dict) else {}
+    payload["agent"] = resolve_agent_config(payload).config.to_dict()
+    return payload
 
 
 def _run_sequence_key(run_id: str) -> tuple[int, str]:

@@ -7,6 +7,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Any, Literal, Mapping, Protocol
 
+from ._agent_config import AgentConfig, resolve_agent_config
 from ._schema_validation import JsonObject, JsonSchemaRegistry, validate_schema_id
 
 
@@ -154,13 +155,16 @@ class ValidatingModelAdapter:
         adapter_id: str,
         adapter_version: str,
         model_id: str,
+        agent_config: AgentConfig | None = None,
         runtime_config: Mapping[str, Any] | None = None,
         output_schemas: JsonSchemaRegistry | None = None,
     ) -> None:
         self.adapter_id = adapter_id
         self.adapter_version = adapter_version
         self.model_id = model_id
-        self.runtime_config = dict(runtime_config or {})
+        base_runtime_config = agent_config.to_dict() if agent_config is not None else {}
+        base_runtime_config.update(runtime_config or {})
+        self.runtime_config = base_runtime_config
         self.output_schemas = dict(output_schemas or {})
 
     def complete(self, request: AdapterRequest) -> AdapterResult:
@@ -210,15 +214,16 @@ class _PlaceholderLiveModelAdapter(ValidatingModelAdapter):
         *,
         adapter_id: str = "resume-agent-live-placeholder",
         adapter_version: str = "0.0.0",
-        model_id: str = "unconfigured-live-model",
-        runtime_config: Mapping[str, Any] | None = None,
+        agent_config: AgentConfig | None = None,
         output_schemas: JsonSchemaRegistry | None = None,
     ) -> None:
+        resolved_agent_config = agent_config or resolve_agent_config({}).config
         super().__init__(
             adapter_id=adapter_id,
             adapter_version=adapter_version,
-            model_id=model_id,
-            runtime_config=runtime_config or {"live_adapter_status": "not_implemented"},
+            model_id=resolved_agent_config.model,
+            agent_config=resolved_agent_config,
+            runtime_config={"live_adapter_status": "not_implemented"},
             output_schemas=output_schemas,
         )
 
@@ -231,8 +236,7 @@ def create_live_model_adapter(
     env: Mapping[str, str] | None = None,
     adapter_id: str = "resume-agent-live-placeholder",
     adapter_version: str = "0.0.0",
-    model_id: str = "unconfigured-live-model",
-    runtime_config: Mapping[str, Any] | None = None,
+    agent_config: AgentConfig | None = None,
     output_schemas: JsonSchemaRegistry | None = None,
 ) -> ModelAdapter:
     """Construct the future live adapter only when explicitly opted in.
@@ -253,11 +257,12 @@ def create_live_model_adapter(
                 "gate_env": "RESUME_AGENT_GATE_PROFILE",
             },
         )
+    if agent_config is not None and not isinstance(agent_config, AgentConfig):
+        raise TypeError("agent_config must be a validated AgentConfig.")
     return _PlaceholderLiveModelAdapter(
         adapter_id=adapter_id,
         adapter_version=adapter_version,
-        model_id=model_id,
-        runtime_config=runtime_config,
+        agent_config=agent_config or resolve_agent_config({}).config,
         output_schemas=output_schemas,
     )
 

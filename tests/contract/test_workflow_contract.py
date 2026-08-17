@@ -494,6 +494,31 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         recovered_second = maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id=second["run_id"]))
         self.assertEqual(recovered_second["resume_from_checkpoint"], "INIT")
 
+    def test_create_run_config_hash_includes_validated_agent_config_defaults_and_model(self):
+        absent_agent = self.create_run()
+        self.config = {
+            "schemaVersion": "1.0",
+            "matching": {"requireHardRequirementsResolved": True},
+            "agent": {
+                "model": "claude-sonnet-4-6",
+                "schema_mode": "json_schema",
+                "timeout_ms": 60000,
+                "max_retries": 2,
+                "cost_ceiling": 1.0,
+            },
+        }
+        explicit_defaults = self.create_run()
+        self.config = {
+            "schemaVersion": "1.0",
+            "matching": {"requireHardRequirementsResolved": True},
+            "agent": {"model": "claude-sonnet-4-6-next"},
+        }
+        changed_model = self.create_run()
+
+        self.assertEqual(absent_agent["config_hash"], explicit_defaults["config_hash"])
+        self.assertNotEqual(explicit_defaults["config_hash"], changed_model["config_hash"])
+        self.assertEqual(changed_model["agent_model_config"]["model"], "claude-sonnet-4-6-next")
+
     def test_recover_run_unknown_run_raises_unknown_run_error(self):
         with self.assertRaises(self.workflow.UnknownRunError) as raised:
             maybe_await(self.workflow.recoverRun(workspace=self.workspace, run_id="run_missing"))

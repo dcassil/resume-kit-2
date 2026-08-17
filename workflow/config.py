@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 from typing import Any
+
+from resume_agent import AgentConfig, resolve_agent_config, stable_agent_config_hash
 
 
 JsonObject = dict[str, Any]
@@ -17,9 +20,15 @@ DEFAULT_MAX_RENDER_OVERFLOW_ITERATIONS = 2
 @dataclass(frozen=True)
 class WorkflowConfig:
     max_render_overflow_iterations: int
+    agent_config: AgentConfig
+    agent_config_hash: str
 
     def to_dict(self) -> JsonObject:
-        return {"maxRenderOverflowIterations": self.max_render_overflow_iterations}
+        return {
+            "maxRenderOverflowIterations": self.max_render_overflow_iterations,
+            "agent": self.agent_config.to_dict(),
+            "agent_config_hash": self.agent_config_hash,
+        }
 
 
 @dataclass(frozen=True)
@@ -55,11 +64,32 @@ def resolve_workflow_config(config: JsonObject | None) -> WorkflowConfigResult:
             errors,
         )
 
+    agent_result = resolve_agent_config(raw)
+    errors.extend(agent_result.errors)
+    warnings.extend(agent_result.warnings)
+
     return WorkflowConfigResult(
-        config=WorkflowConfig(max_render_overflow_iterations=max_iterations),
+        config=WorkflowConfig(
+            max_render_overflow_iterations=max_iterations,
+            agent_config=agent_result.config,
+            agent_config_hash=stable_agent_config_hash(agent_result.config),
+        ),
         errors=errors,
         warnings=warnings,
     )
+
+
+def run_manifest_config_payload(config: JsonObject | None, resolved_config: WorkflowConfig | None = None) -> JsonObject:
+    """Return config material used for run-manifest config_hash.
+
+    The original workspace config is otherwise preserved, but the agent block is
+    replaced by the validated block so defaults participate in the hash.
+    """
+
+    raw = copy.deepcopy(config) if isinstance(config, dict) else {}
+    resolved = resolved_config or resolve_workflow_config(raw).config
+    raw["agent"] = resolved.agent_config.to_dict()
+    return raw
 
 
 def _workflow_payload(raw: JsonObject, errors: list[JsonObject]) -> JsonObject:
