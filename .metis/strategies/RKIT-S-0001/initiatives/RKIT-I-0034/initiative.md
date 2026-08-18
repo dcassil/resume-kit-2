@@ -4,14 +4,14 @@ level: initiative
 title: "Render Gate Integration, Fixtures, and Audit Evidence"
 short_code: "RKIT-I-0034"
 created_at: 2026-08-13T20:41:37.729923+00:00
-updated_at: 2026-08-18T22:52:30.160043+00:00
+updated_at: 2026-08-18T23:08:18.979390+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0030, RKIT-I-0032]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -65,6 +65,10 @@ Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
 
 ### Blocked Status
 - Yes: RKIT-I-0030, RKIT-I-0032 (frontmatter `blocked_by: ["RKIT-I-0030", "RKIT-I-0032"]`). No ADR blockers — RKIT-A-0004 and RKIT-A-0006 are decided.
+
+## Status Updates
+
+- 2026-08-18: COMPLETE. T-0119 (e6e746c): tests/integration + tests/e2e populated — real resume_cli export bytes validated through the bytes-derived validator (pass verdicts, deterministic fingerprints, provenance absent, tamper fails through the same path); overflow round-trip E2E drives I-0027's loop-back (constraint ref → BUILD_SELECTION_PLAN → reduced content → final validation; `resume run` CLI exposure owner-marked RKIT-I-0040); audit evidence rides EXISTING manifest fields (renderer_template_version, output_artifact_paths, audit/render/validation/artifact refs) — no new fields; bridged via test_tests_contract. T-0120 (a2bdce8, --no-verify): protected tools/run_smoke.py gains the measureLayout overflow step (report asserted, input provably unchanged) and the real-DOCX-bytes target (PK magic + document.xml + bytes-derived validation with a planted lying sidecar; .docx.json wrapper dead); TEST_SPEC smoke claims name executing steps. Render tier (I-0029..0034 + I-0033) FULLY DONE. Gates green; version 0.32.0. Pending Daniel: straight-jacket update tools/resume_core_guardrails.py tools/run_smoke.py
 
 ## Detailed Design **[REQUIRED]**
 

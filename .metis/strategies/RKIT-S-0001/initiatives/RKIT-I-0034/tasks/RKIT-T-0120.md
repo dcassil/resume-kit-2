@@ -4,14 +4,14 @@ level: task
 title: "Smoke overflow step + real-DOCX-bytes assertion (protected run_smoke edit), TEST_SPEC strengthening set"
 short_code: "RKIT-T-0120"
 created_at: 2026-08-18T22:51:15.430527+00:00
-updated_at: 2026-08-18T23:01:37.545081+00:00
+updated_at: 2026-08-18T23:08:03.741317+00:00
 parent: render-gate-integration-fixtures
 blocked_by: [RKIT-T-0119]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0034
 ## Objective
 
 Close R3/R4/R6: the smoke gate exercises `measureLayout` with an overflow fixture (asserting overflow is REPORTED, never silently deleted) and accepts only a REAL `.docx` zip validated from its bytes (the `.docx.json` wrapper shortcut is retired) — via an authorized protected edit to `tools/run_smoke.py` under the no-verify workflow — plus the TEST_SPEC strengthening set the initiative owns.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
