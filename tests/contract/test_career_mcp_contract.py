@@ -12,6 +12,10 @@ import unittest
 from pathlib import Path
 
 from tests.e2e.test_career_mcp_audit_reconstruction_e2e import CareerMcpAuditReconstructionE2ETests  # bridge into gated contract module
+from tests.contract.test_career_mcp_server_contract import (  # bridge into gated contract module
+    CareerMcpCliLifecycleContractTests,
+    CareerMcpServerProtocolContractTests,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]

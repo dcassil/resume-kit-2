@@ -4,20 +4,20 @@ level: initiative
 title: "Provide Real Career-MCP Transport and Host Runtime"
 short_code: "RKIT-I-0014"
 created_at: 2026-08-13T20:41:37.135885+00:00
-updated_at: 2026-08-13T20:41:37.135885+00:00
+updated_at: 2026-08-18T21:08:37.673601+00:00
 parent: resume-kit-2-full-product-buildout
-blocked_by: ["RKIT-I-0009"]
+blocked_by: [RKIT-I-0009]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/discovery"
+  - "#phase/active"
 
 
 exit_criteria_met: false
 estimated_complexity: M
 strategy_id: RKIT-S-0001
-initiative_id: NULL
+initiative_id: provide-real-career-mcp-transport
 ---
 
 # Provide Real Career-MCP Transport and Host Runtime Initiative
@@ -93,3 +93,7 @@ Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
 3. Protocol-vs-tool error-channel mapping.
 4. Subprocess smoke, stdio/in-process parity, and startup-failure tests; strengthen the TEST_SPEC smoke item.
 5. Host registration documentation (how a local agent host launches and connects to the server).
+
+## Status Updates
+
+- 2026-08-18: RKIT-T-0111 integration decision recorded in code and report scope: hand-rolled stdlib-only newline-delimited JSON-RPC over stdio is used instead of the MCP SDK because the repo has no runtime dependencies and the smoke gate installs into a fresh environment where a new dependency would require network access. The server is a thin protocol shell over `create_career_mcp`, with `python -m career_mcp --db <path>` opening `career_store.openCareerStore` and injecting the resulting public store service.

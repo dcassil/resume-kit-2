@@ -34,8 +34,17 @@ Tests should treat MCP as an adapter with:
 - error mapping
 - v1 single-user local policy: every manifest policy claim must name executable test coverage, and mutating tools require explicit host-mediated confirmation
 - store service dependency injection
+- a stdlib-only newline-delimited JSON-RPC stdio server shell that opens the public store service by path and delegates to the same adapter
 
 ## Contract Test Cases
+
+### Stdio JSON-RPC server
+
+- `python -m career_mcp --db <path>` uses the public `career_store.openCareerStore` factory, injects that store into `create_career_mcp`, and also accepts `CAREER_MCP_DB`; covered by `CareerMcpCliLifecycleContractTests.test_env_db_fallback_builds_adapter_from_public_store_and_closes_on_eof`.
+- Missing or unopenable store paths exit nonzero with one scrubbed typed stderr line and no traceback or persistence details; covered by `test_missing_db_path_exits_nonzero_with_one_typed_stderr_line` and `test_store_open_failure_is_scrubbed_and_uses_supplied_path_only`.
+- Stdin EOF and SIGTERM close the store cleanly and exit 0; covered by `test_env_db_fallback_builds_adapter_from_public_store_and_closes_on_eof` and `test_sigterm_shutdown_path_closes_store_and_exits_zero`.
+- `initialize`, `notifications/initialized`, `tools/list`, and `tools/call` are bound over newline-delimited JSON-RPC; covered by `CareerMcpServerProtocolContractTests.test_initialize_advertises_tools_capability`, `test_initialized_notification_is_accepted_without_response`, `test_tools_list_maps_canonical_manifest_without_mutating_it`, and `test_tools_call_content_byte_equals_direct_adapter_envelope`.
+- Protocol errors use JSON-RPC error codes while tool-level failures remain successful `tools/call` results containing typed career envelopes; covered by `test_protocol_errors_pin_json_rpc_error_codes` and `test_tool_failures_stay_inside_successful_tools_call_responses`.
 
 ### Tool discovery
 
