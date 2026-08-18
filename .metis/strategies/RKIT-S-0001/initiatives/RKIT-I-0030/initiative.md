@@ -4,20 +4,20 @@ level: initiative
 title: "Semantic-Neutral Markdown and DOCX Rendering"
 short_code: "RKIT-I-0030"
 created_at: 2026-08-13T20:41:37.601397+00:00
-updated_at: 2026-08-13T20:41:37.601397+00:00
+updated_at: 2026-08-18T21:58:53.662379+00:00
 parent: resume-kit-2-full-product-buildout
-blocked_by: ["RKIT-I-0029"]
+blocked_by: [RKIT-I-0029]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/discovery"
+  - "#phase/active"
 
 
 exit_criteria_met: false
 estimated_complexity: M
 strategy_id: RKIT-S-0001
-initiative_id: NULL
+initiative_id: semantic-neutral-markdown-and-docx
 ---
 
 # Semantic-Neutral Markdown and DOCX Rendering Initiative

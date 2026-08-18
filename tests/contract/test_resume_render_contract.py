@@ -12,6 +12,7 @@ import json
 import unittest
 import zipfile
 from pathlib import Path
+from xml.etree import ElementTree
 
 import resume_core
 
@@ -87,6 +88,11 @@ TEMPLATE = {
     "target_pages": 1,
 }
 
+W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
+CT_NS = "http://schemas.openxmlformats.org/package/2006/content-types"
+NS = {"w": W_NS, "rel": REL_NS, "ct": CT_NS}
+
 
 def maybe_await(value):
     if inspect.isawaitable(value):
@@ -142,6 +148,24 @@ def artifact_bytes(result: dict) -> bytes:
         except (binascii.Error, ValueError):
             return b""
     return b""
+
+
+def docx_parts(result: dict) -> dict[str, bytes]:
+    docx_bytes = artifact_bytes(result)
+    with zipfile.ZipFile(io.BytesIO(docx_bytes)) as archive:
+        return {name: archive.read(name) for name in archive.namelist()}
+
+
+def xml_part(parts: dict[str, bytes], name: str) -> ElementTree.Element:
+    return ElementTree.fromstring(parts[name])
+
+
+def attr(node: ElementTree.Element, namespace: str, name: str) -> str | None:
+    if node is None:
+        return None
+    if not namespace:
+        return node.get(name)
+    return node.get(f"{{{namespace}}}{name}")
 
 
 class ResumeRenderSurfaceManifestTests(unittest.TestCase):
@@ -341,6 +365,161 @@ class ResumeRenderContractTests(unittest.TestCase):
         with zipfile.ZipFile(io.BytesIO(docx_bytes)) as archive:
             self.assertIn("[Content_Types].xml", archive.namelist())
             self.assertIn("word/document.xml", archive.namelist())
+
+    def test_docx_uses_numbering_part_and_real_list_paragraphs(self):
+        result = maybe_await(self.renderer.renderDocx(RENDERABLE_RESUME, TEMPLATE))
+        self.assertEqual(result["status"], "ok", result)
+        parts = docx_parts(result)
+        self.assertIn("word/numbering.xml", parts)
+        self.assertIn("word/_rels/document.xml.rels", parts)
+
+        document = xml_part(parts, "word/document.xml")
+        numbering = xml_part(parts, "word/numbering.xml")
+        rels = xml_part(parts, "word/_rels/document.xml.rels")
+        content_types = xml_part(parts, "[Content_Types].xml")
+
+        abstract_nums = numbering.findall("w:abstractNum", NS)
+        nums = numbering.findall("w:num", NS)
+        self.assertEqual(len(abstract_nums), 1)
+        self.assertEqual(len(nums), 1)
+        self.assertEqual(attr(abstract_nums[0], W_NS, "abstractNumId"), "0")
+        self.assertEqual(attr(nums[0], W_NS, "numId"), "1")
+
+        bullet_paragraphs = [
+            paragraph
+            for paragraph in document.findall(".//w:p", NS)
+            if paragraph.find("w:pPr/w:numPr", NS) is not None
+        ]
+        self.assertGreaterEqual(len(bullet_paragraphs), 2)
+        for paragraph in bullet_paragraphs:
+            style = paragraph.find("w:pPr/w:pStyle", NS)
+            num_id = paragraph.find("w:pPr/w:numPr/w:numId", NS)
+            self.assertIsNotNone(style)
+            self.assertIsNotNone(num_id)
+            self.assertEqual(attr(style, W_NS, "val"), "ListParagraph")
+            self.assertEqual(attr(num_id, W_NS, "val"), "1")
+
+        relationship_targets = {
+            attr(relationship, "", "Target")
+            for relationship in rels.findall("rel:Relationship", NS)
+        }
+        self.assertIn("numbering.xml", relationship_targets)
+        self.assertIn("styles.xml", relationship_targets)
+        override_names = {
+            attr(override, "", "PartName")
+            for override in content_types.findall("ct:Override", NS)
+        }
+        self.assertIn("/word/numbering.xml", override_names)
+        self.assertIn("/word/styles.xml", override_names)
+
+    def test_docx_styles_part_defines_every_referenced_style(self):
+        result = maybe_await(self.renderer.renderDocx(RENDERABLE_RESUME, TEMPLATE))
+        self.assertEqual(result["status"], "ok", result)
+        parts = docx_parts(result)
+        self.assertIn("word/styles.xml", parts)
+
+        document = xml_part(parts, "word/document.xml")
+        styles = xml_part(parts, "word/styles.xml")
+        referenced = {
+            attr(style_ref, W_NS, "val")
+            for style_ref in document.findall(".//w:pPr/w:pStyle", NS)
+        }
+        defined = {
+            attr(style, W_NS, "styleId")
+            for style in styles.findall("w:style", NS)
+        }
+        self.assertTrue({"Title", "Heading2", "body", "ListParagraph"}.issubset(referenced))
+        self.assertTrue({"Title", "Heading1", "Heading2", "body", "ListParagraph"}.issubset(defined))
+        self.assertTrue(referenced.issubset(defined), f"Undefined DOCX style IDs: {sorted(referenced - defined)}")
+
+    def test_docx_layout_metrics_map_to_value_level_xml_and_defaults(self):
+        template = {
+            **TEMPLATE,
+            "layout": {
+                "version": "layout-metrics.v1",
+                "fonts": {
+                    "body": {"family": "Arial", "size_pt": 10.5},
+                    "heading": {"family": "Georgia", "size_pt": 16},
+                },
+                "spacing": {"line": 1.2, "para_after_pt": 4},
+                "margins_in": {"top": 0.75, "bottom": 0.8, "left": 0.65, "right": 0.7},
+                "bullet": {"style": "bullet", "indent_in": 0.33},
+            },
+        }
+        result = maybe_await(self.renderer.renderDocx(RENDERABLE_RESUME, template))
+        self.assertEqual(result["status"], "ok", result)
+        parts = docx_parts(result)
+        document = xml_part(parts, "word/document.xml")
+        styles = xml_part(parts, "word/styles.xml")
+        numbering = xml_part(parts, "word/numbering.xml")
+
+        body_style = styles.find("w:style[@w:styleId='body']", NS)
+        heading_style = styles.find("w:style[@w:styleId='Heading2']", NS)
+        self.assertIsNotNone(body_style)
+        self.assertIsNotNone(heading_style)
+        self.assertEqual(attr(body_style.find("w:rPr/w:rFonts", NS), W_NS, "ascii"), "Arial")
+        self.assertEqual(attr(body_style.find("w:rPr/w:sz", NS), W_NS, "val"), "21")
+        self.assertEqual(attr(heading_style.find("w:rPr/w:rFonts", NS), W_NS, "ascii"), "Georgia")
+        self.assertEqual(attr(heading_style.find("w:rPr/w:sz", NS), W_NS, "val"), "32")
+
+        body_spacing = body_style.find("w:pPr/w:spacing", NS)
+        self.assertEqual(attr(body_spacing, W_NS, "after"), "80")
+        self.assertEqual(attr(body_spacing, W_NS, "line"), "288")
+
+        margins = document.find(".//w:sectPr/w:pgMar", NS)
+        self.assertEqual(attr(margins, W_NS, "top"), "1080")
+        self.assertEqual(attr(margins, W_NS, "bottom"), "1152")
+        self.assertEqual(attr(margins, W_NS, "left"), "936")
+        self.assertEqual(attr(margins, W_NS, "right"), "1008")
+
+        bullet_indent = numbering.find(".//w:lvl/w:pPr/w:ind", NS)
+        self.assertEqual(attr(bullet_indent, W_NS, "left"), "475")
+
+        default_result = maybe_await(self.renderer.renderDocx(RENDERABLE_RESUME, TEMPLATE))
+        default_margins = xml_part(docx_parts(default_result), "word/document.xml").find(".//w:sectPr/w:pgMar", NS)
+        self.assertEqual(attr(default_margins, W_NS, "top"), "720")
+        self.assertEqual(attr(default_margins, W_NS, "bottom"), "720")
+        self.assertEqual(attr(default_margins, W_NS, "left"), "720")
+        self.assertEqual(attr(default_margins, W_NS, "right"), "720")
+
+    def test_docx_deterministic_bytes_and_layout_changes_bytes_not_semantics(self):
+        first = maybe_await(self.renderer.renderDocx(RENDERABLE_RESUME, TEMPLATE))
+        second = maybe_await(self.renderer.renderDocx(RENDERABLE_RESUME, TEMPLATE))
+        self.assertEqual(first["status"], "ok", first)
+        self.assertEqual(second["status"], "ok", second)
+        self.assertEqual(artifact_bytes(first), artifact_bytes(second))
+        self.assertEqual(first["semantic_fingerprint"], second["semantic_fingerprint"])
+
+        spacious_template = {
+            **TEMPLATE,
+            "layout": {
+                "margins_in": {"top": 0.75, "bottom": 0.75, "left": 0.75, "right": 0.75},
+            },
+        }
+        spacious = maybe_await(self.renderer.renderDocx(RENDERABLE_RESUME, spacious_template))
+        self.assertEqual(spacious["status"], "ok", spacious)
+        self.assertNotEqual(artifact_bytes(first), artifact_bytes(spacious))
+        self.assertEqual(first["semantic_fingerprint"], spacious["semantic_fingerprint"])
+
+    def test_template_layout_validation_rejects_unknown_keys_and_markdown_ignores_metrics(self):
+        invalid = maybe_await(self.renderer.renderDocx(RENDERABLE_RESUME, {**TEMPLATE, "layout": {"surprise": True}}))
+        self.assertEqual(invalid["status"], "error")
+        self.assertEqual(invalid["error"]["type"], "validation_error")
+        self.assertIn("layout contains unknown key", invalid["error"]["message"])
+
+        custom_layout = {
+            **TEMPLATE,
+            "layout": {
+                "fonts": {"body": {"family": "Arial", "size_pt": 10}},
+                "margins_in": {"top": 0.75, "bottom": 0.75, "left": 0.75, "right": 0.75},
+            },
+        }
+        baseline = maybe_await(self.renderer.renderMarkdown(RENDERABLE_RESUME, TEMPLATE))
+        customized = maybe_await(self.renderer.renderMarkdown(RENDERABLE_RESUME, custom_layout))
+        self.assertEqual(baseline["status"], "ok", baseline)
+        self.assertEqual(customized["status"], "ok", customized)
+        self.assertEqual(baseline["content"], customized["content"])
+        self.assertEqual(baseline["semantic_fingerprint"], customized["semantic_fingerprint"])
 
     def test_pdf_render_policy_contracts_return_exact_unsupported_reasons_without_artifacts(self):
         missing_targets = {key: value for key, value in TEMPLATE.items() if key != "format_targets"}

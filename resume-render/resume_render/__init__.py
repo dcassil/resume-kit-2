@@ -14,9 +14,10 @@ import math
 import zipfile
 from typing import Any
 from xml.etree import ElementTree
-from xml.sax.saxutils import escape
 
 from resume_core import RENDERABLE_RESUME_SCHEMA
+
+from ._ooxml import build_docx, layout_from_template, layout_validation_error
 
 
 RenderDict = dict[str, Any]
@@ -37,18 +38,6 @@ _UNSUPPORTED_CHARACTERS = {
     "\u00a0": "non-breaking space",
 }
 _DOCX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-_DOCX_CONTENT_TYPES = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-  <Default Extension="xml" ContentType="application/xml"/>
-  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-</Types>
-"""
-_DOCX_ROOT_RELS = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-</Relationships>
-"""
 
 
 def _typed_error(kind: str, message: str, fmt: str | None = None) -> RenderDict:
@@ -110,6 +99,8 @@ def _validate_template(template: Any, *, require_version: bool = True) -> str | 
     section_order = template.get("section_order")
     if section_order is not None and not isinstance(section_order, list):
         return "Template section_order must be a list when provided."
+    if error := layout_validation_error(template):
+        return error
     return None
 
 
@@ -340,47 +331,6 @@ def _unsupported_pdf_result(template: dict[str, Any], reason: str) -> RenderDict
     }
 
 
-def _docx_paragraph(line: str) -> str:
-    stripped = line.strip()
-    if not stripped:
-        return "<w:p/>"
-
-    style = ""
-    text = stripped
-    if stripped.startswith("## "):
-        style = '<w:pPr><w:pStyle w:val="Heading2"/></w:pPr>'
-        text = stripped[3:].strip()
-    elif stripped.startswith("# "):
-        style = '<w:pPr><w:pStyle w:val="Title"/></w:pPr>'
-        text = stripped[2:].strip()
-    elif stripped.startswith("- ") or stripped.startswith("* "):
-        text = stripped[2:].strip()
-
-    safe_text = escape(text, {'"': "&quot;"})
-    return f"<w:p>{style}<w:r><w:t xml:space=\"preserve\">{safe_text}</w:t></w:r></w:p>"
-
-
-def _build_docx_bytes(text: str) -> bytes:
-    paragraphs = "\n".join(_docx_paragraph(line) for line in text.splitlines())
-    document_xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:body>
-    {paragraphs}
-    <w:sectPr>
-      <w:pgSz w:w="12240" w:h="15840"/>
-      <w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="360" w:footer="360" w:gutter="0"/>
-    </w:sectPr>
-  </w:body>
-</w:document>
-"""
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("[Content_Types].xml", _DOCX_CONTENT_TYPES)
-        archive.writestr("_rels/.rels", _DOCX_ROOT_RELS)
-        archive.writestr("word/document.xml", document_xml)
-    return buffer.getvalue()
-
-
 def renderMarkdown(resume: Any, template: Any) -> RenderDict:
     """Render a canonical resume to Markdown without changing semantic content."""
 
@@ -404,7 +354,7 @@ def renderDocx(resume: Any, template: Any) -> RenderDict:
         return _typed_error("validation_error", error, "docx")
 
     content, sections = _render_markdown_text(resume, template)
-    docx_bytes = _build_docx_bytes(content)
+    docx_bytes = build_docx(content, layout_from_template(template))
     result = _base_result("docx", template, content)
     result.update(
         {

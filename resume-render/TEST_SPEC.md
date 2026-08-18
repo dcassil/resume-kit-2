@@ -63,7 +63,9 @@ Tests should expect renderer internals around:
 
 - Produce a DOCX artifact.
 - Preserve expected sections/order.
-- Preserve bullet content.
+- Preserve bullet content as real DOCX list paragraphs: bullet paragraphs must use `w:numPr` with the `ListParagraph` style and a `word/numbering.xml` relationship, not flattened text-only paragraphs.
+- Generate `word/styles.xml` defining every paragraph style referenced by `word/document.xml`, including `Title`, `Heading1`, `Heading2`, `body`, and `ListParagraph`.
+- Apply template layout metrics to DOCX XML: default `layout-metrics.v1` uses Aptos 11 pt body text, Aptos Display 14 pt heading text, single line spacing, 0 pt paragraph-after spacing, 0.5 inch margins, and bullet indent 0.25 inch. Template `layout` may override `fonts.body`, `fonts.heading`, `spacing`, `margins_in`, and `bullet`; unknown layout keys are typed validation errors. Markdown treats layout metrics as a typographic no-op.
 - Preserve factual fields.
 - Pass renderer validation.
 - Support template version reporting.
