@@ -501,8 +501,14 @@ RENDERABLE_RESUME_ENTRY_SCHEMA: JsonObject = {
         "start_date": {"type": "string"},
         "end_date": {"type": "string"},
         "date": {"type": "string"},
-        "bullets": {"type": "array"},
-        "skills": {"type": "array"},
+        "summary": {"type": "string"},
+        "description": {"type": "string"},
+        "degree": {"type": "string"},
+        "field": {"type": "string"},
+        "credential": {"type": "string"},
+        "issuer": {"type": "string"},
+        "bullets": {"type": "array", "items": {"type": ["string", "number", "boolean"]}},
+        "skills": {"type": "array", "items": {"type": ["string", "number", "boolean"]}},
     },
 }
 
@@ -513,7 +519,16 @@ RENDERABLE_RESUME_SECTION_SCHEMA: JsonObject = {
     "properties": {
         "id": {"type": "string"},
         "title": {"type": "string"},
-        "entries": {"type": "array", "items": {"type": ["string", "object"]}},
+        "format": {"type": "string"},
+        "entries": {
+            "type": "array",
+            "items": {
+                "oneOf": [
+                    {"type": ["string", "number", "boolean"]},
+                    RENDERABLE_RESUME_ENTRY_SCHEMA,
+                ]
+            },
+        },
     },
 }
 

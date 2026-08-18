@@ -8,16 +8,18 @@ or changing career facts.
 from __future__ import annotations
 
 import base64
+import copy
 import hashlib
 import io
 import math
+import re
 import zipfile
 from typing import Any
 from xml.etree import ElementTree
 
 from resume_core import RENDERABLE_RESUME_SCHEMA
 
-from ._ooxml import build_docx, layout_from_template, layout_validation_error
+from ._ooxml import DEFAULT_LAYOUT, W_NS, build_docx, layout_from_template, layout_validation_error
 
 
 RenderDict = dict[str, Any]
@@ -37,7 +39,16 @@ _UNSUPPORTED_CHARACTERS = {
     "\u2022": "bullet character",
     "\u00a0": "non-breaking space",
 }
+_SANITATION_REPLACEMENTS = {
+    "\u2018": "'",
+    "\u2019": "'",
+    "\u201c": '"',
+    "\u201d": '"',
+    "\u2022": "-",
+    "\u00a0": " ",
+}
 _DOCX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+_XML_DECL_RE = re.compile(br"<\?xml[^>]*encoding=[\"']([^\"']+)[\"']", re.IGNORECASE)
 
 
 def _typed_error(kind: str, message: str, fmt: str | None = None) -> RenderDict:
@@ -58,9 +69,81 @@ def _fingerprint(text: str) -> str:
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
-def _is_internal_key(key: str) -> bool:
-    lowered = key.lower()
-    return lowered.startswith("_") or lowered.startswith("internal") or "provenance" in lowered
+def _schema_types(schema: dict[str, Any]) -> set[str]:
+    raw = schema.get("type")
+    if isinstance(raw, str):
+        return {raw}
+    if isinstance(raw, list):
+        return {str(item) for item in raw}
+    return set()
+
+
+def _schema_matches_value(schema: dict[str, Any], value: Any) -> bool:
+    types = _schema_types(schema)
+    if not types:
+        return True
+    if isinstance(value, dict):
+        return "object" in types
+    if isinstance(value, list):
+        return "array" in types
+    if isinstance(value, str):
+        return "string" in types
+    if isinstance(value, bool):
+        return "boolean" in types
+    if isinstance(value, (int, float)):
+        return bool({"number", "integer"} & types)
+    if value is None:
+        return "null" in types
+    return False
+
+
+def _strip_to_schema(value: Any, schema: dict[str, Any]) -> Any:
+    for variants_key in ("oneOf", "anyOf"):
+        variants = schema.get(variants_key)
+        if isinstance(variants, list):
+            for variant in variants:
+                if isinstance(variant, dict) and _schema_matches_value(variant, value):
+                    return _strip_to_schema(value, variant)
+            return None
+
+    types = _schema_types(schema)
+    if not types:
+        return copy.deepcopy(value)
+
+    if "object" in types:
+        if not isinstance(value, dict):
+            return None
+        properties = schema.get("properties")
+        if not isinstance(properties, dict):
+            return copy.deepcopy(value)
+        stripped: dict[str, Any] = {}
+        for key, nested_schema in properties.items():
+            if key not in value:
+                continue
+            nested = _strip_to_schema(value[key], nested_schema if isinstance(nested_schema, dict) else {})
+            if nested is not None:
+                stripped[str(key)] = nested
+        return stripped
+
+    if "array" in types:
+        if not isinstance(value, list):
+            return None
+        item_schema = schema.get("items")
+        if not isinstance(item_schema, dict):
+            return copy.deepcopy(value)
+        stripped_items = []
+        for item in value:
+            stripped = _strip_to_schema(item, item_schema)
+            if stripped is not None:
+                stripped_items.append(stripped)
+        return stripped_items
+
+    return copy.deepcopy(value) if _schema_matches_value(schema, value) else None
+
+
+def _renderable_resume(resume: dict[str, Any]) -> dict[str, Any]:
+    stripped = _strip_to_schema(resume, RENDERABLE_RESUME_SCHEMA)
+    return stripped if isinstance(stripped, dict) else {}
 
 
 def _validate_resume(resume: Any) -> str | None:
@@ -169,7 +252,7 @@ def _collect_scalar_lines(value: Any) -> list[str]:
     if isinstance(value, dict):
         lines = []
         for key, entry in value.items():
-            if _is_internal_key(str(key)) or str(key) in _SKIP_KEYS:
+            if str(key) in _SKIP_KEYS:
                 continue
             lines.extend(_collect_scalar_lines(entry))
         return lines
@@ -267,19 +350,28 @@ def _render_item(item: Any) -> list[str]:
     }
     for key, value in item.items():
         key_text = str(key)
-        if key_text in consumed or key_text in _SKIP_KEYS or _is_internal_key(key_text):
+        if key_text in consumed or key_text in _SKIP_KEYS:
             continue
         for line in _collect_scalar_lines(value):
             lines.append(line)
     return lines
 
 
+def _section_heading(section: dict[str, Any]) -> str:
+    return _clean_scalar(section.get("title") or section.get("heading") or section.get("id") or "Section")
+
+
+def _section_format(section: dict[str, Any]) -> str:
+    value = section.get("format") or section.get("kind")
+    return _clean_scalar(value).lower() if isinstance(value, str) and value.strip() else "default"
+
+
 def _render_section(section: dict[str, Any]) -> list[str]:
-    heading = _clean_scalar(section.get("title") or section.get("heading") or section.get("id") or "Section")
+    heading = _section_heading(section)
     lines = [f"## {heading}"]
     items = section.get("entries") if "entries" in section else section.get("items", [])
 
-    if section.get("id") == "skills" and isinstance(items, list):
+    if _section_format(section) == "skills" and isinstance(items, list):
         skills: list[str] = []
         grouped: list[str] = []
         for item in items:
@@ -312,6 +404,23 @@ def _render_markdown_text(resume: dict[str, Any], template: dict[str, Any]) -> t
     return "\n\n".join(blocks).strip() + "\n", _section_ids(sections)
 
 
+def _expected_headings(resume: dict[str, Any], template: dict[str, Any]) -> list[str]:
+    return [_section_heading(section) for section in _ordered_sections(resume, template)]
+
+
+def _sanitize_rendered_text(text: str) -> tuple[str, list[str]]:
+    sanitized = text
+    replaced = []
+    for character, replacement in _SANITATION_REPLACEMENTS.items():
+        if character in sanitized:
+            sanitized = sanitized.replace(character, replacement)
+            replaced.append(character)
+    if not replaced:
+        return sanitized, []
+    names = ", ".join(_UNSUPPORTED_CHARACTERS[character] for character in sorted(replaced))
+    return sanitized, [f"ats_unsupported_character_sanitized:{names}"]
+
+
 def _base_result(fmt: str, template: dict[str, Any], content: str) -> RenderDict:
     return {
         "status": "ok",
@@ -339,9 +448,12 @@ def renderMarkdown(resume: Any, template: Any) -> RenderDict:
     if error := _validate_template(template):
         return _typed_error("validation_error", error, "markdown")
 
-    content, sections = _render_markdown_text(resume, template)
+    renderable = _renderable_resume(resume)
+    content, sections = _render_markdown_text(renderable, template)
+    content, sanitation_warnings = _sanitize_rendered_text(content)
     result = _base_result("markdown", template, content)
-    result.update({"content": content, "sections": sections})
+    result.update({"content": content, "sections": sections, "expected_headings": _expected_headings(renderable, template)})
+    result["warnings"].extend(sanitation_warnings)
     return result
 
 
@@ -353,20 +465,27 @@ def renderDocx(resume: Any, template: Any) -> RenderDict:
     if error := _validate_template(template):
         return _typed_error("validation_error", error, "docx")
 
-    content, sections = _render_markdown_text(resume, template)
-    docx_bytes = build_docx(content, layout_from_template(template))
+    renderable = _renderable_resume(resume)
+    content, sections = _render_markdown_text(renderable, template)
+    content, sanitation_warnings = _sanitize_rendered_text(content)
+    layout = layout_from_template(template)
+    docx_bytes = build_docx(content, layout)
     result = _base_result("docx", template, content)
     result.update(
         {
             "artifact": {
                 "kind": "docx",
                 "media_type": _DOCX_MEDIA_TYPE,
+                "encoding": "utf-8",
+                "declared_font_families": sorted({layout.body_font.family, layout.heading_font.family}),
                 "content_base64": base64.b64encode(docx_bytes).decode("ascii"),
                 "text": content,
             },
             "sections": sections,
+            "expected_headings": _expected_headings(renderable, template),
         }
     )
+    result["warnings"].extend(sanitation_warnings)
     return result
 
 
@@ -404,7 +523,7 @@ def measureLayout(resume: Any, template: Any) -> RenderDict:
     if target_pages < 1:
         return _typed_error("validation_error", "Template target_pages must be at least 1.")
 
-    section_blocks = _section_text_blocks(resume, template)
+    section_blocks = _section_text_blocks(_renderable_resume(resume), template)
     content = "\n\n".join(block for _section_id, block in section_blocks).strip() + "\n"
     non_empty_lines = [line for line in content.splitlines() if line.strip()]
     estimated_lines = 0
@@ -445,7 +564,64 @@ def measureLayout(resume: Any, template: Any) -> RenderDict:
     }
 
 
-def _extract_docx_text(content_base64: Any) -> tuple[str | None, list[str]]:
+def _declared_xml_encoding(payload: bytes) -> str:
+    match = _XML_DECL_RE.search(payload[:128])
+    if not match:
+        return "utf-8"
+    try:
+        return match.group(1).decode("ascii").lower()
+    except UnicodeDecodeError:
+        return "utf-8"
+
+
+def _encoding_warnings(parts: dict[str, bytes]) -> list[str]:
+    warnings: list[str] = []
+    for name, payload in sorted(parts.items()):
+        if not name.endswith(".xml"):
+            continue
+        encoding = _declared_xml_encoding(payload)
+        try:
+            payload.decode(encoding)
+        except (LookupError, UnicodeDecodeError):
+            warnings.append(f"ats_encoding_decode:{name}:{encoding}")
+    return warnings
+
+
+def _docx_structural_warnings(parts: dict[str, bytes], declared_fonts: set[str]) -> list[str]:
+    warnings: list[str] = []
+    namespace = {"w": W_NS}
+    document_payload = parts.get("word/document.xml")
+    if document_payload is None:
+        return warnings
+
+    try:
+        document = ElementTree.fromstring(document_payload)
+    except ElementTree.ParseError:
+        return warnings
+
+    if document.findall(".//w:tbl", namespace):
+        warnings.append("ats_hostile_construct:w:tbl")
+    if document.findall(".//w:txbxContent", namespace):
+        warnings.append("ats_hostile_construct:w:txbxContent")
+
+    if declared_fonts and "word/styles.xml" in parts:
+        try:
+            styles = ElementTree.fromstring(parts["word/styles.xml"])
+        except ElementTree.ParseError:
+            styles = None
+        if styles is not None:
+            seen_fonts: set[str] = set()
+            for node in styles.findall(".//w:rFonts", namespace):
+                for attr_name in ("ascii", "hAnsi"):
+                    value = node.get(f"{{{W_NS}}}{attr_name}")
+                    if value:
+                        seen_fonts.add(value)
+            for font in sorted(seen_fonts - declared_fonts):
+                warnings.append(f"ats_exotic_font:{font}")
+    return warnings
+
+
+def _extract_docx_text(content_base64: Any, declared_fonts: set[str] | None = None) -> tuple[str | None, list[str]]:
     if not isinstance(content_base64, str) or not content_base64:
         return None, ["DOCX artifact is missing content_base64."]
 
@@ -461,9 +637,13 @@ def _extract_docx_text(content_base64: Any) -> tuple[str | None, list[str]]:
             missing = sorted(required - names)
             if missing:
                 return None, [f"DOCX artifact is missing required parts: {', '.join(missing)}."]
-            document_xml = archive.read("word/document.xml")
+            parts = {name: archive.read(name) for name in names if name.endswith(".xml")}
+            document_xml = parts["word/document.xml"]
     except (zipfile.BadZipFile, KeyError, OSError):
         return None, ["DOCX artifact is not a readable DOCX zip payload."]
+
+    artifact_warnings = _encoding_warnings(parts)
+    artifact_warnings.extend(_docx_structural_warnings(parts, declared_fonts or set()))
 
     try:
         root = ElementTree.fromstring(document_xml)
@@ -481,8 +661,9 @@ def _extract_docx_text(content_base64: Any) -> tuple[str | None, list[str]]:
         if paragraph_text:
             paragraphs.append(paragraph_text)
     if not paragraphs:
-        return "", ["DOCX artifact contains no readable document text."]
-    return "\n".join(paragraphs), []
+        artifact_warnings.append("DOCX artifact contains no readable document text.")
+        return "", artifact_warnings
+    return "\n".join(paragraphs), artifact_warnings
 
 
 def _text_contains_material_lines(haystack: str, needle: str) -> bool:
@@ -514,7 +695,11 @@ def _extract_text(file: Any) -> tuple[str | None, str | None, dict[str, Any], li
         artifact_text = artifact.get("text") if isinstance(artifact.get("text"), str) else None
         artifact_warnings: list[str] = []
         if artifact_format == "docx" or artifact.get("media_type") == _DOCX_MEDIA_TYPE:
-            docx_text, artifact_warnings = _extract_docx_text(artifact.get("content_base64"))
+            declared_fonts = artifact.get("declared_font_families") or file.get("declared_font_families")
+            font_set = {str(font) for font in declared_fonts} if isinstance(declared_fonts, list) else set()
+            if not font_set:
+                font_set = {DEFAULT_LAYOUT.body_font.family, DEFAULT_LAYOUT.heading_font.family}
+            docx_text, artifact_warnings = _extract_docx_text(artifact.get("content_base64"), font_set)
             if artifact_text and docx_text is not None and not _text_contains_material_lines(docx_text, artifact_text):
                 artifact_warnings.append("DOCX artifact payload is missing text from the parse-back sidecar.")
             return artifact_text or docx_text, "docx", file, artifact_warnings
@@ -533,6 +718,15 @@ def _heading_names(text: str) -> set[str]:
         stripped = line.strip()
         if stripped.startswith(_HEADING_PREFIXES):
             headings.add(stripped.lstrip("#").strip().lower())
+    return headings
+
+
+def _section_heading_names(text: str) -> set[str]:
+    headings: set[str] = set()
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("## ") and not stripped.startswith("### "):
+            headings.add(stripped[3:].strip().lower())
     return headings
 
 
@@ -557,6 +751,16 @@ def _expected_terms(expected_resume: Any) -> list[str]:
     return terms
 
 
+def _payload_expected_headings(payload: dict[str, Any], expected_resume: Any) -> list[str]:
+    headings = payload.get("expected_headings")
+    if isinstance(headings, list):
+        return [str(heading).strip() for heading in headings if str(heading).strip()]
+    if not isinstance(expected_resume, dict):
+        return []
+    template = payload.get("template") if isinstance(payload.get("template"), dict) else {}
+    return _expected_headings(expected_resume, template)
+
+
 def validateRenderedOutput(file: Any) -> RenderDict:
     """Validate parse-back text and renderer-specific ATS concerns."""
 
@@ -576,13 +780,10 @@ def validateRenderedOutput(file: Any) -> RenderDict:
     expected_resume = payload.get("expected_resume") if isinstance(payload, dict) else None
     headings = _heading_names(text)
     missing_sections: list[str] = []
-    if isinstance(expected_resume, dict):
-        for section in expected_resume.get("sections", []):
-            if not isinstance(section, dict):
-                continue
-            heading = str(section.get("heading") or section.get("id") or "").strip()
-            if heading and not _has_heading(text, heading, headings):
-                missing_sections.append(heading)
+    expected_headings = _payload_expected_headings(payload, expected_resume)
+    for heading in expected_headings:
+        if heading and not _has_heading(text, heading, headings):
+            missing_sections.append(heading)
 
     lowered_text = text.lower()
     semantic_differences = [
@@ -604,6 +805,14 @@ def validateRenderedOutput(file: Any) -> RenderDict:
         warnings.append("Rendered output is missing expected text.")
     if unsupported_characters:
         warnings.append("Rendered output contains unsupported characters.")
+    if missing_sections:
+        warnings.append("ats_template_heading_mismatch")
+
+    rendered_section_headings = _section_heading_names(text)
+    if expected_headings and rendered_section_headings:
+        expected_heading_set = {heading.lower() for heading in expected_headings}
+        if rendered_section_headings != expected_heading_set and "ats_template_heading_mismatch" not in warnings:
+            warnings.append("ats_template_heading_mismatch")
 
     return {
         "status": "fail" if warnings else "pass",
@@ -612,6 +821,7 @@ def validateRenderedOutput(file: Any) -> RenderDict:
         "missing_sections": missing_sections,
         "unsupported_characters": unsupported_characters,
         "semantic_differences": semantic_differences,
+        "ats_findings": [warning for warning in warnings if warning.startswith("ats_")],
         "warnings": warnings,
     }
 

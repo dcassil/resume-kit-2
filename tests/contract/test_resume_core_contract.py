@@ -273,7 +273,10 @@ class ResumeCoreDomainContractTests(unittest.TestCase):
         renderable = first["renderable_resume"]
         self.assertEqual(renderable["schema_version"], self.core.RENDERABLE_RESUME_SCHEMA_VERSION)
         self.assertEqual([section["id"] for section in renderable["sections"][:5]], ["summary", "skills", "experience", "projects", "education"])
-        self.assertEqual(set(renderable["sections"][0]), {"id", "title", "entries"})
+        self.assertEqual(set(renderable["sections"][0]), {"id", "title", "format", "entries"})
+        formats = {section["id"]: section["format"] for section in renderable["sections"]}
+        self.assertEqual(formats["skills"], "skills")
+        self.assertEqual(formats["experience"], "default")
 
         input_claims = _claim_texts(canonical)
         output_claims = _claim_texts(renderable)
@@ -285,6 +288,20 @@ class ResumeCoreDomainContractTests(unittest.TestCase):
         self.assertEqual(result.get("status"), "error")
         self.assertEqual(result.get("renderable_resume"), {})
         self.assertIn("invalid_array", {error.get("code") for error in result.get("errors", [])})
+
+    def test_to_renderable_resume_emits_custom_sections_outside_canonical_and_order_lists(self):
+        resume = dict(
+            CANONICAL_RESUME,
+            sections=[{"id": "toolbelt", "title": "Toolbelt", "format": "skills", "items": [{"text": "Python"}, {"text": "Go"}]}],
+        )
+        result = maybe_await(self.core.toRenderableResume(resume, {"template_version": "1"}))
+        self.assertEqual(result.get("status"), "ok", result)
+        sections = {section["id"]: section for section in result["renderable_resume"]["sections"]}
+        self.assertIn("toolbelt", sections, "custom sections must not be silently dropped by derivation ordering")
+        self.assertEqual(sections["toolbelt"]["format"], "skills")
+        serialized_out = json.dumps(result["renderable_resume"], sort_keys=True)
+        self.assertIn("Python", serialized_out)
+        self.assertIn("Go", serialized_out)
 
     def test_to_renderable_resume_accepts_legacy_sections_shape_for_cli_export(self):
         legacy = {
@@ -300,6 +317,7 @@ class ResumeCoreDomainContractTests(unittest.TestCase):
         renderable = result["renderable_resume"]
         self.assertEqual([section["id"] for section in renderable["sections"]], ["skills", "summary"])
         self.assertEqual(renderable["sections"][0]["entries"], ["React", "TypeScript"])
+        self.assertEqual(renderable["sections"][0]["format"], "skills")
 
     def test_discovered_validate_resume_enforces_schema_required_identity_fields(self):
         self.assertEqual(

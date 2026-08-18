@@ -75,6 +75,9 @@ class SharedDtoSchemaContractTests(unittest.TestCase):
         self.assertEqual(set(schema["properties"]["contact"]["required"]), {"name", "email", "phone", "links"})
         section_schema = schema["properties"]["sections"]["items"]
         self.assertEqual(set(section_schema["required"]), {"id", "title", "entries"})
+        self.assertIn("format", section_schema["properties"])
+        entry_schema = section_schema["properties"]["entries"]["items"]["oneOf"][1]
+        self.assertTrue({"summary", "description", "degree", "field", "credential", "issuer"} <= set(entry_schema["properties"]))
 
     def test_resume_core_enums_preserve_truth_and_match_states(self):
         self.assertEqual(

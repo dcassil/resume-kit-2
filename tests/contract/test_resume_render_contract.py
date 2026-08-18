@@ -54,11 +54,13 @@ RENDERABLE_RESUME = {
         {
             "id": "summary",
             "title": "Summary",
+            "format": "default",
             "entries": ["Software engineer focused on React, TypeScript, REST APIs, and responsive web applications."],
         },
         {
             "id": "experience",
             "title": "Experience",
+            "format": "default",
             "entries": [
                 {
                     "company": "Example SaaS",
@@ -75,6 +77,7 @@ RENDERABLE_RESUME = {
         {
             "id": "skills",
             "title": "Skills",
+            "format": "skills",
             "entries": [{"skills": ["React", "TypeScript", "REST APIs", "Responsive design"]}],
         },
     ],
@@ -158,6 +161,21 @@ def docx_parts(result: dict) -> dict[str, bytes]:
 
 def xml_part(parts: dict[str, bytes], name: str) -> ElementTree.Element:
     return ElementTree.fromstring(parts[name])
+
+
+def docx_with_part(result: dict, part_name: str, replacement: bytes) -> dict:
+    source = artifact_bytes(result)
+    output = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(source)) as source_zip, zipfile.ZipFile(output, "w") as target_zip:
+        for info in source_zip.infolist():
+            payload = replacement if info.filename == part_name else source_zip.read(info.filename)
+            target_info = zipfile.ZipInfo(filename=info.filename, date_time=info.date_time)
+            target_info.compress_type = info.compress_type
+            target_info.external_attr = info.external_attr
+            target_zip.writestr(target_info, payload)
+    mutated = json.loads(json.dumps(result))
+    mutated["artifact"]["content_base64"] = base64.b64encode(output.getvalue()).decode("ascii")
+    return mutated
 
 
 def attr(node: ElementTree.Element, namespace: str, name: str) -> str | None:
@@ -335,6 +353,66 @@ class ResumeRenderContractTests(unittest.TestCase):
         self.assertNotIn("staff software engineer", lowered)
         self.assertNotRegex(lowered, r"\b20 million\b|\b30 engineers\b")
         self.assertNotIn("internal_provenance", lowered)
+
+    def test_schema_driven_provenance_stripping_removes_sources_evidence_and_arbitrary_keys(self):
+        resume = json.loads(json.dumps(RENDERABLE_RESUME))
+        resume["sources"] = [{"text": "root source leak"}]
+        resume["sections"][0]["sources"] = [{"text": "section source leak"}]
+        resume["sections"][0]["evidence"] = [{"text": "section evidence leak"}]
+        resume["sections"][0]["entries"].append(
+            {
+                "title": "Legitimate Title",
+                "company": "Legitimate Company",
+                "summary": "Legitimate summary survives.",
+                "sources": [{"text": "entry source leak"}],
+                "evidence": [{"text": "entry evidence leak"}],
+                "arbitrary": "arbitrary leak",
+            }
+        )
+
+        result = maybe_await(self.renderer.renderMarkdown(resume, TEMPLATE))
+        self.assertEqual(result["status"], "ok", result)
+        content = result["content"]
+        self.assertIn("Legitimate Title - Legitimate Company", content)
+        self.assertIn("Legitimate summary survives.", content)
+        self.assertNotIn("source leak", content)
+        self.assertNotIn("evidence leak", content)
+        self.assertNotIn("arbitrary leak", content)
+
+    def test_render_time_ats_sanitation_replaces_named_unsupported_characters(self):
+        resume = json.loads(json.dumps(RENDERABLE_RESUME))
+        resume["sections"][0]["entries"] = ["Built\u00a0React with \u201csmart quotes\u201d and \u2022 markers."]
+        result = maybe_await(self.renderer.renderMarkdown(resume, TEMPLATE))
+        self.assertEqual(result["status"], "ok", result)
+        self.assertIn('Built React with "smart quotes" and - markers.', result["content"])
+        self.assertNotIn("\u00a0", result["content"])
+        self.assertTrue(any(warning.startswith("ats_unsupported_character_sanitized") for warning in result["warnings"]))
+
+    def test_render_time_ats_sanitation_clean_pass_has_no_sanitation_warning(self):
+        result = maybe_await(self.renderer.renderMarkdown(RENDERABLE_RESUME, TEMPLATE))
+        self.assertEqual(result["status"], "ok", result)
+        self.assertFalse(any(warning.startswith("ats_unsupported_character_sanitized") for warning in result["warnings"]))
+
+    def test_skills_formatting_uses_section_metadata_not_section_id(self):
+        resume = json.loads(json.dumps(RENDERABLE_RESUME))
+        skills_section = resume["sections"][2]
+        skills_section["id"] = "technical_toolbox"
+        skills_section["title"] = "Technical Toolbox"
+        skills_section["format"] = "skills"
+        template = {**TEMPLATE, "section_order": ["summary", "experience", "technical_toolbox"]}
+
+        result = maybe_await(self.renderer.renderMarkdown(resume, template))
+        self.assertEqual(result["status"], "ok", result)
+        self.assertIn("## Technical Toolbox\nReact, TypeScript, REST APIs, Responsive design", result["content"])
+
+    def test_non_skills_section_never_gets_skills_formatting_without_metadata(self):
+        resume = json.loads(json.dumps(RENDERABLE_RESUME))
+        resume["sections"][2]["format"] = "default"
+        resume["sections"][2]["entries"] = ["React", "TypeScript", "REST APIs", "Responsive design"]
+        result = maybe_await(self.renderer.renderMarkdown(resume, TEMPLATE))
+        self.assertEqual(result["status"], "ok", result)
+        self.assertIn("React\nTypeScript\nREST APIs\nResponsive design", result["content"])
+        self.assertNotIn("React, TypeScript, REST APIs, Responsive design", result["content"])
 
     def test_markdown_respects_configured_section_order_and_bullets(self):
         result = maybe_await(self.renderer.renderMarkdown(RENDERABLE_RESUME, TEMPLATE))
@@ -592,8 +670,73 @@ class ResumeRenderContractTests(unittest.TestCase):
         self.assertIsInstance(result, dict)
         self.assertIn(result.get("status"), {"pass", "fail", "unsupported"})
         self.assertEqual(result.get("format"), "markdown")
-        for field in ["text_extracted", "missing_sections", "unsupported_characters", "semantic_differences", "warnings"]:
+        for field in ["text_extracted", "missing_sections", "unsupported_characters", "semantic_differences", "ats_findings", "warnings"]:
             self.assertIn(field, result)
+
+    def test_validate_rendered_output_structural_checks_clean_pass_by_name(self):
+        rendered = maybe_await(self.renderer.renderDocx(RENDERABLE_RESUME, TEMPLATE))
+        result = maybe_await(self.renderer.validateRenderedOutput(rendered))
+        self.assertEqual(result["status"], "pass", result)
+        for finding in [
+            "ats_encoding_decode",
+            "ats_hostile_construct:w:tbl",
+            "ats_hostile_construct:w:txbxContent",
+            "ats_exotic_font",
+            "ats_template_heading_mismatch",
+        ]:
+            self.assertFalse(any(warning.startswith(finding) for warning in result["warnings"]), finding)
+
+    def test_validate_rendered_output_detects_declared_encoding_decode_failure_by_name(self):
+        rendered = maybe_await(self.renderer.renderDocx(RENDERABLE_RESUME, TEMPLATE))
+        parts = docx_parts(rendered)
+        bad_styles = parts["word/styles.xml"] + b"\xff"
+        mutated = docx_with_part(rendered, "word/styles.xml", bad_styles)
+
+        result = maybe_await(self.renderer.validateRenderedOutput(mutated))
+        self.assertEqual(result["status"], "fail", result)
+        self.assertTrue(any(warning.startswith("ats_encoding_decode:word/styles.xml:utf-8") for warning in result["warnings"]))
+
+    def test_validate_rendered_output_detects_tables_by_name(self):
+        rendered = maybe_await(self.renderer.renderDocx(RENDERABLE_RESUME, TEMPLATE))
+        document = docx_parts(rendered)["word/document.xml"].replace(
+            b"</w:body>",
+            b"<w:tbl><w:tr><w:tc><w:p><w:r><w:t>Table text</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body>",
+        )
+        mutated = docx_with_part(rendered, "word/document.xml", document)
+
+        result = maybe_await(self.renderer.validateRenderedOutput(mutated))
+        self.assertEqual(result["status"], "fail", result)
+        self.assertIn("ats_hostile_construct:w:tbl", result["warnings"])
+
+    def test_validate_rendered_output_detects_text_boxes_by_name(self):
+        rendered = maybe_await(self.renderer.renderDocx(RENDERABLE_RESUME, TEMPLATE))
+        document = docx_parts(rendered)["word/document.xml"].replace(
+            b"</w:body>",
+            b"<w:p><w:r><w:txbxContent><w:p><w:r><w:t>Box text</w:t></w:r></w:p></w:txbxContent></w:r></w:p></w:body>",
+        )
+        mutated = docx_with_part(rendered, "word/document.xml", document)
+
+        result = maybe_await(self.renderer.validateRenderedOutput(mutated))
+        self.assertEqual(result["status"], "fail", result)
+        self.assertIn("ats_hostile_construct:w:txbxContent", result["warnings"])
+
+    def test_validate_rendered_output_detects_fonts_outside_layout_metrics_by_name(self):
+        rendered = maybe_await(self.renderer.renderDocx(RENDERABLE_RESUME, TEMPLATE))
+        styles = docx_parts(rendered)["word/styles.xml"].replace(b"Aptos", b"Papyrus", 1)
+        mutated = docx_with_part(rendered, "word/styles.xml", styles)
+
+        result = maybe_await(self.renderer.validateRenderedOutput(mutated))
+        self.assertEqual(result["status"], "fail", result)
+        self.assertIn("ats_exotic_font:Papyrus", result["warnings"])
+
+    def test_validate_rendered_output_detects_template_heading_mismatch_by_name(self):
+        rendered = maybe_await(self.renderer.renderMarkdown(RENDERABLE_RESUME, TEMPLATE))
+        rendered["content"] = rendered["content"].replace("## Skills", "## Tools")
+
+        result = maybe_await(self.renderer.validateRenderedOutput(rendered))
+        self.assertEqual(result["status"], "fail", result)
+        self.assertIn("ats_template_heading_mismatch", result["warnings"])
+        self.assertIn("Skills", result["missing_sections"])
 
     def test_malformed_inputs_return_typed_errors_without_tracebacks(self):
         invalid_calls = [

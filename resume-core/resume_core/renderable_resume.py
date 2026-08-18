@@ -29,6 +29,9 @@ _SECTION_TITLES = {
     "awards": "Awards",
 }
 _CANONICAL_SECTION_FIELDS = ("summary", "skills", "experience", "projects", "education", "certifications", "awards")
+_SECTION_FORMATS = {
+    "skills": "skills",
+}
 
 
 def toRenderableResume(canonical_resume: Any, template: JsonObject | None = None) -> JsonObject:
@@ -61,6 +64,10 @@ def _derive_renderable(resume: JsonObject, section_order: list[str]) -> JsonObje
         if section is not None and section_id not in emitted:
             ordered.append(section)
             emitted.add(section_id)
+    for section_id, section in known_sections.items():
+        if section_id not in emitted:
+            ordered.append(section)
+            emitted.add(section_id)
     ordered.extend(_additional_sections(resume))
 
     summary = _summary_text(_field_value(_item(resume, "summary")))
@@ -87,7 +94,7 @@ def _known_sections(resume: JsonObject) -> dict[str, JsonObject]:
 
     skills = _array(_item(resume, "skills", []))
     if skills:
-        sections["skills"] = _section("skills", "Skills", _skill_entries(skills))
+        sections["skills"] = _section("skills", "Skills", _skill_entries(skills), section_format="skills")
 
     for section_id in ("experience", "projects", "education", "certifications", "awards"):
         entries = [_entry(item) for item in _array(_item(resume, section_id, [])) if _has_content(item)]
@@ -103,7 +110,12 @@ def _known_sections(resume: JsonObject) -> dict[str, JsonObject]:
             continue
         entries = _section_entries(section)
         if entries:
-            sections[section_id] = _section(section_id, _section_title(section, section_id), entries)
+            sections[section_id] = _section(
+                section_id,
+                _section_title(section, section_id),
+                entries,
+                section_format=_section_format(section, section_id),
+            )
 
     return sections
 
@@ -118,7 +130,14 @@ def _additional_sections(resume: JsonObject) -> list[JsonObject]:
         section_id = str(_item(section, "id") or _slug(_item(section, "title") or _item(section, "heading") or f"additional_{index}"))
         entries = _section_entries(section)
         if entries:
-            result.append(_section(section_id, _section_title(section, section_id), entries))
+            result.append(
+                _section(
+                    section_id,
+                    _section_title(section, section_id),
+                    entries,
+                    section_format=_section_format(section, section_id),
+                )
+            )
     return result
 
 
@@ -131,12 +150,24 @@ def _section_entries(section: JsonObject) -> list[Any]:
     return _entry_items(content) if _has_content(content) else []
 
 
-def _section(section_id: str, title: str, entries: list[Any]) -> JsonObject:
-    return {"id": section_id, "title": title, "entries": copy.deepcopy(entries)}
+def _section(section_id: str, title: str, entries: list[Any], *, section_format: str | None = None) -> JsonObject:
+    return {
+        "id": section_id,
+        "title": title,
+        "format": section_format or _SECTION_FORMATS.get(section_id, "default"),
+        "entries": copy.deepcopy(entries),
+    }
 
 
 def _section_title(section: JsonObject, section_id: str) -> str:
     return _text(_item(section, "title") or _item(section, "heading") or _SECTION_TITLES.get(section_id) or section_id.replace("_", " ").title())
+
+
+def _section_format(section: JsonObject, section_id: str) -> str:
+    value = _item(section, "format", _item(section, "kind"))
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return _SECTION_FORMATS.get(section_id, "default")
 
 
 def _skill_entries(skills: list[Any]) -> list[Any]:

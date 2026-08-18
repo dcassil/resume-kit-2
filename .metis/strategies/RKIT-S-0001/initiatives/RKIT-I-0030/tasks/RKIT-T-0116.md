@@ -4,14 +4,14 @@ level: task
 title: "ATS-safety expansion, schema-driven provenance stripping, skills de-hardcode, TEST_SPEC strengthening"
 short_code: "RKIT-T-0116"
 created_at: 2026-08-18T21:57:45.503363+00:00
-updated_at: 2026-08-18T21:57:45.503363+00:00
+updated_at: 2026-08-18T22:07:47.516047+00:00
 parent: semantic-neutral-markdown-and-docx
-blocked_by: ["RKIT-T-0115"]
+blocked_by: [RKIT-T-0115]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0030
 ## Objective
 
 Close initiative R4–R6: ATS-safety grows beyond the fixed 6-character deny list into render-time sanitation + validation-time structural checks; provenance stripping becomes schema-driven off the core-owned RenderableResume (strip everything NOT in the renderable schema); skills formatting is selected by template/section metadata instead of a hardcoded id.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -53,4 +55,4 @@ Recommended Agent: opus + medium
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-18: Implemented R4-R6. Added schema-driven renderable stripping in `resume_render`, render-time ATS character sanitation, validation-time DOCX encoding/structure/font/heading warning checks, and section `format` metadata from `resume_core.toRenderableResume` with schema/test coverage. Added renderer contract tests for each positive ATS finding by name plus clean pass, provenance leak/survival, and skills-format metadata behavior. Updated `resume-render/TEST_SPEC.md`; no fixture/snapshot diff. Focused renderer/core contract tests passed. Required gates passed: `python3 tools/run_gate.py --pr --root .` (623 tests), `python3 tools/run_gate.py --smoke --root .`, and `python3 tools/run_gate.py --future-contract --root .` (630 tests). Final Straight Jacket verification still shows only the expected `tools/resume_core_guardrails.py` mismatch.

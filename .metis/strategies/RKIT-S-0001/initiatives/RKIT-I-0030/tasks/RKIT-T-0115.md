@@ -4,14 +4,14 @@ level: task
 title: "OOXML depth: styles.xml, numbering part, real bullet lists, template layout metrics driving DOCX"
 short_code: "RKIT-T-0115"
 created_at: 2026-08-18T21:57:45.433704+00:00
-updated_at: 2026-08-18T21:58:54.011654+00:00
+updated_at: 2026-08-18T22:07:47.308151+00:00
 parent: semantic-neutral-markdown-and-docx
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0030
 ## Objective
 
 Give DOCX artifacts real word-processing structure (initiative R1–R3, R7): a `word/numbering.xml` part with bullets rendered as genuine list items, a generated `word/styles.xml` defining EVERY referenced style, and a versioned template `layout` metrics block (fonts/spacing/margins/bullet style) that drives DOCX generation — the section 9 typography substrate RKIT-I-0031 will measure against. Stdlib-only (RKIT-A-0004 item 3: no python-docx).
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
