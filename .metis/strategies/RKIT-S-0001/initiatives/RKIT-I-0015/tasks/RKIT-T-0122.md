@@ -4,14 +4,14 @@ level: task
 title: "Write-path smoke extension (protected run_smoke edit), TEST_SPEC strengthening, audit-reconstruction E2E wiring"
 short_code: "RKIT-T-0122"
 created_at: 2026-08-18T23:10:05.170939+00:00
-updated_at: 2026-08-18T23:20:03.648843+00:00
+updated_at: 2026-08-18T23:45:24.690881+00:00
 parent: integrate-career-mcp-smoke-and-e2e
 blocked_by: [RKIT-T-0121]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0015
 ## Objective
 
 Close initiative R2 + the TEST_SPEC-strengthening set: `tools/run_smoke.py` (authorized protected edit, no-verify workflow) extends its read-only career-mcp coverage with a real-store write round trip (propose → verify with evidence → add_relationship → search reflecting the writes, all with confirmed:true), and career-mcp/TEST_SPEC.md gets the audit-flagged wording repairs.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

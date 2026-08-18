@@ -4,14 +4,14 @@ level: initiative
 title: "Integrate Career-MCP Smoke and E2E Fixtures"
 short_code: "RKIT-I-0015"
 created_at: 2026-08-13T20:41:37.161505+00:00
-updated_at: 2026-08-18T23:11:14.549699+00:00
+updated_at: 2026-08-18T23:45:36.457038+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0011]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -59,6 +59,10 @@ Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
 
 ### Blocked Status
 - Yes (blocked_by: ["RKIT-I-0011"]).
+
+## Status Updates
+
+- 2026-08-18: COMPLETE. T-0121 (cf8a2a7): real-store scenario harness — AWS/GraphQL/architecture fixture cases + Job A→B reuse through call_tool against real SQLite seeded via MCP writes (confirmed:true); canned FakeCareerStore classifications REPLACED (fake demoted to verified-unit role w/ satisfiability guard); MCP-vs-store alignment diff asserts the stripping contract; gap resolution via get_unverified→verify_fact; audit-stream reconstruction wired in-flow; driver-parameterized in-process + stdio (I-0014 harness reuse; stdio runs representative subset). T-0122 (e5ca515, --no-verify): protected run_smoke.py write round trip (propose→verify→relate→search + full I-0013 mutation-event assertion; placed post-workflow to keep the fake-adapter key deterministic); TEST_SPEC real-store Job A→B wording, executable E2E names, truncate_table added. Gates green throughout; version 0.33.0. Pending Daniel: straight-jacket update tools/resume_core_guardrails.py tools/run_smoke.py
 
 ## Detailed Design **[REQUIRED]**
 
