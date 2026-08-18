@@ -4,14 +4,14 @@ level: initiative
 title: "Resume-Render Template and Result Contract Hardening"
 short_code: "RKIT-I-0029"
 created_at: 2026-08-13T20:41:37.570664+00:00
-updated_at: 2026-08-18T21:29:20.545077+00:00
+updated_at: 2026-08-18T21:56:06.299684+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: []
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -63,6 +63,10 @@ Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
 
 ### Blocked Status
 - No. `blocked_by: []`.
+
+## Status Updates
+
+- 2026-08-18: COMPLETE. T-0113 (3b75c72): resume-core owns RenderableResume + deterministic toRenderableResume (renderable_resume.py; §13 sectionOrder reuse; totality/content-preservation/byte-determinism/typed-error tests); renderer validates against the core schema (direct import — render guardrail permits); CLI alias deleted; shared-DTO/workflow/render tests realigned strengthen-only; LOCKSTEP: core_surface.json + protected resume_core_guardrails.py expanded by the driver (no manifest lag; pending: straight-jacket update tools/resume_core_guardrails.py). T-0114 (2c7d8a2): status_vocabulary.status_table (per-function statuses/conditions/implemented markers; validateRenderedOutput unsupported specified for I-0032 as implemented:false+owner), reachability parity test, required_reduction char-count + ok-genuine-bytes pins (I-0027/I-0033 behavior cited, not redone), DOCX bytes/media-type invariant. All four audit drifts closed or specified for their owning initiative. Gates PR 607 / future 614 / smoke green; version 0.28.0.
 
 ## Detailed Design **[REQUIRED]**
 
