@@ -4,20 +4,20 @@ level: initiative
 title: "Integrate Career-MCP Smoke and E2E Fixtures"
 short_code: "RKIT-I-0015"
 created_at: 2026-08-13T20:41:37.161505+00:00
-updated_at: 2026-08-13T20:41:37.161505+00:00
+updated_at: 2026-08-18T23:11:14.549699+00:00
 parent: resume-kit-2-full-product-buildout
-blocked_by: ["RKIT-I-0011"]
+blocked_by: [RKIT-I-0011]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/discovery"
+  - "#phase/active"
 
 
 exit_criteria_met: false
 estimated_complexity: M
 strategy_id: RKIT-S-0001
-initiative_id: NULL
+initiative_id: integrate-career-mcp-smoke-and-e2e
 ---
 
 # Integrate Career-MCP Smoke and E2E Fixtures Initiative

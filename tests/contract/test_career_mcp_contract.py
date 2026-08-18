@@ -12,6 +12,7 @@ import unittest
 from pathlib import Path
 
 from tests.e2e.test_career_mcp_audit_reconstruction_e2e import CareerMcpAuditReconstructionE2ETests  # bridge into gated contract module
+from tests.e2e.test_career_mcp_real_store_scenarios_e2e import CareerMcpRealStoreScenarioE2ETests  # bridge into gated contract module
 from tests.contract.test_career_mcp_server_contract import (  # bridge into gated contract module
     CareerMcpCliLifecycleContractTests,
     CareerMcpServerProtocolContractTests,
@@ -284,24 +285,30 @@ class FakeCareerStore:
 
     def findCandidateMatches(self, requirements: list[dict], policy: dict):
         self.calls.append(("findCandidateMatches", {"requirements": requirements, "policy": policy}))
-        states = {
-            "req_react": ("exact_match", ["fact_react"]),
-            "req_api": ("verified_fact_match", ["fact_api"]),
-            "req_responsive": ("alias_match", ["fact_responsive"]),
-            "req_aws": ("verified_fact_match", ["fact_aws"]),
-            "req_graphql": ("verified_fact_match", ["fact_graphql"]),
-            "req_azure": ("related_match", ["fact_aws"]),
-            "req_staff": ("unknown", []),
-        }
-        return [
-            {
-                "requirement_id": req["requirement_id"],
-                "resolution_state": states.get(req["requirement_id"], ("possible_match", []))[0],
-                "fact_ids": states.get(req["requirement_id"], ("possible_match", []))[1],
-                "reasoning": "classified by career-store fact graph",
-            }
-            for req in requirements
-        ]
+        matches = []
+        for req in requirements:
+            terms = {str(term).casefold() for term in req.get("normalized_terms", [])}
+            terms.add(str(req.get("source_text", req.get("text", ""))).casefold())
+            matched_fact = None
+            for fact in sorted(self.facts.values(), key=lambda item: item["fact_id"]):
+                if any(term and term in fact["text"].casefold() for term in terms):
+                    matched_fact = fact
+                    break
+            if matched_fact is None:
+                matches.append({"requirement_id": req["requirement_id"], "resolution_state": "unknown", "fact_ids": []})
+                continue
+            state = "verified_fact_match" if matched_fact["verification_state"] == "user_verified" else "exact_match"
+            if matched_fact["verification_state"] in {"unknown", "inferred"}:
+                state = "possible_match"
+            matches.append(
+                {
+                    "requirement_id": req["requirement_id"],
+                    "resolution_state": state,
+                    "fact_ids": [matched_fact["fact_id"]],
+                    "reasoning": "classified by verified fake using local fact text",
+                }
+            )
+        return matches
 
     def findConflicts(self, fact_or_claim: dict, scope=None):
         self.calls.append(("findConflicts", {"fact_or_claim": fact_or_claim, "scope": scope}))
@@ -764,8 +771,61 @@ class CareerMcpAdapterContractTests(unittest.TestCase):
         self.assertNotEqual(azure_aws.get("relationship_type"), "equivalent")
 
     def test_find_matches_returns_resolution_states_without_official_scores(self):
+        _store, adapter = real_store_adapter(self)
+        seeded: dict[str, str] = {}
+        for label, text, verification_state in (
+            ("react", "React", "source_stated"),
+            ("aws", "AWS experience, six years", "user_verified"),
+            ("graphql", "GraphQL APIs in production", "user_verified"),
+        ):
+            proposed = call_tool(
+                adapter,
+                "career.propose_fact",
+                confirmed({
+                    "type": "skill",
+                    "text": text,
+                    "source": "user_answer" if verification_state == "user_verified" else "resume_source",
+                    "evidence": {"source": "user_answer", "source_id": f"seed_{label}", "text": text},
+                }),
+            )
+            self.assertEqual(proposed["status"], "ok", proposed)
+            seeded[label] = proposed["fact_id"]
+            arguments = {
+                "fact_id": proposed["fact_id"],
+                "verification_state": verification_state,
+                "confirmation": confirmation_for_state(proposed["fact_id"], verification_state),
+                "confirmed": True,
+            }
+            if verification_state == "source_stated":
+                arguments["evidence_id"] = f"evidence_seed_{label}"
+            verified = call_tool(adapter, "career.verify_fact", arguments)
+            self.assertEqual(verified["status"], "ok", verified)
+
+        azure = call_tool(
+            adapter,
+            "career.propose_fact",
+            confirmed({
+                "type": "skill",
+                "text": "Azure",
+                "source": "agent_interpretation",
+                "evidence": {"source": "resume_source", "source_id": "seed_azure", "text": "Azure"},
+            }),
+        )
+        self.assertEqual(azure["status"], "ok", azure)
+        related = call_tool(
+            adapter,
+            "career.add_relationship",
+            confirmed({
+                "from_fact_id": seeded["aws"],
+                "to_fact_id": azure["fact_id"],
+                "relationship_type": "related",
+                "evidence": {"source": "user_answer", "text": "AWS and Azure are related cloud platforms, not equivalent."},
+            }),
+        )
+        self.assertEqual(related["status"], "ok", related)
+
         result = call_tool(
-            self.adapter,
+            adapter,
             "career.find_matches",
             {
                 "requirements": [
@@ -784,6 +844,10 @@ class CareerMcpAdapterContractTests(unittest.TestCase):
         self.assertEqual(states["req_graphql"], "verified_fact_match")
         self.assertEqual(states["req_azure"], "related_match")
         self.assertEqual(states["req_staff"], "unknown")
+        fact_ids = {match["requirement_id"]: match["fact_ids"] for match in result["matches"]}
+        self.assertIn(seeded["aws"], fact_ids["req_aws"])
+        self.assertIn(seeded["graphql"], fact_ids["req_graphql"])
+        self.assertIn(seeded["aws"], fact_ids["req_azure"])
         self.assertTrue(set(states.values()) <= RESOLUTION_STATES)
         self.assertNotRegex(json.dumps(result).lower(), r"\b(official_score|overall_score)\b")
 
