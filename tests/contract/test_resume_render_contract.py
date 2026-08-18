@@ -7,8 +7,10 @@ import base64
 import binascii
 import importlib
 import inspect
+import io
 import json
 import unittest
+import zipfile
 from pathlib import Path
 
 import resume_core
@@ -123,6 +125,10 @@ def assert_render_result(test_case: unittest.TestCase, result: dict, expected_fo
 
 
 def pdf_artifact_bytes(result: dict) -> bytes:
+    return artifact_bytes(result)
+
+
+def artifact_bytes(result: dict) -> bytes:
     artifact = result.get("artifact")
     if not isinstance(artifact, dict):
         return b""
@@ -174,6 +180,108 @@ class ResumeRenderSurfaceManifestTests(unittest.TestCase):
         )
         self.assertIn("artifact", output_contract.get("unsupported_must_not_include", []))
 
+    def test_manifest_status_table_represents_unsupported_reason_contracts_across_functions(self):
+        status_rows = SURFACE["status_vocabulary"]["status_table"]
+        unsupported_rows = {row["function"]: row for row in status_rows if row["status"] == "unsupported"}
+        self.assertEqual(set(unsupported_rows), {"renderPdf", "validateRenderedOutput"})
+
+        pdf_row = unsupported_rows["renderPdf"]
+        self.assertIs(pdf_row.get("implemented"), True)
+        self.assertIs(pdf_row.get("requires_reason"), True)
+        self.assertEqual(pdf_row.get("reason_enum_ref"), "#/surfaces/renderPdf/output_contract/unsupported_reasons")
+
+        validation_row = unsupported_rows["validateRenderedOutput"]
+        self.assertIs(validation_row.get("implemented"), False)
+        self.assertEqual(validation_row.get("owner"), "RKIT-I-0032")
+        self.assertIs(validation_row.get("requires_reason"), True)
+        self.assertEqual(
+            validation_row.get("reason_ref"),
+            "#/surfaces/renderPdf/output_contract/unsupported_reasons[pdf_not_supported_in_mvp]",
+        )
+
+    def test_manifest_status_table_matches_reachable_function_statuses(self):
+        renderer = load_render_module(self)
+        long_resume = json.loads(json.dumps(RENDERABLE_RESUME))
+        long_resume["sections"][1]["entries"][0]["bullets"] = [
+            f"Built validated product capability {index} with React and REST APIs."
+            for index in range(80)
+        ]
+        missing_targets = {key: value for key, value in TEMPLATE.items() if key != "format_targets"}
+
+        status_cases = {
+            "renderMarkdown": [
+                (renderer.renderMarkdown, (RENDERABLE_RESUME, TEMPLATE)),
+                (renderer.renderMarkdown, ({}, TEMPLATE)),
+            ],
+            "renderDocx": [
+                (renderer.renderDocx, (RENDERABLE_RESUME, TEMPLATE)),
+                (renderer.renderDocx, (RENDERABLE_RESUME, {})),
+            ],
+            "renderPdf": [
+                (renderer.renderPdf, (RENDERABLE_RESUME, missing_targets)),
+                (renderer.renderPdf, ({}, TEMPLATE)),
+            ],
+            "measureLayout": [
+                (renderer.measureLayout, (RENDERABLE_RESUME, {**TEMPLATE, "target_pages": 5})),
+                (renderer.measureLayout, (long_resume, {**TEMPLATE, "target_pages": 1})),
+                (renderer.measureLayout, (RENDERABLE_RESUME, {**TEMPLATE, "target_pages": 0})),
+            ],
+            "validateRenderedOutput": [
+                (renderer.validateRenderedOutput, ({"format": "markdown", "content": "Readable text."},)),
+                (renderer.validateRenderedOutput, ({"format": "markdown", "content": "Curly \u201cquote\u201d"},)),
+                (renderer.validateRenderedOutput, ({},)),
+                (renderer.validateRenderedOutput, ({"format": "pdf", "artifact": {"kind": "pdf", "media_type": "application/pdf"}},)),
+            ],
+        }
+
+        emitted = {
+            function_name: {maybe_await(function(*args))["status"] for function, args in cases}
+            for function_name, cases in status_cases.items()
+        }
+        rows_by_function: dict[str, list[dict]] = {function_name: [] for function_name in PUBLIC_FUNCTIONS}
+        for row in SURFACE["status_vocabulary"]["status_table"]:
+            rows_by_function.setdefault(row["function"], []).append(row)
+
+        surfaces = {surface["name"]: surface for surface in SURFACE["surfaces"]}
+        for function_name in PUBLIC_FUNCTIONS:
+            with self.subTest(function=function_name):
+                table_statuses = {row["status"] for row in rows_by_function[function_name]}
+                implemented_statuses = {
+                    row["status"]
+                    for row in rows_by_function[function_name]
+                    if row.get("implemented") is True
+                }
+                future_statuses = {
+                    row["status"]
+                    for row in rows_by_function[function_name]
+                    if row.get("implemented") is False
+                }
+                manifest_allowed = set(surfaces[function_name]["output_contract"].get("allowed_statuses", []))
+
+                self.assertEqual(
+                    manifest_allowed,
+                    table_statuses,
+                    f"{function_name} output_contract.allowed_statuses must match status_vocabulary rows.",
+                )
+                unreachable_claimed = implemented_statuses - emitted[function_name]
+                emittable_unclaimed = emitted[function_name] - implemented_statuses
+                emitted_future = emitted[function_name] & future_statuses
+                self.assertEqual(
+                    unreachable_claimed,
+                    set(),
+                    f"{function_name} claims implemented statuses that fixtures did not emit: {sorted(unreachable_claimed)}",
+                )
+                self.assertEqual(
+                    emittable_unclaimed,
+                    set(),
+                    f"{function_name} emitted statuses missing implemented table rows: {sorted(emittable_unclaimed)}",
+                )
+                self.assertEqual(
+                    emitted_future,
+                    set(),
+                    f"{function_name} emitted statuses marked implemented=false: {sorted(emitted_future)}",
+                )
+
 
 class ResumeRenderContractTests(unittest.TestCase):
     def setUp(self):
@@ -223,6 +331,16 @@ class ResumeRenderContractTests(unittest.TestCase):
         self.assertIn("software engineer", text)
         self.assertIn("react", text)
         self.assertNotIn("internal_provenance", text)
+
+    def test_docx_ok_artifact_has_media_type_matching_real_docx_bytes(self):
+        result = maybe_await(self.renderer.renderDocx(RENDERABLE_RESUME, TEMPLATE))
+        self.assertEqual(result["status"], "ok", result)
+        artifact = result["artifact"]
+        self.assertEqual(artifact["media_type"], "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        docx_bytes = artifact_bytes(result)
+        with zipfile.ZipFile(io.BytesIO(docx_bytes)) as archive:
+            self.assertIn("[Content_Types].xml", archive.namelist())
+            self.assertIn("word/document.xml", archive.namelist())
 
     def test_pdf_render_policy_contracts_return_exact_unsupported_reasons_without_artifacts(self):
         missing_targets = {key: value for key, value in TEMPLATE.items() if key != "format_targets"}

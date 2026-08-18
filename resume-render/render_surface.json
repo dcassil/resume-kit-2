@@ -25,6 +25,102 @@
     "semantic_fingerprint",
     "warnings"
   ],
+  "status_vocabulary": {
+    "unsupported_semantics": "unsupported means the requested format or artifact kind is not supported under the current renderer policy, template targets, or MVP runtime; unsupported results must carry a machine-readable reason.",
+    "ok_payload_invariant": "ok means the function produced a genuine output payload. Artifact results that claim a media_type must include bytes whose container/header matches that media_type; markdown ok results are text content with no media_type claim.",
+    "required_reduction_unit": "required_reduction and requiredReduction are integer character counts, not page deltas.",
+    "status_table": [
+      {
+        "function": "renderMarkdown",
+        "status": "ok",
+        "implemented": true,
+        "condition": "resume validates as RenderableResume, template validates, and markdown text content is produced without changing semantic content."
+      },
+      {
+        "function": "renderMarkdown",
+        "status": "error",
+        "implemented": true,
+        "condition": "resume or template validation fails, returning a typed validation/render error without traceback leakage."
+      },
+      {
+        "function": "renderDocx",
+        "status": "ok",
+        "implemented": true,
+        "condition": "resume validates as RenderableResume, template validates, and a DOCX artifact is produced with media_type application/vnd.openxmlformats-officedocument.wordprocessingml.document and valid DOCX zip bytes."
+      },
+      {
+        "function": "renderDocx",
+        "status": "error",
+        "implemented": true,
+        "condition": "resume or template validation fails, returning a typed validation/render error without traceback leakage."
+      },
+      {
+        "function": "renderPdf",
+        "status": "ok",
+        "implemented": false,
+        "condition": "specified for a future real PDF runtime only: template targets PDF and the renderer emits actual PDF bytes with media_type application/pdf."
+      },
+      {
+        "function": "renderPdf",
+        "status": "unsupported",
+        "implemented": true,
+        "condition": "template omits format_targets, excludes pdf, or targets pdf while the MVP runtime has no PDF renderer.",
+        "requires_reason": true,
+        "reason_enum_ref": "#/surfaces/renderPdf/output_contract/unsupported_reasons"
+      },
+      {
+        "function": "renderPdf",
+        "status": "error",
+        "implemented": true,
+        "condition": "resume or template validation fails before PDF policy evaluation, returning a typed validation/render error without traceback leakage."
+      },
+      {
+        "function": "measureLayout",
+        "status": "fits",
+        "implemented": true,
+        "condition": "estimated page count is less than or equal to target_pages and required_reduction/requiredReduction are 0 character counts."
+      },
+      {
+        "function": "measureLayout",
+        "status": "overflow",
+        "implemented": true,
+        "condition": "estimated page count exceeds target_pages and required_reduction/requiredReduction are positive integer character counts with offending_sections."
+      },
+      {
+        "function": "measureLayout",
+        "status": "error",
+        "implemented": true,
+        "condition": "resume or template validation fails, including invalid target_pages, returning a typed validation error."
+      },
+      {
+        "function": "validateRenderedOutput",
+        "status": "pass",
+        "implemented": true,
+        "condition": "readable text is extracted and no missing sections, unsupported characters, empty output, artifact parse-back gaps, or semantic differences are found."
+      },
+      {
+        "function": "validateRenderedOutput",
+        "status": "fail",
+        "implemented": true,
+        "condition": "readable text is extracted but renderer-specific validation warnings are present."
+      },
+      {
+        "function": "validateRenderedOutput",
+        "status": "unsupported",
+        "implemented": false,
+        "owner": "RKIT-I-0032",
+        "condition": "specified for RKIT-I-0032: pdf-kind artifacts under MVP parse-back policy must return unsupported instead of pass/fail/error.",
+        "requires_reason": true,
+        "reason_ref": "#/surfaces/renderPdf/output_contract/unsupported_reasons[pdf_not_supported_in_mvp]"
+      },
+      {
+        "function": "validateRenderedOutput",
+        "status": "error",
+        "implemented": true,
+        "condition": "input lacks readable text or a recognized format/artifact payload, returning a typed validation error."
+      }
+    ]
+  },
   "non_responsibilities": [
     "semantic_rewrite",
     "relevance_selection",
@@ -65,6 +161,11 @@
           "semantic_fingerprint",
           "warnings"
         ],
+        "allowed_statuses": [
+          "ok",
+          "error"
+        ],
+        "ok_condition": "Produces markdown text content; no media_type is claimed for markdown text results.",
         "must_preserve": [
           "employment_titles",
           "dates",
@@ -112,6 +213,11 @@
           "semantic_fingerprint",
           "warnings"
         ],
+        "allowed_statuses": [
+          "ok",
+          "error"
+        ],
+        "ok_condition": "Produces an artifact with DOCX media_type and valid DOCX zip bytes.",
         "must_preserve": [
           "employment_titles",
           "dates",
@@ -158,6 +264,7 @@
           "unsupported",
           "error"
         ],
+        "ok_condition": "Future-only until a PDF runtime exists: ok requires an artifact with media_type application/pdf and bytes beginning with %PDF.",
         "unsupported_reasons": [
           "format_targets_missing",
           "not_in_format_targets",
@@ -212,6 +319,8 @@
           "overflow",
           "error"
         ],
+        "required_reduction_unit": "integer_character_count",
+        "required_reduction_unit_description": "required_reduction and requiredReduction are integer character counts required to fit target_pages, never a page-count delta.",
         "overflow_required_fields": [
           "estimated_pages",
           "target_pages",
@@ -254,8 +363,10 @@
         "allowed_statuses": [
           "pass",
           "fail",
-          "unsupported"
-        ]
+          "unsupported",
+          "error"
+        ],
+        "unsupported_condition": "Specified for RKIT-I-0032 only: pdf-kind artifacts under MVP parse-back policy return unsupported with a machine-readable reason; implemented=false in status_vocabulary until that behavior lands."
       }
     }
   ]

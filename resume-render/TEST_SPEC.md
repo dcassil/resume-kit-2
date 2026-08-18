@@ -12,6 +12,20 @@ Relevant public surface:
 - `measureLayout(resume, template)`
 - `validateRenderedOutput(file)`
 
+## Status Vocabulary
+
+`resume-render/render_surface.json` owns the per-function status table. `tests.contract.test_resume_render_contract.ResumeRenderSurfaceManifestTests.test_manifest_status_table_matches_reachable_function_statuses` drives each public function across reachable fixtures and asserts the rows marked `implemented: true` match emitted statuses exactly. Rows marked `implemented: false` are asserted not to emit yet, so future work must flip the marker when it lands.
+
+- `renderMarkdown`: `ok` for valid RenderableResume/template markdown content; `error` for typed validation/render errors. Covered by `test_markdown_render_preserves_semantic_content_and_excludes_provenance`, `test_markdown_respects_configured_section_order_and_bullets`, `test_malformed_inputs_return_typed_errors_without_tracebacks`, and the status-table parity test.
+- `renderDocx`: `ok` for a DOCX artifact with genuine DOCX bytes and the DOCX media type; `error` for typed validation/render errors. Covered by `test_docx_render_reports_artifact_template_version_and_preserves_sections`, `test_docx_ok_artifact_has_media_type_matching_real_docx_bytes`, `test_malformed_inputs_return_typed_errors_without_tracebacks`, and the status-table parity test.
+- `renderPdf`: `unsupported` with one of the manifest-owned reasons `format_targets_missing`, `not_in_format_targets`, or `pdf_not_supported_in_mvp`; `error` for validation errors. Future `ok` is specified but `implemented: false` until a real PDF runtime emits bytes beginning with `%PDF`. Covered by `test_manifest_enumerates_pdf_unsupported_reasons`, `test_pdf_render_policy_contracts_return_exact_unsupported_reasons_without_artifacts`, `test_pdf_render_status_artifact_invariant`, and the status-table parity test.
+- `measureLayout`: `fits` when estimated pages are within `target_pages`; `overflow` when estimated pages exceed `target_pages`; `error` for typed validation errors. Covered by `test_layout_measurement_reports_overflow_constraints_without_shortening_content`, `tests.contract.test_workflow_contract.WorkflowContractTests.test_render_overflow_routes_back_with_character_count_constraint_evidence`, and the status-table parity test.
+- `validateRenderedOutput`: `pass` when parse-back/ATS validation finds no warnings; `fail` when readable output has validation warnings; `error` when readable text cannot be extracted. `unsupported` for pdf-kind artifacts under MVP parse-back policy is specified for RKIT-I-0032 with `implemented: false`. Covered by `test_validate_rendered_output_reports_parse_back_and_ats_findings`, `test_malformed_inputs_return_typed_errors_without_tracebacks`, `test_manifest_status_table_represents_unsupported_reason_contracts_across_functions`, and the status-table parity test.
+
+`unsupported` means the requested format or artifact kind is not supported under current policy, template targets, or MVP runtime, and the result must carry a machine-readable `reason`. The manifest references the existing `renderPdf.output_contract.unsupported_reasons` enum instead of duplicating it in the status table. Schema-level unsupported+reason representability across functions is covered by `test_manifest_status_table_represents_unsupported_reason_contracts_across_functions`; the concrete renderPdf invariant is covered by `test_pdf_render_policy_contracts_return_exact_unsupported_reasons_without_artifacts`.
+
+`ok` requires a genuine output payload. Artifact results that claim `media_type` must include bytes matching that media type; markdown `ok` is text content with no media type claim. Covered by `test_docx_ok_artifact_has_media_type_matching_real_docx_bytes`, `test_pdf_render_status_artifact_invariant`, and the status-table parity test.
+
 ## Expected Structure
 
 Tests should expect renderer internals around:
@@ -66,9 +80,10 @@ Tests should expect renderer internals around:
 
 - Return page estimate and status.
 - Return overflow status when target pages are exceeded.
-- Include target pages, estimated pages, and required reduction.
+- Include target pages, estimated pages, and `required_reduction`/`requiredReduction` as integer character counts, not page deltas.
 - Never silently shorten content to fit target pages.
 - Ensure overflow routes back to selection/rewrite workflow.
+- Character-count unit is covered by `test_layout_measurement_reports_overflow_constraints_without_shortening_content` and `tests.contract.test_workflow_contract.WorkflowContractTests.test_render_overflow_routes_back_with_character_count_constraint_evidence`.
 
 ### Renderer-specific ATS checks
 

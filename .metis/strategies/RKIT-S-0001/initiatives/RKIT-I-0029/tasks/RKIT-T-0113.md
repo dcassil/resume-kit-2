@@ -4,14 +4,14 @@ level: task
 title: "RenderableResume DTO owned by resume-core: schema, toRenderableResume derivation, renderer realignment, CLI alias deletion"
 short_code: "RKIT-T-0113"
 created_at: 2026-08-18T21:28:11.238018+00:00
-updated_at: 2026-08-18T21:29:20.859616+00:00
+updated_at: 2026-08-18T21:48:27.727591+00:00
 parent: resume-render-template-and-result
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0029
 ## Objective
 
 Close initiative R1 — the "renderer rejects the documented canonical shape" audit defect: resume-core owns and exports the `RenderableResume` schema (contact/summary + ordered `sections: [{id, title, entries}]`) AND the deterministic `toRenderableResume(CanonicalResume, template)` derivation; resume-render's `_validate_resume` validates against the core-owned schema; the duplicate CLI alias (resume-cli/resume_cli/__init__.py:429-441 area) is deleted in favor of the core export. Section 4.1 CanonicalResume becomes renderable end to end for the first time.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

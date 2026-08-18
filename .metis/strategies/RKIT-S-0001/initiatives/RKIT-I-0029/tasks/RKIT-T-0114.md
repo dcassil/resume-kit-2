@@ -4,14 +4,14 @@ level: task
 title: "Per-function render status vocabulary, required_reduction/ok-bytes spec wording, strengthen-only contract tests"
 short_code: "RKIT-T-0114"
 created_at: 2026-08-18T21:28:11.302297+00:00
-updated_at: 2026-08-18T21:28:11.302297+00:00
+updated_at: 2026-08-18T21:48:28.260557+00:00
 parent: resume-render-template-and-result
-blocked_by: ["RKIT-T-0113"]
+blocked_by: [RKIT-T-0113]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0029
 ## Objective
 
 Close initiative R2–R5 spec-side: `render_surface.json` gains a per-function status table (ok/failed/unsupported with exact conditions per function, incl. when `validateRenderedOutput` must return `unsupported` — for RKIT-I-0032 to implement), the two audit-flagged wording gaps are pinned (`required_reduction` is a character count; `ok` requires an artifact whose bytes match its claimed `media_type`), all mirrored in TEST_SPEC with strengthen-only contract tests.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
