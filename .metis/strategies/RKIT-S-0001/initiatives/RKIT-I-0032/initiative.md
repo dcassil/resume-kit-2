@@ -4,14 +4,14 @@ level: initiative
 title: "Rendered Output Parse-Back and ATS Validation"
 short_code: "RKIT-I-0032"
 created_at: 2026-08-13T20:41:37.665427+00:00
-updated_at: 2026-08-18T22:39:41.848829+00:00
+updated_at: 2026-08-18T22:49:46.358446+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0030]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -65,6 +65,10 @@ Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
 
 ### Blocked Status
 - Yes: RKIT-I-0030 (frontmatter `blocked_by: ["RKIT-I-0030"]`). Explicitly not blocked by RKIT-I-0031; no ADR blockers — RKIT-A-0004 and RKIT-A-0006 are decided.
+
+## Status Updates
+
+- 2026-08-18: COMPLETE (single task T-0118, 43c4a33). Bytes-only trust model: sidecar fallback + any-dict-with-text pass deleted; verdicts exclusively from artifact bytes (I-0030-aware extraction); bidirectional two-way multiset comparison with added/omitted tagging; four adversarial tamper fixtures (added claim fail / removed content fail / lying sidecar pass / honest sidecar tampered bytes fail) + inert-sidecar test; unsupported reachable for pdf-kind (T-0114 status-table row flipped implemented:true, parity enforces); corruption diagnostics preserved; TEST_SPEC names bytes-derivation + addition-detection + fixtures. Driver independently probed the tampered-addition and lying-sidecar cases. The last row of the audit's high-severity defect table is closed. Zero protected edits; gates PR 635 / future 642 / smoke green; version 0.31.0.
 
 ## Detailed Design **[REQUIRED]**
 

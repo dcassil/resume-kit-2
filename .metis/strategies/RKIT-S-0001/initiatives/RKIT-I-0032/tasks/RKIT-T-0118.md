@@ -4,14 +4,14 @@ level: task
 title: "Bytes-only parse-back trust model: bidirectional semantic comparison, inert sidecar, reachable unsupported, tamper fixtures"
 short_code: "RKIT-T-0118"
 created_at: 2026-08-18T22:39:03.148530+00:00
-updated_at: 2026-08-18T22:39:41.988152+00:00
+updated_at: 2026-08-18T22:49:31.519082+00:00
 parent: rendered-output-parse-back-and-ats
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0032
 ## Objective
 
 Repair the audit's most serious render defect — validateRenderedOutput trusting the renderer's sidecar and missing additions: every verdict input derives EXCLUSIVELY from the artifact bytes; the semantic comparison is bidirectional (material additions fail, not just omissions — the byte-tampered inflated-claim DOCX becomes a permanent failing fixture); `unsupported` becomes reachable for kinds with no parse-back path; TEST_SPEC is strengthened so the sidecar shortcut can never re-certify.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
