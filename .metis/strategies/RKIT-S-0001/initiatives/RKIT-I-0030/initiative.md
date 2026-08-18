@@ -4,14 +4,14 @@ level: initiative
 title: "Semantic-Neutral Markdown and DOCX Rendering"
 short_code: "RKIT-I-0030"
 created_at: 2026-08-13T20:41:37.601397+00:00
-updated_at: 2026-08-18T21:58:53.662379+00:00
+updated_at: 2026-08-18T22:20:58.247859+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0029]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -66,6 +66,10 @@ Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
 
 ### Blocked Status
 - Yes: RKIT-I-0029 (frontmatter `blocked_by: ["RKIT-I-0029"]`). No ADR blockers — both relevant ADRs are decided.
+
+## Status Updates
+
+- 2026-08-18: COMPLETE. T-0115 (0744631): real OOXML — word/numbering.xml + w:numPr bullet list items (flattening gone), generated word/styles.xml defining every referenced styleId (structural unzip tests), layout-metrics.v1 template block (fonts/spacing/margins/bullet + defaults + version) driving w:rPr/w:pPr/w:sectPr, unknown-key typed rejection, byte-determinism pinned, TEST_SPEC bullets-preserved requires w:numPr; driver probed the canonical→derive→render round trip. T-0116 (bd3c42f): ATS render-time sanitation + structural checks (encoding, w:tbl/w:txbxContent, undeclared fonts, heading/template breakage — named detection+clean pairs); provenance stripping schema-driven off RENDERABLE_RESUME_SCHEMA (leak probe clean); skills formatting via section format metadata from toRenderableResume. DRIVER FIX: derivation ordering silently dropped custom canonical sections (Toolbelt probe) — remaining known sections now emit, named regression added. Zero protected edits; gates PR 624 / future 631 / smoke green; version 0.29.0.
 
 ## Detailed Design **[REQUIRED]**
 

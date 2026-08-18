@@ -4,14 +4,14 @@ level: task
 title: "ATS-safety expansion, schema-driven provenance stripping, skills de-hardcode, TEST_SPEC strengthening"
 short_code: "RKIT-T-0116"
 created_at: 2026-08-18T21:57:45.503363+00:00
-updated_at: 2026-08-18T22:07:47.516047+00:00
+updated_at: 2026-08-18T22:20:46.414254+00:00
 parent: semantic-neutral-markdown-and-docx
 blocked_by: [RKIT-T-0115]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0030
 ## Objective
 
 Close initiative R4–R6: ATS-safety grows beyond the fixed 6-character deny list into render-time sanitation + validation-time structural checks; provenance stripping becomes schema-driven off the core-owned RenderableResume (strip everything NOT in the renderable schema); skills formatting is selected by template/section metadata instead of a hardcoded id.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
