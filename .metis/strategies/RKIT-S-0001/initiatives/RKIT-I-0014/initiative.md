@@ -4,14 +4,14 @@ level: initiative
 title: "Provide Real Career-MCP Transport and Host Runtime"
 short_code: "RKIT-I-0014"
 created_at: 2026-08-13T20:41:37.135885+00:00
-updated_at: 2026-08-18T21:08:37.673601+00:00
+updated_at: 2026-08-18T21:26:00.846930+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0009]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -60,6 +60,10 @@ Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
 
 ### Blocked Status
 - Yes (blocked_by: ["RKIT-I-0009"]).
+
+## Status Updates
+
+- 2026-08-18: COMPLETE. T-0111 (a4441be): stdlib-only newline-delimited JSON-RPC 2.0 stdio server (`python -m career_mcp --db`, CAREER_MCP_DB fallback) — initialize/notifications/tools-list/tools-call thin shell over the existing adapter, canonical-manifest mapping without mutation, -32700/-32600/-32601 protocol codes vs typed envelopes inside successful tools/call, scrubbed startup failures, EOF/SIGTERM clean close; hand-rolled framing over the mcp SDK recorded as decision (stdlib-only runtime, smoke venv can't take a networked dep). T-0112 (26a6c84): real-subprocess smoke/parity/startup/protocol tests (+~0.8s PR gate), TEST_SPEC "server/tool registry loads" now real-process-only, host README. Driver independently probed a full subprocess round-trip. Zero NEW protected edits; straight-jacket verify fully clean; gates PR 599 / future 606 / smoke green; version 0.27.0.
 
 ## Detailed Design **[REQUIRED]**
 

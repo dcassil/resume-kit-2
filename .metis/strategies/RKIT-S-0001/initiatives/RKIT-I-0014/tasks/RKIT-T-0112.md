@@ -4,14 +4,14 @@ level: task
 title: "Transport tests: subprocess smoke, stdio/in-process parity, startup failures, TEST_SPEC strengthening, host docs"
 short_code: "RKIT-T-0112"
 created_at: 2026-08-18T21:07:19.603072+00:00
-updated_at: 2026-08-18T21:17:25.382868+00:00
+updated_at: 2026-08-18T21:25:48.360690+00:00
 parent: provide-real-career-mcp-transport
 blocked_by: [RKIT-T-0111]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0014
 ## Objective
 
 Prove the T-0111 server against a REAL process boundary and close the audit-flagged shortcut: subprocess smoke (spawn, handshake, tools/list = canonical eight+, round-trip a call), stdio/in-process byte-parity (R5), startup-failure behavior (R1), the TEST_SPEC "MCP server/tool registry loads" item rewritten so only a real server process can satisfy it, and host-registration documentation.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
