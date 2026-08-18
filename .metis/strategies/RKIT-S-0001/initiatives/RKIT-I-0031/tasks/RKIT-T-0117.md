@@ -4,14 +4,14 @@ level: task
 title: "Template-grounded capacity model, per-section overflow constraints, metrics-version report"
 short_code: "RKIT-T-0117"
 created_at: 2026-08-18T22:22:23.296181+00:00
-updated_at: 2026-08-18T22:23:04.893543+00:00
+updated_at: 2026-08-18T22:37:27.294019+00:00
 parent: resume-render-layout-measurement
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0031
 ## Objective
 
 Replace `measureLayout`'s fixed 45-line/90-char markdown heuristic with a capacity model derived from the I-0030 layout-metrics.v1 template block (page geometry, fonts, spacing, bullet indents, versioned glyph-width table), keep `required_reduction` as the character count consistent with that same model, itemize per-section overflow contributions, and stamp the metrics version into the report — the actionable, reconstructable constraint product I-0027/0039's loop-back consumes.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

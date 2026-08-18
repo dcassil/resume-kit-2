@@ -4,14 +4,14 @@ level: initiative
 title: "Resume-Render Layout Measurement and Overflow Constraint Reporting"
 short_code: "RKIT-I-0031"
 created_at: 2026-08-13T20:41:37.632529+00:00
-updated_at: 2026-08-18T22:23:04.758267+00:00
+updated_at: 2026-08-18T22:37:39.214689+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: [RKIT-I-0030]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -63,6 +63,10 @@ Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
 
 ### Blocked Status
 - Yes: RKIT-I-0030 (frontmatter `blocked_by: ["RKIT-I-0030"]`). No ADR blockers — RKIT-A-0006 is decided and settles the unit question.
+
+## Status Updates
+
+- 2026-08-18: COMPLETE (single task T-0117, 3703add). Capacity model in resume_render/_layout.py from layout-metrics.v1 + versioned glyph-widths.v1 table (45/90 constants deleted grep-proof); required_reduction char count from the same model (value-level boundary fixtures); per_section [{id, estimated_lines, overflow_chars}] + metrics_version; template-metric discrimination tests; workflow I-0027 consumers green. DRIVER FIX: object-shaped canonical bullets were silently deleted by the renderer's schema strip (schema declares scalar bullet text; derivation emitted {id,text}) — bullets now flatten to text in toRenderableResume, with an end-to-end regression covering render AND measurement (the prior E2E used string bullets only). Zero protected edits; gates PR 629 / future 636 / smoke green; version 0.30.0.
 
 ## Detailed Design **[REQUIRED]**
 
