@@ -15,6 +15,8 @@ from tests.e2e.test_career_mcp_audit_reconstruction_e2e import CareerMcpAuditRec
 from tests.contract.test_career_mcp_server_contract import (  # bridge into gated contract module
     CareerMcpCliLifecycleContractTests,
     CareerMcpServerProtocolContractTests,
+    CareerMcpSubprocessStartupFailureContractTests,
+    CareerMcpSubprocessTransportContractTests,
 )
 
 

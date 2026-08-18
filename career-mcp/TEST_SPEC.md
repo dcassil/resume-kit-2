@@ -45,6 +45,9 @@ Tests should treat MCP as an adapter with:
 - Stdin EOF and SIGTERM close the store cleanly and exit 0; covered by `test_env_db_fallback_builds_adapter_from_public_store_and_closes_on_eof` and `test_sigterm_shutdown_path_closes_store_and_exits_zero`.
 - `initialize`, `notifications/initialized`, `tools/list`, and `tools/call` are bound over newline-delimited JSON-RPC; covered by `CareerMcpServerProtocolContractTests.test_initialize_advertises_tools_capability`, `test_initialized_notification_is_accepted_without_response`, `test_tools_list_maps_canonical_manifest_without_mutating_it`, and `test_tools_call_content_byte_equals_direct_adapter_envelope`.
 - Protocol errors use JSON-RPC error codes while tool-level failures remain successful `tools/call` results containing typed career envelopes; covered by `test_protocol_errors_pin_json_rpc_error_codes` and `test_tool_failures_stay_inside_successful_tools_call_responses`.
+- A real `python3 -m career_mcp --db <path>` subprocess must complete initialize, `tools/list`, one `career.search_facts` `tools/call`, and EOF shutdown over stdio; in-process handler instantiation alone is not sufficient for the server/tool registry load requirement. Covered by `CareerMcpSubprocessTransportContractTests.test_subprocess_smoke_handshake_tools_list_call_and_clean_shutdown`.
+- Stdio `tools/call` content must match the same adapter envelope after JSON-canonicalization across a real process boundary for one read and one confirmed mutation; covered by `test_subprocess_tools_call_content_matches_in_process_for_read_and_confirmed_mutation`.
+- Real subprocess startup failures and protocol errors must stay typed and traceback-free; covered by `CareerMcpSubprocessStartupFailureContractTests` and `test_subprocess_protocol_errors_keep_json_rpc_and_tool_error_channels_distinct`.
 
 ### Tool discovery
 
@@ -144,7 +147,7 @@ Tests should treat MCP as an adapter with:
 
 The smoke fixture must prove:
 
-- MCP server/tool registry loads,
+- MCP server/tool registry loads through a real stdio server process, not only in-process adapter or handler instantiation. This is satisfied by `CareerMcpSubprocessTransportContractTests.test_subprocess_smoke_handshake_tools_list_call_and_clean_shutdown`, which launches `python3 -m career_mcp --db <path>` and compares `tools/list` against the canonical manifest.
 - search and get work,
 - no raw SQL tool is exposed,
 - write tools return mutation status, fact ID, verification state, conflicts, and confirmation-needed indicators.

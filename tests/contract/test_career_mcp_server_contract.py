@@ -5,12 +5,17 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import os
+import select
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 from typing import Any
 
 import career_mcp
 import career_mcp.__main__ as career_mcp_main
+from career_store import openCareerStore
 from career_mcp.server import (
     INVALID_REQUEST,
     METHOD_NOT_FOUND,
@@ -23,6 +28,8 @@ from career_mcp.server import (
 
 ROOT = Path(__file__).resolve().parents[2]
 SURFACE = json.loads((ROOT / "career-mcp" / "career_mcp" / "tool_surface.json").read_text(encoding="utf-8"))
+SUBPROCESS_TIMEOUT_SECONDS = 10
+FIXED_CLOCK = "2026-01-01T00:00:00Z"
 
 
 class SimpleStore:
@@ -80,6 +87,114 @@ class SimpleStore:
 
 def response_envelope(response: dict[str, Any]) -> dict[str, Any]:
     return json.loads(response["result"]["content"][0]["text"])
+
+
+def canonical_json_text(value: dict[str, Any]) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def subprocess_env() -> dict[str, str]:
+    env = os.environ.copy()
+    package_paths = [str(ROOT / "career-mcp"), str(ROOT / "career-store")]
+    if env.get("PYTHONPATH"):
+        package_paths.append(env["PYTHONPATH"])
+    env["PYTHONPATH"] = os.pathsep.join(package_paths)
+    env.pop("CAREER_MCP_DB", None)
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    return env
+
+
+def seed_real_store(db_path: Path, observed_at: str = FIXED_CLOCK) -> None:
+    store = openCareerStore(str(db_path), clock=lambda: observed_at)
+    store.upsertFact(
+        {"type": "skill", "text": "React", "verification_state": "unknown"},
+        {"source": "resume_source", "text": "Built React applications."},
+        source="resume_source",
+        policy={"allow_inferred_final": True},
+    )
+
+
+class CareerMcpProcess:
+    def __init__(self, test_case: unittest.TestCase, db_path: Path) -> None:
+        self.test_case = test_case
+        self.process = subprocess.Popen(
+            ["python3", "-m", "career_mcp", "--db", str(db_path)],
+            cwd=ROOT,
+            env=subprocess_env(),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+        )
+        test_case.addCleanup(self.kill_if_running)
+
+    def request(self, request: dict[str, Any]) -> dict[str, Any]:
+        self.write_line(canonical_json_text(request))
+        return self.read_response()
+
+    def write_line(self, line: str) -> None:
+        assert self.process.stdin is not None
+        self.process.stdin.write(line + "\n")
+        self.process.stdin.flush()
+
+    def read_response(self) -> dict[str, Any]:
+        line = self.read_line()
+        return json.loads(line)
+
+    def read_line(self) -> str:
+        assert self.process.stdout is not None
+        ready, _write, _error = select.select([self.process.stdout], [], [], SUBPROCESS_TIMEOUT_SECONDS)
+        if not ready:
+            self.kill_if_running()
+            self.test_case.fail("Timed out waiting for career-mcp subprocess response.")
+        line = self.process.stdout.readline()
+        if not line:
+            stderr = self.process.stderr.read() if self.process.stderr is not None else ""
+            self.test_case.fail(f"career-mcp subprocess exited before a response. stderr={stderr!r}")
+        return line
+
+    def close_and_wait(self) -> int:
+        if self.process.stdin is not None and not self.process.stdin.closed:
+            self.process.stdin.close()
+        try:
+            code = self.process.wait(timeout=SUBPROCESS_TIMEOUT_SECONDS)
+            self.close_pipes()
+            return code
+        except subprocess.TimeoutExpired:
+            self.kill_if_running()
+            self.test_case.fail("Timed out waiting for career-mcp subprocess shutdown.")
+            raise AssertionError("unreachable")
+
+    def kill_if_running(self) -> None:
+        if self.process.poll() is not None:
+            self.close_pipes()
+            return
+        self.process.kill()
+        try:
+            self.process.wait(timeout=SUBPROCESS_TIMEOUT_SECONDS)
+        except subprocess.TimeoutExpired:
+            pass
+        self.close_pipes()
+
+    def close_pipes(self) -> None:
+        for pipe in (self.process.stdin, self.process.stdout, self.process.stderr):
+            if pipe is not None and not pipe.closed:
+                pipe.close()
+
+
+def run_cli_subprocess(args: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["python3", "-m", "career_mcp", *args],
+        cwd=ROOT,
+        env=subprocess_env(),
+        input="",
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=SUBPROCESS_TIMEOUT_SECONDS,
+        check=False,
+    )
 
 
 class CareerMcpServerProtocolContractTests(unittest.TestCase):
@@ -276,6 +391,147 @@ class CareerMcpCliLifecycleContractTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         self.assertTrue(captured["store"].closed)
+
+
+class CareerMcpSubprocessTransportContractTests(unittest.TestCase):
+    def make_db_path(self, directory: str, name: str = "career.db") -> Path:
+        return Path(directory) / name
+
+    def test_subprocess_smoke_handshake_tools_list_call_and_clean_shutdown(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = self.make_db_path(tmp)
+            seed_real_store(db_path)
+            process = CareerMcpProcess(self, db_path)
+
+            initialize = process.request(
+                {"jsonrpc": "2.0", "id": "init", "method": "initialize", "params": {"protocolVersion": "2024-11-05"}}
+            )
+            self.assertEqual(initialize["result"]["protocolVersion"], "2024-11-05")
+            self.assertEqual(initialize["result"]["capabilities"], {"tools": {}})
+
+            tools = process.request({"jsonrpc": "2.0", "id": "tools", "method": "tools/list"})
+            self.assertEqual([tool["name"] for tool in tools["result"]["tools"]], [tool["name"] for tool in SURFACE["tools"]])
+
+            call = process.request(
+                {
+                    "jsonrpc": "2.0",
+                    "id": "search",
+                    "method": "tools/call",
+                    "params": {"name": "career.search_facts", "arguments": {"query": "React", "limit": 1}},
+                }
+            )
+            self.assertNotIn("error", call)
+            envelope = response_envelope(call)
+            self.assertEqual(envelope["status"], "ok")
+            self.assertEqual(envelope["tool"], "career.search_facts")
+            self.assertTrue(envelope["facts"])
+
+            self.assertEqual(process.close_and_wait(), 0)
+
+    def test_subprocess_tools_call_content_matches_in_process_for_read_and_confirmed_mutation(self):
+        read_arguments = {"query": "React", "limit": 1}
+        mutation_arguments = {
+            "type": "skill",
+            "text": "TypeScript",
+            "source": "agent_interpretation",
+            "confirmed": True,
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            read_direct_db = self.make_db_path(tmp, "read_direct.db")
+            read_process_db = self.make_db_path(tmp, "read_process.db")
+            seed_real_store(read_direct_db)
+            seed_real_store(read_process_db)
+
+            read_process = CareerMcpProcess(self, read_process_db)
+            read_response = read_process.request(
+                {
+                    "jsonrpc": "2.0",
+                    "id": "read",
+                    "method": "tools/call",
+                    "params": {"name": "career.search_facts", "arguments": read_arguments},
+                }
+            )
+            self.assertEqual(read_process.close_and_wait(), 0)
+
+            read_store = openCareerStore(str(read_direct_db), clock=lambda: FIXED_CLOCK)
+            read_direct = asyncio.run(career_mcp.create_career_mcp(store=read_store).call_tool("career.search_facts", read_arguments))
+            self.assertEqual(
+                canonical_json_text(json.loads(read_response["result"]["content"][0]["text"])),
+                canonical_json_text(read_direct),
+            )
+
+            mutation_direct_db = self.make_db_path(tmp, "mutation_direct.db")
+            mutation_process_db = self.make_db_path(tmp, "mutation_process.db")
+            seed_real_store(mutation_direct_db)
+            seed_real_store(mutation_process_db)
+
+            mutation_process = CareerMcpProcess(self, mutation_process_db)
+            mutation_response = mutation_process.request(
+                {
+                    "jsonrpc": "2.0",
+                    "id": "mutation",
+                    "method": "tools/call",
+                    "params": {"name": "career.propose_fact", "arguments": mutation_arguments},
+                }
+            )
+            self.assertEqual(mutation_process.close_and_wait(), 0)
+
+            mutation_process_envelope = json.loads(mutation_response["result"]["content"][0]["text"])
+            observed_at = mutation_process_envelope["audit"]["observed_at"]
+            mutation_store = openCareerStore(str(mutation_direct_db), clock=lambda: observed_at)
+            mutation_direct = asyncio.run(
+                career_mcp.create_career_mcp(store=mutation_store).call_tool("career.propose_fact", mutation_arguments)
+            )
+            self.assertEqual(canonical_json_text(mutation_process_envelope), canonical_json_text(mutation_direct))
+
+    def test_subprocess_protocol_errors_keep_json_rpc_and_tool_error_channels_distinct(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = self.make_db_path(tmp)
+            seed_real_store(db_path)
+            process = CareerMcpProcess(self, db_path)
+
+            process.write_line("{not json}")
+            malformed = process.read_response()
+            self.assertEqual(malformed["error"]["code"], PARSE_ERROR)
+
+            unknown_method = process.request({"jsonrpc": "2.0", "id": "unknown", "method": "career.missing"})
+            self.assertEqual(unknown_method["error"]["code"], METHOD_NOT_FOUND)
+
+            unknown_tool = process.request(
+                {
+                    "jsonrpc": "2.0",
+                    "id": "unknown_tool",
+                    "method": "tools/call",
+                    "params": {"name": "career.unknown", "arguments": {}},
+                }
+            )
+            self.assertNotIn("error", unknown_tool)
+            envelope = response_envelope(unknown_tool)
+            self.assertEqual(envelope["status"], "error")
+            self.assertEqual(envelope["error"]["type"], "unknown_tool")
+
+            self.assertEqual(process.close_and_wait(), 0)
+
+
+class CareerMcpSubprocessStartupFailureContractTests(unittest.TestCase):
+    def test_subprocess_missing_db_path_exits_nonzero_with_one_scrubbed_stderr_line(self):
+        completed = run_cli_subprocess([])
+
+        self.assertNotEqual(completed.returncode, 0)
+        lines = completed.stderr.splitlines()
+        self.assertEqual(lines, ["career_mcp_startup_error type=missing_db"])
+        self.assertNotRegex(completed.stderr.lower(), r"traceback")
+
+    def test_subprocess_unopenable_db_path_exits_nonzero_with_typed_stderr_and_no_traceback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            completed = run_cli_subprocess(["--db", tmp])
+
+        self.assertNotEqual(completed.returncode, 0)
+        lines = completed.stderr.splitlines()
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines[0], f"career_mcp_startup_error type=store_open_failed path={tmp!r}")
+        self.assertNotRegex(completed.stderr.lower(), r"traceback")
 
 
 if __name__ == "__main__":

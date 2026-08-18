@@ -4,14 +4,14 @@ level: task
 title: "Stdio JSON-RPC MCP server: entry point, store lifecycle, protocol binding, error channels"
 short_code: "RKIT-T-0111"
 created_at: 2026-08-18T21:07:19.534465+00:00
-updated_at: 2026-08-18T21:08:38.025445+00:00
+updated_at: 2026-08-18T21:17:25.221177+00:00
 parent: provide-real-career-mcp-transport
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0014
 ## Objective
 
 Make career-mcp a real, connectable MCP surface for the first time (R1–R4): `python -m career_mcp --db <path>` runs a stdio JSON-RPC MCP server — initialize handshake, `tools/list` from the canonical manifest, `tools/call` delegating to the existing adapter — as a thin shell with zero tool logic moved, honest error channels, and clean store lifecycle.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
