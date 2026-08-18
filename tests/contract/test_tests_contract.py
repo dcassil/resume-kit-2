@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -52,6 +54,23 @@ class TestsSuiteContractTests(unittest.TestCase):
         for command_name in ["boundary", "fixtures", "contract_current", "contract_tdd", "future_contract", "smoke", "main", "guardrails"]:
             self.assertIn(command_name, commands)
             self.assertTrue(commands[command_name].startswith("python3"))
+
+    def test_render_gate_integration_and_e2e_modules_are_bridged_into_current_gate(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "unittest",
+                "tests.integration.test_cli_render_artifacts_integration",
+                "tests.e2e.test_render_overflow_round_trip_e2e",
+            ],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
 
 
 if __name__ == "__main__":
