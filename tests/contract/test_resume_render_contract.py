@@ -178,6 +178,43 @@ def docx_with_part(result: dict, part_name: str, replacement: bytes) -> dict:
     return mutated
 
 
+def docx_with_expected_resume(result: dict) -> dict:
+    payload = json.loads(json.dumps(result))
+    payload["expected_resume"] = RENDERABLE_RESUME
+    return payload
+
+
+def validation_verdict(result: dict) -> dict:
+    verdict_keys = {
+        "status",
+        "format",
+        "text_extracted",
+        "missing_sections",
+        "unsupported_characters",
+        "semantic_differences",
+        "ats_findings",
+        "warnings",
+        "reason",
+        "cause",
+        "error",
+    }
+    return {key: value for key, value in result.items() if key in verdict_keys}
+
+
+def docx_with_added_paragraph(result: dict, text: str) -> dict:
+    escaped = (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    ).encode("utf-8")
+    paragraph = (
+        b'<w:p><w:pPr><w:pStyle w:val="body"/></w:pPr>'
+        b'<w:r><w:t xml:space="preserve">' + escaped + b"</w:t></w:r></w:p>"
+    )
+    document = docx_parts(result)["word/document.xml"].replace(b"</w:body>", paragraph + b"</w:body>")
+    return docx_with_part(result, "word/document.xml", document)
+
+
 def attr(node: ElementTree.Element, namespace: str, name: str) -> str | None:
     if node is None:
         return None
@@ -233,7 +270,7 @@ class ResumeRenderSurfaceManifestTests(unittest.TestCase):
         self.assertEqual(pdf_row.get("reason_enum_ref"), "#/surfaces/renderPdf/output_contract/unsupported_reasons")
 
         validation_row = unsupported_rows["validateRenderedOutput"]
-        self.assertIs(validation_row.get("implemented"), False)
+        self.assertIs(validation_row.get("implemented"), True)
         self.assertEqual(validation_row.get("owner"), "RKIT-I-0032")
         self.assertIs(validation_row.get("requires_reason"), True)
         self.assertEqual(
@@ -273,6 +310,18 @@ class ResumeRenderSurfaceManifestTests(unittest.TestCase):
                 (renderer.validateRenderedOutput, ({"format": "markdown", "content": "Curly \u201cquote\u201d"},)),
                 (renderer.validateRenderedOutput, ({},)),
                 (renderer.validateRenderedOutput, ({"format": "pdf", "artifact": {"kind": "pdf", "media_type": "application/pdf"}},)),
+                (
+                    renderer.validateRenderedOutput,
+                    (
+                        {
+                            "format": "docx",
+                            "artifact": {
+                                "kind": "docx",
+                                "content_base64": base64.b64encode(b"not a zip").decode("ascii"),
+                            },
+                        },
+                    ),
+                ),
             ],
         }
 
@@ -777,7 +826,7 @@ class ResumeRenderContractTests(unittest.TestCase):
         markdown = "# Summary\nSoftware engineer\n# Experience\nSoftware Engineer 2019-01 to 2024-06\n# Skills\nReact"
         result = maybe_await(self.renderer.validateRenderedOutput({"format": "markdown", "content": markdown, "expected_resume": RENDERABLE_RESUME}))
         self.assertIsInstance(result, dict)
-        self.assertIn(result.get("status"), {"pass", "fail", "unsupported"})
+        self.assertIn(result.get("status"), {"pass", "fail", "unsupported", "failed"})
         self.assertEqual(result.get("format"), "markdown")
         for field in ["text_extracted", "missing_sections", "unsupported_characters", "semantic_differences", "ats_findings", "warnings"]:
             self.assertIn(field, result)
@@ -794,6 +843,101 @@ class ResumeRenderContractTests(unittest.TestCase):
             "ats_template_heading_mismatch",
         ]:
             self.assertFalse(any(warning.startswith(finding) for warning in result["warnings"]), finding)
+
+    def test_validate_rendered_output_docx_tamper_added_inflated_claim_fails_by_name(self):
+        rendered = docx_with_expected_resume(maybe_await(self.renderer.renderDocx(RENDERABLE_RESUME, TEMPLATE)))
+        tampered = docx_with_added_paragraph(
+            rendered,
+            "Managed 30 engineers and scaled GraphQL platform to 20 million users.",
+        )
+
+        result = maybe_await(self.renderer.validateRenderedOutput(tampered))
+
+        self.assertEqual(result["status"], "fail", result)
+        added = [difference for difference in result["semantic_differences"] if difference["kind"] == "added"]
+        self.assertTrue(added, result)
+        added_tokens = {difference["token"] for difference in added}
+        self.assertTrue({"30", "graphql", "20", "million"}.issubset(added_tokens), result)
+        self.assertIn("Rendered output contains unexpected material text.", result["warnings"])
+
+    def test_validate_rendered_output_docx_tamper_removed_content_fails_by_name(self):
+        rendered = docx_with_expected_resume(maybe_await(self.renderer.renderDocx(RENDERABLE_RESUME, TEMPLATE)))
+        document = docx_parts(rendered)["word/document.xml"].replace(b"Example SaaS", b"", 1)
+        tampered = docx_with_part(rendered, "word/document.xml", document)
+
+        result = maybe_await(self.renderer.validateRenderedOutput(tampered))
+
+        self.assertEqual(result["status"], "fail", result)
+        omitted = [difference for difference in result["semantic_differences"] if difference["kind"] == "omitted"]
+        self.assertTrue(omitted, result)
+        omitted_tokens = {difference["token"] for difference in omitted}
+        self.assertTrue({"example", "saas"}.issubset(omitted_tokens), result)
+        self.assertIn("Rendered output is missing expected material text.", result["warnings"])
+
+    def test_validate_rendered_output_lie_sidecar_honest_bytes_passes_by_name(self):
+        rendered = docx_with_expected_resume(maybe_await(self.renderer.renderDocx(RENDERABLE_RESUME, TEMPLATE)))
+        rendered["artifact"]["text"] = "Managed 30 engineers and scaled GraphQL platform to 20 million users."
+
+        result = maybe_await(self.renderer.validateRenderedOutput(rendered))
+
+        self.assertEqual(result["status"], "pass", result)
+        self.assertEqual(result["semantic_differences"], [])
+        self.assertEqual(result["renderer_reported_text"], rendered["artifact"]["text"])
+
+    def test_validate_rendered_output_honest_sidecar_tampered_bytes_fails_by_name(self):
+        rendered = docx_with_expected_resume(maybe_await(self.renderer.renderDocx(RENDERABLE_RESUME, TEMPLATE)))
+        tampered = docx_with_added_paragraph(
+            rendered,
+            "Managed 30 engineers and scaled GraphQL platform to 20 million users.",
+        )
+
+        result = maybe_await(self.renderer.validateRenderedOutput(tampered))
+
+        self.assertEqual(result["status"], "fail", result)
+        self.assertTrue(any(difference["kind"] == "added" for difference in result["semantic_differences"]), result)
+        self.assertEqual(result["renderer_reported_text"], rendered["artifact"]["text"])
+
+    def test_validate_rendered_output_artifact_text_inert_to_verdict_by_name(self):
+        honest = docx_with_expected_resume(maybe_await(self.renderer.renderDocx(RENDERABLE_RESUME, TEMPLATE)))
+        lying = json.loads(json.dumps(honest))
+        lying["artifact"]["text"] = "Managed 30 engineers and scaled GraphQL platform to 20 million users."
+
+        honest_result = maybe_await(self.renderer.validateRenderedOutput(honest))
+        lying_result = maybe_await(self.renderer.validateRenderedOutput(lying))
+
+        self.assertEqual(validation_verdict(honest_result), validation_verdict(lying_result))
+        self.assertNotEqual(honest_result["renderer_reported_text"], lying_result["renderer_reported_text"])
+
+    def test_validate_rendered_output_pdf_kind_unsupported_by_name(self):
+        result = maybe_await(
+            self.renderer.validateRenderedOutput(
+                {"format": "pdf", "artifact": {"kind": "pdf", "media_type": "application/pdf", "text": "sidecar"}}
+            )
+        )
+
+        self.assertEqual(result["status"], "unsupported", result)
+        self.assertEqual(result["reason"], "pdf_not_supported_in_mvp")
+        self.assertEqual(result["renderer_reported_text"], "sidecar")
+        self.assertEqual(result["text_extracted"], "")
+
+    def test_validate_rendered_output_corrupt_docx_failed_with_cause_by_name(self):
+        result = maybe_await(
+            self.renderer.validateRenderedOutput(
+                {
+                    "format": "docx",
+                    "artifact": {
+                        "kind": "docx",
+                        "content_base64": base64.b64encode(b"not a zip").decode("ascii"),
+                        "text": "sidecar cannot certify corrupt bytes",
+                    },
+                }
+            )
+        )
+
+        self.assertEqual(result["status"], "failed", result)
+        self.assertEqual(result["cause"], "docx_unreadable_zip")
+        self.assertIn("DOCX artifact is not a readable DOCX zip payload.", result["warnings"])
+        self.assertEqual(result["renderer_reported_text"], "sidecar cannot certify corrupt bytes")
 
     def test_validate_rendered_output_detects_declared_encoding_decode_failure_by_name(self):
         rendered = maybe_await(self.renderer.renderDocx(RENDERABLE_RESUME, TEMPLATE))
@@ -841,6 +985,7 @@ class ResumeRenderContractTests(unittest.TestCase):
     def test_validate_rendered_output_detects_template_heading_mismatch_by_name(self):
         rendered = maybe_await(self.renderer.renderMarkdown(RENDERABLE_RESUME, TEMPLATE))
         rendered["content"] = rendered["content"].replace("## Skills", "## Tools")
+        rendered["expected_resume"] = RENDERABLE_RESUME
 
         result = maybe_await(self.renderer.validateRenderedOutput(rendered))
         self.assertEqual(result["status"], "fail", result)

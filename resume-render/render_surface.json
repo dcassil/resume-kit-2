@@ -107,11 +107,18 @@
       {
         "function": "validateRenderedOutput",
         "status": "unsupported",
-        "implemented": false,
+        "implemented": true,
         "owner": "RKIT-I-0032",
-        "condition": "specified for RKIT-I-0032: pdf-kind artifacts under MVP parse-back policy must return unsupported instead of pass/fail/error.",
+        "condition": "pdf-kind artifacts and artifact kinds with no bytes parse-back path return unsupported instead of a sidecar-based pass/fail/error.",
         "requires_reason": true,
         "reason_ref": "#/surfaces/renderPdf/output_contract/unsupported_reasons[pdf_not_supported_in_mvp]"
+      },
+      {
+        "function": "validateRenderedOutput",
+        "status": "failed",
+        "implemented": true,
+        "owner": "RKIT-I-0032",
+        "condition": "artifact kind has a parse-back path but the bytes are corrupt or unreadable, returning a machine-readable cause."
       },
       {
         "function": "validateRenderedOutput",
@@ -374,9 +381,10 @@
           "pass",
           "fail",
           "unsupported",
+          "failed",
           "error"
         ],
-        "unsupported_condition": "Specified for RKIT-I-0032 only: pdf-kind artifacts under MVP parse-back policy return unsupported with a machine-readable reason; implemented=false in status_vocabulary until that behavior lands."
+        "unsupported_condition": "PDF-kind artifacts under MVP parse-back policy and artifact kinds with no bytes parse-back path return unsupported with a machine-readable reason."
       }
     }
   ]

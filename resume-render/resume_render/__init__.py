@@ -13,6 +13,7 @@ import hashlib
 import io
 import re
 import zipfile
+from collections import Counter
 from typing import Any
 from xml.etree import ElementTree
 
@@ -48,7 +49,9 @@ _SANITATION_REPLACEMENTS = {
     "\u00a0": " ",
 }
 _DOCX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+_PDF_MEDIA_TYPE = "application/pdf"
 _XML_DECL_RE = re.compile(br"<\?xml[^>]*encoding=[\"']([^\"']+)[\"']", re.IGNORECASE)
+_SEMANTIC_TOKEN_RE = re.compile(r"[a-z0-9]+(?:[.+#/-][a-z0-9]+)*", re.IGNORECASE)
 
 
 def _typed_error(kind: str, message: str, fmt: str | None = None) -> RenderDict:
@@ -615,14 +618,14 @@ def _docx_structural_warnings(parts: dict[str, bytes], declared_fonts: set[str])
     return warnings
 
 
-def _extract_docx_text(content_base64: Any, declared_fonts: set[str] | None = None) -> tuple[str | None, list[str]]:
+def _extract_docx_text(content_base64: Any, declared_fonts: set[str] | None = None) -> tuple[str | None, list[str], str | None]:
     if not isinstance(content_base64, str) or not content_base64:
-        return None, ["DOCX artifact is missing content_base64."]
+        return None, ["DOCX artifact is missing content_base64."], "docx_missing_content_base64"
 
     try:
         docx_bytes = base64.b64decode(content_base64, validate=True)
     except (ValueError, TypeError):
-        return None, ["DOCX artifact content_base64 is not valid base64."]
+        return None, ["DOCX artifact content_base64 is not valid base64."], "docx_invalid_base64"
 
     try:
         with zipfile.ZipFile(io.BytesIO(docx_bytes)) as archive:
@@ -630,11 +633,11 @@ def _extract_docx_text(content_base64: Any, declared_fonts: set[str] | None = No
             required = {"[Content_Types].xml", "_rels/.rels", "word/document.xml"}
             missing = sorted(required - names)
             if missing:
-                return None, [f"DOCX artifact is missing required parts: {', '.join(missing)}."]
+                return None, [f"DOCX artifact is missing required parts: {', '.join(missing)}."], "docx_missing_required_parts"
             parts = {name: archive.read(name) for name in names if name.endswith(".xml")}
             document_xml = parts["word/document.xml"]
     except (zipfile.BadZipFile, KeyError, OSError):
-        return None, ["DOCX artifact is not a readable DOCX zip payload."]
+        return None, ["DOCX artifact is not a readable DOCX zip payload."], "docx_unreadable_zip"
 
     artifact_warnings = _encoding_warnings(parts)
     artifact_warnings.extend(_docx_structural_warnings(parts, declared_fonts or set()))
@@ -642,7 +645,7 @@ def _extract_docx_text(content_base64: Any, declared_fonts: set[str] | None = No
     try:
         root = ElementTree.fromstring(document_xml)
     except ElementTree.ParseError:
-        return None, ["DOCX artifact word/document.xml is not readable XML."]
+        return None, ["DOCX artifact word/document.xml is not readable XML."], "docx_unreadable_document_xml"
 
     namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
     paragraphs: list[str] = []
@@ -656,54 +659,125 @@ def _extract_docx_text(content_base64: Any, declared_fonts: set[str] | None = No
             paragraphs.append(paragraph_text)
     if not paragraphs:
         artifact_warnings.append("DOCX artifact contains no readable document text.")
-        return "", artifact_warnings
-    return "\n".join(paragraphs), artifact_warnings
+        return "", artifact_warnings, None
+    return "\n".join(paragraphs), artifact_warnings, None
 
 
-def _text_contains_material_lines(haystack: str, needle: str) -> bool:
-    lowered_haystack = haystack.lower()
-    for raw_line in needle.splitlines():
-        line = raw_line.strip()
-        if line.startswith("#"):
-            line = line.lstrip("#").strip()
-        if line.startswith("- ") or line.startswith("* "):
-            line = line[2:].strip()
-        if line and line.lower() not in lowered_haystack:
-            return False
-    return True
+def _markdown_text_from_expected_resume(expected_resume: Any) -> str:
+    if not isinstance(expected_resume, dict):
+        return ""
+    return _render_markdown_text(expected_resume, {})[0]
 
 
-def _extract_text(file: Any) -> tuple[str | None, str | None, dict[str, Any], list[str]]:
+def _semantic_tokens(text: str) -> Counter[str]:
+    normalized = re.sub(r"\s+", " ", text.casefold())
+    return Counter(match.group(0) for match in _SEMANTIC_TOKEN_RE.finditer(normalized))
+
+
+def _semantic_differences(rendered_text: str, expected_resume: Any) -> list[dict[str, Any]]:
+    expected_text = _markdown_text_from_expected_resume(expected_resume)
+    if not expected_text:
+        return []
+
+    rendered_tokens = _semantic_tokens(rendered_text)
+    expected_tokens = _semantic_tokens(expected_text)
+    differences: list[dict[str, Any]] = []
+    for token, count in sorted((rendered_tokens - expected_tokens).items()):
+        differences.append(
+            {
+                "kind": "added",
+                "classification": "material",
+                "token": token,
+                "count": count,
+            }
+        )
+    for token, count in sorted((expected_tokens - rendered_tokens).items()):
+        differences.append(
+            {
+                "kind": "omitted",
+                "classification": "material",
+                "token": token,
+                "count": count,
+            }
+        )
+    return differences
+
+
+def _unsupported_validation_result(fmt: str, reason: str, renderer_reported_text: str | None = None) -> RenderDict:
+    result: RenderDict = {
+        "status": "unsupported",
+        "format": fmt,
+        "reason": reason,
+        "text_extracted": "",
+        "missing_sections": [],
+        "unsupported_characters": [],
+        "semantic_differences": [],
+        "ats_findings": [],
+        "warnings": [],
+    }
+    if renderer_reported_text is not None:
+        result["renderer_reported_text"] = renderer_reported_text
+    return result
+
+
+def _failed_validation_result(fmt: str, cause: str, warnings: list[str], renderer_reported_text: str | None = None) -> RenderDict:
+    result: RenderDict = {
+        "status": "failed",
+        "format": fmt,
+        "cause": cause,
+        "text_extracted": "",
+        "missing_sections": [],
+        "unsupported_characters": [],
+        "semantic_differences": [],
+        "ats_findings": [warning for warning in warnings if warning.startswith("ats_")],
+        "warnings": warnings,
+    }
+    if renderer_reported_text is not None:
+        result["renderer_reported_text"] = renderer_reported_text
+    return result
+
+
+def _extract_text(file: Any) -> tuple[str | None, str | None, dict[str, Any], list[str], str | None, RenderDict | None]:
     if isinstance(file, str):
-        return file, "markdown", {}, []
+        return file, "markdown", {}, [], None, None
     if not isinstance(file, dict):
-        return None, None, {}, []
+        return None, None, {}, [], None, None
 
     fmt = str(file.get("format") or "unknown")
     if isinstance(file.get("content"), str):
-        return file["content"], fmt, file, []
+        return file["content"], fmt, file, [], None, None
 
     artifact = file.get("artifact")
     if isinstance(artifact, dict):
         artifact_format = str(artifact.get("kind") or fmt)
         artifact_text = artifact.get("text") if isinstance(artifact.get("text"), str) else None
-        artifact_warnings: list[str] = []
         if artifact_format == "docx" or artifact.get("media_type") == _DOCX_MEDIA_TYPE:
             declared_fonts = artifact.get("declared_font_families") or file.get("declared_font_families")
             font_set = {str(font) for font in declared_fonts} if isinstance(declared_fonts, list) else set()
             if not font_set:
                 font_set = {DEFAULT_LAYOUT.body_font.family, DEFAULT_LAYOUT.heading_font.family}
-            docx_text, artifact_warnings = _extract_docx_text(artifact.get("content_base64"), font_set)
-            if artifact_text and docx_text is not None and not _text_contains_material_lines(docx_text, artifact_text):
-                artifact_warnings.append("DOCX artifact payload is missing text from the parse-back sidecar.")
-            return artifact_text or docx_text, "docx", file, artifact_warnings
-        if artifact_text is not None:
-            return artifact_text, artifact_format, file, []
+            docx_text, artifact_warnings, cause = _extract_docx_text(artifact.get("content_base64"), font_set)
+            if cause is not None:
+                return None, "docx", file, artifact_warnings, artifact_text, _failed_validation_result(
+                    "docx",
+                    cause,
+                    artifact_warnings,
+                    artifact_text,
+                )
+            return docx_text, "docx", file, artifact_warnings, artifact_text, None
+        if artifact_format == "pdf" or artifact.get("media_type") == _PDF_MEDIA_TYPE:
+            return None, "pdf", file, [], artifact_text, _unsupported_validation_result(
+                "pdf",
+                "pdf_not_supported_in_mvp",
+                artifact_text,
+            )
+        return None, artifact_format, file, [], artifact_text, _unsupported_validation_result(
+            artifact_format,
+            "parse_back_not_supported",
+            artifact_text,
+        )
 
-    if isinstance(file.get("text"), str):
-        return file["text"], fmt, file, []
-
-    return None, fmt, file, []
+    return None, fmt, file, [], None, None
 
 
 def _heading_names(text: str) -> set[str]:
@@ -731,60 +805,26 @@ def _has_heading(text: str, heading: str, headings: set[str]) -> bool:
     return any(line.strip().lower() == lowered_heading for line in text.splitlines())
 
 
-def _expected_terms(expected_resume: Any) -> list[str]:
-    if not isinstance(expected_resume, dict):
-        return []
-    terms: list[str] = []
-    for section in expected_resume.get("sections", []):
-        if not isinstance(section, dict):
-            continue
-        for line in _render_section(section):
-            stripped = line.lstrip("-").strip()
-            if stripped and not stripped.startswith("#"):
-                terms.append(stripped)
-    return terms
-
-
 def _payload_expected_headings(payload: dict[str, Any], expected_resume: Any) -> list[str]:
-    headings = payload.get("expected_headings")
-    if isinstance(headings, list):
-        return [str(heading).strip() for heading in headings if str(heading).strip()]
     if not isinstance(expected_resume, dict):
         return []
-    template = payload.get("template") if isinstance(payload.get("template"), dict) else {}
-    return _expected_headings(expected_resume, template)
+    return _expected_headings(expected_resume, {})
 
 
-def validateRenderedOutput(file: Any) -> RenderDict:
-    """Validate parse-back text and renderer-specific ATS concerns."""
-
-    text, fmt, payload, artifact_warnings = _extract_text(file)
-    if text is None or fmt is None or fmt == "unknown":
-        return {
-            "status": "error",
-            "format": fmt or "unknown",
-            "error": {"type": "validation_error", "message": "Rendered output must include readable text."},
-            "text_extracted": "",
-            "missing_sections": [],
-            "unsupported_characters": [],
-            "semantic_differences": [],
-            "warnings": [],
-        }
-
-    expected_resume = payload.get("expected_resume") if isinstance(payload, dict) else None
+def _validate_text_against_expected(
+    text: str,
+    fmt: str,
+    expected_resume: Any,
+    artifact_warnings: list[str],
+) -> RenderDict:
     headings = _heading_names(text)
     missing_sections: list[str] = []
-    expected_headings = _payload_expected_headings(payload, expected_resume)
+    expected_headings = _payload_expected_headings({}, expected_resume)
     for heading in expected_headings:
         if heading and not _has_heading(text, heading, headings):
             missing_sections.append(heading)
 
-    lowered_text = text.lower()
-    semantic_differences = [
-        term
-        for term in _expected_terms(expected_resume)
-        if term.lower() not in lowered_text
-    ]
+    semantic_differences = _semantic_differences(text, expected_resume)
     unsupported_characters = [
         {"character": character, "description": description}
         for character, description in _UNSUPPORTED_CHARACTERS.items()
@@ -795,8 +835,10 @@ def validateRenderedOutput(file: Any) -> RenderDict:
         warnings.append("Rendered output is empty.")
     if missing_sections:
         warnings.append("Rendered output is missing section headings.")
-    if semantic_differences:
-        warnings.append("Rendered output is missing expected text.")
+    if any(difference["kind"] == "omitted" for difference in semantic_differences):
+        warnings.append("Rendered output is missing expected material text.")
+    if any(difference["kind"] == "added" for difference in semantic_differences):
+        warnings.append("Rendered output contains unexpected material text.")
     if unsupported_characters:
         warnings.append("Rendered output contains unsupported characters.")
     if missing_sections:
@@ -818,6 +860,31 @@ def validateRenderedOutput(file: Any) -> RenderDict:
         "ats_findings": [warning for warning in warnings if warning.startswith("ats_")],
         "warnings": warnings,
     }
+
+
+def validateRenderedOutput(file: Any) -> RenderDict:
+    """Validate parse-back text and renderer-specific ATS concerns."""
+
+    text, fmt, payload, artifact_warnings, renderer_reported_text, terminal_result = _extract_text(file)
+    if terminal_result is not None:
+        return terminal_result
+    if text is None or fmt is None or fmt == "unknown":
+        return {
+            "status": "error",
+            "format": fmt or "unknown",
+            "error": {"type": "validation_error", "message": "Rendered output must include readable text."},
+            "text_extracted": "",
+            "missing_sections": [],
+            "unsupported_characters": [],
+            "semantic_differences": [],
+            "warnings": [],
+        }
+
+    expected_resume = payload.get("expected_resume") if isinstance(payload, dict) else None
+    result = _validate_text_against_expected(text, fmt, expected_resume, artifact_warnings)
+    if renderer_reported_text is not None:
+        result["renderer_reported_text"] = renderer_reported_text
+    return result
 
 
 __all__ = [

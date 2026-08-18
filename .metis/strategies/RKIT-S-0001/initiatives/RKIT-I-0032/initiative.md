@@ -4,20 +4,20 @@ level: initiative
 title: "Rendered Output Parse-Back and ATS Validation"
 short_code: "RKIT-I-0032"
 created_at: 2026-08-13T20:41:37.665427+00:00
-updated_at: 2026-08-13T20:41:37.665427+00:00
+updated_at: 2026-08-18T22:39:41.848829+00:00
 parent: resume-kit-2-full-product-buildout
-blocked_by: ["RKIT-I-0030"]
+blocked_by: [RKIT-I-0030]
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/discovery"
+  - "#phase/active"
 
 
 exit_criteria_met: false
 estimated_complexity: M
 strategy_id: RKIT-S-0001
-initiative_id: NULL
+initiative_id: rendered-output-parse-back-and-ats
 ---
 
 # Rendered Output Parse-Back and ATS Validation Initiative
