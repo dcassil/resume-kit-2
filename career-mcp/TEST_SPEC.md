@@ -20,6 +20,7 @@ Forbidden tool surface:
 - `execute_sql`
 - `run_query`
 - `truncate`
+- `truncate_table`
 - `raw_update`
 - `raw_delete`
 - any equivalent unrestricted database operation
@@ -132,9 +133,9 @@ Tests should treat MCP as an adapter with:
 
 ### Match lookup
 
-- `career.find_matches` maps Job A requirements to known facts through a real `career-store` instance; fake-only satisfaction is not sufficient.
+- `career.find_matches` maps Job A requirements to known facts through a real `career-store` instance; satisfying this with a canned fake dict is insufficient. Covered by the T-0121 real-store scenario harness in `test_mcp_search_matches_store_search_for_job_a_react`, `test_mcp_get_fact_matches_store_fact_detail_shape`, and `test_mcp_find_matches_aligns_with_store_for_job_a`.
 - It returns exact/alias/verified/related/possible/unknown states distinctly.
-- It resolves AWS and GraphQL for Job B using facts learned in Job A through a real `career-store` instance; fake-only satisfaction is not sufficient.
+- It resolves AWS and GraphQL for Job B using facts learned in Job A through a real `career-store` instance; satisfying this with a canned fake dict is insufficient. Covered by the T-0121 scenarios `test_gap_resolution_promotes_user_answer_fact_through_mcp_and_audit` and `test_job_b_reuses_facts_learned_from_job_a`.
 
 ## Boundary Tests
 
@@ -156,7 +157,7 @@ The smoke fixture must prove:
 
 The E2E fixture must prove:
 
-- MCP search results align with store service results,
-- MCP supports targeted gap resolution,
+- MCP search results align with store service results; covered by `test_mcp_search_matches_store_search_for_job_a_react`, `test_mcp_get_fact_matches_store_fact_detail_shape`, and `test_mcp_find_matches_aligns_with_store_for_job_a`,
+- MCP supports targeted gap resolution; covered by `test_gap_resolution_promotes_user_answer_fact_through_mcp_and_audit`,
 - verified facts learned through user answers are reusable,
-- audit can identify which MCP operations changed career knowledge; covered by `test_audit_stream_reconstructs_changed_facts_and_states_without_store_access` and `test_jsonl_audit_sink_round_trip_reconstructs_changed_facts_and_states`.
+- audit can identify which MCP operations changed career knowledge; covered by `test_audit_stream_reconstructs_changed_facts_and_states_without_store_access`, `test_jsonl_audit_sink_round_trip_reconstructs_changed_facts_and_states`, and `test_gap_resolution_promotes_user_answer_fact_through_mcp_and_audit`.

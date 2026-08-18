@@ -4,14 +4,14 @@ level: task
 title: "Write-path smoke extension (protected run_smoke edit), TEST_SPEC strengthening, audit-reconstruction E2E wiring"
 short_code: "RKIT-T-0122"
 created_at: 2026-08-18T23:10:05.170939+00:00
-updated_at: 2026-08-18T23:10:05.170939+00:00
+updated_at: 2026-08-18T23:20:03.648843+00:00
 parent: integrate-career-mcp-smoke-and-e2e
-blocked_by: ["RKIT-T-0121"]
+blocked_by: [RKIT-T-0121]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0015
 ## Objective
 
 Close initiative R2 + the TEST_SPEC-strengthening set: `tools/run_smoke.py` (authorized protected edit, no-verify workflow) extends its read-only career-mcp coverage with a real-store write round trip (propose → verify with evidence → add_relationship → search reflecting the writes, all with confirmed:true), and career-mcp/TEST_SPEC.md gets the audit-flagged wording repairs.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
@@ -51,4 +53,4 @@ Recommended Agent: opus + medium
 
 ## Status Updates
 
-*To be added during implementation*
+- 2026-08-18: Added the authorized `tools/run_smoke.py` career-mcp write-path round trip through the existing real-store adapter/audit sink, after the main workflow assertions to avoid changing deterministic rewrite fixture inputs. Strengthened `career-mcp/TEST_SPEC.md` with `truncate_table`, real-store-only Job A/B wording, and named executable E2E coverage. Verified `--smoke`, `--pr`, and `--future-contract` green; `straight-jacket verify --json` reports exactly `tools/resume_core_guardrails.py` and `tools/run_smoke.py` checksum mismatches.

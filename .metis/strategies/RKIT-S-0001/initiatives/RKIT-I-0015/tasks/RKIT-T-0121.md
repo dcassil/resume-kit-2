@@ -4,14 +4,14 @@ level: task
 title: "Real-store scenario harness: AWS/GraphQL/architecture fixtures, Job A→B reuse, MCP-vs-store alignment, gap resolution, stdio parameterization"
 short_code: "RKIT-T-0121"
 created_at: 2026-08-18T23:10:05.103360+00:00
-updated_at: 2026-08-18T23:11:14.738805+00:00
+updated_at: 2026-08-18T23:20:03.318202+00:00
 parent: integrate-career-mcp-smoke-and-e2e
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0015
 ## Objective
 
 Close the fake-vs-real fidelity gap (initiative R1, R3–R6): a scenario harness drives fixture cases through `call_tool` against a REAL SQLite store (seeded through MCP write tools, never SQL/store internals), replacing the canned FakeCareerStore `find_matches` classifications; the harness is driver-parameterized so every scenario also runs over the I-0014 stdio transport.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

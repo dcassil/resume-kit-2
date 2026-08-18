@@ -140,7 +140,8 @@ def run_smoke(root: Path, workspace: Path, keep_workspace: bool) -> None:
     react_fact = assert_store_fact(store, "React")
     assert_store_fact(store, "api")
 
-    adapter = career_mcp.create_career_mcp(store)
+    mcp_audit_events: list[JsonObject] = []
+    adapter = career_mcp.create_career_mcp(store, audit_sink=mcp_audit_events)
     listed_tools = {tool.get("name"): tool for tool in adapter.list_tools() if isinstance(tool, dict)}
     canonical_surface = require_json(
         root / "career-mcp" / "career_mcp" / "tool_surface.json",
@@ -264,6 +265,78 @@ def run_smoke(root: Path, workspace: Path, keep_workspace: bool) -> None:
         job_ingest=job_ingest,
         initial_match=initial_match,
         resolved=resolved,
+    )
+    smoke_evidence = {
+        "source": "resume_source",
+        "source_id": "smoke-mcp-write-path",
+        "text": "Smoke fixture states Python automation experience.",
+    }
+    proposed = asyncio.run(
+        adapter.call_tool(
+            "career.propose_fact",
+            {
+                "type": "skill",
+                "text": "Python automation",
+                "source": "resume_source",
+                "evidence": smoke_evidence,
+                "confirmed": True,
+            },
+        )
+    )
+    require_ok(proposed, "career.propose_fact")
+    smoke_fact_id = proposed.get("fact_id")
+    require(isinstance(smoke_fact_id, str) and smoke_fact_id.startswith("fact_"), "MCP proposal did not return a fact ID")
+    verified = asyncio.run(
+        adapter.call_tool(
+            "career.verify_fact",
+            {
+                "fact_id": smoke_fact_id,
+                "verification_state": "source_stated",
+                "evidence_id": "evidence_smoke-mcp-write-path",
+                "confirmation": {
+                    "factId": smoke_fact_id,
+                    "outcome": "affirmed",
+                    "provenance": [smoke_evidence],
+                },
+                "confirmed": True,
+            },
+        )
+    )
+    require_ok(verified, "career.verify_fact")
+    require(verified.get("verification_state") == "source_stated", "MCP verification did not persist source_stated")
+    related = asyncio.run(
+        adapter.call_tool(
+            "career.add_relationship",
+            {
+                "from_fact_id": smoke_fact_id,
+                "to_fact_id": react_fact["fact_id"],
+                "relationship_type": "related",
+                "evidence": {
+                    "source": "resume_source",
+                    "text": "Python automation supports React delivery workflow.",
+                },
+                "confirmed": True,
+            },
+        )
+    )
+    require_ok(related, "career.add_relationship")
+    write_search = asyncio.run(adapter.call_tool("career.search_facts", {"query": "Python automation", "limit": 5}))
+    require_ok(write_search, "career.search_facts after write")
+    written_facts = [fact for fact in write_search.get("facts", []) if fact.get("fact_id") == smoke_fact_id]
+    require(written_facts, "MCP search did not reflect written fact")
+    require(written_facts[0].get("verification_state") == "source_stated", "MCP search did not reflect verified write")
+    mutation_events = [event for event in mcp_audit_events if event.get("is_mutation")]
+    require(mutation_events, "MCP audit sink did not capture a mutation event")
+    require(
+        any(
+            event.get("operation_id")
+            and event.get("is_mutation") is True
+            and event.get("affected_fact_ids")
+            and event.get("resulting_verification_state")
+            and event.get("confirmation_required") is True
+            for event in mutation_events
+        ),
+        "MCP audit sink did not capture a full mutation event",
     )
 
     if keep_workspace:
