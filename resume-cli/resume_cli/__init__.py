@@ -12,7 +12,7 @@ from typing import Any
 
 from career_store import openCareerStore
 from resume_agent import extractJobSemantics, extractResumeSemantics, generateClarificationQuestion, interpretUserAnswer, proposeRewrite, resolve_agent_config
-from resume_core import applyChange, normalizeJobModel, normalizeResume, rankResumeContent, sanitizeText, scoreMatch, validateChange, validateFinalResume, validateGrounding, validateResume
+from resume_core import applyChange, normalizeJobModel, normalizeResume, rankResumeContent, sanitizeText, scoreMatch, toRenderableResume, validateChange, validateFinalResume, validateGrounding, validateResume
 from resume_render import renderDocx, renderMarkdown, renderPdf, validateRenderedOutput
 from workflow import CHECKPOINT_ORDER, UnknownRunError, createRun, reconstructRunManifest, recordCheckpointResult
 
@@ -236,7 +236,7 @@ def _tailor(workspace: Path) -> JsonObject:
     match_result = _match(workspace)["match_result"]
     selection = rankResumeContent(working, job, match_result, _config(workspace).get("tailoring", {}))
     target_path = _best_rewrite_target(working)
-    original_text = _json_pointer_value(working, target_path) or _resume_text(working) or "Built web applications."
+    original_text = _claim_text(_json_pointer_value(working, target_path)) or _resume_text(working) or "Built web applications."
     context = {
         "original_text": original_text,
         "target_path": target_path,
@@ -266,7 +266,7 @@ def _tailor(workspace: Path) -> JsonObject:
                 rejected.append({"operation_id": operation["operation_id"], "status": "rejected", "validation": apply_result})
         else:
             rejected.append({"operation_id": operation["operation_id"], "status": "rejected", "validation": validation})
-    hallucinated = _hallucinated_operation(original_text, target_path)
+    hallucinated = _hallucinated_operation(original_text, _target_path(target_path))
     hallucination_validation = validateChange(updated_working, hallucinated, job, facts, {"require_verified": True})
     rejected.append({"operation_id": hallucinated["operation_id"], "status": "rejected", "validation": hallucination_validation})
     _write_json(paths["resume_working"], updated_working)
@@ -343,8 +343,12 @@ def _export(workspace: Path, fmt: str) -> JsonObject:
     paths = _paths(workspace)
     resume = _read_json(paths["resume_working"], {})
     template = _template()
-    markdown = renderMarkdown(resume, template)
-    docx = renderDocx(resume, template)
+    renderable_result = toRenderableResume(resume, template)
+    if renderable_result.get("status") != "ok":
+        return _error("validation_error", "working resume could not be converted to RenderableResume")
+    renderable_resume = renderable_result["renderable_resume"]
+    markdown = renderMarkdown(renderable_resume, template)
+    docx = renderDocx(renderable_resume, template)
     _write_text(paths["output_dir"] / "resume.md", markdown.get("content", ""))
     docx_path = _write_docx_artifact(paths["output_dir"] / "resume.docx", docx)
     _write_json(paths["output_dir"] / "resume.docx.json", docx)
@@ -353,7 +357,7 @@ def _export(workspace: Path, fmt: str) -> JsonObject:
     elif fmt == "markdown":
         selected = markdown
     elif fmt == "pdf":
-        selected = renderPdf(resume, template)
+        selected = renderPdf(renderable_resume, template)
     else:
         return _error("validation_error", f"unsupported export format: {fmt}")
     if selected.get("status") == "unsupported":
@@ -375,7 +379,7 @@ def _export(workspace: Path, fmt: str) -> JsonObject:
         _write_json(paths["reports_dir"] / "export.json", result)
         _record_latest_run_snapshot(workspace, "RENDER", {"output_artifact_paths": result["artifacts"]})
         return result
-    render_validation = validateRenderedOutput({**selected, "expected_resume": resume}) if isinstance(selected, dict) else {}
+    render_validation = validateRenderedOutput({**selected, "expected_resume": renderable_resume}) if isinstance(selected, dict) else {}
     result = {
         "status": "ok",
         "exit_code": 0,
@@ -604,19 +608,11 @@ def _resume_from_text(text: str, extraction: JsonObject | None = None, source_fi
         "experience": experience,
         "skills": skills,
         "education": education,
-        "sections": [
-            {"id": "summary", "heading": "Summary", "items": [summary] if summary else []},
-            {"id": "experience", "heading": "Experience", "items": []},
-            {"id": "skills", "heading": "Skills", "items": skills},
-        ],
         "source": {"kind": "text", "path": str(source_file) if source_file else None},
         "provenance": _resume_provenance(text, extraction),
         "ingest_warnings": [],
         "verification_state": "source_stated",
     }
-    if education:
-        resume["sections"].append({"id": "education", "heading": "Education", "items": education})
-    resume["sections"][1]["items"] = resume["experience"]
     return resume
 
 
@@ -1051,6 +1047,15 @@ def _current_job_id(workspace: Path) -> str:
 
 
 def _best_rewrite_target(resume: JsonObject) -> str:
+    for item_index, item in enumerate(resume.get("experience", [])):
+        if not isinstance(item, dict):
+            continue
+        for bullet_index, bullet in enumerate(item.get("bullets", [])):
+            text = str(bullet).lower()
+            if "api" in text or "responsive" in text or "web app" in text:
+                return f"/sections/1/items/{item_index}/bullets/{bullet_index}"
+        if item.get("bullets"):
+            return f"/sections/1/items/{item_index}/bullets/0"
     for section_index, section in enumerate(resume.get("sections", [])):
         if not isinstance(section, dict) or section.get("id") != "experience":
             continue
@@ -1063,7 +1068,7 @@ def _best_rewrite_target(resume: JsonObject) -> str:
                     return f"/sections/{section_index}/items/{item_index}/bullets/{bullet_index}"
             if item.get("bullets"):
                 return f"/sections/{section_index}/items/{item_index}/bullets/0"
-    return "/sections/1/items/0/bullets/0"
+    return "/experience/0/bullets/0"
 
 
 def _job_terms_for_rewrite(job: JsonObject) -> list[str]:
@@ -1155,16 +1160,21 @@ def _core_operation(operation: JsonObject) -> JsonObject:
 
 
 def _target_path(value: str) -> str:
+    if value.startswith("/sections/1/items/"):
+        canonical = value.replace("/sections/1/items/", "/experience/", 1)
+        return f"{canonical}/value" if re.search(r"/bullets/\d+$", canonical) else canonical
     if value.startswith("/"):
         return value
     if value == "experience[0].bullets[1]":
-        return "/sections/1/items/0/bullets/1"
+        return "/experience/0/bullets/1"
     if value == "experience[0].bullets[0]":
-        return "/sections/1/items/0/bullets/0"
-    return "/sections/1/items/0/bullets/1"
+        return "/experience/0/bullets/0"
+    return "/experience/0/bullets/1"
 
 
 def _json_pointer_value(document: Any, pointer: str) -> Any:
+    if pointer.startswith("/sections/1/items/") and isinstance(document, dict) and "sections" not in document:
+        pointer = pointer.replace("/sections/1/items/", "/experience/", 1)
     current = document
     for token in pointer.strip("/").split("/"):
         token = token.replace("~1", "/").replace("~0", "~")
@@ -1175,6 +1185,16 @@ def _json_pointer_value(document: Any, pointer: str) -> Any:
         else:
             return None
     return current
+
+
+def _claim_text(value: Any) -> str:
+    if isinstance(value, dict) and "value" in value:
+        return _claim_text(value["value"])
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    return str(value)
 
 
 def _hallucinated_operation(before: Any, path: str) -> JsonObject:

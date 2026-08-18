@@ -5,6 +5,7 @@
   "public_api": {
     "types": [
       "CanonicalResume",
+      "RenderableResume",
       "ResumeField",
       "JobModel",
       "JobRequirement",
@@ -21,6 +22,7 @@
       "scoreMatch",
       "getUnresolvedRequirements",
       "rankResumeContent",
+      "toRenderableResume",
       "validateChange",
       "applyChange",
       "validateGrounding",
@@ -141,6 +143,19 @@
       "output_contract": {
         "required_fields": ["schema_version", "status", "selection_plan", "ranked_content"],
         "must_not_include": ["applied_resume", "agent_override"]
+      }
+    },
+    {
+      "name": "toRenderableResume",
+      "description": "Derive the renderer-safe RenderableResume DTO from a CanonicalResume and template deterministically, without adding, rewriting, or scoring content.",
+      "input_contract": {
+        "required_fields": ["canonical_resume"],
+        "must_include": ["section_4_1_canonical_resume"],
+        "must_not_include": ["rendered_output", "agent_authority"]
+      },
+      "output_contract": {
+        "required_fields": ["schema_version", "status", "renderable_resume", "errors", "warnings"],
+        "must_not_include": ["unsupported_claims", "persistence_status", "rendered_output"]
       }
     },
     {

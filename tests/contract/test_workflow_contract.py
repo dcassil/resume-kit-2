@@ -369,6 +369,7 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
         self.advance_ok(run_state, "ATS_STRUCTURE_VALIDATION", {"ats_report": self.artifact_ref(f"reports/ats-{operation_id}.json", {"status": "passed"})})
 
     def overflow_layout_payload(self):
+        import resume_core
         import resume_render
 
         long_resume = {
@@ -393,7 +394,9 @@ class WorkflowStateMachineContractTests(unittest.TestCase):
             ],
         }
         template = {"template_version": "1.0.0", "section_order": ["summary", "experience"], "target_pages": 1}
-        layout = maybe_await(resume_render.measureLayout(long_resume, template))
+        renderable = maybe_await(resume_core.toRenderableResume(long_resume, template))
+        self.assertEqual(renderable["status"], "ok", renderable)
+        layout = maybe_await(resume_render.measureLayout(renderable["renderable_resume"], template))
         self.assertEqual(layout["status"], "overflow", layout)
         self.assertGreater(layout["requiredReduction"], layout["estimated_pages"] - layout["target_pages"])
         return layout

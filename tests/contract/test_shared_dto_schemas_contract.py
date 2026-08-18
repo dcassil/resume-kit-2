@@ -16,6 +16,7 @@ class SharedDtoSchemaContractTests(unittest.TestCase):
             "Result",
             "Error",
             "CanonicalResume",
+            "RenderableResume",
             "JobModel",
             "JobRequirement",
             "MatchResult",
@@ -34,6 +35,7 @@ class SharedDtoSchemaContractTests(unittest.TestCase):
             "Result": {"schema_version", "status"},
             "Error": {"code", "message", "severity"},
             "CanonicalResume": {"schema_version", "resume_id", "source", "experience", "skills", "education"},
+            "RenderableResume": {"schema_version", "contact", "sections"},
             "JobModel": {"schema_version", "job_id", "requirements", "preferred", "industries", "domains", "terminology"},
             "JobRequirement": {"requirement_id", "classification", "concept", "importance", "weight", "source_text", "normalized_terms"},
             "MatchDimension": {"name", "weight", "score", "contribution", "evidence"},
@@ -66,6 +68,13 @@ class SharedDtoSchemaContractTests(unittest.TestCase):
         for schema_name, required_fields in expected.items():
             with self.subTest(schema_name=schema_name):
                 self.assertEqual(set(resume_core.SCHEMAS[schema_name]["required"]), required_fields)
+
+    def test_renderable_resume_schema_preserves_renderer_input_contract(self):
+        schema = resume_core.SCHEMAS["RenderableResume"]
+        self.assertEqual(schema["schema_version"], resume_core.RENDERABLE_RESUME_SCHEMA_VERSION)
+        self.assertEqual(set(schema["properties"]["contact"]["required"]), {"name", "email", "phone", "links"})
+        section_schema = schema["properties"]["sections"]["items"]
+        self.assertEqual(set(section_schema["required"]), {"id", "title", "entries"})
 
     def test_resume_core_enums_preserve_truth_and_match_states(self):
         self.assertEqual(

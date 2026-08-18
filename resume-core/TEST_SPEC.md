@@ -9,6 +9,7 @@ It must import no CLI, MCP, plugin, renderer, or SQLite implementation details.
 Relevant contract surfaces:
 
 - `CanonicalResume`
+- `RenderableResume`
 - `ResumeField<T>`
 - `JobModel`
 - `JobRequirement`
@@ -23,6 +24,7 @@ Relevant contract surfaces:
 - `scoreMatch`
 - `getUnresolvedRequirements`
 - `rankResumeContent`
+- `toRenderableResume`
 - `validateChange`
 - `applyChange`
 - `validateGrounding`
@@ -150,6 +152,14 @@ Future implementation may decompose internally, but tests should assume public A
 - Never allow agent output to override structural maxima directly.
 - Keep the base resume unchanged.
 - Produce deterministic ranked content and selection plans for identical resume/job/match/config input.
+
+### Renderable resume derivation
+
+- Export `RENDERABLE_RESUME_SCHEMA` / `RenderableResume` from `resume_core.schemas` and `resume_core`.
+- Derive `RenderableResume` through `toRenderableResume(canonical_resume, template)` with section-13 `resume.sectionOrder` and the default `summary`, `skills`, `experience`, `projects`, `education` order when the template is silent.
+- Preserve populated canonical contact, title, summary, experience, skills, education, projects, certifications, awards, and additional section claim text in the renderable DTO.
+- Reject malformed canonical input with typed validation errors and no partial `renderable_resume`.
+- Produce byte-identical results for repeated derivations of identical input.
 
 ### Change validation
 

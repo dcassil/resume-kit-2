@@ -23,6 +23,7 @@ ALLOWED_SURFACES = {
     "scoreMatch",
     "getUnresolvedRequirements",
     "rankResumeContent",
+    "toRenderableResume",
     "validateChange",
     "applyChange",
     "validateGrounding",
@@ -31,6 +32,7 @@ ALLOWED_SURFACES = {
 
 REQUIRED_TYPES = {
     "CanonicalResume",
+    "RenderableResume",
     "ResumeField",
     "JobModel",
     "JobRequirement",
@@ -46,6 +48,7 @@ REQUIRED_OUTPUTS = {
     "sanitizeText": {"text", "warnings"},
     "normalizeJobModel": {"job_model", "warnings"},
     "scoreMatch": {"match_result"},
+    "toRenderableResume": {"renderable_resume", "errors", "warnings"},
     "getUnresolvedRequirements": {"unresolved_requirements", "can_continue"},
     "rankResumeContent": {"selection_plan", "ranked_content"},
     "validateChange": {"operation_id", "validation_state", "errors", "grounding"},

@@ -16,6 +16,8 @@ from typing import Any
 from xml.etree import ElementTree
 from xml.sax.saxutils import escape
 
+from resume_core import RENDERABLE_RESUME_SCHEMA
+
 
 RenderDict = dict[str, Any]
 
@@ -75,9 +77,28 @@ def _is_internal_key(key: str) -> bool:
 def _validate_resume(resume: Any) -> str | None:
     if not isinstance(resume, dict):
         return "Resume must be an object."
+    for field_name in RENDERABLE_RESUME_SCHEMA.get("required", []):
+        if field_name not in resume:
+            return f"RenderableResume requires {field_name}."
+    contact = resume.get("contact")
+    if not isinstance(contact, dict):
+        return "RenderableResume contact must be an object."
+    for field_name in RENDERABLE_RESUME_SCHEMA["properties"]["contact"].get("required", []):
+        if field_name not in contact:
+            return f"RenderableResume contact requires {field_name}."
+    if not isinstance(contact.get("links"), list):
+        return "RenderableResume contact.links must be a list."
     sections = resume.get("sections")
-    if not isinstance(sections, list) or not sections:
-        return "Resume must include a non-empty sections list."
+    if not isinstance(sections, list):
+        return "RenderableResume sections must be a list."
+    for index, section in enumerate(sections):
+        if not isinstance(section, dict):
+            return f"RenderableResume sections.{index} must be an object."
+        for field_name in RENDERABLE_RESUME_SCHEMA["properties"]["sections"]["items"].get("required", []):
+            if field_name not in section:
+                return f"RenderableResume sections.{index} requires {field_name}."
+        if not isinstance(section.get("entries"), list):
+            return f"RenderableResume sections.{index}.entries must be a list."
     return None
 
 
@@ -165,7 +186,7 @@ def _collect_scalar_lines(value: Any) -> list[str]:
 
 
 def _render_basics(resume: dict[str, Any]) -> list[str]:
-    basics = resume.get("basics")
+    basics = resume.get("contact") or resume.get("basics")
     if not isinstance(basics, dict):
         return []
 
@@ -179,6 +200,15 @@ def _render_basics(resume: dict[str, Any]) -> list[str]:
         value = basics.get(key)
         if value:
             contact_parts.append(_clean_scalar(value))
+    links = basics.get("links")
+    if isinstance(links, list):
+        for link in links:
+            if isinstance(link, dict):
+                value = link.get("url") or link.get("href") or link.get("label")
+            else:
+                value = link
+            if value:
+                contact_parts.append(_clean_scalar(value))
     if contact_parts:
         lines.append(" | ".join(contact_parts))
     return lines
@@ -201,11 +231,13 @@ def _render_item(item: Any) -> list[str]:
     lines: list[str] = []
     title = _clean_scalar(item.get("title", "")) if item.get("title") else ""
     company = _clean_scalar(item.get("company", "")) if item.get("company") else ""
+    organization = _clean_scalar(item.get("organization", "")) if item.get("organization") else ""
     start = _clean_scalar(item.get("start_date", "")) if item.get("start_date") else ""
     end = _clean_scalar(item.get("end_date", "")) if item.get("end_date") else ""
+    date = _clean_scalar(item.get("date", "")) if item.get("date") else ""
 
-    heading_parts = [part for part in (title, company) if part]
-    date_parts = [part for part in (start, end) if part]
+    heading_parts = [part for part in (title, company or organization) if part]
+    date_parts = [part for part in (start, end) if part] or ([date] if date else [])
     if heading_parts or date_parts:
         heading = " - ".join(heading_parts)
         if date_parts:
@@ -223,14 +255,24 @@ def _render_item(item: Any) -> list[str]:
             for line in _collect_scalar_lines(bullet):
                 lines.append(f"- {line}")
 
+    skills = item.get("skills")
+    if isinstance(skills, list):
+        rendered_skills = [_clean_scalar(skill) for skill in skills if isinstance(skill, (str, int, float, bool))]
+        if rendered_skills:
+            prefix = f"{title}: " if title and not (heading_parts or date_parts) else ""
+            lines.append(prefix + ", ".join(skill for skill in rendered_skills if skill))
+
     consumed = {
         "title",
         "company",
+        "organization",
         "start_date",
         "end_date",
+        "date",
         "summary",
         "description",
         "bullets",
+        "skills",
     }
     for key, value in item.items():
         key_text = str(key)
@@ -242,14 +284,25 @@ def _render_item(item: Any) -> list[str]:
 
 
 def _render_section(section: dict[str, Any]) -> list[str]:
-    heading = _clean_scalar(section.get("heading") or section.get("id") or "Section")
+    heading = _clean_scalar(section.get("title") or section.get("heading") or section.get("id") or "Section")
     lines = [f"## {heading}"]
-    items = section.get("items", [])
+    items = section.get("entries") if "entries" in section else section.get("items", [])
 
     if section.get("id") == "skills" and isinstance(items, list):
-        skills = [_clean_scalar(item) for item in items if isinstance(item, (str, int, float, bool))]
-        if skills:
-            lines.append(", ".join(skill for skill in skills if skill))
+        skills: list[str] = []
+        grouped: list[str] = []
+        for item in items:
+            if isinstance(item, (str, int, float, bool)):
+                skills.append(_clean_scalar(item))
+            elif isinstance(item, dict) and isinstance(item.get("skills"), list):
+                rendered = [_clean_scalar(skill) for skill in item["skills"] if isinstance(skill, (str, int, float, bool))]
+                if rendered:
+                    group = _clean_scalar(item.get("title", "")) if item.get("title") else ""
+                    grouped.append(f"{group}: {', '.join(rendered)}" if group else ", ".join(rendered))
+        if skills or grouped:
+            lines.extend(grouped)
+            if skills:
+                lines.append(", ".join(skill for skill in skills if skill))
             return lines
 
     if isinstance(items, list):

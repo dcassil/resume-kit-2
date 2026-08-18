@@ -11,6 +11,8 @@ import json
 import unittest
 from pathlib import Path
 
+import resume_core
+
 
 ROOT = Path(__file__).resolve().parents[2]
 SURFACE = json.loads((ROOT / "resume-render" / "render_surface.json").read_text(encoding="utf-8"))
@@ -18,18 +20,43 @@ PUBLIC_FUNCTIONS = tuple(SURFACE["public_api"]["functions"])
 
 
 CANONICAL_RESUME = {
-    "schema_version": "test-1",
-    "basics": {"name": "Daniel Candidate", "email": "candidate@example.com"},
+    "schema_version": "canonical-resume.v1",
+    "resume_id": "resume_render_contract",
+    "source": {"kind": "test_fixture"},
+    "contact": {"name": "Daniel Candidate", "email": "candidate@example.com"},
+    "summary": "Software engineer focused on React, TypeScript, REST APIs, and responsive web applications.",
+    "experience": [
+        {
+            "company": "Example SaaS",
+            "title": "Software Engineer",
+            "start_date": "2019-01",
+            "end_date": "2024-06",
+            "bullets": [
+                "Built React and TypeScript user interfaces.",
+                "Designed REST API integrations for responsive web applications.",
+            ],
+        }
+    ],
+    "skills": ["React", "TypeScript", "REST APIs", "Responsive design"],
+    "education": [],
+    "provenance": [{"source": "test", "text": "React"}],
+    "verification_state": "source_stated",
+    "internal_provenance": {"source": "must not appear in exported output"},
+}
+
+RENDERABLE_RESUME = {
+    "schema_version": resume_core.RENDERABLE_RESUME_SCHEMA_VERSION,
+    "contact": {"name": "Daniel Candidate", "email": "candidate@example.com", "phone": "", "links": []},
     "sections": [
         {
             "id": "summary",
-            "heading": "Summary",
-            "items": ["Software engineer focused on React, TypeScript, REST APIs, and responsive web applications."],
+            "title": "Summary",
+            "entries": ["Software engineer focused on React, TypeScript, REST APIs, and responsive web applications."],
         },
         {
             "id": "experience",
-            "heading": "Experience",
-            "items": [
+            "title": "Experience",
+            "entries": [
                 {
                     "company": "Example SaaS",
                     "title": "Software Engineer",
@@ -44,11 +71,10 @@ CANONICAL_RESUME = {
         },
         {
             "id": "skills",
-            "heading": "Skills",
-            "items": ["React", "TypeScript", "REST APIs", "Responsive design"],
+            "title": "Skills",
+            "entries": [{"skills": ["React", "TypeScript", "REST APIs", "Responsive design"]}],
         },
     ],
-    "internal_provenance": {"source": "must not appear in exported output"},
 }
 
 TEMPLATE = {
@@ -154,7 +180,7 @@ class ResumeRenderContractTests(unittest.TestCase):
         self.renderer = load_render_module(self)
 
     def test_markdown_render_preserves_semantic_content_and_excludes_provenance(self):
-        result = maybe_await(self.renderer.renderMarkdown(CANONICAL_RESUME, TEMPLATE))
+        result = maybe_await(self.renderer.renderMarkdown(RENDERABLE_RESUME, TEMPLATE))
         assert_render_result(self, result, "markdown")
         self.assertEqual(result["status"], "ok")
         content = result.get("content", "")
@@ -179,7 +205,7 @@ class ResumeRenderContractTests(unittest.TestCase):
         self.assertNotIn("internal_provenance", lowered)
 
     def test_markdown_respects_configured_section_order_and_bullets(self):
-        result = maybe_await(self.renderer.renderMarkdown(CANONICAL_RESUME, TEMPLATE))
+        result = maybe_await(self.renderer.renderMarkdown(RENDERABLE_RESUME, TEMPLATE))
         content = result.get("content", "")
         self.assertLess(content.index("Summary"), content.index("Experience"))
         self.assertLess(content.index("Experience"), content.index("Skills"))
@@ -187,7 +213,7 @@ class ResumeRenderContractTests(unittest.TestCase):
         self.assertRegex(content, r"(?m)^[-*] Designed REST API")
 
     def test_docx_render_reports_artifact_template_version_and_preserves_sections(self):
-        result = maybe_await(self.renderer.renderDocx(CANONICAL_RESUME, TEMPLATE))
+        result = maybe_await(self.renderer.renderDocx(RENDERABLE_RESUME, TEMPLATE))
         assert_render_result(self, result, "docx")
         self.assertEqual(result["status"], "ok")
         self.assertIn("artifact", result)
@@ -207,7 +233,7 @@ class ResumeRenderContractTests(unittest.TestCase):
         ]
         for label, template, reason in cases:
             with self.subTest(label=label):
-                result = maybe_await(self.renderer.renderPdf(CANONICAL_RESUME, template))
+                result = maybe_await(self.renderer.renderPdf(RENDERABLE_RESUME, template))
                 self.assertEqual(
                     result,
                     {
@@ -225,7 +251,7 @@ class ResumeRenderContractTests(unittest.TestCase):
             {**TEMPLATE, "format_targets": ["markdown", "docx", "pdf"]},
         ]
         for template in templates:
-            result = maybe_await(self.renderer.renderPdf(CANONICAL_RESUME, template))
+            result = maybe_await(self.renderer.renderPdf(RENDERABLE_RESUME, template))
             if result.get("status") != "ok":
                 self.assertNotIn("artifact", result)
                 continue
@@ -235,8 +261,8 @@ class ResumeRenderContractTests(unittest.TestCase):
             )
 
     def test_layout_measurement_reports_overflow_constraints_without_shortening_content(self):
-        long_resume = json.loads(json.dumps(CANONICAL_RESUME))
-        long_resume["sections"][1]["items"][0]["bullets"] = [
+        long_resume = json.loads(json.dumps(RENDERABLE_RESUME))
+        long_resume["sections"][1]["entries"][0]["bullets"] = [
             f"Built validated product capability {index} with React and REST APIs."
             for index in range(80)
         ]
@@ -265,7 +291,7 @@ class ResumeRenderContractTests(unittest.TestCase):
 
     def test_validate_rendered_output_reports_parse_back_and_ats_findings(self):
         markdown = "# Summary\nSoftware engineer\n# Experience\nSoftware Engineer 2019-01 to 2024-06\n# Skills\nReact"
-        result = maybe_await(self.renderer.validateRenderedOutput({"format": "markdown", "content": markdown, "expected_resume": CANONICAL_RESUME}))
+        result = maybe_await(self.renderer.validateRenderedOutput({"format": "markdown", "content": markdown, "expected_resume": RENDERABLE_RESUME}))
         self.assertIsInstance(result, dict)
         self.assertIn(result.get("status"), {"pass", "fail", "unsupported"})
         self.assertEqual(result.get("format"), "markdown")
@@ -275,7 +301,7 @@ class ResumeRenderContractTests(unittest.TestCase):
     def test_malformed_inputs_return_typed_errors_without_tracebacks(self):
         invalid_calls = [
             (self.renderer.renderMarkdown, [{}, TEMPLATE]),
-            (self.renderer.renderDocx, [CANONICAL_RESUME, {}]),
+            (self.renderer.renderDocx, [RENDERABLE_RESUME, {}]),
             (self.renderer.measureLayout, [{}, {"target_pages": 1}]),
             (self.renderer.validateRenderedOutput, [{}]),
         ]
@@ -285,6 +311,11 @@ class ResumeRenderContractTests(unittest.TestCase):
                 self.assertEqual(result["status"], "error")
                 self.assertIn(result["error"]["type"], {"validation_error", "schema_error", "render_error"})
                 self.assertNotRegex(serialized(result), r"\btraceback|sqlite|select|insert|update|delete\b")
+
+    def test_core_derived_renderable_resume_renders_end_to_end(self):
+        derived = maybe_await(self.renderer.renderMarkdown(resume_core.toRenderableResume(CANONICAL_RESUME, TEMPLATE)["renderable_resume"], TEMPLATE))
+        self.assertEqual(derived.get("status"), "ok", derived)
+        self.assertIn("Built React and TypeScript", derived.get("content", ""))
 
 
 if __name__ == "__main__":

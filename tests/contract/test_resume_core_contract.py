@@ -113,6 +113,7 @@ class ResumeCoreSurfaceManifestTests(unittest.TestCase):
                 "scoreMatch",
                 "getUnresolvedRequirements",
                 "rankResumeContent",
+                "toRenderableResume",
                 "validateChange",
                 "applyChange",
                 "validateGrounding",
@@ -123,6 +124,7 @@ class ResumeCoreSurfaceManifestTests(unittest.TestCase):
             set(PUBLIC_TYPES),
             {
                 "CanonicalResume",
+                "RenderableResume",
                 "ResumeField",
                 "JobModel",
                 "JobRequirement",
@@ -243,6 +245,61 @@ class ResumeCoreDomainContractTests(unittest.TestCase):
         self.assertIn("invalid_verification_state", {error.get("code") for error in explicit_absence.get("errors", [])})
         self.assertNotIn("conflicted", {state.value for state in self.core.VerificationState})
         self.assertNotIn("conflicted", {state.value for state in self.core.ResolutionState})
+
+    def test_to_renderable_resume_is_total_deterministic_and_preserves_canonical_claims(self):
+        canonical = dict(
+            CANONICAL_RESUME,
+            contact={
+                "name": "Daniel Candidate",
+                "email": "candidate@example.com",
+                "phone": "555-0100",
+                "links": [{"label": "Portfolio", "url": "https://example.com"}],
+            },
+            title={"value": "Software Engineer"},
+            summary={"value": "Builds durable React and API products."},
+            education=[{"institution": "Example University", "degree": "BS Computer Science", "date": "2018"}],
+            projects=[{"title": "Launch Console", "bullets": ["Shipped deployment workflow controls."]}],
+            certifications=[{"title": "Cloud Fundamentals", "issuer": "Example Certs", "date": "2022"}],
+            awards=[{"title": "Product Quality Award", "date": "2023"}],
+            additionalSections=[{"id": "community", "title": "Community", "items": ["Mentored junior developers."]}],
+        )
+        template = {"resume": {"sectionOrder": ["summary", "skills", "experience", "projects", "education"]}}
+
+        first = maybe_await(self.core.toRenderableResume(canonical, template))
+        second = maybe_await(self.core.toRenderableResume(canonical, template))
+        self.assertEqual(json.dumps(first, sort_keys=True), json.dumps(second, sort_keys=True))
+        self.assertEqual(first.get("status"), "ok", first)
+
+        renderable = first["renderable_resume"]
+        self.assertEqual(renderable["schema_version"], self.core.RENDERABLE_RESUME_SCHEMA_VERSION)
+        self.assertEqual([section["id"] for section in renderable["sections"][:5]], ["summary", "skills", "experience", "projects", "education"])
+        self.assertEqual(set(renderable["sections"][0]), {"id", "title", "entries"})
+
+        input_claims = _claim_texts(canonical)
+        output_claims = _claim_texts(renderable)
+        self.assertTrue(input_claims <= output_claims, sorted(input_claims - output_claims))
+
+    def test_to_renderable_resume_rejects_malformed_input_with_typed_errors(self):
+        malformed = dict(CANONICAL_RESUME, experience="not an array")
+        result = maybe_await(self.core.toRenderableResume(malformed, {}))
+        self.assertEqual(result.get("status"), "error")
+        self.assertEqual(result.get("renderable_resume"), {})
+        self.assertIn("invalid_array", {error.get("code") for error in result.get("errors", [])})
+
+    def test_to_renderable_resume_accepts_legacy_sections_shape_for_cli_export(self):
+        legacy = {
+            "schema_version": "legacy-render.v1",
+            "basics": {"name": "Daniel Candidate", "email": "candidate@example.com"},
+            "sections": [
+                {"id": "summary", "heading": "Summary", "items": ["Legacy summary"]},
+                {"id": "skills", "heading": "Skills", "items": ["React", "TypeScript"]},
+            ],
+        }
+        result = maybe_await(self.core.toRenderableResume(legacy, {"section_order": ["skills", "summary"]}))
+        self.assertEqual(result.get("status"), "ok", result)
+        renderable = result["renderable_resume"]
+        self.assertEqual([section["id"] for section in renderable["sections"]], ["skills", "summary"])
+        self.assertEqual(renderable["sections"][0]["entries"], ["React", "TypeScript"])
 
     def test_discovered_validate_resume_enforces_schema_required_identity_fields(self):
         self.assertEqual(
@@ -480,6 +537,40 @@ class ResumeCoreDomainContractTests(unittest.TestCase):
             self.assertEqual(set(entry), {"path", "action", "relevance", "reason", "requirement_ids", "fact_ids"})
         self.assertEqual(plan["constraint_report"][0]["constraint"], "resume.skills.max")
         self.assertIn("ranked_content", result)
+
+
+def _claim_texts(value):
+    ignored = {
+        "schema_version",
+        "resume_id",
+        "source",
+        "provenance",
+        "ingest_warnings",
+        "verification_state",
+        "metadata",
+        "claim_id",
+        "id",
+    }
+    if value is None:
+        return set()
+    if isinstance(value, str):
+        return {value} if value.strip() and not value.startswith("http") else set()
+    if isinstance(value, (int, float, bool)):
+        return {str(value)}
+    if isinstance(value, list):
+        result = set()
+        for item in value:
+            result |= _claim_texts(item)
+        return result
+    if isinstance(value, dict):
+        if "value" in value:
+            return _claim_texts(value["value"])
+        result = set()
+        for key, item in value.items():
+            if key not in ignored:
+                result |= _claim_texts(item)
+        return result
+    return set()
 
 
 if __name__ == "__main__":

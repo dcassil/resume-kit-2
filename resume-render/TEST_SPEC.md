@@ -2,7 +2,7 @@
 
 ## Contract
 
-`resume-render` converts a validated canonical resume into delivery formats without changing career truth. It may report layout pressure, page estimates, font/spacing details, and renderer-specific ATS issues. It must not rewrite semantic content, select relevance, add skills, change dates, or query career knowledge.
+`resume-render` converts a validated `RenderableResume` DTO owned by `resume-core` into delivery formats without changing career truth. It may report layout pressure, page estimates, font/spacing details, and renderer-specific ATS issues. It must not rewrite semantic content, select relevance, add skills, change dates, or query career knowledge.
 
 Relevant public surface:
 
@@ -30,6 +30,7 @@ Tests should expect renderer internals around:
 ### Semantic neutrality
 
 - Render all validated canonical resume sections without changing text meaning.
+- Validate renderer input against the core-owned `RENDERABLE_RESUME_SCHEMA`.
 - Preserve employment titles and dates.
 - Preserve skill names and ordering according to canonical input/template rules.
 - Do not add AWS, GraphQL, Staff title, metrics, management scope, or outcomes.

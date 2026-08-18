@@ -21,6 +21,7 @@ MATCH_RESULT_SCHEMA_VERSION = "match-result.v1"
 CONTENT_SELECTION_ENTRY_SCHEMA_VERSION = "content-selection-entry.v1"
 CONTENT_SELECTION_CONSTRAINT_REPORT_SCHEMA_VERSION = "content-selection-constraint-report.v1"
 CONTENT_SELECTION_PLAN_SCHEMA_VERSION = "content-selection-plan.v1"
+RENDERABLE_RESUME_SCHEMA_VERSION = "renderable-resume.v1"
 RESUME_CHANGE_OPERATION_SCHEMA_VERSION = "resume-change-operation.v1"
 
 
@@ -236,6 +237,14 @@ class ContentSelectionPlan:
     entries: list[ContentSelectionEntry | JsonObject]
     constraint_report: list[ContentSelectionConstraintReport | JsonObject]
     metadata: JsonObject = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class RenderableResume:
+    schema_version: str
+    contact: JsonObject
+    sections: list[JsonObject]
+    summary: str | None = None
 
 
 @dataclass(frozen=True)
@@ -481,6 +490,54 @@ CONTENT_SELECTION_PLAN_SCHEMA: JsonObject = {
     },
 }
 
+RENDERABLE_RESUME_ENTRY_SCHEMA: JsonObject = {
+    "schema_version": RENDERABLE_RESUME_SCHEMA_VERSION,
+    "type": "object",
+    "required": [],
+    "properties": {
+        "title": {"type": "string"},
+        "company": {"type": "string"},
+        "organization": {"type": "string"},
+        "start_date": {"type": "string"},
+        "end_date": {"type": "string"},
+        "date": {"type": "string"},
+        "bullets": {"type": "array"},
+        "skills": {"type": "array"},
+    },
+}
+
+RENDERABLE_RESUME_SECTION_SCHEMA: JsonObject = {
+    "schema_version": RENDERABLE_RESUME_SCHEMA_VERSION,
+    "type": "object",
+    "required": ["id", "title", "entries"],
+    "properties": {
+        "id": {"type": "string"},
+        "title": {"type": "string"},
+        "entries": {"type": "array", "items": {"type": ["string", "object"]}},
+    },
+}
+
+RENDERABLE_RESUME_SCHEMA: JsonObject = {
+    "schema_version": RENDERABLE_RESUME_SCHEMA_VERSION,
+    "type": "object",
+    "required": ["schema_version", "contact", "sections"],
+    "properties": {
+        "schema_version": {"type": "string"},
+        "contact": {
+            "type": "object",
+            "required": ["name", "email", "phone", "links"],
+            "properties": {
+                "name": {"type": "string"},
+                "email": {"type": "string"},
+                "phone": {"type": "string"},
+                "links": {"type": "array"},
+            },
+        },
+        "summary": {"type": ["string", "null"]},
+        "sections": {"type": "array", "items": RENDERABLE_RESUME_SECTION_SCHEMA},
+    },
+}
+
 RESUME_CHANGE_OPERATION_SCHEMA: JsonObject = {
     "schema_version": RESUME_CHANGE_OPERATION_SCHEMA_VERSION,
     "type": "object",
@@ -523,5 +580,6 @@ SCHEMAS: dict[str, JsonObject] = {
     "ContentSelectionEntry": CONTENT_SELECTION_ENTRY_SCHEMA,
     "ContentSelectionConstraintReport": CONTENT_SELECTION_CONSTRAINT_REPORT_SCHEMA,
     "ContentSelectionPlan": CONTENT_SELECTION_PLAN_SCHEMA,
+    "RenderableResume": RENDERABLE_RESUME_SCHEMA,
     "ResumeChangeOperation": RESUME_CHANGE_OPERATION_SCHEMA,
 }
