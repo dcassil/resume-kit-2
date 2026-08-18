@@ -11,7 +11,6 @@ import base64
 import copy
 import hashlib
 import io
-import math
 import re
 import zipfile
 from typing import Any
@@ -19,6 +18,7 @@ from xml.etree import ElementTree
 
 from resume_core import RENDERABLE_RESUME_SCHEMA
 
+from ._layout import estimate_layout
 from ._ooxml import DEFAULT_LAYOUT, W_NS, build_docx, layout_from_template, layout_validation_error
 
 
@@ -524,29 +524,18 @@ def measureLayout(resume: Any, template: Any) -> RenderDict:
         return _typed_error("validation_error", "Template target_pages must be at least 1.")
 
     section_blocks = _section_text_blocks(_renderable_resume(resume), template)
-    content = "\n\n".join(block for _section_id, block in section_blocks).strip() + "\n"
-    non_empty_lines = [line for line in content.splitlines() if line.strip()]
-    estimated_lines = 0
-    for line in non_empty_lines:
-        estimated_lines += max(1, math.ceil(len(line) / 90))
-    estimated_pages = max(1, math.ceil(estimated_lines / 45))
-    target_line_capacity = target_pages * 45
-    overflow_lines = max(0, estimated_lines - target_line_capacity)
-    required_reduction = overflow_lines * 90
-    status = "overflow" if required_reduction else "fits"
+    estimate = estimate_layout(section_blocks, template, target_pages)
+    required_reduction = estimate.required_reduction
+    status = estimate.status
     section_lengths = [
-        {"section_id": section_id, "character_count": len(block)}
-        for section_id, block in section_blocks
+        {"section_id": section.id, "character_count": section.character_count}
+        for section in estimate.per_section
     ]
-    offending_sections = [
-        entry["section_id"]
-        for entry in sorted(section_lengths, key=lambda item: (-int(item["character_count"]), str(item["section_id"])))[:3]
-        if required_reduction > 0
-    ]
+    offending_sections = estimate.offending_sections
 
     return {
         "status": status,
-        "estimated_pages": estimated_pages,
+        "estimated_pages": estimate.estimated_pages,
         "target_pages": target_pages,
         "required_reduction": required_reduction,
         "requiredReduction": required_reduction,
@@ -554,11 +543,16 @@ def measureLayout(resume: Any, template: Any) -> RenderDict:
         "constraints": {
             "requiredReduction": required_reduction,
             "offending_sections": offending_sections,
-            "line_capacity_per_page": 45,
-            "character_wrap_width": 90,
-            "content_lines": estimated_lines,
-            "overflow_lines": overflow_lines,
+            "line_capacity_per_page": estimate.lines_per_page,
+            "character_wrap_width": estimate.body_chars_per_line,
+            "content_lines": estimate.estimated_lines,
+            "overflow_lines": estimate.overflow_lines,
             "section_character_counts": section_lengths,
+            "per_section": [
+                {"id": section.id, "estimated_lines": section.estimated_lines, "overflow_chars": section.overflow_chars}
+                for section in estimate.per_section
+            ],
+            "metrics_version": estimate.metrics_version,
         },
         "warnings": ["Content exceeds target page estimate."] if status == "overflow" else [],
     }

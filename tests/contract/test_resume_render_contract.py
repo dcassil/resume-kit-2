@@ -664,6 +664,115 @@ class ResumeRenderContractTests(unittest.TestCase):
         self.assertNotIn("shortened_content", result)
         self.assertNotIn("deleted_bullets", result)
 
+    def test_layout_measurement_uses_template_metrics_for_page_estimates_by_name(self):
+        fixed_resume = {
+            "schema_version": resume_core.RENDERABLE_RESUME_SCHEMA_VERSION,
+            "contact": {"name": "", "email": "", "phone": "", "links": []},
+            "sections": [
+                {
+                    "id": "summary",
+                    "title": "Summary",
+                    "format": "default",
+                    "entries": ["x" * 12000],
+                }
+            ],
+        }
+        compact_template = {
+            **TEMPLATE,
+            "layout": {
+                "version": "layout-metrics.v1",
+                "fonts": {
+                    "body": {"family": "Aptos", "size_pt": 10},
+                    "heading": {"family": "Aptos Display", "size_pt": 12},
+                },
+                "spacing": {"line": 1, "para_after_pt": 0},
+                "margins_in": {"top": 0.35, "bottom": 0.35, "left": 0.35, "right": 0.35},
+                "bullet": {"style": "bullet", "indent_in": 0.2},
+            },
+        }
+        roomy_template = {
+            **TEMPLATE,
+            "layout": {
+                "version": "layout-metrics.v1",
+                "fonts": {
+                    "body": {"family": "Aptos", "size_pt": 12},
+                    "heading": {"family": "Aptos Display", "size_pt": 16},
+                },
+                "spacing": {"line": 1.2, "para_after_pt": 3},
+                "margins_in": {"top": 0.75, "bottom": 0.75, "left": 0.75, "right": 0.75},
+                "bullet": {"style": "bullet", "indent_in": 0.35},
+            },
+        }
+
+        compact = maybe_await(self.renderer.measureLayout(fixed_resume, compact_template))
+        roomy = maybe_await(self.renderer.measureLayout(fixed_resume, roomy_template))
+
+        compact_capacity = compact["constraints"]["line_capacity_per_page"] * compact["constraints"]["character_wrap_width"]
+        roomy_capacity = roomy["constraints"]["line_capacity_per_page"] * roomy["constraints"]["character_wrap_width"]
+        self.assertGreater(compact_capacity, roomy_capacity)
+        self.assertNotEqual(compact["estimated_pages"], roomy["estimated_pages"])
+        self.assertLess(compact["estimated_pages"], roomy["estimated_pages"])
+
+    def test_layout_measurement_required_reduction_is_same_model_character_count_by_name(self):
+        def resume_with_summary(character_count: int) -> dict:
+            return {
+                "schema_version": resume_core.RENDERABLE_RESUME_SCHEMA_VERSION,
+                "contact": {"name": "", "email": "", "phone": "", "links": []},
+                "sections": [
+                    {
+                        "id": "summary",
+                        "title": "Summary",
+                        "format": "default",
+                        "entries": ["x" * character_count],
+                    }
+                ],
+            }
+
+        exact_fit = maybe_await(self.renderer.measureLayout(resume_with_summary(5985), {**TEMPLATE, "target_pages": 1}))
+        self.assertEqual(exact_fit["status"], "fits", exact_fit)
+        self.assertEqual(exact_fit["estimated_pages"], 1)
+        self.assertEqual(exact_fit["required_reduction"], 0)
+        self.assertEqual(exact_fit["constraints"]["per_section"][0]["overflow_chars"], 0)
+
+        known_excess = maybe_await(self.renderer.measureLayout(resume_with_summary(6022), {**TEMPLATE, "target_pages": 1}))
+        self.assertEqual(known_excess["status"], "overflow", known_excess)
+        self.assertEqual(known_excess["requiredReduction"], 37)
+        self.assertEqual(known_excess["required_reduction"], 37)
+        self.assertEqual(known_excess["constraints"]["per_section"][0]["overflow_chars"], 37)
+        self.assertEqual(known_excess["constraints"]["metrics_version"], "layout-metrics.v1+glyph-widths.v1")
+
+        reduced = maybe_await(
+            self.renderer.measureLayout(
+                resume_with_summary(6022 - known_excess["requiredReduction"]),
+                {**TEMPLATE, "target_pages": 1},
+            )
+        )
+        self.assertEqual(reduced["status"], "fits", reduced)
+        self.assertEqual(reduced["requiredReduction"], 0)
+
+    def test_layout_measurement_itemizes_per_section_overflow_and_is_byte_deterministic_by_name(self):
+        overflowing_resume = {
+            "schema_version": resume_core.RENDERABLE_RESUME_SCHEMA_VERSION,
+            "contact": {"name": "", "email": "", "phone": "", "links": []},
+            "sections": [
+                {"id": "summary", "title": "Summary", "format": "default", "entries": ["Concise summary."]},
+                {"id": "skills", "title": "Skills", "format": "skills", "entries": [{"skills": ["React", "APIs"]}]},
+                {"id": "experience", "title": "Experience", "format": "default", "entries": ["x" * 6022]},
+            ],
+        }
+        template = {**TEMPLATE, "section_order": ["summary", "skills", "experience"], "target_pages": 1}
+
+        first = maybe_await(self.renderer.measureLayout(overflowing_resume, template))
+        second = maybe_await(self.renderer.measureLayout(overflowing_resume, template))
+
+        self.assertEqual(json.dumps(first, sort_keys=True), json.dumps(second, sort_keys=True))
+        per_section = {entry["id"]: entry for entry in first["constraints"]["per_section"]}
+        self.assertEqual(set(per_section), {"summary", "skills", "experience"})
+        self.assertEqual(per_section["summary"]["overflow_chars"], 0)
+        self.assertEqual(per_section["skills"]["overflow_chars"], 0)
+        self.assertGreater(per_section["experience"]["overflow_chars"], 0)
+        self.assertEqual(first["offending_sections"], ["experience"])
+
     def test_validate_rendered_output_reports_parse_back_and_ats_findings(self):
         markdown = "# Summary\nSoftware engineer\n# Experience\nSoftware Engineer 2019-01 to 2024-06\n# Skills\nReact"
         result = maybe_await(self.renderer.validateRenderedOutput({"format": "markdown", "content": markdown, "expected_resume": RENDERABLE_RESUME}))
@@ -756,6 +865,24 @@ class ResumeRenderContractTests(unittest.TestCase):
         derived = maybe_await(self.renderer.renderMarkdown(resume_core.toRenderableResume(CANONICAL_RESUME, TEMPLATE)["renderable_resume"], TEMPLATE))
         self.assertEqual(derived.get("status"), "ok", derived)
         self.assertIn("Built React and TypeScript", derived.get("content", ""))
+
+    def test_core_derived_object_bullets_survive_render_and_measurement(self):
+        canonical = json.loads(json.dumps(CANONICAL_RESUME))
+        canonical["experience"][0]["bullets"] = [
+            {"id": "b1", "text": "Led the migration of critical systems to a new platform."},
+            {"id": "b2", "text": "Mentored engineers across delivery teams."},
+        ]
+        renderable = resume_core.toRenderableResume(canonical, TEMPLATE)["renderable_resume"]
+        rendered = maybe_await(self.renderer.renderMarkdown(renderable, TEMPLATE))
+        self.assertEqual(rendered.get("status"), "ok", rendered)
+        self.assertIn("Led the migration of critical systems", rendered.get("content", ""))
+        measured = maybe_await(self.renderer.measureLayout(renderable, dict(TEMPLATE, target_pages=1)))
+        experience = {section["id"]: section for section in measured["constraints"]["per_section"]}.get("experience", {})
+        self.assertGreaterEqual(
+            experience.get("estimated_lines", 0),
+            3,
+            "object-shaped canonical bullets must be measured, not silently stripped by the renderable schema",
+        )
 
 
 if __name__ == "__main__":

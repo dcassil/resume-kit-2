@@ -195,6 +195,14 @@ def _skill_entries(skills: list[Any]) -> list[Any]:
     return grouped
 
 
+def _bullet_text(item: Any) -> str:
+    value = _field_value(item)
+    if isinstance(value, dict):
+        text = _field_value(_item(value, "text", _item(value, "value", "")))
+        return _text(text)
+    return _text(value)
+
+
 def _entry(item: Any) -> Any:
     value = _field_value(item)
     if isinstance(value, list):
@@ -227,7 +235,10 @@ def _entry(item: Any) -> Any:
 
     for key in ("bullets", "highlights"):
         if isinstance(_item(value, key), list):
-            result["bullets"] = [_field_value(entry) for entry in _array(_item(value, key)) if _has_content(entry)]
+            # The renderable schema declares bullets as scalar text; canonical
+            # bullet objects ({id, text, ...}) must flatten or the renderer's
+            # schema strip silently deletes them.
+            result["bullets"] = [_bullet_text(entry) for entry in _array(_item(value, key)) if _has_content(entry)]
             break
     if isinstance(_item(value, "skills"), list):
         result["skills"] = [_field_value(entry) for entry in _array(_item(value, "skills")) if _has_content(entry)]

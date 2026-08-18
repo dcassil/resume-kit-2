@@ -321,6 +321,16 @@
         ],
         "required_reduction_unit": "integer_character_count",
         "required_reduction_unit_description": "required_reduction and requiredReduction are integer character counts required to fit target_pages, never a page-count delta.",
+        "constraints_required_fields": [
+          "requiredReduction",
+          "offending_sections",
+          "per_section",
+          "metrics_version"
+        ],
+        "constraints_shape": {
+          "per_section": "Array of {id, estimated_lines, overflow_chars}; sections that do not contribute to overflow report overflow_chars: 0.",
+          "metrics_version": "Combined layout-metrics and glyph-width table version used to reconstruct the estimate."
+        },
         "overflow_required_fields": [
           "estimated_pages",
           "target_pages",
