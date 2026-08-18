@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import base64
 import hashlib
 import importlib
 import importlib.metadata
@@ -15,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import venv
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +44,7 @@ WORKSPACE_PATHS = [
 ]
 
 JsonObject = dict[str, Any]
+DOCX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 
 class SmokeFailure(AssertionError):
@@ -97,6 +100,7 @@ def run_smoke(root: Path, workspace: Path, keep_workspace: bool) -> None:
     career_store = modules["career_store"]
     career_mcp = modules["career_mcp"]
     resume_cli = modules["resume_cli"]
+    resume_render = modules["resume_render"]
     workflow = modules["workflow"]
 
     resume_file = root / "fixtures" / "resumes" / "resume-main.txt"
@@ -225,6 +229,8 @@ def run_smoke(root: Path, workspace: Path, keep_workspace: bool) -> None:
     require(validations.get("ats") == "passed", "ATS validation did not pass")
     require(validations.get("structure") == "passed", "structure validation did not pass")
 
+    verify_measure_layout_overflow_step(resume_core, resume_render, workspace)
+
     final_match = run_cli(resume_cli, ["match", "--working"], workspace)
     repeat_final_match = run_cli(resume_cli, ["match", "--working"], workspace)
     require_ok(final_match, "resume match --working")
@@ -236,7 +242,11 @@ def run_smoke(root: Path, workspace: Path, keep_workspace: bool) -> None:
     require_ok(markdown, "resume export --format markdown")
     require_ok(docx, "resume export --format docx")
     require((workspace / "output" / "resume.md").exists(), "Markdown export was not created")
-    require((workspace / "output" / "resume.docx.json").exists(), "DOCX export artifact was not created")
+    require_real_docx_artifact(
+        workspace / "output" / "resume.docx",
+        resume_render,
+        renderable_resume(resume_core, tailored_working),
+    )
     require(markdown.get("render_validation", {}).get("status") == "pass", "Markdown render validation did not pass")
     require(docx.get("render_validation", {}).get("status") == "pass", "DOCX render validation did not pass")
 
@@ -287,6 +297,98 @@ def assert_store_fact(store: Any, query: str) -> JsonObject:
     require(fact.get("verification_state") == "source_stated", f"{query} fact should be source_stated")
     require(fact.get("evidence"), f"{query} fact must include evidence")
     return fact
+
+
+def verify_measure_layout_overflow_step(resume_core: Any, resume_render: Any, workspace: Path) -> None:
+    overflowing = renderable_resume(resume_core, overflow_canonical_resume(6022))
+    content_length_before = renderable_content_length(overflowing)
+    serialized_before = json.dumps(overflowing, sort_keys=True)
+    report = resume_render.measureLayout(overflowing, smoke_template())
+    report_path = workspace / "reports" / "smoke-overflow-layout.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(report, sort_keys=True, indent=2), encoding="utf-8")
+
+    require(report_path.exists(), "measureLayout overflow smoke report was not created")
+    require(report.get("status") == "overflow", f"measureLayout smoke step did not report overflow: {report}")
+    if "fits" in report:
+        require(report.get("fits") is False, "measureLayout overflow smoke step reported fits=True")
+    require(report.get("estimated_pages", 0) > report.get("target_pages", 0), "measureLayout overflow page estimate did not exceed target")
+    require(report.get("required_reduction", 0) > 0, "measureLayout overflow required_reduction was not positive")
+    require(report.get("requiredReduction") == report.get("required_reduction"), "measureLayout requiredReduction alias drifted")
+    constraints = report.get("constraints")
+    require(isinstance(constraints, dict) and constraints, "measureLayout overflow report missed constraints")
+    require(constraints.get("requiredReduction") == report.get("requiredReduction"), "measureLayout constraints missed requiredReduction")
+    require(constraints.get("per_section"), "measureLayout constraints missed per-section overflow data")
+    require(constraints.get("metrics_version"), "measureLayout constraints missed metrics_version")
+    require(renderable_content_length(overflowing) == content_length_before, "measureLayout changed input content length")
+    require(json.dumps(overflowing, sort_keys=True) == serialized_before, "measureLayout mutated overflow input")
+
+
+def require_real_docx_artifact(path: Path, resume_render: Any, expected_resume: JsonObject) -> None:
+    require(path.exists(), "DOCX export artifact was not created")
+    docx_bytes = path.read_bytes()
+    require(docx_bytes.startswith(b"PK"), "DOCX export target must be real ZIP/DOCX bytes, not a JSON wrapper")
+    try:
+        with zipfile.ZipFile(path) as archive:
+            require("word/document.xml" in set(archive.namelist()), "DOCX export target missed word/document.xml")
+    except zipfile.BadZipFile as exc:
+        raise SmokeFailure("DOCX export target was not a readable ZIP archive") from exc
+
+    validation = resume_render.validateRenderedOutput(
+        {
+            "format": "docx",
+            "artifact": {
+                "kind": "docx",
+                "media_type": DOCX_MEDIA_TYPE,
+                "encoding": "utf-8",
+                "declared_font_families": ["Aptos", "Aptos Display"],
+                "content_base64": base64.b64encode(docx_bytes).decode("ascii"),
+                "text": "sidecar text must not certify DOCX bytes",
+            },
+            "expected_resume": expected_resume,
+        }
+    )
+    require(validation.get("status") == "pass", f"DOCX bytes-derived render validation did not pass: {json.dumps(validation, sort_keys=True)}")
+
+
+def overflow_canonical_resume(summary_chars: int) -> JsonObject:
+    return {
+        "schema_version": "canonical-resume.v1",
+        "resume_id": f"render_overflow_{summary_chars}",
+        "source": {"kind": "smoke_fixture"},
+        "contact": {"name": "", "email": ""},
+        "summary": "x" * summary_chars,
+        "experience": [],
+        "skills": [],
+        "education": [],
+        "verification_state": "source_stated",
+    }
+
+
+def renderable_resume(resume_core: Any, canonical_resume: JsonObject) -> JsonObject:
+    result = resume_core.toRenderableResume(canonical_resume, smoke_template())
+    require(result.get("status") == "ok", f"resume could not be converted to RenderableResume: {result}")
+    return result["renderable_resume"]
+
+
+def smoke_template() -> JsonObject:
+    return {
+        "template_id": "ats-clean",
+        "template_version": "1.0.0",
+        "format_targets": ["markdown", "docx"],
+        "section_order": ["summary", "experience", "skills"],
+        "target_pages": 1,
+    }
+
+
+def renderable_content_length(value: Any) -> int:
+    if isinstance(value, str):
+        return len(value)
+    if isinstance(value, dict):
+        return sum(renderable_content_length(item) for item in value.values())
+    if isinstance(value, list):
+        return sum(renderable_content_length(item) for item in value)
+    return 0
 
 
 def require_requirement(match_result: JsonObject, requirement_id: str, allowed_states: set[str]) -> JsonObject:

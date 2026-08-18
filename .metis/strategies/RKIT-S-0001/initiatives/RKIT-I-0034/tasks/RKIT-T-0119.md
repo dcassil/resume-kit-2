@@ -4,14 +4,14 @@ level: task
 title: "Integration suite over real CLI artifacts, overflow round-trip E2E, audit-evidence manifest assertions"
 short_code: "RKIT-T-0119"
 created_at: 2026-08-18T22:51:15.359175+00:00
-updated_at: 2026-08-18T22:52:30.340212+00:00
+updated_at: 2026-08-18T23:01:37.272575+00:00
 parent: render-gate-integration-fixtures
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0034
 ## Objective
 
 Fill the empty `tests/integration` and `tests/e2e` promises (R1/R2/R5): the render boundary exercised with artifacts ACTUALLY produced through resume-cli export (real bytes from output/, not synthetic dicts), the overflow round-trip E2E with render-side assertions active (orchestration side landed with I-0027 — activate it fully), and audit-gate assertions that run manifests carry template_version, artifact fingerprints, layout report, and validation results.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
