@@ -4,14 +4,14 @@ level: task
 title: "Real resume terminal client: result envelope, entrypoint, stdout/stderr presentation, TerminalIO seam"
 short_code: "RKIT-T-0123"
 created_at: 2026-08-18T23:47:13.716402+00:00
-updated_at: 2026-08-18T23:48:28.150201+00:00
+updated_at: 2026-08-19T00:06:38.742100+00:00
 parent: resume-cli-runtime-and-workspace
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0035
 ## Objective
 
 Ship the actual developer-facing `resume` terminal client (initiative plan steps 1–3): a shared result envelope + typed error taxonomy + exit-code mapping across existing commands; a `[project.scripts]` console entrypoint and `resume_cli/__main__.py` with human-readable stdout reports, typed stderr errors, and `--json` machine mode; and the `TerminalIO` interaction seam (interactive + deterministic scripted mode) that I-0037/I-0040 will consume. The library `main()` stays callable — one dispatch path.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

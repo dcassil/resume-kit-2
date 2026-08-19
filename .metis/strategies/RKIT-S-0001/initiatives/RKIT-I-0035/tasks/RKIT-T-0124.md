@@ -4,14 +4,14 @@ level: task
 title: "Section-13 config contract, unknown/legacy key rejection, config hash, real getMigrationState in init"
 short_code: "RKIT-T-0124"
 created_at: 2026-08-18T23:47:13.801567+00:00
-updated_at: 2026-08-18T23:47:13.801567+00:00
+updated_at: 2026-08-19T00:06:39.568670+00:00
 parent: resume-cli-runtime-and-workspace
-blocked_by: ["RKIT-T-0123"]
+blocked_by: [RKIT-T-0123]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0035
 ## Objective
 
 Implement the section-13 configuration contract (RKIT-A-0006 item 6) and honest init (initiative plan steps 4–6): `init` writes a section-13-complete default config validated at load (unknown keys typed-fail; legacy flat keys fail with per-key migration guidance), the run-manifest config hash covers the FULL validated config including the agent block, and `init` reports the real `getMigrationState()` DTO instead of the hardcoded `prepared` literal.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

@@ -14,7 +14,15 @@ from .domain import (
     validateResume,
     matchingVersions,
 )
+from .guardrails_config import DEFAULT_ALLOW_INFERRED_FACTS, resolve_guardrails_config
+from .matching_config import (
+    DEFAULT_MATCHING_WEIGHTS,
+    DEFAULT_REQUIRE_HARD_REQUIREMENTS_RESOLVED,
+    DEFAULT_SCORE_AUTO_THRESHOLD,
+    resolve_matching_config,
+)
 from .renderable_resume import toRenderableResume
+from .resume_config import DEFAULT_MAX_COUNT, DEFAULT_MIN_COUNT, DEFAULT_SECTION_ORDER, DEFAULT_TARGET_PAGES, resolve_resume_config
 from .schemas import (
     CANONICAL_RESUME_SCHEMA_VERSION,
     CANONICAL_RESUME_SCHEMA,
@@ -117,6 +125,14 @@ __all__ = [
     "Status",
     "TermRelationshipKind",
     "VerificationState",
+    "DEFAULT_ALLOW_INFERRED_FACTS",
+    "DEFAULT_MATCHING_WEIGHTS",
+    "DEFAULT_MAX_COUNT",
+    "DEFAULT_MIN_COUNT",
+    "DEFAULT_REQUIRE_HARD_REQUIREMENTS_RESOLVED",
+    "DEFAULT_SCORE_AUTO_THRESHOLD",
+    "DEFAULT_SECTION_ORDER",
+    "DEFAULT_TARGET_PAGES",
     "applyChange",
     "getUnresolvedRequirements",
     "matchingVersions",
@@ -124,6 +140,9 @@ __all__ = [
     "normalizeResume",
     "rankResumeContent",
     "require_fields",
+    "resolve_guardrails_config",
+    "resolve_matching_config",
+    "resolve_resume_config",
     "sanitizeText",
     "scoreMatch",
     "to_json_dict",

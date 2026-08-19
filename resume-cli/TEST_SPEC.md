@@ -49,12 +49,21 @@ Required command surface:
 ### init
 
 - Creates the expected workspace folders/files.
-- Writes valid default config.
-- Creates SQLite database or prepares it for migration.
-- Applies migrations successfully.
+- Writes the section-13-complete default `config.json`: `matching.scoreAutoThreshold`, `matching.weights.*`, `matching.requireHardRequirementsResolved`, `resume.targetPages`, `resume.sectionOrder`, `resume.skills.{min,max}`, `resume.experience.{min,max}`, `resume.bulletsPerRole.{min,max}`, `guardrails.allow_inferred_facts`, and the RKIT-A-0003 `agent` block.
+- Default config values are sourced from the owning package defaults (`resume_core.matching_config`, `resume_core.resume_config`, `resume_core.guardrails_config`, `resume_agent._agent_config`) with a consistency test so CLI defaults cannot drift.
+- Loads config through parse -> schema validation -> freeze -> hash before commands consume it.
+- Creates SQLite database or prepares it for migration through career-store.
+- Embeds career-store `getMigrationState()` verbatim in the result and persisted workspace run artifact.
 - Records config/schema versions.
 - Re-running init is safe and does not destroy existing data.
 - Returns the stable result envelope: `{status, exit_code, artifacts, report, errors}`.
+
+### config validation
+
+- Unknown top-level keys fail with a typed error naming the key path.
+- Unknown nested keys in `matching`, `matching.weights`, `resume`, resume min/max ranges, `guardrails`, and `agent` fail with owning resolver typed errors naming the key path.
+- Legacy flat keys fail with section-13 replacement guidance: `policy` -> `matching.scoreAutoThreshold`/`matching.weights`, `require_hard_resolution` -> `matching.requireHardRequirementsResolved`, `allow_inferred_facts` -> `guardrails.allow_inferred_facts`, `max_skills` -> `resume.skills.max`.
+- The run-manifest config hash covers the full validated config including `agent`; a sampled change in each section-13 block changes the hash.
 
 ### ingest resume
 

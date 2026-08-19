@@ -15,7 +15,13 @@ from typing import Any, Protocol, TextIO
 from career_store import openCareerStore
 
 from . import _argv
-from resume_agent import extractJobSemantics, extractResumeSemantics, generateClarificationQuestion, interpretUserAnswer, proposeRewrite, resolve_agent_config
+from ._config import (
+    WorkspaceConfigValidationError,
+    default_config as _default_config,
+    load_workspace_config as _load_workspace_config,
+    stable_config_hash as _stable_config_hash,
+)
+from resume_agent import extractJobSemantics, extractResumeSemantics, generateClarificationQuestion, interpretUserAnswer, proposeRewrite
 from resume_core import applyChange, normalizeJobModel, normalizeResume, rankResumeContent, sanitizeText, scoreMatch, toRenderableResume, validateChange, validateFinalResume, validateGrounding, validateResume
 from resume_render import renderDocx, renderMarkdown, renderPdf, validateRenderedOutput
 from workflow import CHECKPOINT_ORDER, UnknownRunError, createRun, reconstructRunManifest, recordCheckpointResult
@@ -23,7 +29,6 @@ from workflow import CHECKPOINT_ORDER, UnknownRunError, createRun, reconstructRu
 
 JsonObject = dict[str, Any]
 
-CONFIG_VERSION = "resume-cli.config.v1"
 SUCCESS_EXIT = 0
 DOMAIN_VALIDATION_EXIT = 1
 USAGE_CONFIG_EXIT = 2
@@ -144,6 +149,8 @@ def main(
             return _envelope("inspect requirement", workspace, _inspect_requirement(workspace, args[2]))
         if command == "audit":
             return _envelope("audit", workspace, _audit_report(workspace))
+    except WorkspaceConfigValidationError as exc:
+        return _config_validation_error(exc)
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
         return _error("validation_error", _safe_message(exc), ref="workspace")
     return _error("usage_error", f"unknown command: {' '.join(args)}", ref="argv", exit_code=USAGE_CONFIG_EXIT)
@@ -157,9 +164,7 @@ def _init(workspace: Path) -> JsonObject:
     paths = _paths(workspace)
     for folder in [paths["resume_dir"], paths["job_dir"], paths["data_dir"], paths["operations_dir"], paths["reports_dir"], paths["output_dir"]]:
         folder.mkdir(parents=True, exist_ok=True)
-    config = _read_json(paths["config"], _default_config())
-    config.setdefault("config_version", CONFIG_VERSION)
-    config.setdefault("schema_versions", _schema_versions())
+    config = _load_workspace_config(paths["config"]).config if paths["config"].exists() else _default_config()
     _write_json(paths["config"], config)
     _write_json_if_missing(paths["resume_base"], {})
     _write_json_if_missing(paths["resume_working"], {})
@@ -167,6 +172,8 @@ def _init(workspace: Path) -> JsonObject:
     store = openCareerStore(str(paths["career_db"]))
     migration_state = _migration_state_payload(store)
     run_state = createRun(workspace=workspace, config=config)
+    run_state["careerDbVersion"] = migration_state
+    _write_json(_workflow_run_file(workspace, str(run_state["run_id"])), run_state)
     return {
         "status": "ok",
         "exit_code": 0,
@@ -183,6 +190,7 @@ def _status(workspace: Path) -> JsonObject:
     paths = _paths(workspace)
     if not paths["config"].exists():
         return _error("workspace_not_initialized", "workspace has not been initialized", ref="workspace")
+    _config(workspace)
     initialized = paths["career_db"].exists()
     return {
         "status": "ok" if initialized else "error",
@@ -416,7 +424,7 @@ def _match(workspace: Path) -> JsonObject:
     resume = _read_json(paths["resume_working"], {})
     job = _read_json(paths["job_current"], {})
     facts = _all_facts(workspace)
-    result = scoreMatch(resume, job, facts, _config(workspace).get("matching", {}))
+    result = scoreMatch(resume, job, facts, _config(workspace))
     match_result = dict(result.get("match_result", {}))
     requirements = []
     for item in match_result.get("requirement_results", []):
@@ -490,7 +498,7 @@ def _tailor(workspace: Path) -> JsonObject:
     job = _read_json(paths["job_current"], {})
     facts = _all_facts(workspace)
     match_result = _match(workspace)["match_result"]
-    selection = rankResumeContent(working, job, match_result, _config(workspace).get("tailoring", {}))
+    selection = rankResumeContent(working, job, match_result, _config(workspace))
     target_path = _best_rewrite_target(working)
     original_text = _claim_text(_json_pointer_value(working, target_path)) or _resume_text(working) or "Built web applications."
     context = {
@@ -557,7 +565,7 @@ def _validate(workspace: Path) -> JsonObject:
     job = _read_json(paths["job_current"], {})
     facts = _all_facts(workspace)
     applied_operations = _applied_operations_for_validation(workspace)
-    final = validateFinalResume(working, job, facts, _config(workspace).get("matching", {}), applied_operations)
+    final = validateFinalResume(working, job, facts, _config(workspace), applied_operations)
     grounding = validateGrounding(working, facts, applied_operations, {})
     validations = {
         "final_match": final.get("match_result", {}),
@@ -766,7 +774,7 @@ def _operation_ids(items: Any) -> list[str]:
 
 
 def _latest_persisted_run_for_current_config(workspace: Path) -> JsonObject | None:
-    config_hash = _workflow_stable_hash(_run_manifest_config_payload(_config(workspace)))
+    config_hash = _stable_config_hash(_config(workspace))
     index = _read_json(workspace / ".workflow" / "runs" / "index.json", {})
     if not isinstance(index, dict):
         return None
@@ -778,12 +786,6 @@ def _latest_persisted_run_for_current_config(workspace: Path) -> JsonObject | No
     return {"config_hash": config_hash, "run_id": latest}
 
 
-def _run_manifest_config_payload(config: JsonObject) -> JsonObject:
-    payload = dict(config) if isinstance(config, dict) else {}
-    payload["agent"] = resolve_agent_config(payload).config.to_dict()
-    return payload
-
-
 def _run_sequence_key(run_id: str) -> tuple[int, str]:
     match = re.search(r"_(\d+)$", run_id)
     sequence = int(match.group(1)) if match else -1
@@ -792,21 +794,6 @@ def _run_sequence_key(run_id: str) -> tuple[int, str]:
 
 def _workflow_run_file(workspace: Path, run_id: str) -> Path:
     return workspace / ".workflow" / "runs" / f"{run_id}.json"
-
-
-def _workflow_stable_hash(value: Any) -> str:
-    payload = json.dumps(_jsonable(value), sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
-
-def _jsonable(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {str(key): _jsonable(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_jsonable(item) for item in value]
-    if isinstance(value, tuple):
-        return [_jsonable(item) for item in value]
-    return value
 
 
 def _paths(workspace: Path) -> dict[str, Path]:
@@ -825,26 +812,8 @@ def _paths(workspace: Path) -> dict[str, Path]:
     }
 
 
-def _default_config() -> JsonObject:
-    return {
-        "config_version": CONFIG_VERSION,
-        "schema_versions": _schema_versions(),
-        "matching": {"requireHardRequirementsResolved": True},
-    }
-
-
-def _schema_versions() -> JsonObject:
-    return {
-        "canonical_resume": "canonical-resume.v1",
-        "job": "job-model.v1",
-        "career_db": "career-store.v1",
-        "change_operation": "resume-change-operation.v1",
-        "renderer_template": "ats-clean@1.0.0",
-    }
-
-
 def _config(workspace: Path) -> JsonObject:
-    return _read_json(_paths(workspace)["config"], _default_config())
+    return _load_workspace_config(_paths(workspace)["config"]).config
 
 
 def _resume_from_text(text: str, extraction: JsonObject | None = None, source_file: Path | None = None) -> JsonObject:
@@ -1485,6 +1454,22 @@ def _error(error_type: str, message: str, *, ref: str = "input", exit_code: int 
         "errors": [error],
         "error": {"type": error_type, "message": message},
     }
+
+
+def _config_validation_error(exc: WorkspaceConfigValidationError) -> JsonObject:
+    errors = []
+    for issue in exc.errors:
+        field_path = str(issue.get("field_path") or "config")
+        errors.append(
+            {
+                "code": str(issue.get("code") or "config_validation_error"),
+                "message": str(issue.get("message") or "config validation failed"),
+                "ref": field_path,
+                "offending_input_ref": field_path,
+                "details": dict(issue.get("details", {})) if isinstance(issue.get("details"), dict) else {},
+            }
+        )
+    return {"status": "error", "exit_code": USAGE_CONFIG_EXIT, "artifacts": {}, "report": {}, "errors": errors}
 
 
 def _safe_message(exc: Exception) -> str:

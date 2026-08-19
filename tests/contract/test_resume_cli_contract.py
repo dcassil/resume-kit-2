@@ -13,6 +13,7 @@ import tempfile
 import tomllib
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -163,12 +164,49 @@ class ResumeCliCommandContractTests(unittest.TestCase):
         config = json.loads((self.workspace / "config.json").read_text(encoding="utf-8"))
         self.assertIn("config_version", config)
         self.assertIn("schema_versions", config)
+        self.assertEqual(set(config["matching"]), {"scoreAutoThreshold", "weights", "requireHardRequirementsResolved"})
+        self.assertEqual(
+            set(config["matching"]["weights"]),
+            {"requiredSkills", "experience", "roleAlignment", "domainIndustry", "preferredSkills", "terminology"},
+        )
+        self.assertEqual(set(config["resume"]), {"targetPages", "skills", "experience", "bulletsPerRole", "sectionOrder"})
+        for key in ["skills", "experience", "bulletsPerRole"]:
+            self.assertEqual(set(config["resume"][key]), {"min", "max"})
+        self.assertEqual(set(config["guardrails"]), {"allow_inferred_facts"})
+        self.assertEqual(set(config["agent"]), {"model", "schema_mode", "timeout_ms", "max_retries", "cost_ceiling"})
 
         career_db_before = (self.workspace / "data" / "career.db").stat().st_mtime_ns
         second = normalize_result(run_cli(self.cli, ["init"], self.workspace))
         self.assertIn(second.get("exit_code", 0), {0, None})
         self.assertTrue((self.workspace / "data" / "career.db").exists())
         self.assertGreaterEqual((self.workspace / "data" / "career.db").stat().st_mtime_ns, career_db_before)
+
+    def test_init_embeds_store_state_verbatim_in_result_and_run_artifact(self):
+        expected_state = {
+            "schema_version": "career-store.v1",
+            "database_path": str(self.workspace / "data" / "career.db"),
+            "applied_migrations": ["001_initial"],
+            "pending_migrations": ["002_pending"],
+            "status": "pending",
+            "metadata": {"source": "double"},
+        }
+        store = type("CareerStoreStatusDouble", (), {})()
+        setattr(store, "get" + "MigrationState", lambda: expected_state)
+
+        with mock.patch.object(self.cli, "openCareerStore", return_value=store):
+            result = normalize_result(run_cli(self.cli, ["init"], self.workspace))
+
+        self.assertEqual(result["migrations"]["career_store"], expected_state)
+        run_artifact = json.loads((self.workspace / ".workflow" / "runs" / f"{result['run_id']}.json").read_text(encoding="utf-8"))
+        self.assertEqual(run_artifact["careerDbVersion"], expected_state)
+
+    def test_init_surfaces_store_typed_version_error_without_rewriting_it(self):
+        with mock.patch.object(self.cli, "openCareerStore", side_effect=ValueError("incompatible_schema_version: career-store.v999")):
+            result = normalize_result(run_cli(self.cli, ["init"], self.workspace))
+
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(result["errors"][0]["code"], "validation_error")
+        self.assertIn("incompatible_schema_version", result["errors"][0]["message"])
 
     def test_ingest_resume_creates_base_working_hash_and_career_fact_summary(self):
         run_cli(self.cli, ["init"], self.workspace)
