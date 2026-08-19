@@ -68,13 +68,16 @@ Required command surface:
 ### ingest resume
 
 - Accepts fixture resume input.
+- Runs file read -> `sanitizeText` -> `extractResumeSemantics` -> `canonicalResumeFromExtraction` -> `normalizeResume` -> `validateResume` before persistence.
 - Produces `resume/base.json`.
 - Produces `resume/working.json` semantically equal to base.
 - Records base hash.
 - Runs canonical validation.
 - Runs ATS sanitation.
 - Persists candidate career facts through career-store.
+- Empty or failed extraction returns the typed ingest error envelope with `status`, `exit_code`, `errors[]`, `extraction`, `validation`, `sanitation`, `career_facts`, and `checkpoints`; it must not construct fallback resume content.
 - Does not allow agent-generated unsupported content into base.
+- Does not fabricate default title, company, role, or experience values when the source/extraction omits them.
 
 ### job ingest
 

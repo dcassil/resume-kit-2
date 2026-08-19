@@ -72,6 +72,22 @@ class TestsSuiteContractTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stdout)
 
+    def test_resume_ingest_constructor_unit_module_is_bridged_into_current_gate(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "unittest",
+                "tests.unit.test_canonical_resume_from_extraction_unit",
+            ],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -109,6 +109,7 @@ class ResumeCoreSurfaceManifestTests(unittest.TestCase):
                 "normalizeResume",
                 "validateResume",
                 "sanitizeText",
+                "canonicalResumeFromExtraction",
                 "normalizeJobModel",
                 "scoreMatch",
                 "getUnresolvedRequirements",

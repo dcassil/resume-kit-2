@@ -1,0 +1,154 @@
+{
+  "fixture_id": "resume-agent-extraction-render-overflow-inline-resume",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Minimal E2E resume extraction is grounded in the supplied temp resume text.",
+    "No unstated title or experience entry is fabricated."
+  ],
+  "comment": "Fixture added for RKIT-T-0127 after deleting CLI fallback resume parsing for the render-overflow E2E resume.",
+  "data": {
+    "key": {
+      "sha256": "044cfc48488f5959eebc10d1a01c4eada6b85dbd9ecd320ac9d499cbc5149782",
+      "prompt_template_id": "resume-agent.resume-extraction@v1",
+      "output_schema_id": "resume-agent.resume-extraction.v1",
+      "canonical_input_json": "{\"resume_text\":\"Dana Candidate\\nReact TypeScript API engineer.\\n\",\"schema_id\":\"resume-agent.resume-extraction.v1\",\"source\":{\"kind\":\"raw_text\",\"sha256\":\"da549798a26d8a864830f4a0fe845f05e155537381294fa470096bea5f42c2cc\",\"source_id\":\"resume.txt\"}}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.resume-extraction.v1",
+      "proposal_type": "resume_extraction",
+      "requires_validation": true,
+      "resume_id": "render_overflow_inline_resume",
+      "source": {
+        "kind": "raw_text",
+        "source_id": "resume.txt",
+        "sha256": "da549798a26d8a864830f4a0fe845f05e155537381294fa470096bea5f42c2cc"
+      },
+      "basics": {
+        "name": {
+          "value": "Dana Candidate",
+          "evidence": [
+            {
+              "evidence_id": "ev_render_name",
+              "source_text": "Dana Candidate",
+              "span": {
+                "start": 0,
+                "end": 14
+              },
+              "lines": {
+                "start": 1,
+                "end": 1
+              }
+            }
+          ],
+          "confidence": 0.98
+        }
+      },
+      "skills": [
+        {
+          "name": "React",
+          "category": "framework",
+          "normalized_terms": [
+            "react"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_render_skills",
+              "source_text": "React TypeScript API engineer.",
+              "span": {
+                "start": 15,
+                "end": 45
+              },
+              "lines": {
+                "start": 2,
+                "end": 2
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "name": "TypeScript",
+          "category": "language",
+          "normalized_terms": [
+            "typescript"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_render_skills",
+              "source_text": "React TypeScript API engineer.",
+              "span": {
+                "start": 15,
+                "end": 45
+              },
+              "lines": {
+                "start": 2,
+                "end": 2
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "name": "API",
+          "category": "api",
+          "normalized_terms": [
+            "api",
+            "api architecture"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_render_skills",
+              "source_text": "React TypeScript API engineer.",
+              "span": {
+                "start": 15,
+                "end": 45
+              },
+              "lines": {
+                "start": 2,
+                "end": 2
+              }
+            }
+          ],
+          "confidence": 0.9
+        }
+      ],
+      "experience": [],
+      "education": [],
+      "certifications": [],
+      "projects": [],
+      "employment": [],
+      "source_evidence": [
+        {
+          "evidence_id": "ev_render_name",
+          "source_text": "Dana Candidate",
+          "span": {
+            "start": 0,
+            "end": 14
+          },
+          "lines": {
+            "start": 1,
+            "end": 1
+          }
+        },
+        {
+          "evidence_id": "ev_render_skills",
+          "source_text": "React TypeScript API engineer.",
+          "span": {
+            "start": 15,
+            "end": 45
+          },
+          "lines": {
+            "start": 2,
+            "end": 2
+          }
+        }
+      ],
+      "uncertainty": [],
+      "metadata": {
+        "fixture": "render-overflow-inline-resume"
+      }
+    }
+  }
+}

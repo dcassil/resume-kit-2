@@ -20,6 +20,7 @@ Relevant contract surfaces:
 - `normalizeResume`
 - `validateResume`
 - `sanitizeText`
+- `canonicalResumeFromExtraction`
 - `normalizeJobModel`
 - `scoreMatch`
 - `getUnresolvedRequirements`
@@ -94,6 +95,10 @@ Future implementation may decompose internally, but tests should assume public A
 
 ### Resume normalization
 
+- `canonicalResumeFromExtraction(extraction, source, config)` constructs the structured input consumed by `normalizeResume` from `resume_semantic_extraction` proposal results only.
+- Group extraction `fact_proposals`/`proposals` by category into canonical basics/title/summary, skills, experience/highlights, education, certifications, and projects.
+- Attach per-field `ResumeField` provenance from referenced `source_evidence` with `source_stated` verification for document-derived content.
+- Return a typed `error` result for empty or failed extraction and never fabricate missing names, titles, roles, employers, summaries, dates, skills, education, or experience entries.
 - Preserve all source experience entries.
 - Preserve role titles and employers exactly where they are factual fields.
 - Keep React, TypeScript, Node, PostgreSQL, Azure, SaaS, REST/API claims from source fixtures.

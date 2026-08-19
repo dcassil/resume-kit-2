@@ -14,6 +14,7 @@ from .domain import (
     validateResume,
     matchingVersions,
 )
+from .canonical_extraction import canonicalResumeFromExtraction
 from .guardrails_config import DEFAULT_ALLOW_INFERRED_FACTS, resolve_guardrails_config
 from .matching_config import (
     DEFAULT_MATCHING_WEIGHTS,
@@ -134,6 +135,7 @@ __all__ = [
     "DEFAULT_SECTION_ORDER",
     "DEFAULT_TARGET_PAGES",
     "applyChange",
+    "canonicalResumeFromExtraction",
     "getUnresolvedRequirements",
     "matchingVersions",
     "normalizeJobModel",

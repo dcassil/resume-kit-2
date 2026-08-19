@@ -18,6 +18,7 @@
       "normalizeResume",
       "validateResume",
       "sanitizeText",
+      "canonicalResumeFromExtraction",
       "normalizeJobModel",
       "scoreMatch",
       "getUnresolvedRequirements",
@@ -98,6 +99,19 @@
       "output_contract": {
         "required_fields": ["schema_version", "status", "text", "warnings"],
         "must_not_include": ["new_claims"]
+      }
+    },
+    {
+      "name": "canonicalResumeFromExtraction",
+      "description": "Construct normalized-resume input from source-backed resume semantic extraction proposals and source metadata without fabricating missing claims.",
+      "input_contract": {
+        "required_fields": ["extraction", "source", "config"],
+        "must_include": ["fact_proposals", "source_evidence"],
+        "must_not_include": ["file_path_only", "agent_runtime", "workspace_paths"]
+      },
+      "output_contract": {
+        "required_fields": ["schema_version", "status", "canonical_resume", "errors", "warnings"],
+        "must_not_include": ["unsupported_claims", "persistence_status", "rendered_output", "validation_authority"]
       }
     },
     {

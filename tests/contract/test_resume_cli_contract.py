@@ -214,6 +214,9 @@ class ResumeCliCommandContractTests(unittest.TestCase):
         self.assertIn(result.get("exit_code", 0), {0, None})
         base = json.loads((self.workspace / "resume" / "base.json").read_text(encoding="utf-8"))
         working = json.loads((self.workspace / "resume" / "working.json").read_text(encoding="utf-8"))
+        from resume_core import CANONICAL_RESUME_SCHEMA
+
+        self.assertEqual(set(base) & set(CANONICAL_RESUME_SCHEMA["required"]), set(CANONICAL_RESUME_SCHEMA["required"]))
         self.assertEqual(base.get("semantic_fingerprint"), working.get("semantic_fingerprint"))
         self.assertIn("base_hash", result)
         serialized = json.dumps(base, sort_keys=True).lower()
@@ -221,6 +224,69 @@ class ResumeCliCommandContractTests(unittest.TestCase):
         self.assertNotIn("aws", serialized)
         self.assertNotIn("graphql", serialized)
         self.assertNotIn("staff software engineer", serialized)
+
+    def test_ingest_resume_empty_extraction_returns_typed_failure_without_fallback_content(self):
+        run_cli(self.cli, ["init"], self.workspace)
+        with mock.patch.object(
+            self.cli,
+            "extractResumeSemantics",
+            return_value={"schema_version": "resume-agent.proposal.v1", "proposal_type": "resume_semantic_extraction", "fact_proposals": [], "source_evidence": []},
+        ):
+            result = normalize_result(run_cli(self.cli, ["ingest", str(self.resume_file)], self.workspace))
+
+        self.assertEqual(result.get("status"), "error")
+        self.assertEqual(result.get("exit_code"), 1)
+        self.assertEqual(result.get("base_hash"), None)
+        self.assertEqual(result.get("career_facts"), [])
+        self.assertEqual(result["errors"][0]["code"], "empty_resume_extraction")
+        self.assertEqual(json.loads((self.workspace / "resume" / "base.json").read_text(encoding="utf-8")), {})
+
+    def test_ingest_resume_no_title_or_experience_does_not_fabricate_defaults(self):
+        run_cli(self.cli, ["init"], self.workspace)
+        minimal_resume = self.workspace / "minimal-resume.txt"
+        minimal_resume.write_text("Sam No Defaults\nSkills: Python\n", encoding="utf-8")
+        extraction = {
+            "schema_version": "resume-agent.proposal.v1",
+            "proposal_type": "resume_semantic_extraction",
+            "fact_proposals": [
+                {
+                    "fact_id": "fact_minimal_name",
+                    "category": "name",
+                    "text": "Sam No Defaults",
+                    "normalized_terms": ["sam no defaults"],
+                    "source_evidence_ids": ["ev_minimal_name"],
+                    "verification_state": "inferred",
+                    "confidence": 0.94,
+                    "review_required": True,
+                },
+                {
+                    "fact_id": "fact_minimal_python",
+                    "category": "skill",
+                    "text": "Python",
+                    "normalized_terms": ["python"],
+                    "source_evidence_ids": ["ev_minimal_skills"],
+                    "verification_state": "inferred",
+                    "confidence": 0.91,
+                    "review_required": True,
+                },
+            ],
+            "source_evidence": [
+                {"evidence_id": "ev_minimal_name", "text": "Sam No Defaults", "span": {"start": 0, "end": 15}},
+                {"evidence_id": "ev_minimal_skills", "text": "Skills: Python", "span": {"start": 16, "end": 30}},
+            ],
+        }
+
+        with mock.patch.object(self.cli, "extractResumeSemantics", return_value=extraction):
+            result = normalize_result(run_cli(self.cli, ["ingest", str(minimal_resume)], self.workspace))
+
+        self.assertEqual(result.get("status"), "ok", result)
+        base = json.loads((self.workspace / "resume" / "base.json").read_text(encoding="utf-8"))
+        serialized = json.dumps(base, sort_keys=True)
+        self.assertNotIn("title", base)
+        self.assertEqual(base["experience"], [])
+        self.assertNotIn("Software Engineer", serialized)
+        self.assertNotIn("Source Resume", serialized)
+        self.assertNotIn("Software Developer", serialized)
 
     def test_job_ingest_persists_source_text_and_requirement_classification(self):
         run_cli(self.cli, ["init"], self.workspace)

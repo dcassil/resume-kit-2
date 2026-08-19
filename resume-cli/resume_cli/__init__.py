@@ -22,7 +22,7 @@ from ._config import (
     stable_config_hash as _stable_config_hash,
 )
 from resume_agent import extractJobSemantics, extractResumeSemantics, generateClarificationQuestion, interpretUserAnswer, proposeRewrite
-from resume_core import applyChange, normalizeJobModel, normalizeResume, rankResumeContent, sanitizeText, scoreMatch, toRenderableResume, validateChange, validateFinalResume, validateGrounding, validateResume
+from resume_core import applyChange, canonicalResumeFromExtraction, normalizeJobModel, normalizeResume, rankResumeContent, sanitizeText, scoreMatch, toRenderableResume, validateChange, validateFinalResume, validateGrounding, validateResume
 from resume_render import renderDocx, renderMarkdown, renderPdf, validateRenderedOutput
 from workflow import CHECKPOINT_ORDER, UnknownRunError, createRun, reconstructRunManifest, recordCheckpointResult
 
@@ -360,11 +360,17 @@ def _ingest_resume(workspace: Path, resume_file: Path) -> JsonObject:
     sanitation = sanitizeText(text)
     sanitized_text = str(sanitation.get("text", text))
     extraction = extractResumeSemantics(sanitized_text, {"source_path": str(resume_file)})
-    normalized = normalizeResume(_resume_from_text(sanitized_text, extraction, resume_file), _config(workspace))
+    config = _config(workspace)
+    constructed = canonicalResumeFromExtraction(extraction, {"kind": "file", "path": str(resume_file), "text": sanitized_text}, config)
+    if constructed.get("status") == "error":
+        return _ingest_resume_error(constructed.get("errors", []), extraction, sanitation, {}, ["INGEST_RESUME"])
+    normalized = normalizeResume(constructed.get("canonical_resume", {}), config)
+    if normalized.get("status") == "error":
+        return _ingest_resume_error(normalized.get("errors", []), extraction, sanitation, normalized, ["INGEST_RESUME"])
     canonical = dict(normalized.get("canonical_resume", {}))
     validation = validateResume(canonical)
     if validation.get("status") == "error":
-        return _error("schema_error", "resume validation failed")
+        return _ingest_resume_error(validation.get("errors", []), extraction, sanitation, validation, ["INGEST_RESUME", "VALIDATE_BASE"])
     base_hash = _hash(canonical)
     canonical["base_hash"] = base_hash
     canonical["semantic_fingerprint"] = _semantic_fingerprint(canonical)
@@ -390,6 +396,29 @@ def _ingest_resume(workspace: Path, resume_file: Path) -> JsonObject:
         "sanitation": sanitation,
         "career_facts": persisted,
         "checkpoints": ["INGEST_RESUME", "VALIDATE_BASE", "EXTRACT_PERSIST_CAREER_FACTS"],
+    }
+
+
+def _ingest_resume_error(
+    errors: Any,
+    extraction: JsonObject,
+    sanitation: JsonObject,
+    validation: JsonObject,
+    checkpoints: list[str],
+) -> JsonObject:
+    normalized_errors = [error for error in errors if isinstance(error, dict)] if isinstance(errors, list) else []
+    if not normalized_errors:
+        normalized_errors = [{"code": "schema_error", "message": "resume ingest failed", "severity": "error", "field_path": "resume"}]
+    return {
+        "status": "error",
+        "exit_code": DOMAIN_VALIDATION_EXIT,
+        "base_hash": None,
+        "extraction": extraction,
+        "validation": validation,
+        "sanitation": sanitation,
+        "career_facts": [],
+        "checkpoints": checkpoints,
+        "errors": normalized_errors,
     }
 
 
@@ -816,31 +845,6 @@ def _config(workspace: Path) -> JsonObject:
     return _load_workspace_config(_paths(workspace)["config"]).config
 
 
-def _resume_from_text(text: str, extraction: JsonObject | None = None, source_file: Path | None = None) -> JsonObject:
-    lines = _non_empty_lines(text)
-    name = lines[0] if lines else "Candidate"
-    title = _candidate_title(lines)
-    summary = _section_text(lines, "Summary", {"Experience", "Skills", "Education"}) or title
-    experience = _experience_entries(lines)
-    skills = _skills_from_resume(lines, text)
-    education = _education_items(lines)
-    resume = {
-        "schema_version": "canonical-resume.v1",
-        "resume_id": _stable_short_id("resume", text),
-        "basics": {"name": name},
-        "title": title,
-        "summary": summary,
-        "experience": experience,
-        "skills": skills,
-        "education": education,
-        "source": {"kind": "text", "path": str(source_file) if source_file else None},
-        "provenance": _resume_provenance(text, extraction),
-        "ingest_warnings": [],
-        "verification_state": "source_stated",
-    }
-    return resume
-
-
 def _job_from_text(text: str, extraction: JsonObject | None = None, source_file: Path | None = None) -> JsonObject:
     requirements = _requirements_from_extraction(extraction) or _requirements_from_job_text(text)
     lines = _non_empty_lines(text)
@@ -895,148 +899,12 @@ def _non_empty_lines(text: str) -> list[str]:
     return [line.strip() for line in text.replace("\r\n", "\n").replace("\r", "\n").splitlines() if line.strip()]
 
 
-def _candidate_title(lines: list[str]) -> str:
-    for line in lines[1:4]:
-        if line.lower() not in {"summary", "experience", "skills", "education"}:
-            return line
-    return "Software Engineer"
-
-
-def _section_text(lines: list[str], heading: str, stop_headings: set[str]) -> str:
-    collecting = False
-    parts: list[str] = []
-    for line in lines:
-        if line.lower() == heading.lower():
-            collecting = True
-            continue
-        if collecting and line in stop_headings:
-            break
-        if collecting:
-            parts.append(_strip_bullet(line))
-    return " ".join(parts).strip()
-
-
-def _experience_entries(lines: list[str]) -> list[JsonObject]:
-    entries: list[JsonObject] = []
-    in_experience = False
-    current: JsonObject | None = None
-    pending_dates: tuple[str | None, str | None] = (None, None)
-    for line in lines:
-        lowered = line.lower()
-        if lowered == "experience":
-            in_experience = True
-            continue
-        if lowered in {"skills", "education"}:
-            break
-        if not in_experience:
-            continue
-        clean = _strip_bullet(line)
-        if _is_bullet(line):
-            if current is None:
-                current = _new_experience_entry(len(entries), "Experience", "Software Developer", pending_dates)
-            current.setdefault("bullets", []).append(clean)
-            continue
-        if dates := _date_range(clean):
-            pending_dates = dates
-            if current is not None:
-                current["start_date"], current["end_date"] = dates
-            continue
-        if current is not None:
-            entries.append(current)
-        company, title = _company_title(clean)
-        current = _new_experience_entry(len(entries), company, title, pending_dates)
-        pending_dates = (None, None)
-    if current is not None:
-        entries.append(current)
-    return entries or [_new_experience_entry(0, "Source Resume", "Software Developer", (None, None))]
-
-
-def _new_experience_entry(index: int, company: str, title: str, dates: tuple[str | None, str | None]) -> JsonObject:
-    start, end = dates
-    entry: JsonObject = {
-        "id": f"exp_{index + 1}",
-        "company": company,
-        "title": title,
-        "bullets": [],
-    }
-    if start:
-        entry["start_date"] = start
-    if end:
-        entry["end_date"] = end
-    return entry
-
-
-def _company_title(line: str) -> tuple[str, str]:
-    if " - " in line:
-        company, title = line.split(" - ", 1)
-        return company.strip() or "Source Resume", title.strip() or "Software Developer"
-    return line, "Software Developer"
-
-
-def _date_range(line: str) -> tuple[str | None, str | None] | None:
-    parts = re.split(r"\s+-\s+|\s+to\s+", line, maxsplit=1, flags=re.IGNORECASE)
-    if len(parts) != 2:
-        return None
-    return _normalize_date(parts[0]), _normalize_date(parts[1])
-
-
-def _normalize_date(value: str) -> str | None:
-    text = value.strip()
-    if text.lower() in {"present", "current"}:
-        return "present"
-    month_map = {
-        "jan": "01",
-        "feb": "02",
-        "mar": "03",
-        "apr": "04",
-        "may": "05",
-        "jun": "06",
-        "jul": "07",
-        "aug": "08",
-        "sep": "09",
-        "oct": "10",
-        "nov": "11",
-        "dec": "12",
-    }
-    if match := re.search(r"\b(19|20)\d{2}\b", text):
-        year = match.group(0)
-        month = "01"
-        prefix = text[: match.start()].strip()[:3].lower()
-        if prefix in month_map:
-            month = month_map[prefix]
-        return f"{year}-{month}"
-    return None
-
-
 def _is_bullet(line: str) -> bool:
     return bool(re.match(r"^\s*[-*•◦]\s+", line))
 
 
 def _strip_bullet(line: str) -> str:
     return re.sub(r"^\s*[-*•◦]\s+", "", line).strip()
-
-
-def _skills_from_resume(lines: list[str], text: str) -> list[str]:
-    skills_line = _section_text(lines, "Skills", {"Education"})
-    explicit = [part.strip() for part in skills_line.split(",") if part.strip()]
-    if explicit:
-        return explicit
-    known = ["React", "TypeScript", "Node.js", "PostgreSQL", "Azure", "REST APIs", "SaaS", "workflow automation", "responsive web apps", "team leadership"]
-    lowered = text.lower()
-    return [skill for skill in known if skill.lower() in lowered]
-
-
-def _education_items(lines: list[str]) -> list[str]:
-    text = _section_text(lines, "Education", set())
-    return [text] if text else []
-
-
-def _resume_provenance(text: str, extraction: JsonObject | None) -> list[JsonObject]:
-    provenance = [{"source": "resume", "text": text}]
-    for evidence in (extraction or {}).get("source_evidence", []):
-        if isinstance(evidence, dict) and evidence.get("text"):
-            provenance.append({"source": "resume", "text": evidence["text"], "source_span": evidence.get("span")})
-    return provenance
 
 
 def _requirements_from_extraction(extraction: JsonObject | None) -> list[JsonObject]:
