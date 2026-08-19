@@ -4,14 +4,14 @@ level: initiative
 title: "Resume CLI Runtime and Workspace Contract"
 short_code: "RKIT-I-0035"
 created_at: 2026-08-13T20:41:37.761934+00:00
-updated_at: 2026-08-18T23:48:27.395660+00:00
+updated_at: 2026-08-19T00:18:46.056981+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: []
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -60,6 +60,10 @@ Re-baselined 2026-08-13 against the alignment audit and decided ADRs.
 
 ### Blocked Status
 - Not blocked (frontmatter blocked_by: []).
+
+## Status Updates
+
+- 2026-08-19: COMPLETE. T-0123 (1ae3a7c): real `resume` terminal client — [project.scripts] entrypoint + __main__.py + cli.py presenter (envelope {status, exit_code, artifacts, report, errors[]}, exit codes 0/1/2, --json mode, typed stderr); TerminalIO seam (interactive + scripted deterministic); output discard removed; subprocess contract tests. DRIVER FIXES: `init --help` executed init in cwd (trailing args silently ignored) — -h/--help now prints usage exit 0, exact argv arity enforced in new _argv.py before any side effect; smoke's historic no-op `match --working` flag made an accepted documented spelling; __init__.py held under the 1500 cap by extraction. T-0124 (d8d12ea): resume_cli/_config.py section-13 contract — complete defaults sourced from owning-package constants, unknown-key path rejection, legacy flat keys fail with replacement guidance (probed), full config hash incl. agent, init persists getMigrationState DTO verbatim ('prepared' literal dead). Zero protected edits; gates PR 653 / future 660 / smoke green; version 0.34.0. NOTE: resume_cli/__init__.py at 1483/1500 — new logic in private modules.
 
 ## Detailed Design **[REQUIRED]**
 
