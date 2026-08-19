@@ -202,9 +202,9 @@
     {
       "path": "tools/resume_core_guardrails.py",
       "name": "resume_core_guardrails.py",
-      "checksum": "sha256:d230a2c8784919e4f4bd24d3f5dc239e03432abe01273d39b7e25fd0ac44d937",
-      "size": 20899,
-      "registeredAt": "2026-08-13T20:26:43.189Z"
+      "checksum": "sha256:64c6fee3402209a48cf981966d13556e4eabaf8a11224eb986a555e0e88fc705",
+      "size": 21020,
+      "registeredAt": "2026-08-19T17:44:20.992Z"
     },
     {
       "path": "tools/resume_plugin_guardrails.py",
@@ -230,9 +230,9 @@
     {
       "path": "tools/run_smoke.py",
       "name": "run_smoke.py",
-      "checksum": "sha256:f5383b35dd4a98e208e233d16d5f25d99a8a6a8d6245996bd8e0304476fa6d31",
-      "size": 20524,
-      "registeredAt": "2026-08-17T18:32:17.401Z"
+      "checksum": "sha256:78b3ff2c7c103a8ae0f2a2de256930f35cf2edffd75842c7afc7448abc3a0d21",
+      "size": 28627,
+      "registeredAt": "2026-08-19T17:44:20.993Z"
     },
     {
       "path": "tools/run_tests.py",
