@@ -1,6 +1,19 @@
 # Handoff — 2026-08-15 (I-0004..I-0008 COMPLETE — career-store tier DONE, continuous codex mode)
 
-## -5. 2026-08-17 (evening) session update — read this first (supersedes §-4 state line)
+## -6. 2026-08-19 (afternoon) session update — read this first (supersedes §-5 state line)
+
+develop PUSHED through v0.35.0. **37 initiatives complete.** Daniel's approval pass for guardrails+smoke landed at session start (verify clean), then **RKIT-I-0036 (Resume and Job Ingest Orchestration) COMPLETE, v0.35.0** — T-0127..0130:
+
+- **T-0127**: new resume-core surface `canonicalResumeFromExtraction(extraction, source, config)` (`resume_core/canonical_extraction.py`) builds CanonicalResume from agent extraction proposals w/ per-field ResumeField provenance; `_ingest_resume` rewired sanitize→extract→construct→normalize→validate; deleted `_resume_from_text`/`_normalize_date`/`_candidate_title`/`_experience_entries`/`_company_title` + text-parsing helpers (CLI __init__.py 1483→1351). Typed error envelope on empty/error extraction, NO fallback. Lockstep edit: protected `tools/resume_core_guardrails.py`.
+- **T-0128**: career facts persist from extraction `fact_proposals` via core validation (`_validated_fact_proposals`, `FACT_PROPOSAL_CATEGORY_TO_TYPE` table in core); hardcoded 12-entry fact list + `_source_span` deleted — **DoD 4 closed** (off-fixture Python/Spark/Kafka test guards zero-fact regression). Extraction schemas gained optional `fact_id`/`verification_state` so fixtures pin historical smoke fact ids → zero snapshot churn.
+- **T-0129**: `_ingest_job` = input resolver (path→URL→pasted text, injectable `_fetch_url_text` seam, typed `job_url_fetch_failed`) → sanitize → `extractJobSemantics` → `normalizeJobModel`; deleted `_requirements_*`/`_looks_like_requirement`/`_requirement`/`_job_from_text` + weight 1.0 literal. Preferred kept as lossless superset (scoreMatch reads both arrays). Smoke requirement ids pinned in fixtures (mapping in commit msg).
+- **T-0130**: off-fixture data-engineer fixture set (`fixtures/resumes/off-fixture-data-engineer.txt`, `fixtures/jobs/job-c-data-engineer.txt`, `fixtures/ingest-expected/` — NOT fixtures/expected/, that dir is regenerable-snapshots-only); fabrication guards; DTO conformance (CANONICAL_RESUME_SCHEMA + JobRequirement incl. now-required `years`); AST anti-regrowth guardrail in protected `tools/resume_cli_guardrails.py` (month tables, date regexes, requirement-vocab lists, schema-version construction) + non-protected `tests/boundary/test_resume_cli_domain_regrowth.py`; residual fixture vocabulary purged from `_resolution_priority`/`_topic_for_requirement`/`_job_terms_for_rewrite` (importance-rank ordering replaces the AWS/GraphQL hardcoded order — note for I-0037).
+
+**PENDING approval (two files): `straight-jacket update tools/resume_core_guardrails.py tools/resume_cli_guardrails.py`** — both task-authorized lockstep edits, committed --no-verify per protected-files workflow.
+
+Gates at v0.35.0: --pr 659, --future-contract 666, smoke — green at every commit; snapshot regen ×2 no-drift verified per task. Driver probes this session: off-fixture ingest typed failure + no fabrication (empty `{}` base.json is `_init`'s placeholder, pre-existing), argv arity rejection, URL-failure typed error, guardrail month-table negative probe. **NEXT unblocked:** I-0037 (match/resolve/inspect UX — check blocked_by), then I-0038/0039/0040/0041, I-0047. Same loop (§4). Metis decomposition note: MCP create_document fails with "parent not found" for tasks — use `metis create task --initiative RKIT-I-00XX "title"` CLI instead.
+
+## -5. 2026-08-17 (evening) session update — (superseded by §-6)
 
 develop PUSHED through **28277c5, v0.23.0**. Daniel's approval pass landed mid-day (straight-jacket verify was CLEAN at session start). Since then, **25 initiatives complete** — this session added:
 

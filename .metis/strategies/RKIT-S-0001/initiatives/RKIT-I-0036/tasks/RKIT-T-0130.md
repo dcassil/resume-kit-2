@@ -4,14 +4,14 @@ level: task
 title: "Off-fixture ingest fixture, fabrication guards, DTO conformance, boundary guardrail, TEST_SPEC strengthening; close-out"
 short_code: "RKIT-T-0130"
 created_at: 2026-08-19T17:52:19.077872+00:00
-updated_at: 2026-08-19T18:41:37.870811+00:00
+updated_at: 2026-08-19T18:59:30.571235+00:00
 parent: resume-and-job-ingest-orchestration
 blocked_by: [RKIT-T-0127, RKIT-T-0128, RKIT-T-0129]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: true
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0036
 ## Objective **[REQUIRED]**
 
 Prove the fixture-independence, no-fabrication, and DTO-conformance claims of I-0036 with a full second-vocabulary ingest fixture set, permanent boundary guardrails against CLI domain-logic regrowth, and TEST_SPEC strengthening covering the previously unspecified URL/pasted-text and fabrication cases. Close out the initiative.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
