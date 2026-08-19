@@ -88,6 +88,7 @@ class CanonicalResumeFromExtractionTests(unittest.TestCase):
 
         self.assertEqual(result.get("status"), "ok", result)
         canonical = result["canonical_resume"]
+        facts = {proposal["fact_id"]: proposal for proposal in result["fact_proposals"]}
         normalized = resume_core.normalizeResume(canonical)["canonical_resume"]
 
         self.assertEqual(normalized["contact"]["name"], "Alex Rivera")
@@ -96,6 +97,9 @@ class CanonicalResumeFromExtractionTests(unittest.TestCase):
         self.assertEqual(normalized["skills"][0]["value"], "Python")
         self.assertEqual(normalized["skills"][0]["verification_state"], "source_stated")
         self.assertEqual(normalized["skills"][0]["provenance"][0]["evidence_id"], "ev_skills")
+        self.assertEqual(facts["fact_python"]["type"], "skill")
+        self.assertEqual(facts["fact_python"]["verification_state"], "inferred")
+        self.assertEqual(facts["fact_python"]["evidence"]["source_span"], {"start": 28, "end": 42})
         self.assertEqual(normalized["experience"][0]["start_date"], "2021-01")
         self.assertEqual(normalized["experience"][0]["end_date"], "current")
         self.assertEqual(normalized["experience"][0]["bullets"][0]["value"], "Built Spark pipelines for billing analytics.")

@@ -28,6 +28,34 @@ _BASICS_KEYS = {
     "portfolio",
 }
 
+FACT_PROPOSAL_CATEGORY_TO_TYPE = {
+    "address": "profile",
+    "certification": "certification",
+    "city": "profile",
+    "country": "profile",
+    "domain": "domain",
+    "education": "education",
+    "email": "profile",
+    "employment": None,
+    "experience": "experience",
+    "experience_highlight": "experience",
+    "github": "profile",
+    "headline": "profile",
+    "linkedin": "profile",
+    "location": "profile",
+    "name": "profile",
+    "phone": "profile",
+    "portfolio": "profile",
+    "postal_code": "profile",
+    "project": "project",
+    "region": "profile",
+    "skill": "skill",
+    "summary": "profile",
+    "technical_skill": "skill",
+    "title": "profile",
+    "website": "profile",
+}
+
 
 def canonicalResumeFromExtraction(extraction: Any, source: JsonObject | None = None, config: JsonObject | None = None) -> JsonObject:
     """Construct canonical resume input from extraction proposals."""
@@ -88,7 +116,14 @@ def canonicalResumeFromExtraction(extraction: Any, source: JsonObject | None = N
     resume["experience"] = list(experience_by_key.values())
     if not resume["contact"]:
         del resume["contact"]
-    return _result("warning" if warnings else "ok", canonical_resume=resume, errors=[], warnings=warnings)
+    validated_fact_proposals = _validated_fact_proposals(proposals, evidence_by_id, warnings)
+    return _result(
+        "warning" if warnings else "ok",
+        canonical_resume=resume,
+        fact_proposals=validated_fact_proposals,
+        errors=[],
+        warnings=warnings,
+    )
 
 
 def _apply_proposal(
@@ -122,6 +157,96 @@ def _apply_proposal(
 def _fact_proposals(payload: JsonObject) -> list[JsonObject]:
     proposals = payload.get("fact_proposals", payload.get("proposals", []))
     return [item for item in proposals if isinstance(item, dict)]
+
+
+def _validated_fact_proposals(
+    proposals: list[JsonObject],
+    evidence_by_id: dict[str, JsonObject],
+    warnings: list[JsonObject],
+) -> list[JsonObject]:
+    validated: list[JsonObject] = []
+    for proposal in proposals:
+        fact_id = _clean_text(proposal.get("fact_id"))
+        category = _clean_text(proposal.get("category")).lower()
+        if category not in FACT_PROPOSAL_CATEGORY_TO_TYPE:
+            warnings.append(_issue("unsupported_fact_category", "Ignored fact proposal with unsupported category.", f"category/{category or 'unknown'}"))
+            continue
+        fact_type = FACT_PROPOSAL_CATEGORY_TO_TYPE[category]
+        if fact_type is None:
+            continue
+        text = _clean_text(proposal.get("text"))
+        terms = [_clean_text(term) for term in proposal.get("normalized_terms", []) if _clean_text(term)]
+        state = _clean_text(proposal.get("verification_state")) or VerificationState.UNKNOWN.value
+        evidence = _fact_evidence(proposal, evidence_by_id)
+        if not fact_id:
+            warnings.append(_issue("missing_fact_id", "Ignored fact proposal without a fact_id.", "fact_proposals"))
+            continue
+        if not text:
+            warnings.append(_issue("missing_fact_text", "Ignored fact proposal without text.", f"fact_proposals/{fact_id}"))
+            continue
+        if not terms:
+            warnings.append(_issue("missing_fact_terms", "Ignored fact proposal without normalized_terms.", f"fact_proposals/{fact_id}"))
+            continue
+        if state not in {item.value for item in VerificationState}:
+            warnings.append(_issue("invalid_fact_verification_state", "Ignored fact proposal with invalid verification_state.", f"fact_proposals/{fact_id}"))
+            continue
+        if not evidence:
+            warnings.append(_issue("missing_fact_evidence", "Ignored fact proposal without source evidence.", f"fact_proposals/{fact_id}"))
+            continue
+        validated.append(
+            {
+                "fact_id": fact_id,
+                "category": category,
+                "type": fact_type,
+                "text": text,
+                "normalized_terms": terms,
+                "source_evidence_ids": [str(item) for item in proposal.get("source_evidence_ids", []) if _clean_text(item)],
+                "evidence": evidence,
+                "verification_state": state,
+                "review_required": bool(proposal.get("review_required", False)),
+            }
+        )
+    return validated
+
+
+def _fact_evidence(proposal: JsonObject, evidence_by_id: dict[str, JsonObject]) -> JsonObject:
+    entries: list[JsonObject] = []
+    for item in proposal.get("evidence", []):
+        if isinstance(item, dict):
+            entry = _source_evidence_entry(_clean_text(item.get("evidence_id")), item)
+            if entry:
+                entries.append(entry)
+    for evidence_id in proposal.get("source_evidence_ids", []):
+        evidence = evidence_by_id.get(str(evidence_id))
+        if evidence:
+            entry = _source_evidence_entry(str(evidence_id), evidence)
+            if entry and entry not in entries:
+                entries.append(entry)
+    if not entries:
+        return {}
+    evidence = copy.deepcopy(entries[0])
+    metadata = dict(evidence.get("metadata", {})) if isinstance(evidence.get("metadata"), dict) else {}
+    metadata["claim_id"] = _clean_text(proposal.get("fact_id"))
+    metadata["category"] = _clean_text(proposal.get("category")).lower()
+    metadata["normalized_terms"] = [_clean_text(term) for term in proposal.get("normalized_terms", []) if _clean_text(term)]
+    metadata["source_evidence_ids"] = [entry["evidence_id"] for entry in entries if entry.get("evidence_id")]
+    metadata["source_evidence"] = copy.deepcopy(entries)
+    evidence["metadata"] = metadata
+    return evidence
+
+
+def _source_evidence_entry(evidence_id: str, evidence: JsonObject) -> JsonObject:
+    text = _clean_text(evidence.get("text") or evidence.get("source_text") or evidence.get("snippet"))
+    if not text:
+        return {}
+    entry: JsonObject = {"source": "resume", "text": text}
+    if evidence_id:
+        entry["evidence_id"] = evidence_id
+    if evidence.get("span") is not None:
+        entry["source_span"] = copy.deepcopy(evidence.get("span"))
+    if evidence.get("lines") is not None:
+        entry["lines"] = copy.deepcopy(evidence.get("lines"))
+    return entry
 
 
 def _add_basic(resume: JsonObject, proposal: JsonObject, category: str, evidence_by_id: dict[str, JsonObject]) -> None:

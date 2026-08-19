@@ -4,14 +4,14 @@ level: task
 title: "Fact proposals through extraction, core validation, and career-store persistence; delete the hardcoded fact list"
 short_code: "RKIT-T-0128"
 created_at: 2026-08-19T17:52:18.931312+00:00
-updated_at: 2026-08-19T17:52:18.931312+00:00
+updated_at: 2026-08-19T18:09:30.296856+00:00
 parent: resume-and-job-ingest-orchestration
-blocked_by: ["RKIT-T-0127"]
+blocked_by: [RKIT-T-0127]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0036
 ## Objective **[REQUIRED]**
 
 Career facts persisted at ingest must originate from the agent extraction's `fact_proposals`, be validated by resume-core, and be persisted through career-store — closing DoD 4 (off-fixture resumes currently persist ZERO facts because `_facts_from_resume` is a hardcoded 12-entry smoke-fixture keyword list at `resume-cli/resume_cli/__init__.py:873`). Delete `_facts_from_resume` entirely; the CLI never authors facts.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria **[REQUIRED]**
 
@@ -58,4 +60,4 @@ Recommended Agent: opus + medium
 
 ## Status Updates **[REQUIRED]**
 
-*To be added during implementation*
+- 2026-08-19: Implemented proposal-derived ingest persistence path. `canonicalResumeFromExtraction` now returns core-validated `fact_proposals` with a single core category-to-type table and evidence derived from extraction evidence spans; `_ingest_resume` persists those proposals through `upsertFact` and removed the CLI keyword fact table/substr span lookup. Added Python/Spark/Kafka off-fixture fake-adapter fixture and integration test bridged through `test_tests_contract`. Smoke fixture now pins historical fact IDs where downstream flows require them (`fact_react`, `fact_typescript`, `fact_node`, `fact_postgresql`, `fact_azure`, `fact_api`, `fact_saas`, `fact_workflow`, `fact_responsive`, `fact_leadership`) and a new rewrite replay fixture was keyed for proposal-derived allowed facts. Focused tests and direct smoke harness pass; full gates still pending.

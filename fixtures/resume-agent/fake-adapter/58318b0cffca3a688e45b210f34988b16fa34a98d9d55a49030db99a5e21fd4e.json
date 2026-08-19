@@ -43,7 +43,9 @@
             }
           ],
           "confidence": 0.97,
-          "normalized": "senior software developer"
+          "normalized": "senior software developer",
+          "fact_id": "fact_title",
+          "verification_state": "source_stated"
         }
       },
       "skills": [
@@ -67,7 +69,9 @@
               }
             }
           ],
-          "confidence": 0.96
+          "confidence": 0.96,
+          "fact_id": "fact_react",
+          "verification_state": "source_stated"
         },
         {
           "name": "TypeScript",
@@ -89,7 +93,9 @@
               }
             }
           ],
-          "confidence": 0.96
+          "confidence": 0.96,
+          "fact_id": "fact_typescript",
+          "verification_state": "source_stated"
         },
         {
           "name": "Node.js",
@@ -112,7 +118,9 @@
               }
             }
           ],
-          "confidence": 0.94
+          "confidence": 0.94,
+          "fact_id": "fact_node",
+          "verification_state": "source_stated"
         },
         {
           "name": "PostgreSQL",
@@ -134,7 +142,9 @@
               }
             }
           ],
-          "confidence": 0.94
+          "confidence": 0.94,
+          "fact_id": "fact_postgresql",
+          "verification_state": "source_stated"
         },
         {
           "name": "Azure",
@@ -156,7 +166,9 @@
               }
             }
           ],
-          "confidence": 0.92
+          "confidence": 0.92,
+          "fact_id": "fact_azure",
+          "verification_state": "source_stated"
         },
         {
           "name": "REST APIs",
@@ -179,7 +191,9 @@
               }
             }
           ],
-          "confidence": 0.94
+          "confidence": 0.94,
+          "fact_id": "fact_api",
+          "verification_state": "source_stated"
         },
         {
           "name": "SaaS",
@@ -201,7 +215,9 @@
               }
             }
           ],
-          "confidence": 0.91
+          "confidence": 0.91,
+          "fact_id": "fact_saas",
+          "verification_state": "source_stated"
         },
         {
           "name": "workflow automation",
@@ -223,7 +239,9 @@
               }
             }
           ],
-          "confidence": 0.9
+          "confidence": 0.9,
+          "fact_id": "fact_workflow",
+          "verification_state": "source_stated"
         },
         {
           "name": "responsive web apps",
@@ -246,7 +264,9 @@
               }
             }
           ],
-          "confidence": 0.91
+          "confidence": 0.91,
+          "fact_id": "fact_responsive",
+          "verification_state": "source_stated"
         },
         {
           "name": "team leadership",
@@ -268,7 +288,8 @@
               }
             }
           ],
-          "confidence": 0.9
+          "confidence": 0.9,
+          "verification_state": "source_stated"
         }
       ],
       "experience": [
@@ -295,7 +316,8 @@
                 }
               }
             ],
-            "confidence": 0.93
+            "confidence": 0.93,
+            "verification_state": "source_stated"
           },
           "location": null,
           "highlights": [
@@ -320,7 +342,8 @@
                   }
                 }
               ],
-              "confidence": 0.91
+              "confidence": 0.91,
+              "verification_state": "source_stated"
             },
             {
               "text": "Designed REST APIs and integration patterns connecting product data, workflow automation, and reporting.",
@@ -343,7 +366,8 @@
                   }
                 }
               ],
-              "confidence": 0.91
+              "confidence": 0.91,
+              "verification_state": "source_stated"
             },
             {
               "text": "Led a small team of three developers through delivery planning, code review, and release coordination.",
@@ -366,7 +390,9 @@
                   }
                 }
               ],
-              "confidence": 0.9
+              "confidence": 0.9,
+              "verification_state": "source_stated",
+              "fact_id": "fact_leadership"
             },
             {
               "text": "Improved front-end reliability for responsive web apps across desktop and mobile browsers.",
@@ -387,7 +413,8 @@
                   }
                 }
               ],
-              "confidence": 0.9
+              "confidence": 0.9,
+              "verification_state": "source_stated"
             }
           ],
           "skills": [
@@ -413,7 +440,8 @@
               }
             }
           ],
-          "confidence": 0.93
+          "confidence": 0.93,
+          "verification_state": "source_stated"
         },
         {
           "role": "Software Developer",
@@ -438,7 +466,8 @@
                 }
               }
             ],
-            "confidence": 0.91
+            "confidence": 0.91,
+            "verification_state": "source_stated"
           },
           "location": null,
           "highlights": [
@@ -463,7 +492,8 @@
                   }
                 }
               ],
-              "confidence": 0.9
+              "confidence": 0.9,
+              "verification_state": "source_stated"
             },
             {
               "text": "Integrated Azure services for deployment, monitoring, and application operations.",
@@ -486,7 +516,8 @@
                   }
                 }
               ],
-              "confidence": 0.88
+              "confidence": 0.88,
+              "verification_state": "source_stated"
             }
           ],
           "skills": [
@@ -509,7 +540,8 @@
               }
             }
           ],
-          "confidence": 0.91
+          "confidence": 0.91,
+          "verification_state": "source_stated"
         }
       ],
       "education": [
@@ -532,7 +564,8 @@
               }
             }
           ],
-          "confidence": 0.86
+          "confidence": 0.86,
+          "verification_state": "source_stated"
         }
       ],
       "certifications": [],
@@ -558,7 +591,8 @@
               }
             }
           ],
-          "confidence": 0.93
+          "confidence": 0.93,
+          "verification_state": "source_stated"
         },
         {
           "organization": "AutomationWorks",
@@ -580,7 +614,8 @@
               }
             }
           ],
-          "confidence": 0.91
+          "confidence": 0.91,
+          "verification_state": "source_stated"
         }
       ],
       "source_evidence": [

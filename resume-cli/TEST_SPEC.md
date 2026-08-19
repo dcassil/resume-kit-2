@@ -74,7 +74,8 @@ Required command surface:
 - Records base hash.
 - Runs canonical validation.
 - Runs ATS sanitation.
-- Persists candidate career facts through career-store.
+- Persists candidate career facts through career-store from core-validated extraction `fact_proposals`, not CLI keyword lists or substring searches.
+- Off-fixture fake-adapter resume input persists exactly the proposed facts and does not persist unproposed fixture facts such as `fact_azure`.
 - Empty or failed extraction returns the typed ingest error envelope with `status`, `exit_code`, `errors[]`, `extraction`, `validation`, `sanitation`, `career_facts`, and `checkpoints`; it must not construct fallback resume content.
 - Does not allow agent-generated unsupported content into base.
 - Does not fabricate default title, company, role, or experience values when the source/extraction omits them.

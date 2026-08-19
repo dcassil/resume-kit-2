@@ -4,14 +4,14 @@ level: task
 title: "Resume ingest via agent extraction + core canonical construction; delete CLI schema construction and fabricated fallbacks"
 short_code: "RKIT-T-0127"
 created_at: 2026-08-19T17:52:18.855363+00:00
-updated_at: 2026-08-19T17:54:59.532586+00:00
+updated_at: 2026-08-19T18:09:29.488342+00:00
 parent: resume-and-job-ingest-orchestration
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0036
 ## Objective **[REQUIRED]**
 
 Make `resume ingest` build its canonical resume from the agent extraction proposal via a resume-core-owned construction surface, instead of the CLI's fixture-tuned text parser. Delete the CLI-owned schema construction (`_resume_from_text` body), date normalization (`_normalize_date`), and every fabricated fallback (`_candidate_title` inventing "Software Engineer", `_experience_entries` inventing "Source Resume"/"Software Developer", `_company_title` default title). Missing data becomes a typed, user-visible outcome — never an invented claim in base.json.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

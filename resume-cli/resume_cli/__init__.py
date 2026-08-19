@@ -379,12 +379,14 @@ def _ingest_resume(workspace: Path, resume_file: Path) -> JsonObject:
     _write_json(paths["resume_working"], dict(canonical))
     store = openCareerStore(str(paths["career_db"]))
     persisted = []
-    for fact in _facts_from_resume(canonical):
+    policy = _resume_fact_policy(config, canonical)
+    for proposal in constructed.get("fact_proposals", []):
+        fact = _store_fact_from_proposal(proposal)
         result = store.upsertFact(
             fact,
-            {"source": "resume", "text": fact["text"], "source_span": _source_span(text, fact["text"])},
+            proposal.get("evidence") if isinstance(proposal, dict) else None,
             source="resume",
-            policy={},
+            policy=policy,
         )
         persisted.append(result.get("fact_id"))
     return {
@@ -845,6 +847,24 @@ def _config(workspace: Path) -> JsonObject:
     return _load_workspace_config(_paths(workspace)["config"]).config
 
 
+def _store_fact_from_proposal(proposal: JsonObject) -> JsonObject:
+    return {
+        "fact_id": proposal.get("fact_id"),
+        "type": proposal.get("type"),
+        "text": proposal.get("text"),
+        "normalized_terms": proposal.get("normalized_terms", []),
+        "verification_state": proposal.get("verification_state"),
+    }
+
+
+def _resume_fact_policy(config: JsonObject, resume: JsonObject) -> JsonObject:
+    guardrails = config.get("guardrails") if isinstance(config.get("guardrails"), dict) else {}
+    return {
+        "allow_inferred_final": bool(guardrails.get("allow_inferred_facts", False)),
+        "resume_id": resume.get("resume_id"),
+    }
+
+
 def _job_from_text(text: str, extraction: JsonObject | None = None, source_file: Path | None = None) -> JsonObject:
     requirements = _requirements_from_extraction(extraction) or _requirements_from_job_text(text)
     lines = _non_empty_lines(text)
@@ -872,27 +892,6 @@ def _requirement(requirement_id: str, classification: str, concept: str, terms: 
         "normalized_terms": terms,
         "required": classification == "required",
     }
-
-
-def _facts_from_resume(resume: JsonObject) -> list[JsonObject]:
-    facts = []
-    for fact_id, text, terms, kind in [
-        ("fact_software_development", "software development", ["software development"], "experience"),
-        ("fact_years_software", "12 years of software development", ["12 years", "software development"], "experience"),
-        ("fact_react", "React", ["react"], "skill"),
-        ("fact_typescript", "TypeScript", ["typescript"], "skill"),
-        ("fact_node", "Node.js", ["node", "node.js"], "skill"),
-        ("fact_postgresql", "PostgreSQL", ["postgresql"], "skill"),
-        ("fact_azure", "Azure", ["azure"], "skill"),
-        ("fact_api", "REST API design", ["api", "api design"], "experience"),
-        ("fact_responsive", "responsive web apps", ["responsive", "responsive web apps"], "experience"),
-        ("fact_saas", "SaaS products", ["saas"], "domain"),
-        ("fact_workflow", "workflow automation", ["workflow automation"], "experience"),
-        ("fact_leadership", "Led a small team of three developers", ["three developers", "leadership", "team leadership"], "experience"),
-    ]:
-        if any(term in _resume_text(resume).lower() for term in terms):
-            facts.append({"fact_id": fact_id, "type": kind, "text": text, "normalized_terms": terms, "verification_state": "source_stated"})
-    return facts
 
 
 def _non_empty_lines(text: str) -> list[str]:
@@ -1047,13 +1046,6 @@ def _write_docx_artifact(path: Path, render_result: JsonObject) -> Path | None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
     return path
-
-
-def _source_span(source_text: str, snippet: str) -> JsonObject | None:
-    start = source_text.casefold().find(snippet.casefold())
-    if start < 0:
-        return None
-    return {"start": start, "end": start + len(snippet)}
 
 
 def _resolution_context(match_result: JsonObject, facts: list[JsonObject]) -> JsonObject:

@@ -1,0 +1,195 @@
+{
+  "fixture_id": "resume-agent-extraction-off-fixture-python-spark-kafka-resume",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Off-fixture resume uses Python, Spark, and Kafka vocabulary not covered by the old resume-cli keyword table.",
+    "Payload declares stable fact IDs and source-stated verification for exact persistence assertions."
+  ],
+  "comment": "RKIT-T-0128 regression fixture. The file name is the sha256 key for the request tuple.",
+  "data": {
+    "key": {
+      "sha256": "c11585f84d23957683e6af9c270de41db986cc773cf7a88445d5ce04e58338df",
+      "prompt_template_id": "resume-agent.resume-extraction@v1",
+      "output_schema_id": "resume-agent.resume-extraction.v1",
+      "canonical_input_json": "{\"resume_text\":\"Jordan Lee\\nData Platform Engineer\\nBuilt Python Spark pipelines and Kafka streaming jobs for analytics.\\n\",\"schema_id\":\"resume-agent.resume-extraction.v1\",\"source\":{\"kind\":\"raw_text\",\"sha256\":\"a9e0a61e62c98cf4970e67163f8abef6b4b0abc4de1e8004cc1e1e4459b9373e\",\"source_id\":\"off-fixture-resume.txt\"}}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.resume-extraction.v1",
+      "proposal_type": "resume_extraction",
+      "requires_validation": true,
+      "resume_id": "off_fixture_python_spark_kafka_resume",
+      "source": {
+        "kind": "raw_text",
+        "source_id": "off-fixture-resume.txt",
+        "sha256": "a9e0a61e62c98cf4970e67163f8abef6b4b0abc4de1e8004cc1e1e4459b9373e"
+      },
+      "basics": {
+        "name": {
+          "fact_id": "fact_offfixture_name",
+          "value": "Jordan Lee",
+          "evidence": [
+            {
+              "evidence_id": "ev_offfixture_name",
+              "source_text": "Jordan Lee",
+              "span": {
+                "start": 0,
+                "end": 10
+              },
+              "lines": {
+                "start": 1,
+                "end": 1
+              }
+            }
+          ],
+          "confidence": 0.98,
+          "verification_state": "source_stated",
+          "normalized": "jordan lee"
+        },
+        "title": {
+          "fact_id": "fact_offfixture_title",
+          "value": "Data Platform Engineer",
+          "evidence": [
+            {
+              "evidence_id": "ev_offfixture_title",
+              "source_text": "Data Platform Engineer",
+              "span": {
+                "start": 11,
+                "end": 33
+              },
+              "lines": {
+                "start": 2,
+                "end": 2
+              }
+            }
+          ],
+          "confidence": 0.97,
+          "verification_state": "source_stated",
+          "normalized": "data platform engineer"
+        }
+      },
+      "skills": [
+        {
+          "fact_id": "fact_python",
+          "name": "Python",
+          "category": "language",
+          "normalized_terms": [
+            "python"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_offfixture_skills",
+              "source_text": "Built Python Spark pipelines and Kafka streaming jobs for analytics.",
+              "span": {
+                "start": 34,
+                "end": 102
+              },
+              "lines": {
+                "start": 3,
+                "end": 3
+              }
+            }
+          ],
+          "confidence": 0.96,
+          "verification_state": "source_stated"
+        },
+        {
+          "fact_id": "fact_spark",
+          "name": "Spark",
+          "category": "data",
+          "normalized_terms": [
+            "spark"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_offfixture_skills",
+              "source_text": "Built Python Spark pipelines and Kafka streaming jobs for analytics.",
+              "span": {
+                "start": 34,
+                "end": 102
+              },
+              "lines": {
+                "start": 3,
+                "end": 3
+              }
+            }
+          ],
+          "confidence": 0.95,
+          "verification_state": "source_stated"
+        },
+        {
+          "fact_id": "fact_kafka",
+          "name": "Kafka",
+          "category": "streaming",
+          "normalized_terms": [
+            "kafka"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_offfixture_skills",
+              "source_text": "Built Python Spark pipelines and Kafka streaming jobs for analytics.",
+              "span": {
+                "start": 34,
+                "end": 102
+              },
+              "lines": {
+                "start": 3,
+                "end": 3
+              }
+            }
+          ],
+          "confidence": 0.95,
+          "verification_state": "source_stated"
+        }
+      ],
+      "experience": [],
+      "education": [],
+      "certifications": [],
+      "projects": [],
+      "employment": [],
+      "source_evidence": [
+        {
+          "evidence_id": "ev_offfixture_name",
+          "source_text": "Jordan Lee",
+          "span": {
+            "start": 0,
+            "end": 10
+          },
+          "lines": {
+            "start": 1,
+            "end": 1
+          }
+        },
+        {
+          "evidence_id": "ev_offfixture_title",
+          "source_text": "Data Platform Engineer",
+          "span": {
+            "start": 11,
+            "end": 33
+          },
+          "lines": {
+            "start": 2,
+            "end": 2
+          }
+        },
+        {
+          "evidence_id": "ev_offfixture_skills",
+          "source_text": "Built Python Spark pipelines and Kafka streaming jobs for analytics.",
+          "span": {
+            "start": 34,
+            "end": 102
+          },
+          "lines": {
+            "start": 3,
+            "end": 3
+          }
+        }
+      ],
+      "uncertainty": [],
+      "metadata": {
+        "fixture_source_id": "off-fixture-resume.txt"
+      }
+    }
+  }
+}

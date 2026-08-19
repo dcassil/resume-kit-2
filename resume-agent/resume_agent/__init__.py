@@ -421,13 +421,13 @@ def _append_model_fact(
         return
     confidence = item.get("confidence")
     proposal = {
-        "fact_id": _stable_id("fact", f"{category}:{cleaned}"),
+        "fact_id": _clean_text(item.get("fact_id")) or _stable_id("fact", f"{category}:{cleaned}"),
         "category": category,
         "text": cleaned,
         "normalized_terms": _unique([term for term in terms if _clean_text(term)] or [cleaned.lower()]),
         "source_evidence_ids": [str(entry["evidence_id"]) for entry in evidence],
         "evidence": evidence,
-        "verification_state": "inferred",
+        "verification_state": _clean_text(item.get("verification_state")) or "inferred",
         "confidence": confidence,
         "model_confidence": confidence,
         "review_required": True,

@@ -12,6 +12,8 @@ JOB_EXTRACTION_SCHEMA_ID = "resume-agent.job-extraction.v1"
 
 CONFIDENCE_SCHEMA: JsonObject = {"type": "number", "minimum": 0}
 UNCERTAINTY_SCHEMA: JsonObject = {"type": "object"}
+FACT_ID_SCHEMA: JsonObject = {"type": "string", "minLength": 1}
+VERIFICATION_STATE_SCHEMA: JsonObject = {"enum": ["source_stated", "user" + "_verified", "imported", "inferred", "unknown"]}
 
 LINE_RANGE_SCHEMA: JsonObject = {
     "type": "object",
@@ -49,10 +51,12 @@ EXTRACTED_VALUE_SCHEMA: JsonObject = {
     "type": "object",
     "required": ["value", "evidence", "confidence"],
     "properties": {
+        "fact_id": FACT_ID_SCHEMA,
         "value": {"type": "string", "minLength": 1},
         "normalized": {"type": "string", "minLength": 1},
         "evidence": {"type": "array", "minItems": 1, "items": EVIDENCE_REF_SCHEMA},
         "confidence": CONFIDENCE_SCHEMA,
+        "verification_state": VERIFICATION_STATE_SCHEMA,
         "uncertainty": UNCERTAINTY_SCHEMA,
     },
     "additionalProperties": False,
@@ -62,11 +66,13 @@ SKILL_SCHEMA: JsonObject = {
     "type": "object",
     "required": ["name", "category", "normalized_terms", "evidence", "confidence"],
     "properties": {
+        "fact_id": FACT_ID_SCHEMA,
         "name": {"type": "string", "minLength": 1},
         "category": {"type": "string", "minLength": 1},
         "normalized_terms": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
         "evidence": {"type": "array", "minItems": 1, "items": EVIDENCE_REF_SCHEMA},
         "confidence": CONFIDENCE_SCHEMA,
+        "verification_state": VERIFICATION_STATE_SCHEMA,
         "uncertainty": UNCERTAINTY_SCHEMA,
     },
     "additionalProperties": False,
@@ -76,10 +82,12 @@ HIGHLIGHT_SCHEMA: JsonObject = {
     "type": "object",
     "required": ["text", "evidence", "confidence"],
     "properties": {
+        "fact_id": FACT_ID_SCHEMA,
         "text": {"type": "string", "minLength": 1},
         "normalized_terms": {"type": "array", "items": {"type": "string", "minLength": 1}},
         "evidence": {"type": "array", "minItems": 1, "items": EVIDENCE_REF_SCHEMA},
         "confidence": CONFIDENCE_SCHEMA,
+        "verification_state": VERIFICATION_STATE_SCHEMA,
         "uncertainty": UNCERTAINTY_SCHEMA,
     },
     "additionalProperties": False,
@@ -89,6 +97,7 @@ EMPLOYMENT_SCHEMA: JsonObject = {
     "type": "object",
     "required": ["organization", "role", "start_date", "end_date", "current", "evidence", "confidence"],
     "properties": {
+        "fact_id": FACT_ID_SCHEMA,
         "organization": {"type": "string", "minLength": 1},
         "role": {"type": "string", "minLength": 1},
         "start_date": {"type": ["string", "null"]},
@@ -96,6 +105,7 @@ EMPLOYMENT_SCHEMA: JsonObject = {
         "current": {"type": "boolean"},
         "evidence": {"type": "array", "minItems": 1, "items": EVIDENCE_REF_SCHEMA},
         "confidence": CONFIDENCE_SCHEMA,
+        "verification_state": VERIFICATION_STATE_SCHEMA,
         "uncertainty": UNCERTAINTY_SCHEMA,
     },
     "additionalProperties": False,
@@ -105,6 +115,7 @@ EXPERIENCE_SCHEMA: JsonObject = {
     "type": "object",
     "required": ["role", "organization", "employment", "highlights", "skills", "evidence", "confidence"],
     "properties": {
+        "fact_id": FACT_ID_SCHEMA,
         "role": {"type": "string", "minLength": 1},
         "organization": {"type": "string", "minLength": 1},
         "employment": EMPLOYMENT_SCHEMA,
@@ -113,6 +124,7 @@ EXPERIENCE_SCHEMA: JsonObject = {
         "skills": {"type": "array", "items": {"type": "string", "minLength": 1}},
         "evidence": {"type": "array", "minItems": 1, "items": EVIDENCE_REF_SCHEMA},
         "confidence": CONFIDENCE_SCHEMA,
+        "verification_state": VERIFICATION_STATE_SCHEMA,
         "uncertainty": UNCERTAINTY_SCHEMA,
     },
     "additionalProperties": False,
@@ -122,12 +134,14 @@ EDUCATION_SCHEMA: JsonObject = {
     "type": "object",
     "required": ["institution", "degree", "field", "evidence", "confidence"],
     "properties": {
+        "fact_id": FACT_ID_SCHEMA,
         "institution": {"type": "string", "minLength": 1},
         "degree": {"type": "string", "minLength": 1},
         "field": {"type": "string", "minLength": 1},
         "graduation_date": {"type": ["string", "null"]},
         "evidence": {"type": "array", "minItems": 1, "items": EVIDENCE_REF_SCHEMA},
         "confidence": CONFIDENCE_SCHEMA,
+        "verification_state": VERIFICATION_STATE_SCHEMA,
         "uncertainty": UNCERTAINTY_SCHEMA,
     },
     "additionalProperties": False,
@@ -137,11 +151,13 @@ CERTIFICATION_SCHEMA: JsonObject = {
     "type": "object",
     "required": ["name", "issuer", "evidence", "confidence"],
     "properties": {
+        "fact_id": FACT_ID_SCHEMA,
         "name": {"type": "string", "minLength": 1},
         "issuer": {"type": "string", "minLength": 1},
         "date": {"type": ["string", "null"]},
         "evidence": {"type": "array", "minItems": 1, "items": EVIDENCE_REF_SCHEMA},
         "confidence": CONFIDENCE_SCHEMA,
+        "verification_state": VERIFICATION_STATE_SCHEMA,
         "uncertainty": UNCERTAINTY_SCHEMA,
     },
     "additionalProperties": False,
@@ -151,11 +167,13 @@ PROJECT_SCHEMA: JsonObject = {
     "type": "object",
     "required": ["name", "description", "skills", "evidence", "confidence"],
     "properties": {
+        "fact_id": FACT_ID_SCHEMA,
         "name": {"type": "string", "minLength": 1},
         "description": {"type": "string", "minLength": 1},
         "skills": {"type": "array", "items": {"type": "string", "minLength": 1}},
         "evidence": {"type": "array", "minItems": 1, "items": EVIDENCE_REF_SCHEMA},
         "confidence": CONFIDENCE_SCHEMA,
+        "verification_state": VERIFICATION_STATE_SCHEMA,
         "uncertainty": UNCERTAINTY_SCHEMA,
     },
     "additionalProperties": False,
