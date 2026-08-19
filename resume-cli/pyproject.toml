@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "resume-cli"
+version = "0.33.0"
+description = "Terminal client for resume-kit workflows."
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+resume = "resume_cli.cli:main"
+
+[tool.setuptools]
+packages = ["resume_cli"]
+
+[tool.setuptools.package-dir]
+resume_cli = "resume_cli"

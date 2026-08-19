@@ -7,10 +7,14 @@ import json
 import base64
 import binascii
 import re
+import sys
+from dataclasses import asdict, is_dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, TextIO
 
 from career_store import openCareerStore
+
+from . import _argv
 from resume_agent import extractJobSemantics, extractResumeSemantics, generateClarificationQuestion, interpretUserAnswer, proposeRewrite, resolve_agent_config
 from resume_core import applyChange, normalizeJobModel, normalizeResume, rankResumeContent, sanitizeText, scoreMatch, toRenderableResume, validateChange, validateFinalResume, validateGrounding, validateResume
 from resume_render import renderDocx, renderMarkdown, renderPdf, validateRenderedOutput
@@ -20,6 +24,79 @@ from workflow import CHECKPOINT_ORDER, UnknownRunError, createRun, reconstructRu
 JsonObject = dict[str, Any]
 
 CONFIG_VERSION = "resume-cli.config.v1"
+SUCCESS_EXIT = 0
+DOMAIN_VALIDATION_EXIT = 1
+USAGE_CONFIG_EXIT = 2
+
+
+class TerminalIO(Protocol):
+    """Terminal interaction seam used by interactive commands."""
+
+    def ask(self, question: str) -> str:
+        """Ask a terminal question and return the answer."""
+
+    def confirm(self, summary: str) -> bool:
+        """Ask for confirmation and return the user's decision."""
+
+
+class ScriptedTerminalIO:
+    """Deterministic terminal seam backed by a fixed answer stream."""
+
+    def __init__(self, answers: list[str] | tuple[str, ...] | str | None = None) -> None:
+        if answers is None:
+            self._answers: list[str] = []
+        elif isinstance(answers, str):
+            self._answers = [line for line in answers.splitlines() if line.strip()]
+        else:
+            self._answers = [str(answer) for answer in answers]
+
+    def ask(self, question: str) -> str:
+        del question
+        if not self._answers:
+            return ""
+        return self._answers.pop(0)
+
+    def confirm(self, summary: str) -> bool:
+        answer = self.ask(summary).strip().lower()
+        return answer in {"y", "yes", "true", "1"}
+
+
+class InteractiveTerminalIO:
+    """TTY-backed terminal seam for the real console client."""
+
+    def __init__(
+        self,
+        stdin: TextIO | None = None,
+        stdout: TextIO | None = None,
+        stderr: TextIO | None = None,
+    ) -> None:
+        self._stdin = stdin or sys.stdin
+        self._stdout = stdout or sys.stdout
+        self._stderr = stderr or sys.stderr
+
+    def ask(self, question: str) -> str:
+        print(question, file=self._stdout)
+        self._stdout.flush()
+        return self._stdin.readline().rstrip("\n")
+
+    def confirm(self, summary: str) -> bool:
+        print(f"{summary} [y/N]", file=self._stdout)
+        self._stdout.flush()
+        answer = self._stdin.readline().strip().lower()
+        if answer in {"y", "yes"}:
+            return True
+        if answer in {"n", "no", ""}:
+            return False
+        print("Unrecognized confirmation response; treating as no.", file=self._stderr)
+        return False
+
+
+def _terminal_io(stdin: str | None, stdout: Any, stderr: Any) -> TerminalIO:
+    if isinstance(stdin, str):
+        return ScriptedTerminalIO(stdin)
+    if stdin is not None or stdout is not None or stderr is not None:
+        return InteractiveTerminalIO(stdin=stdin, stdout=stdout, stderr=stderr)
+    return ScriptedTerminalIO()
 
 
 def main(
@@ -28,42 +105,52 @@ def main(
     stdin: str | None = None,
     stdout: Any = None,
     stderr: Any = None,
+    terminal_io: TerminalIO | None = None,
 ) -> JsonObject:
-    del stdout, stderr
     args = list(argv or [])
     workspace = Path(cwd or ".").resolve()
     if not args:
-        return _error("validation_error", "command is required")
+        return _error("usage_error", "command is required", ref="argv", exit_code=USAGE_CONFIG_EXIT)
     command = args[0]
+    io = terminal_io or _terminal_io(stdin, stdout, stderr)
+    arity_error = _unexpected_arguments_error(args)
+    if arity_error is not None:
+        return arity_error
     try:
         if command == "init":
-            return _init(workspace)
+            return _envelope("init", workspace, _init(workspace))
+        if command == "status":
+            return _envelope("status", workspace, _status(workspace))
         if command == "ingest" and len(args) >= 2:
-            return _ingest_resume(workspace, Path(args[1]))
+            return _envelope("ingest", workspace, _ingest_resume(workspace, Path(args[1])))
         if command == "job" and len(args) >= 3 and args[1] == "ingest":
-            return _ingest_job(workspace, Path(args[2]))
+            return _envelope("job ingest", workspace, _ingest_job(workspace, Path(args[2])))
         if command == "match":
-            return _match(workspace)
+            return _envelope("match", workspace, _match(workspace))
         if command == "resolve":
-            return _resolve(workspace, stdin or "")
+            return _envelope("resolve", workspace, _resolve(workspace, io))
         if command == "tailor":
-            return _tailor(workspace)
+            return _envelope("tailor", workspace, _tailor(workspace))
         if command == "validate":
-            return _validate(workspace)
+            return _envelope("validate", workspace, _validate(workspace))
         if command == "export":
             fmt = args[args.index("--format") + 1] if "--format" in args and args.index("--format") + 1 < len(args) else "docx"
-            return _export(workspace, fmt)
+            return _envelope("export", workspace, _export(workspace, fmt))
         if command == "run" and len(args) >= 3:
-            return _run(workspace, Path(args[1]), Path(args[2]))
+            return _envelope("run", workspace, _run(workspace, Path(args[1]), Path(args[2])))
         if command == "inspect" and len(args) >= 3 and args[1] == "fact":
-            return _inspect_fact(workspace, args[2])
+            return _envelope("inspect fact", workspace, _inspect_fact(workspace, args[2]))
         if command == "inspect" and len(args) >= 3 and args[1] == "requirement":
-            return _inspect_requirement(workspace, args[2])
+            return _envelope("inspect requirement", workspace, _inspect_requirement(workspace, args[2]))
         if command == "audit":
-            return _audit_report(workspace)
+            return _envelope("audit", workspace, _audit_report(workspace))
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
-        return _error("validation_error", _safe_message(exc))
-    return _error("validation_error", f"unknown command: {' '.join(args)}")
+        return _error("validation_error", _safe_message(exc), ref="workspace")
+    return _error("usage_error", f"unknown command: {' '.join(args)}", ref="argv", exit_code=USAGE_CONFIG_EXIT)
+
+
+def _unexpected_arguments_error(args: list[str]) -> JsonObject | None:
+    return _argv.unexpected_arguments_error(args, _error, USAGE_CONFIG_EXIT)
 
 
 def _init(workspace: Path) -> JsonObject:
@@ -77,7 +164,8 @@ def _init(workspace: Path) -> JsonObject:
     _write_json_if_missing(paths["resume_base"], {})
     _write_json_if_missing(paths["resume_working"], {})
     _write_json_if_missing(paths["job_current"], {})
-    openCareerStore(str(paths["career_db"]))
+    store = openCareerStore(str(paths["career_db"]))
+    migration_state = _migration_state_payload(store)
     run_state = createRun(workspace=workspace, config=config)
     return {
         "status": "ok",
@@ -85,9 +173,176 @@ def _init(workspace: Path) -> JsonObject:
         "workspace": str(workspace),
         "config_version": config["config_version"],
         "schema_versions": config["schema_versions"],
-        "migrations": {"career_store": "prepared"},
+        "migrations": {"career_store": migration_state},
         "run_id": run_state["run_id"],
         "warnings": [],
+    }
+
+
+def _status(workspace: Path) -> JsonObject:
+    paths = _paths(workspace)
+    if not paths["config"].exists():
+        return _error("workspace_not_initialized", "workspace has not been initialized", ref="workspace")
+    initialized = paths["career_db"].exists()
+    return {
+        "status": "ok" if initialized else "error",
+        "exit_code": SUCCESS_EXIT if initialized else DOMAIN_VALIDATION_EXIT,
+        "workspace": str(workspace),
+        "initialized": initialized,
+        "artifacts": _workspace_artifacts(workspace),
+        "warnings": [] if initialized else ["career database is missing"],
+    }
+
+
+def _envelope(command: str, workspace: Path, result: JsonObject) -> JsonObject:
+    if _is_envelope(result):
+        return result
+    status = str(result.get("status") or "ok")
+    exit_code = _exit_code_for_result(result)
+    errors = _errors_for_result(result, default_ref=command or "argv")
+    artifacts = _artifacts_for_result(command, workspace, result)
+    report = result.get("report")
+    if not isinstance(report, dict):
+        report = _report_for_result(command, workspace, result, artifacts, errors)
+    return {
+        **result,
+        "status": status,
+        "exit_code": exit_code,
+        "artifacts": artifacts,
+        "report": report,
+        "errors": errors,
+    }
+
+
+def _is_envelope(result: JsonObject) -> bool:
+    return {"status", "exit_code", "artifacts", "report", "errors"} <= set(result)
+
+
+def _exit_code_for_result(result: JsonObject) -> int:
+    raw = result.get("exit_code")
+    if isinstance(raw, int) and raw in {SUCCESS_EXIT, DOMAIN_VALIDATION_EXIT, USAGE_CONFIG_EXIT}:
+        return raw
+    if result.get("status") in {"ok", "unsupported"}:
+        return SUCCESS_EXIT
+    return DOMAIN_VALIDATION_EXIT
+
+
+def _errors_for_result(result: JsonObject, default_ref: str) -> list[JsonObject]:
+    raw_errors = result.get("errors")
+    if isinstance(raw_errors, list):
+        return [_normalize_error(error, default_ref) for error in raw_errors if isinstance(error, dict)]
+    raw_error = result.get("error")
+    if isinstance(raw_error, dict):
+        return [_normalize_error(raw_error, default_ref)]
+    return []
+
+
+def _normalize_error(error: JsonObject, default_ref: str) -> JsonObject:
+    code = str(error.get("code") or error.get("type") or "validation_error")
+    message = str(error.get("message") or code)
+    ref = str(error.get("offending_input_ref") or error.get("ref") or error.get("field_path") or default_ref)
+    return {"code": code, "message": message, "ref": ref, "offending_input_ref": ref}
+
+
+def _artifacts_for_result(command: str, workspace: Path, result: JsonObject) -> JsonObject:
+    artifacts = result.get("artifacts")
+    if isinstance(artifacts, dict):
+        return dict(artifacts)
+    paths = _paths(workspace)
+    if command in {"init", "status", "run"}:
+        return _workspace_artifacts(workspace)
+    if command == "ingest":
+        return {"resume_base": str(paths["resume_base"]), "resume_working": str(paths["resume_working"])}
+    if command == "job ingest":
+        return {"job_current": str(paths["job_current"])}
+    if command == "match":
+        return {"match_report": str(paths["reports_dir"] / "match.json")}
+    if command == "tailor":
+        return {"selection": str(paths["operations_dir"] / "selection.json"), "tailor": str(paths["operations_dir"] / "tailor.json")}
+    if command == "validate":
+        return {"validations": str(paths["reports_dir"] / "validations.json")}
+    if command == "export":
+        return {"output": str(paths["output_dir"])}
+    return {}
+
+
+def _workspace_artifacts(workspace: Path) -> JsonObject:
+    paths = _paths(workspace)
+    return {
+        "config": str(paths["config"]),
+        "resume_base": str(paths["resume_base"]),
+        "resume_working": str(paths["resume_working"]),
+        "job_current": str(paths["job_current"]),
+        "career_db": str(paths["career_db"]),
+        "operations": str(paths["operations_dir"]),
+        "reports": str(paths["reports_dir"]),
+        "output": str(paths["output_dir"]),
+    }
+
+
+def _report_for_result(
+    command: str,
+    workspace: Path,
+    result: JsonObject,
+    artifacts: JsonObject,
+    errors: list[JsonObject],
+) -> JsonObject:
+    title = f"resume {command}".strip()
+    sections: list[JsonObject] = [
+        {"heading": "Status", "lines": [str(result.get("status") or "ok"), f"exit_code: {_exit_code_for_result(result)}"]},
+    ]
+    if command in {"init", "status"}:
+        sections.append(
+            {
+                "heading": "Workspace",
+                "lines": [
+                    str(result.get("workspace") or workspace),
+                    f"initialized: {bool(result.get('initialized', result.get('status') == 'ok'))}",
+                ],
+            }
+        )
+    if command == "match" and isinstance(result.get("match_result"), dict):
+        match_result = result["match_result"]
+        sections.append(
+            {
+                "heading": "Match",
+                "lines": [
+                    f"score: {match_result.get('score', 'unknown')}",
+                    f"requirements: {len(match_result.get('requirements', []))}",
+                    f"unresolved: {len(match_result.get('unresolved', []))}",
+                ],
+            }
+        )
+    if command == "resolve":
+        sections.append({"heading": "Question", "lines": [str(result.get("question") or "")]})
+    if command == "export":
+        lines = [f"format: {result.get('format', 'docx')}"]
+        artifact = result.get("artifact")
+        if artifact:
+            lines.append(f"artifact: {artifact}")
+        if result.get("notice"):
+            lines.append(str(result["notice"]))
+        sections.append({"heading": "Export", "lines": lines})
+    if artifacts:
+        sections.append({"heading": "Artifacts", "lines": [f"{key}: {value}" for key, value in sorted(artifacts.items())]})
+    if errors:
+        sections.append({"heading": "Errors", "lines": [f"{error['code']}: {error['message']} ({error['ref']})" for error in errors]})
+    return {"title": title, "summary": str(result.get("status") or "ok"), "sections": sections}
+
+
+def _migration_state_payload(store: Any) -> JsonObject:
+    state = store.getMigrationState()
+    if is_dataclass(state):
+        return asdict(state)
+    if isinstance(state, dict):
+        return dict(state)
+    return {
+        "schema_version": str(getattr(state, "schema_version", "")),
+        "database_path": str(getattr(state, "database_path", "")),
+        "applied_migrations": list(getattr(state, "applied_migrations", [])),
+        "pending_migrations": list(getattr(state, "pending_migrations", [])),
+        "status": str(getattr(state, "status", "unknown")),
+        "metadata": dict(getattr(state, "metadata", {})),
     }
 
 
@@ -178,11 +433,12 @@ def _match(workspace: Path) -> JsonObject:
     return {"status": "ok", "exit_code": 0, "match_result": match_result}
 
 
-def _resolve(workspace: Path, answer: str) -> JsonObject:
+def _resolve(workspace: Path, terminal_io: TerminalIO) -> JsonObject:
     _init(workspace)
     match_result = _match(workspace)["match_result"]
     context = _resolution_context(match_result, _all_facts(workspace))
     question = generateClarificationQuestion(context)
+    answer = terminal_io.ask(str(question.get("question") or ""))
     interpretation_context = {**context, "question": question.get("question")}
     interpretation = interpretUserAnswer(answer, interpretation_context)
     store = openCareerStore(str(_paths(workspace)["career_db"]))
@@ -1215,8 +1471,20 @@ def _hallucinated_operation(before: Any, path: str) -> JsonObject:
     }
 
 
-def _error(error_type: str, message: str) -> JsonObject:
-    return {"status": "error", "exit_code": 1, "error": {"type": error_type, "message": message}}
+def _error(error_type: str, message: str, *, ref: str = "input", exit_code: int = DOMAIN_VALIDATION_EXIT) -> JsonObject:
+    error = {"code": error_type, "type": error_type, "message": message, "ref": ref, "offending_input_ref": ref}
+    return {
+        "status": "error",
+        "exit_code": exit_code,
+        "artifacts": {},
+        "report": {
+            "title": "resume error",
+            "summary": "error",
+            "sections": [{"heading": "Errors", "lines": [f"{error_type}: {message} ({ref})"]}],
+        },
+        "errors": [error],
+        "error": {"type": error_type, "message": message},
+    }
 
 
 def _safe_message(exc: Exception) -> str:
@@ -1227,4 +1495,4 @@ def _safe_message(exc: Exception) -> str:
     return text or "command failed validation"
 
 
-__all__ = ["main"]
+__all__ = ["InteractiveTerminalIO", "ScriptedTerminalIO", "TerminalIO", "main"]

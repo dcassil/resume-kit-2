@@ -4,20 +4,20 @@ level: initiative
 title: "Resume CLI Runtime and Workspace Contract"
 short_code: "RKIT-I-0035"
 created_at: 2026-08-13T20:41:37.761934+00:00
-updated_at: 2026-08-13T20:41:37.761934+00:00
+updated_at: 2026-08-18T23:48:27.395660+00:00
 parent: resume-kit-2-full-product-buildout
 blocked_by: []
 archived: false
 
 tags:
   - "#initiative"
-  - "#phase/discovery"
+  - "#phase/active"
 
 
 exit_criteria_met: false
 estimated_complexity: M
 strategy_id: RKIT-S-0001
-initiative_id: NULL
+initiative_id: resume-cli-runtime-and-workspace
 ---
 
 # Resume CLI Runtime and Workspace Contract Initiative

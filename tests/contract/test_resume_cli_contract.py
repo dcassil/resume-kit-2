@@ -6,16 +6,23 @@ import asyncio
 import importlib
 import inspect
 import json
+import os
+import subprocess
+import sys
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
 SURFACE = json.loads((ROOT / "resume-cli" / "cli_surface.json").read_text(encoding="utf-8"))
+ROOT_PYPROJECT = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+RESUME_CLI_PYPROJECT = tomllib.loads((ROOT / "resume-cli" / "pyproject.toml").read_text(encoding="utf-8"))
 REQUIRED_COMMANDS = tuple(SURFACE["required_commands"])
 EXPECTED_WORKSPACE = tuple(SURFACE["expected_workspace"])
 CHECKPOINTS = tuple(SURFACE["canonical_checkpoints"])
+SUBPROCESS_TIMEOUT_SECONDS = 10
 
 
 RESUME_FIXTURE_TEXT = """
@@ -62,6 +69,38 @@ def normalize_result(result):
     return result
 
 
+def subprocess_env() -> dict[str, str]:
+    env = os.environ.copy()
+    package_paths = [
+        str(ROOT / "resume-cli"),
+        str(ROOT / "resume-core"),
+        str(ROOT / "career-store"),
+        str(ROOT / "career-mcp"),
+        str(ROOT / "resume-agent"),
+        str(ROOT / "resume-render"),
+        str(ROOT),
+    ]
+    if env.get("PYTHONPATH"):
+        package_paths.append(env["PYTHONPATH"])
+    env["PYTHONPATH"] = os.pathsep.join(package_paths)
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    return env
+
+
+def run_resume_subprocess(args: list[str], cwd: Path, stdin: str = "") -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, "-m", "resume_cli", *args],
+        cwd=cwd,
+        env=subprocess_env(),
+        input=stdin,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=SUBPROCESS_TIMEOUT_SECONDS,
+        check=False,
+    )
+
+
 class ResumeCliSurfaceManifestTests(unittest.TestCase):
     def test_manifest_declares_exact_command_surface(self):
         self.assertEqual(set(REQUIRED_COMMANDS), {
@@ -94,6 +133,10 @@ class ResumeCliSurfaceManifestTests(unittest.TestCase):
         self.assertIn("RENDER_VALIDATION", CHECKPOINTS)
         self.assertEqual(CHECKPOINTS[-1], "COMPLETE")
 
+    def test_pyproject_declares_resume_console_entrypoint(self):
+        self.assertEqual(ROOT_PYPROJECT["project"]["scripts"]["resume"], "resume_cli.cli:main")
+        self.assertEqual(RESUME_CLI_PYPROJECT["project"]["scripts"]["resume"], "resume_cli.cli:main")
+
 
 class ResumeCliCommandContractTests(unittest.TestCase):
     def setUp(self):
@@ -111,6 +154,9 @@ class ResumeCliCommandContractTests(unittest.TestCase):
     def test_init_creates_expected_workspace_and_is_idempotent(self):
         first = normalize_result(run_cli(self.cli, ["init"], self.workspace))
         self.assertIn(first.get("exit_code", 0), {0, None})
+        self.assertEqual({"status", "exit_code", "artifacts", "report", "errors"} & set(first), {"status", "exit_code", "artifacts", "report", "errors"})
+        self.assertEqual(first["errors"], [])
+        self.assertIn("config", first["artifacts"])
         for path in EXPECTED_WORKSPACE:
             target = self.workspace / path.rstrip("/")
             self.assertTrue(target.exists(), f"init must create or prepare {path}")
@@ -262,6 +308,90 @@ class ResumeCliCommandContractTests(unittest.TestCase):
         serialized_audit = json.dumps(audit, sort_keys=True).lower()
         for expected in ["config_hash", "schema", "scores", "facts", "operations", "validations", "outputs"]:
             self.assertIn(expected, serialized_audit)
+
+    def test_result_envelope_wraps_domain_error_with_stable_ref(self):
+        result = normalize_result(run_cli(self.cli, ["inspect", "requirement", "missing"], self.workspace))
+        self.assertEqual(result.get("status"), "error")
+        self.assertEqual(result.get("exit_code"), 1)
+        self.assertIn("artifacts", result)
+        self.assertIn("report", result)
+        self.assertEqual(result["errors"][0]["code"], "not_found")
+        self.assertEqual(result["errors"][0]["ref"], "input")
+
+    def test_terminal_io_scripted_mode_is_deterministic(self):
+        scripted = self.cli.ScriptedTerminalIO(["first answer", "yes", "unused"])
+        self.assertEqual(scripted.ask("Question?"), "first answer")
+        self.assertTrue(scripted.confirm("Confirm?"))
+        self.assertEqual(scripted.ask("Next?"), "unused")
+        self.assertEqual(scripted.ask("Exhausted?"), "")
+
+
+class ResumeCliSubprocessContractTests(unittest.TestCase):
+    def test_python_module_entrypoint_init_and_status_render_human_reports(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+
+            init = run_resume_subprocess(["init"], workspace)
+            self.assertEqual(init.returncode, 0, init.stderr)
+            self.assertIn("resume init", init.stdout)
+            self.assertIn("Workspace", init.stdout)
+            self.assertEqual(init.stderr, "")
+
+            status = run_resume_subprocess(["status"], workspace)
+            self.assertEqual(status.returncode, 0, status.stderr)
+            self.assertIn("resume status", status.stdout)
+            self.assertIn("initialized: True", status.stdout)
+            self.assertEqual(status.stderr, "")
+
+    def test_python_module_json_mode_emits_machine_envelope(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+
+            completed = run_resume_subprocess(["--json", "init"], workspace)
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            envelope = json.loads(completed.stdout)
+            self.assertEqual(envelope["status"], "ok")
+            self.assertEqual(envelope["exit_code"], 0)
+            self.assertEqual(envelope["errors"], [])
+            self.assertIn("artifacts", envelope)
+            self.assertIn("report", envelope)
+
+    def test_python_module_typed_stderr_errors_cover_domain_and_usage_exit_codes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+
+            domain = run_resume_subprocess(["status"], workspace)
+            self.assertEqual(domain.returncode, 1)
+            domain_error = json.loads(domain.stderr)
+            self.assertEqual(domain_error["type"], "resume_cli.error")
+            self.assertEqual(domain_error["code"], "workspace_not_initialized")
+            self.assertEqual(domain_error["ref"], "workspace")
+
+            usage = run_resume_subprocess(["bogus"], workspace)
+            self.assertEqual(usage.returncode, 2)
+            usage_error = json.loads(usage.stderr)
+            self.assertEqual(usage_error["type"], "resume_cli.error")
+            self.assertEqual(usage_error["code"], "usage_error")
+            self.assertEqual(usage_error["ref"], "argv")
+
+    def test_help_flag_prints_usage_and_never_executes_the_command(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            result = run_resume_subprocess(["init", "--help"], workspace)
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("usage: resume", result.stdout)
+            self.assertFalse((workspace / "config.json").exists(), "--help must not execute init")
+            self.assertFalse((workspace / "data").exists(), "--help must not create workspace dirs")
+
+    def test_unexpected_trailing_arguments_are_usage_errors_not_silently_ignored(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            result = run_resume_subprocess(["init", "extra-arg"], workspace)
+            self.assertEqual(result.returncode, 2)
+            error = json.loads(result.stderr)
+            self.assertEqual(error["code"], "usage_error")
+            self.assertIn("unexpected arguments", error["message"])
+            self.assertFalse((workspace / "config.json").exists(), "arity errors must not execute the command")
 
 
 if __name__ == "__main__":

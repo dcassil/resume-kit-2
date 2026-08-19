@@ -36,6 +36,16 @@ Required command surface:
 
 ## Command Test Cases
 
+### terminal entrypoint and envelope
+
+- `python -m resume_cli init` renders a sectioned human report on stdout and returns exit code 0.
+- `python -m resume_cli status` renders initialized workspace state on stdout after `init`.
+- `python -m resume_cli --json init` emits the machine envelope with `status`, `exit_code`, `artifacts`, `report`, and `errors`.
+- Domain validation failures emit typed error records on stderr and return exit code 1.
+- Usage/config failures emit typed error records on stderr and return exit code 2.
+- The install metadata declares `[project.scripts] resume = "resume_cli.cli:main"`; installed console-script smoke may exercise it when the editable environment exposes it.
+- Presentation renders the returned envelope only; it does not reconstruct domain content from workspace files.
+
 ### init
 
 - Creates the expected workspace folders/files.
@@ -44,6 +54,7 @@ Required command surface:
 - Applies migrations successfully.
 - Records config/schema versions.
 - Re-running init is safe and does not destroy existing data.
+- Returns the stable result envelope: `{status, exit_code, artifacts, report, errors}`.
 
 ### ingest resume
 
@@ -78,10 +89,17 @@ Required command surface:
 
 - Selects unresolved requirement/topic by deterministic code ranking.
 - Uses agent only to phrase questions.
-- Accepts simulated answers.
+- Accepts simulated answers through the `TerminalIO` seam.
 - Interprets answers into structured proposals.
 - Persists verified facts through career-store only after explicit confirmation.
 - Re-runs match after each resolution.
+
+### TerminalIO seam
+
+- `TerminalIO.ask(question) -> answer` and `TerminalIO.confirm(summary) -> bool` are injected into command dispatch.
+- Interactive mode binds stdin/stdout/stderr for real TTY usage.
+- Scripted mode consumes a fixed answer stream deterministically for contract and smoke tests.
+- Resolve semantics beyond seam wiring are owned by RKIT-I-0037.
 
 ### tailor
 
@@ -163,4 +181,3 @@ The E2E fixture must prove:
 - audit reconstruction,
 - Job B reuse of learned facts without duplicate questioning,
 - failure recovery from persisted deterministic state.
-
