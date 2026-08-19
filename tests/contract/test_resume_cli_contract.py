@@ -26,17 +26,9 @@ CHECKPOINTS = tuple(SURFACE["canonical_checkpoints"])
 SUBPROCESS_TIMEOUT_SECONDS = 10
 
 
-RESUME_FIXTURE_TEXT = """
-Daniel Candidate
-Software Engineer
-Built React and TypeScript applications, REST APIs, and responsive web apps.
-"""
+RESUME_FIXTURE_TEXT = (ROOT / "fixtures" / "resumes" / "resume-main.txt").read_text(encoding="utf-8")
 
-JOB_FIXTURE_TEXT = """
-Senior Software Engineer
-Required: React, TypeScript, API architecture, responsive design.
-Preferred: AWS, GraphQL, SaaS.
-"""
+JOB_FIXTURE_TEXT = (ROOT / "fixtures" / "jobs" / "job-a-staff-software-engineer.txt").read_text(encoding="utf-8")
 
 
 def maybe_await(value):
@@ -144,8 +136,8 @@ class ResumeCliCommandContractTests(unittest.TestCase):
         self.cli = load_cli_module(self)
         self.tempdir = tempfile.TemporaryDirectory()
         self.workspace = Path(self.tempdir.name)
-        self.resume_file = self.workspace / "resume.txt"
-        self.job_file = self.workspace / "job.txt"
+        self.resume_file = self.workspace / "resume-main.txt"
+        self.job_file = self.workspace / "job-a-staff-software-engineer.txt"
         self.resume_file.write_text(RESUME_FIXTURE_TEXT, encoding="utf-8")
         self.job_file.write_text(JOB_FIXTURE_TEXT, encoding="utf-8")
 
@@ -330,6 +322,7 @@ class ResumeCliCommandContractTests(unittest.TestCase):
         run_cli(self.cli, ["ingest", str(self.resume_file)], self.workspace)
         base_before = (self.workspace / "resume" / "base.json").read_text(encoding="utf-8")
         run_cli(self.cli, ["job", "ingest", str(self.job_file)], self.workspace)
+        run_cli(self.cli, ["resolve"], self.workspace, stdin="Yes. I have about six years of AWS experience, mainly EC2, S3, Lambda, RDS, and IAM.\n")
         result = normalize_result(run_cli(self.cli, ["tailor"], self.workspace))
         self.assertIn(result.get("exit_code", 0), {0, None})
         self.assertEqual((self.workspace / "resume" / "base.json").read_text(encoding="utf-8"), base_before)
@@ -380,10 +373,10 @@ class ResumeCliCommandContractTests(unittest.TestCase):
         run_workspace = self.workspace / "run"
         sequence_workspace.mkdir()
         run_workspace.mkdir()
-        seq_resume = sequence_workspace / "resume.txt"
-        seq_job = sequence_workspace / "job.txt"
-        run_resume = run_workspace / "resume.txt"
-        run_job = run_workspace / "job.txt"
+        seq_resume = sequence_workspace / "resume-main.txt"
+        seq_job = sequence_workspace / "job-a-staff-software-engineer.txt"
+        run_resume = run_workspace / "resume-main.txt"
+        run_job = run_workspace / "job-a-staff-software-engineer.txt"
         for path, text in [(seq_resume, RESUME_FIXTURE_TEXT), (seq_job, JOB_FIXTURE_TEXT), (run_resume, RESUME_FIXTURE_TEXT), (run_job, JOB_FIXTURE_TEXT)]:
             path.write_text(text, encoding="utf-8")
 

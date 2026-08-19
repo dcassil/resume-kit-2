@@ -11,6 +11,9 @@ import sys
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any, Protocol, TextIO
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 from career_store import openCareerStore
 
@@ -129,7 +132,7 @@ def main(
         if command == "ingest" and len(args) >= 2:
             return _envelope("ingest", workspace, _ingest_resume(workspace, Path(args[1])))
         if command == "job" and len(args) >= 3 and args[1] == "ingest":
-            return _envelope("job ingest", workspace, _ingest_job(workspace, Path(args[2])))
+            return _envelope("job ingest", workspace, _ingest_job(workspace, args[2]))
         if command == "match":
             return _envelope("match", workspace, _match(workspace))
         if command == "resolve":
@@ -424,20 +427,28 @@ def _ingest_resume_error(
     }
 
 
-def _ingest_job(workspace: Path, job_file: Path) -> JsonObject:
+def _ingest_job(workspace: Path, job_input: str | Path) -> JsonObject:
     _init(workspace)
-    text = job_file.read_text(encoding="utf-8")
-    extraction = extractJobSemantics(text, {"source_path": str(job_file)})
-    normalized = normalizeJobModel(_job_from_text(text, extraction, job_file), _config(workspace))
+    try:
+        resolved = _resolve_job_input(str(job_input))
+    except JobInputResolutionError as exc:
+        return _ingest_job_error([exc.to_error()], {}, {}, {}, ["INGEST_JOB"])
+    sanitation = sanitizeText(resolved["text"])
+    sanitized_text = str(sanitation.get("text", resolved["text"]))
+    extraction = extractJobSemantics(sanitized_text, _job_extraction_context(resolved))
+    extraction_errors = _job_extraction_errors(extraction)
+    if extraction_errors:
+        return _ingest_job_error(extraction_errors, extraction, sanitation, {}, ["INGEST_JOB"])
+    source_job = _job_model_input_from_extraction(extraction, resolved, sanitized_text)
+    normalized = normalizeJobModel(source_job, _config(workspace))
     if normalized.get("status") == "error":
-        return _error("schema_error", "job validation failed")
+        return _ingest_job_error(normalized.get("errors", []), extraction, sanitation, normalized, ["INGEST_JOB", "NORMALIZE_JOB"])
     job = dict(normalized.get("job_model", {}))
-    # Compatibility shim (RKIT-I-0001/T-0008): JobModel now splits preferred
-    # requirements into a distinct `preferred` array. This CLI still reads only
-    # `requirements`, so fold preferred into the requirements superset (preferred
-    # is preserved alongside, not dropped) to keep ingest lossless. Proper
-    # preferred-vs-required handling is owned by the resume-cli initiative
-    # (RKIT-I-0036/0037); remove this shim when that lands.
+    # Compatibility shim: protected smoke and some CLI helpers read
+    # `requirements`, while resume-core scoreMatch already reads both arrays and
+    # dedupes by requirement_id. Keep a lossless superset in requirements and
+    # preserve the separated preferred array until the remaining CLI readers are
+    # migrated.
     job["requirements"] = [*job.get("requirements", []), *job.get("preferred", [])]
     _write_json(_paths(workspace)["job_current"], job)
     return {
@@ -447,6 +458,149 @@ def _ingest_job(workspace: Path, job_file: Path) -> JsonObject:
         "extraction": extraction,
         "requirements": job["requirements"],
         "checkpoints": ["INGEST_JOB", "NORMALIZE_JOB"],
+    }
+
+
+class JobInputResolutionError(Exception):
+    def __init__(self, code: str, message: str, ref: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.ref = ref
+
+    def to_error(self) -> JsonObject:
+        return {"code": self.code, "message": str(self), "severity": "error", "field_path": self.ref}
+
+
+def _resolve_job_input(value: str) -> JsonObject:
+    path = Path(value)
+    if path.exists():
+        return {"text": path.read_text(encoding="utf-8"), "source": {"kind": "file", "path": str(path)}, "source_path": str(path)}
+    parsed = urlparse(value)
+    if parsed.scheme in {"http", "https"}:
+        return {"text": _fetch_url_text(value), "source": {"kind": "url", "url": value}, "source_id": value}
+    return {"text": value, "source": {"kind": "pasted_text"}, "source_id": "inline"}
+
+
+def _fetch_url_text(url: str) -> str:
+    request = Request(url, headers={"User-Agent": "resume-kit/0"})
+    try:
+        with urlopen(request, timeout=10) as response:
+            charset = response.headers.get_content_charset() or "utf-8"
+            return response.read().decode(charset, errors="replace")
+    except (HTTPError, URLError, TimeoutError, OSError) as exc:
+        raise JobInputResolutionError("job_url_fetch_failed", _safe_message(exc) or "job URL fetch failed", "job_url") from exc
+
+
+def _job_extraction_context(resolved: JsonObject) -> JsonObject:
+    context: JsonObject = {}
+    if resolved.get("source_path"):
+        context["source_path"] = resolved["source_path"]
+    if resolved.get("source_id"):
+        context["source_id"] = resolved["source_id"]
+    return context
+
+
+def _job_extraction_errors(extraction: Any) -> list[JsonObject]:
+    if not isinstance(extraction, dict):
+        return [{"code": "job_extraction_error", "message": "job extraction failed", "severity": "error", "field_path": "job"}]
+    if extraction.get("status") == "error":
+        error = extraction.get("error")
+        if isinstance(error, dict):
+            return [_normalize_error(error, "job")]
+        return [{"code": "job_extraction_error", "message": "job extraction failed", "severity": "error", "field_path": "job"}]
+    if not _extracted_job_requirements(extraction):
+        return [{"code": "empty_job_extraction", "message": "job extraction produced no requirements", "severity": "error", "field_path": "requirements"}]
+    return []
+
+
+def _job_model_input_from_extraction(extraction: JsonObject, resolved: JsonObject, text: str) -> JsonObject:
+    source = dict(extraction.get("source") if isinstance(extraction.get("source"), dict) else resolved.get("source", {}))
+    source.setdefault("kind", resolved.get("source", {}).get("kind", "text") if isinstance(resolved.get("source"), dict) else "text")
+    if isinstance(resolved.get("source"), dict):
+        source.update({key: value for key, value in resolved["source"].items() if key not in source})
+    source["text"] = text
+    job: JsonObject = {
+        "schema_version": "job-model.v1",
+        "source": source,
+        "raw_description": text,
+        "requirements": [_job_requirement_input(item) for item in _extracted_required_requirements(extraction)],
+        "preferred": [_job_requirement_input(item) for item in _extracted_preferred_requirements(extraction)],
+        "metadata": {
+            "requirement_proposals": extraction.get("requirement_proposals", []),
+            "requirement_classification_proposals": extraction.get("requirement_classification_proposals", []),
+            "terminology_proposals": extraction.get("terminology", []),
+            "source_evidence": extraction.get("source_evidence", []),
+            "uncertainty": extraction.get("uncertainty", []),
+        },
+    }
+    job_id = _optional_extracted_text(extraction.get("job_id"))
+    if job_id:
+        job["job_id"] = job_id
+    title = _optional_extracted_text(extraction.get("job_title")) or _optional_extracted_text(extraction.get("title"))
+    if title:
+        job["title"] = title
+    company = _optional_extracted_text(extraction.get("company"))
+    if company:
+        job["company"] = company
+    return job
+
+
+def _extracted_job_requirements(extraction: JsonObject) -> list[JsonObject]:
+    return [*_extracted_required_requirements(extraction), *_extracted_preferred_requirements(extraction)]
+
+
+def _extracted_required_requirements(extraction: JsonObject) -> list[JsonObject]:
+    direct = _dict_items(extraction.get("requirements"))
+    if direct:
+        return direct
+    return [item for item in _dict_items(extraction.get("requirement_proposals")) if item.get("classification") != "preferred"]
+
+
+def _extracted_preferred_requirements(extraction: JsonObject) -> list[JsonObject]:
+    direct = _dict_items(extraction.get("preferred"))
+    if direct:
+        return direct
+    return [item for item in _dict_items(extraction.get("requirement_proposals")) if item.get("classification") == "preferred"]
+
+
+def _job_requirement_input(requirement: JsonObject) -> JsonObject:
+    allowed = ("requirement_id", "classification", "concept", "importance", "source_text", "normalized_terms", "years")
+    return {key: requirement[key] for key in allowed if key in requirement and requirement[key] not in (None, "")}
+
+
+def _dict_items(value: Any) -> list[JsonObject]:
+    return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+
+
+def _optional_extracted_text(value: Any) -> str | None:
+    if isinstance(value, dict):
+        value = value.get("value")
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _ingest_job_error(
+    errors: Any,
+    extraction: JsonObject,
+    sanitation: JsonObject,
+    validation: JsonObject,
+    checkpoints: list[str],
+) -> JsonObject:
+    normalized_errors = [error for error in errors if isinstance(error, dict)] if isinstance(errors, list) else []
+    if not normalized_errors:
+        normalized_errors = [{"code": "schema_error", "message": "job ingest failed", "severity": "error", "field_path": "job"}]
+    return {
+        "status": "error",
+        "exit_code": DOMAIN_VALIDATION_EXIT,
+        "job_id": None,
+        "extraction": extraction,
+        "validation": validation,
+        "sanitation": sanitation,
+        "requirements": [],
+        "checkpoints": checkpoints,
+        "errors": normalized_errors,
     }
 
 
@@ -863,121 +1017,6 @@ def _resume_fact_policy(config: JsonObject, resume: JsonObject) -> JsonObject:
         "allow_inferred_final": bool(guardrails.get("allow_inferred_facts", False)),
         "resume_id": resume.get("resume_id"),
     }
-
-
-def _job_from_text(text: str, extraction: JsonObject | None = None, source_file: Path | None = None) -> JsonObject:
-    requirements = _requirements_from_extraction(extraction) or _requirements_from_job_text(text)
-    lines = _non_empty_lines(text)
-    title = str((extraction or {}).get("job_title") or (lines[0] if lines else "Job"))
-    company = str((extraction or {}).get("company") or (lines[1] if len(lines) > 1 and not _job_section_heading(lines[1]) else ""))
-    return {
-        "schema_version": "job-model.v1",
-        "job_id": _stable_short_id("job", text),
-        "title": title,
-        "company": company or None,
-        "source": {"kind": "text", "path": str(source_file) if source_file else None, "text": text},
-        "requirements": requirements,
-    }
-
-
-def _requirement(requirement_id: str, classification: str, concept: str, terms: list[str], source_text: str | None = None) -> JsonObject:
-    source = source_text or concept
-    return {
-        "requirement_id": requirement_id,
-        "classification": classification,
-        "concept": concept,
-        "importance": classification,
-        "weight": 1.0,
-        "source_text": source,
-        "normalized_terms": terms,
-        "required": classification == "required",
-    }
-
-
-def _non_empty_lines(text: str) -> list[str]:
-    return [line.strip() for line in text.replace("\r\n", "\n").replace("\r", "\n").splitlines() if line.strip()]
-
-
-def _is_bullet(line: str) -> bool:
-    return bool(re.match(r"^\s*[-*•◦]\s+", line))
-
-
-def _strip_bullet(line: str) -> str:
-    return re.sub(r"^\s*[-*•◦]\s+", "", line).strip()
-
-
-def _requirements_from_extraction(extraction: JsonObject | None) -> list[JsonObject]:
-    requirements = []
-    extracted = extraction or {}
-    for item in [*extracted.get("requirements", []), *extracted.get("preferred", [])]:
-        if not isinstance(item, dict):
-            continue
-        source_text = str(item.get("source_text") or item.get("concept") or "")
-        requirements.extend(_requirements_for_text(source_text, str(item.get("classification") or "contextual")))
-    return _dedupe_requirements(requirements)
-
-
-def _requirements_from_job_text(text: str) -> list[JsonObject]:
-    requirements: list[JsonObject] = []
-    classification = "contextual"
-    for raw_line in _non_empty_lines(text):
-        line = _strip_bullet(raw_line).rstrip(".")
-        lowered = line.lower()
-        if _job_section_heading(line):
-            classification = "preferred" if "preferred" in lowered else "required"
-            after_colon = line.split(":", 1)[1].strip() if ":" in line else ""
-            if after_colon:
-                requirements.extend(_requirements_for_text(after_colon, classification))
-            continue
-        if classification in {"required", "preferred"} and (_is_bullet(raw_line) or _looks_like_requirement(line)):
-            requirements.extend(_requirements_for_text(line, classification))
-    return _dedupe_requirements(requirements)
-
-
-def _job_section_heading(line: str) -> bool:
-    lowered = line.lower().rstrip(":")
-    return lowered in {"required", "preferred", "required qualifications", "preferred qualifications"} or lowered.startswith("required:") or lowered.startswith("preferred:")
-
-
-def _looks_like_requirement(line: str) -> bool:
-    lowered = line.lower()
-    return any(term in lowered for term in ["experience", "react", "typescript", "api", "responsive", "saas", "aws", "graphql", "leadership", "node", "postgresql"])
-
-
-def _requirements_for_text(source_text: str, classification: str) -> list[JsonObject]:
-    lowered = source_text.lower()
-    specs = [
-        ("req_years", "8+ years software engineering", ["8+ years", "software engineering", "software development", "years"], r"8\+?\s*years|software engineering experience"),
-        ("req_react", "React", ["react"], r"\breact\b"),
-        ("req_typescript", "TypeScript", ["typescript"], r"\btypescript\b"),
-        ("req_api", "API architecture", ["api", "api architecture", "api design"], r"\bapi\b|architecture/design"),
-        ("req_responsive", "responsive design", ["responsive design", "responsive"], r"responsive"),
-        ("req_saas", "SaaS", ["saas"], r"\bsaas\b"),
-        ("req_aws", "AWS", ["aws"], r"\baws\b"),
-        ("req_graphql", "GraphQL", ["graphql"], r"\bgraphql\b"),
-        ("req_leadership", "technical leadership", ["technical leadership", "leadership", "mentoring", "design review"], r"leadership|mentoring|design review"),
-        ("req_node", "Node.js", ["node", "node.js"], r"\bnode(?:\\.js)?\b"),
-        ("req_postgresql", "PostgreSQL", ["postgresql"], r"\bpostgresql\b"),
-    ]
-    matches = [
-        _requirement(requirement_id, classification, concept, terms, source_text=source_text)
-        for requirement_id, concept, terms, pattern in specs
-        if re.search(pattern, lowered)
-    ]
-    if matches:
-        return matches
-    return [_requirement(_stable_short_id("req", source_text), classification, source_text, [source_text.lower()], source_text=source_text)]
-
-
-def _dedupe_requirements(requirements: list[JsonObject]) -> list[JsonObject]:
-    deduped: dict[str, JsonObject] = {}
-    for requirement in requirements:
-        key = str(requirement.get("requirement_id"))
-        if key not in deduped:
-            deduped[key] = requirement
-        elif deduped[key].get("classification") != "required" and requirement.get("classification") == "required":
-            deduped[key] = requirement
-    return list(deduped.values())
 
 
 def _all_facts(workspace: Path) -> list[JsonObject]:

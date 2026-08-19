@@ -130,7 +130,7 @@
         "ingest",
         "<file-or-url-text>"
       ],
-      "description": "Accept a job description, call core job normalization, retain source text, classify requirement types, and persist job/current.json.",
+      "description": "Accept a job description as an existing file path, http(s) URL, or pasted text; call agent extraction and core job normalization; retain source text; classify requirement types; and persist job/current.json.",
       "checkpoints": [
         "INGEST_JOB",
         "NORMALIZE_JOB"

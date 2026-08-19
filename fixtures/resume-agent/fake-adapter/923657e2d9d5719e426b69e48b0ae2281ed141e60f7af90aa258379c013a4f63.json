@@ -145,7 +145,7 @@
       ],
       "requirements": [
         {
-          "requirement_id": "req_smoke_b_react",
+          "requirement_id": "req_react",
           "classification": "required",
           "concept": "React production web applications",
           "importance": "high",
@@ -216,7 +216,7 @@
           "confidence": 0.94
         },
         {
-          "requirement_id": "req_smoke_b_node",
+          "requirement_id": "req_node",
           "classification": "required",
           "concept": "Node.js service development",
           "importance": "high",
@@ -287,7 +287,7 @@
           "confidence": 0.94
         },
         {
-          "requirement_id": "req_smoke_b_graphql_api",
+          "requirement_id": "req_graphql",
           "classification": "required",
           "concept": "GraphQL API design",
           "importance": "high",
@@ -359,7 +359,7 @@
           "confidence": 0.94
         },
         {
-          "requirement_id": "req_smoke_b_aws",
+          "requirement_id": "req_aws",
           "classification": "required",
           "concept": "AWS application infrastructure",
           "importance": "high",
@@ -412,7 +412,7 @@
       ],
       "preferred": [
         {
-          "requirement_id": "req_smoke_b_postgresql",
+          "requirement_id": "req_postgresql",
           "classification": "preferred",
           "concept": "PostgreSQL",
           "importance": "medium",
@@ -442,7 +442,7 @@
           "confidence": 0.94
         },
         {
-          "requirement_id": "req_smoke_b_saas",
+          "requirement_id": "req_saas",
           "classification": "preferred",
           "concept": "SaaS product background",
           "importance": "medium",

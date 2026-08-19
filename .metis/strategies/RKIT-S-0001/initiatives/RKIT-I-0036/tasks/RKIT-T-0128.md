@@ -4,14 +4,14 @@ level: task
 title: "Fact proposals through extraction, core validation, and career-store persistence; delete the hardcoded fact list"
 short_code: "RKIT-T-0128"
 created_at: 2026-08-19T17:52:18.931312+00:00
-updated_at: 2026-08-19T18:09:30.296856+00:00
+updated_at: 2026-08-19T18:27:34.404058+00:00
 parent: resume-and-job-ingest-orchestration
 blocked_by: [RKIT-T-0127]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0036
 ## Objective **[REQUIRED]**
 
 Career facts persisted at ingest must originate from the agent extraction's `fact_proposals`, be validated by resume-core, and be persisted through career-store — closing DoD 4 (off-fixture resumes currently persist ZERO facts because `_facts_from_resume` is a hardcoded 12-entry smoke-fixture keyword list at `resume-cli/resume_cli/__init__.py:873`). Delete `_facts_from_resume` entirely; the CLI never authors facts.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

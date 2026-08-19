@@ -4,14 +4,14 @@ level: task
 title: "Job ingest via agent extraction + core requirement normalization; URL and pasted-text input; delete CLI requirement vocabulary"
 short_code: "RKIT-T-0129"
 created_at: 2026-08-19T17:52:19.002638+00:00
-updated_at: 2026-08-19T17:52:19.002638+00:00
+updated_at: 2026-08-19T18:27:34.868061+00:00
 parent: resume-and-job-ingest-orchestration
-blocked_by: ["RKIT-T-0127"]
+blocked_by: [RKIT-T-0127]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0036
 ## Objective **[REQUIRED]**
 
 Route `resume job ingest` entirely through agent JD extraction (`extractJobSemantics`) plus resume-core requirement normalization (`normalizeJobModel`), deleting the CLI-owned requirement vocabulary (`_requirements_from_job_text`, `_requirements_for_text`, `_looks_like_requirement`, `_requirements_from_extraction` fallback chain, the local `_requirement` constructor with its hardcoded `weight: 1.0`, and `_job_from_text` construction). Extend input acceptance to the mandated `<file-or-url-text>` surface: existing file path, http(s) URL, or pasted text.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria **[REQUIRED]**
 
@@ -59,4 +61,12 @@ Recommended Agent: opus + medium
 
 ## Status Updates **[REQUIRED]**
 
-*To be added during implementation*
+### 2026-08-19 implementation update
+
+- Routed `resume job ingest` through `extractJobSemantics` and `normalizeJobModel`; removed CLI requirement regex/vocabulary helpers and the local `weight: 1.0` constructor.
+- Added file/URL/pasted-text resolver with existing-path precedence, injectable stdlib URL fetch seam, sanitation before extraction, typed URL and empty/error extraction failures, and no fallback requirements.
+- Kept the lossless preferred compatibility superset in persisted `requirements` while preserving `preferred`, because `resume_core.scoreMatch` already consumes both arrays and dedupes by `requirement_id`, but protected smoke still reads `job["requirements"]`.
+- Added integration coverage for file, URL-stub, and pasted-text ingest; DTO shape; config-driven weights; typed URL failure; and typed empty/error extraction failure. Bridged the module through `tests/contract/test_tests_contract.py`.
+- Updated job fake-adapter fixtures to pin smoke-compatible requirement IDs and added the routed rewrite fixture needed by smoke after job extraction IDs/terms changed.
+- Verification run: `python3 tools/run_gate.py --pr --root .` passed; `python3 tools/run_gate.py --smoke --root .` passed; snapshot regeneration twice produced no `fixtures/expected` diff; `wc -l resume-cli/resume_cli/__init__.py` reported 1382 lines.
+- Known external issue: `straight-jacket verify --json` still reports a checksum mismatch for protected `tools/resume_core_guardrails.py`; this was present before implementation and this task did not edit protected files.

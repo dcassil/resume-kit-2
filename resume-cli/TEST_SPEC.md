@@ -82,12 +82,16 @@ Required command surface:
 
 ### job ingest
 
+- Accepts `<file-or-url-text>` as exactly one positional argument.
+- Resolves existing paths before URL detection, fetches `http://`/`https://` input through an injectable stdlib URL seam, and otherwise treats the argument as pasted JD text.
+- Sanitizes file, URL, and pasted-text input before extraction; URL tests stub the fetcher and gates use no live network.
 - Accepts fixture JD input.
 - Persists `job/current.json`.
 - Classifies required/preferred/contextual requirements.
 - Retains source text.
 - Normalizes concepts and terminology.
 - Validates schema through core.
+- Empty or failed job extraction returns the typed ingest error envelope and must not write fallback requirements.
 
 ### match
 

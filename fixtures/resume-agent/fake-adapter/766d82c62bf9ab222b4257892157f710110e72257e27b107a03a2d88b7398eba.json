@@ -164,7 +164,7 @@
       ],
       "requirements": [
         {
-          "requirement_id": "req_smoke_a_years",
+          "requirement_id": "req_years",
           "classification": "required",
           "concept": "software engineering experience",
           "importance": "high",
@@ -172,6 +172,7 @@
           "source_text": "8+ years of software engineering experience building production applications.",
           "normalized_terms": [
             "8+ years",
+            "software development",
             "software engineering",
             "production applications"
           ],
@@ -259,7 +260,7 @@
           "confidence": 0.94
         },
         {
-          "requirement_id": "req_smoke_a_react_typescript",
+          "requirement_id": "req_react",
           "classification": "required",
           "concept": "React and TypeScript",
           "importance": "high",
@@ -310,7 +311,7 @@
           "confidence": 0.94
         },
         {
-          "requirement_id": "req_smoke_a_api_architecture",
+          "requirement_id": "req_api",
           "classification": "required",
           "concept": "API architecture/design",
           "importance": "high",
@@ -383,7 +384,7 @@
           "confidence": 0.94
         },
         {
-          "requirement_id": "req_smoke_a_responsive",
+          "requirement_id": "req_responsive",
           "classification": "required",
           "concept": "responsive design",
           "importance": "high",
@@ -435,7 +436,7 @@
           "confidence": 0.94
         },
         {
-          "requirement_id": "req_smoke_a_saas",
+          "requirement_id": "req_saas",
           "classification": "required",
           "concept": "SaaS products",
           "importance": "high",
@@ -443,6 +444,7 @@
           "source_text": "Background building or operating SaaS products.",
           "normalized_terms": [
             "saas",
+            "example saas co",
             "products"
           ],
           "years": null,
@@ -508,7 +510,7 @@
       ],
       "preferred": [
         {
-          "requirement_id": "req_smoke_a_aws",
+          "requirement_id": "req_aws",
           "classification": "preferred",
           "concept": "AWS",
           "importance": "medium",
@@ -538,7 +540,7 @@
           "confidence": 0.94
         },
         {
-          "requirement_id": "req_smoke_a_graphql_api",
+          "requirement_id": "req_graphql",
           "classification": "preferred",
           "concept": "GraphQL API",
           "importance": "medium",
@@ -589,7 +591,7 @@
           "confidence": 0.94
         },
         {
-          "requirement_id": "req_smoke_a_leadership",
+          "requirement_id": "req_leadership",
           "classification": "preferred",
           "concept": "technical leadership",
           "importance": "medium",

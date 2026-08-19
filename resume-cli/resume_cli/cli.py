@@ -21,7 +21,8 @@ commands:
   init                       initialize the workspace (config, store, run state)
   status                     show workspace status
   ingest <resume-file>       ingest a resume document
-  job ingest <job-file>      ingest a job description
+  job ingest <file-or-url-text>
+                             ingest a job description
   match                      score the working resume against the current job
   resolve                    interactively resolve unresolved requirements
   tailor                     apply validated tailoring operations
