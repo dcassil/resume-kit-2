@@ -333,7 +333,7 @@ CANONICAL_RESUME_SCHEMA: JsonObject = {
 JOB_REQUIREMENT_SCHEMA: JsonObject = {
     "schema_version": JOB_REQUIREMENT_SCHEMA_VERSION,
     "type": "object",
-    "required": ["requirement_id", "classification", "concept", "importance", "weight", "source_text", "normalized_terms"],
+    "required": ["requirement_id", "classification", "concept", "importance", "weight", "source_text", "normalized_terms", "years"],
     "properties": {
         "requirement_id": {"type": "string"},
         "classification": {"enum": [state.value for state in RequirementClassification]},
@@ -342,6 +342,7 @@ JOB_REQUIREMENT_SCHEMA: JsonObject = {
         "weight": {"type": "number"},
         "source_text": {"type": "string"},
         "normalized_terms": {"type": "array", "items": {"type": "string"}},
+        "years": {"type": ["string", "object", "null"]},
     },
 }
 

@@ -4,14 +4,14 @@ level: task
 title: "Job ingest via agent extraction + core requirement normalization; URL and pasted-text input; delete CLI requirement vocabulary"
 short_code: "RKIT-T-0129"
 created_at: 2026-08-19T17:52:19.002638+00:00
-updated_at: 2026-08-19T18:27:34.868061+00:00
+updated_at: 2026-08-19T18:41:37.433524+00:00
 parent: resume-and-job-ingest-orchestration
 blocked_by: [RKIT-T-0127]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0036
 ## Objective **[REQUIRED]**
 
 Route `resume job ingest` entirely through agent JD extraction (`extractJobSemantics`) plus resume-core requirement normalization (`normalizeJobModel`), deleting the CLI-owned requirement vocabulary (`_requirements_from_job_text`, `_requirements_for_text`, `_looks_like_requirement`, `_requirements_from_extraction` fallback chain, the local `_requirement` constructor with its hardcoded `weight: 1.0`, and `_job_from_text` construction). Extend input acceptance to the mandated `<file-or-url-text>` surface: existing file path, http(s) URL, or pasted text.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

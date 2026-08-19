@@ -37,7 +37,16 @@ class SharedDtoSchemaContractTests(unittest.TestCase):
             "CanonicalResume": {"schema_version", "resume_id", "source", "experience", "skills", "education"},
             "RenderableResume": {"schema_version", "contact", "sections"},
             "JobModel": {"schema_version", "job_id", "requirements", "preferred", "industries", "domains", "terminology"},
-            "JobRequirement": {"requirement_id", "classification", "concept", "importance", "weight", "source_text", "normalized_terms"},
+            "JobRequirement": {
+                "requirement_id",
+                "classification",
+                "concept",
+                "importance",
+                "weight",
+                "source_text",
+                "normalized_terms",
+                "years",
+            },
             "MatchDimension": {"name", "weight", "score", "contribution", "evidence"},
             "MatchResult": {
                 "schema_version",

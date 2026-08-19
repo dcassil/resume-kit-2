@@ -14,7 +14,7 @@ tags:
   - "#phase/active"
 
 
-exit_criteria_met: false
+exit_criteria_met: true
 estimated_complexity: M
 strategy_id: RKIT-S-0001
 initiative_id: resume-and-job-ingest-orchestration
@@ -98,3 +98,10 @@ Decompose in this order (no Metis tasks created here):
 4. Remove fabricated fallbacks; add typed empty-extraction/missing-section outcomes.
 5. Add URL/pasted-text input resolution for `job ingest`.
 6. Off-fixture fixture, fabrication guards, DTO conformance, and TEST_SPEC strengthening.
+
+## Close-Out Verification
+
+- RKIT-T-0127, RKIT-T-0128, RKIT-T-0129, and RKIT-T-0130 have landed the ingest orchestration removal set and proof suite.
+- Resume/job ingest now runs through resume-agent extraction and resume-core construction/normalization, with career facts persisted from core-validated proposals.
+- Off-fixture Python/Spark/Kafka data-engineer fixture set, fabrication guard, DTO conformance tests, URL/pasted-text job input coverage, and CLI boundary guardrails are complete.
+- Close-out gates passed on 2026-08-19: `--pr`, `--future-contract`, `--smoke`; snapshot regeneration was stable across two runs.

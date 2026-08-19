@@ -150,6 +150,29 @@ Job B should be a Senior Full Stack Engineer style posting with:
 
 This fixture proves persistent learning from Job A.
 
+## Required Off-Fixture Ingest Fixture
+
+`fixtures/resumes/off-fixture-data-engineer.txt` and
+`fixtures/jobs/job-c-data-engineer.txt` define the second-vocabulary ingest
+fixture set for RKIT-I-0036 close-out. The pair must use Python, Spark, Kafka,
+Airflow, SQL, and data-pipeline vocabulary rather than the original smoke
+fixture vocabulary.
+
+Expected:
+
+- resume and job extraction use pinned DeterministicFakeAdapter fixtures under
+  `fixtures/resume-agent/fake-adapter/` with reviewed envelopes,
+- `resume ingest` persists every declared source-stated fact ID from
+  `fixture_manifest.json.off_fixture_ingest_fixture.required_fact_ids`,
+- `resume job ingest` persists JobRequirement DTOs with
+  `requirement_id`, `classification`, `concept`, `importance`, `weight`,
+  `source_text`, `normalized_terms`, and `years`,
+- generated base/job subset artifacts match
+  `fixtures/ingest-expected/off-fixture-data-engineer-base.json` and
+  `fixtures/ingest-expected/off-fixture-data-engineer-job.json`,
+- no behavior depends on React, TypeScript, Azure, or any other original smoke
+  fixture keyword.
+
 ## Required Answer Fixtures
 
 ### AWS

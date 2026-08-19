@@ -1,0 +1,72 @@
+{
+  "fixture_id": "off-fixture-data-engineer-job",
+  "schema_version": "expected-ingest-artifact.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Job ingest produces a faithful job artifact from the off-fixture data-engineer JD.",
+    "Requirement DTOs retain source text, normalized terms, classification, importance, core-owned weight, and years."
+  ],
+  "comment": "Stable subset for RKIT-T-0130 off-fixture job ingest.",
+  "data": {
+    "job_id": "off_fixture_data_engineer_job",
+    "title": "Data Engineer",
+    "company": "StreamWorks Labs",
+    "requirements": [
+      {
+        "requirement_id": "req_data_python_spark",
+        "classification": "required",
+        "concept": "Python data pipelines with Apache Spark",
+        "importance": "high",
+        "weight": 10.0,
+        "source_text": "Build Python data pipelines with Apache Spark.",
+        "normalized_terms": [
+          "python",
+          "apache spark",
+          "data pipelines"
+        ],
+        "years": null
+      },
+      {
+        "requirement_id": "req_data_kafka_streaming",
+        "classification": "required",
+        "concept": "Kafka streaming jobs",
+        "importance": "high",
+        "weight": 10.0,
+        "source_text": "Operate Kafka streaming jobs for analytics events.",
+        "normalized_terms": [
+          "kafka",
+          "streaming jobs",
+          "analytics events"
+        ],
+        "years": null
+      },
+      {
+        "requirement_id": "req_data_sql_workflow",
+        "classification": "required",
+        "concept": "SQL data models and workflow orchestration",
+        "importance": "high",
+        "weight": 10.0,
+        "source_text": "Maintain SQL data models and workflow orchestration.",
+        "normalized_terms": [
+          "sql",
+          "data models",
+          "workflow orchestration"
+        ],
+        "years": null
+      },
+      {
+        "requirement_id": "req_data_airflow",
+        "classification": "preferred",
+        "concept": "Airflow",
+        "importance": "medium",
+        "weight": 3.0,
+        "source_text": "Airflow experience.",
+        "normalized_terms": [
+          "airflow"
+        ],
+        "years": null
+      }
+    ]
+  }
+}

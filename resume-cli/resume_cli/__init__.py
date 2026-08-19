@@ -520,7 +520,6 @@ def _job_model_input_from_extraction(extraction: JsonObject, resolved: JsonObjec
         source.update({key: value for key, value in resolved["source"].items() if key not in source})
     source["text"] = text
     job: JsonObject = {
-        "schema_version": "job-model.v1",
         "source": source,
         "raw_description": text,
         "requirements": [_job_requirement_input(item) for item in _extracted_required_requirements(extraction)],
@@ -1095,7 +1094,7 @@ def _resolution_context(match_result: JsonObject, facts: list[JsonObject]) -> Js
     ]
     unresolved.sort(key=lambda item: (_resolution_priority(item), str(item.get("requirement_id", ""))))
     selected = unresolved[0] if unresolved else {}
-    requirement_id = str(selected.get("requirement_id") or "req_aws")
+    requirement_id = str(selected.get("requirement_id") or "requirement_unresolved")
     topic = _topic_for_requirement(selected)
     return {
         "selected_requirement_ids": [requirement_id],
@@ -1107,19 +1106,22 @@ def _resolution_context(match_result: JsonObject, facts: list[JsonObject]) -> Js
 
 def _resolution_priority(requirement: JsonObject) -> tuple[int, int]:
     classification = str(requirement.get("classification", "contextual"))
-    concept = _topic_for_requirement(requirement).lower()
-    preferred_order = {"aws": 0, "graphql": 1, "api architecture": 2, "responsive design": 3}
-    return (0 if classification == "required" else 1, preferred_order.get(concept, 9))
+    importance = str(requirement.get("importance", "")).lower()
+    importance_rank = {"critical": 0, "high": 1, "medium": 2, "low": 3}.get(importance, 4)
+    return (0 if classification == "required" else 1, importance_rank)
 
 
 def _topic_for_requirement(requirement: JsonObject) -> str:
+    topic = str(requirement.get("concept") or requirement.get("source_text") or "").strip()
+    if topic:
+        return topic
     terms = requirement.get("normalized_terms")
     if isinstance(terms, list):
-        lowered = " ".join(str(term).lower() for term in terms)
-        for topic in ["AWS", "GraphQL", "API architecture", "responsive design", "technical leadership", "Node.js", "PostgreSQL", "SaaS"]:
-            if topic.lower().replace("node.js", "node") in lowered:
-                return topic
-    return str(requirement.get("concept") or requirement.get("source_text") or "AWS")
+        for term in terms:
+            text = str(term).strip()
+            if text:
+                return text
+    return "requirement"
 
 
 def _fact_proposals(interpretation: JsonObject, context: JsonObject) -> list[JsonObject]:
@@ -1206,8 +1208,7 @@ def _job_terms_for_rewrite(job: JsonObject) -> list[str]:
         for term in requirement.get("normalized_terms", []):
             if str(term):
                 terms.append(str(term))
-    preferred = ["API architecture", "responsive design", "React", "TypeScript"]
-    ordered = [term for term in preferred + terms if _safe_rewrite_term(term)]
+    ordered = [term for term in terms if _safe_rewrite_term(term)]
     return _unique_text(ordered)
 
 

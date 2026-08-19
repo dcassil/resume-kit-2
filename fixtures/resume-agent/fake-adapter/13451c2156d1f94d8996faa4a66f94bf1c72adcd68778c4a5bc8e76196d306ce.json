@@ -1,0 +1,443 @@
+{
+  "fixture_id": "resume-agent-extraction-off-fixture-data-engineer-job",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Off-fixture job uses Python, Spark, Kafka, SQL, workflow orchestration, and Airflow requirements independent of the smoke fixture.",
+    "Payload declares JobRequirement-shaped proposals with source text, normalized terms, years, and classifications."
+  ],
+  "comment": "RKIT-T-0130 off-fixture source job extraction for fixtures/jobs/job-c-data-engineer.txt.",
+  "data": {
+    "key": {
+      "sha256": "13451c2156d1f94d8996faa4a66f94bf1c72adcd68778c4a5bc8e76196d306ce",
+      "prompt_template_id": "resume-agent.job-extraction@v1",
+      "output_schema_id": "resume-agent.job-extraction.v1",
+      "canonical_input_json": "{\"job_text\":\"Data Engineer\\nStreamWorks Labs\\nRequired:\\n- Build Python data pipelines with Apache Spark.\\n- Operate Kafka streaming jobs for analytics events.\\n- Maintain SQL data models and workflow orchestration.\\nPreferred:\\n- Airflow experience.\\n\",\"schema_id\":\"resume-agent.job-extraction.v1\",\"source\":{\"kind\":\"raw_text\",\"sha256\":\"0e5eeb9a628ebf5afb1f003a7a33da4e396b31f2e1c5ef3d52316e97a14d84d8\",\"source_id\":\"job-c-data-engineer.txt\"}}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.job-extraction.v1",
+      "proposal_type": "job_extraction",
+      "requires_validation": true,
+      "job_id": "off_fixture_data_engineer_job",
+      "source": {
+        "kind": "raw_text",
+        "source_id": "job-c-data-engineer.txt",
+        "sha256": "0e5eeb9a628ebf5afb1f003a7a33da4e396b31f2e1c5ef3d52316e97a14d84d8"
+      },
+      "title": {
+        "value": "Data Engineer",
+        "evidence": [
+          {
+            "evidence_id": "ev_data_job_title",
+            "source_text": "Data Engineer",
+            "span": {
+              "start": 0,
+              "end": 13
+            },
+            "lines": {
+              "start": 1,
+              "end": 1
+            }
+          }
+        ],
+        "confidence": 0.96,
+        "normalized": "data engineer"
+      },
+      "company": {
+        "value": "StreamWorks Labs",
+        "evidence": [
+          {
+            "evidence_id": "ev_data_job_company",
+            "source_text": "StreamWorks Labs",
+            "span": {
+              "start": 14,
+              "end": 30
+            },
+            "lines": {
+              "start": 2,
+              "end": 2
+            }
+          }
+        ],
+        "confidence": 0.92
+      },
+      "seniority": [],
+      "industries": [],
+      "domains": [
+        {
+          "value": "data engineering",
+          "evidence": [
+            {
+              "evidence_id": "ev_data_job_title",
+              "source_text": "Data Engineer",
+              "span": {
+                "start": 0,
+                "end": 13
+              },
+              "lines": {
+                "start": 1,
+                "end": 1
+              }
+            }
+          ],
+          "confidence": 0.9,
+          "normalized": "data engineering"
+        }
+      ],
+      "requirements": [
+        {
+          "requirement_id": "req_data_python_spark",
+          "classification": "required",
+          "concept": "Python data pipelines with Apache Spark",
+          "importance": "high",
+          "weight": 1.0,
+          "source_text": "Build Python data pipelines with Apache Spark.",
+          "normalized_terms": [
+            "python",
+            "apache spark",
+            "data pipelines"
+          ],
+          "years": null,
+          "seniority": [],
+          "industries": [],
+          "domains": [
+            {
+              "value": "data engineering",
+              "evidence": [
+                {
+                  "evidence_id": "ev_data_job_title",
+                  "source_text": "Data Engineer",
+                  "span": {
+                    "start": 0,
+                    "end": 13
+                  },
+                  "lines": {
+                    "start": 1,
+                    "end": 1
+                  }
+                }
+              ],
+              "confidence": 0.9,
+              "normalized": "data engineering"
+            }
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_data_req_python_spark",
+              "source_text": "Build Python data pipelines with Apache Spark.",
+              "span": {
+                "start": 43,
+                "end": 89
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.95
+        },
+        {
+          "requirement_id": "req_data_kafka_streaming",
+          "classification": "required",
+          "concept": "Kafka streaming jobs",
+          "importance": "high",
+          "weight": 1.0,
+          "source_text": "Operate Kafka streaming jobs for analytics events.",
+          "normalized_terms": [
+            "kafka",
+            "streaming jobs",
+            "analytics events"
+          ],
+          "years": null,
+          "seniority": [],
+          "industries": [],
+          "domains": [
+            {
+              "value": "data engineering",
+              "evidence": [
+                {
+                  "evidence_id": "ev_data_job_title",
+                  "source_text": "Data Engineer",
+                  "span": {
+                    "start": 0,
+                    "end": 13
+                  },
+                  "lines": {
+                    "start": 1,
+                    "end": 1
+                  }
+                }
+              ],
+              "confidence": 0.9,
+              "normalized": "data engineering"
+            }
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_data_req_kafka",
+              "source_text": "Operate Kafka streaming jobs for analytics events.",
+              "span": {
+                "start": 92,
+                "end": 142
+              },
+              "lines": {
+                "start": 5,
+                "end": 5
+              }
+            }
+          ],
+          "confidence": 0.95
+        },
+        {
+          "requirement_id": "req_data_sql_workflow",
+          "classification": "required",
+          "concept": "SQL data models and workflow orchestration",
+          "importance": "high",
+          "weight": 1.0,
+          "source_text": "Maintain SQL data models and workflow orchestration.",
+          "normalized_terms": [
+            "sql",
+            "data models",
+            "workflow orchestration"
+          ],
+          "years": null,
+          "seniority": [],
+          "industries": [],
+          "domains": [
+            {
+              "value": "data engineering",
+              "evidence": [
+                {
+                  "evidence_id": "ev_data_job_title",
+                  "source_text": "Data Engineer",
+                  "span": {
+                    "start": 0,
+                    "end": 13
+                  },
+                  "lines": {
+                    "start": 1,
+                    "end": 1
+                  }
+                }
+              ],
+              "confidence": 0.9,
+              "normalized": "data engineering"
+            }
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_data_req_sql",
+              "source_text": "Maintain SQL data models and workflow orchestration.",
+              "span": {
+                "start": 145,
+                "end": 197
+              },
+              "lines": {
+                "start": 6,
+                "end": 6
+              }
+            }
+          ],
+          "confidence": 0.94
+        }
+      ],
+      "preferred": [
+        {
+          "requirement_id": "req_data_airflow",
+          "classification": "preferred",
+          "concept": "Airflow",
+          "importance": "medium",
+          "weight": 0.5,
+          "source_text": "Airflow experience.",
+          "normalized_terms": [
+            "airflow"
+          ],
+          "years": null,
+          "seniority": [],
+          "industries": [],
+          "domains": [
+            {
+              "value": "data engineering",
+              "evidence": [
+                {
+                  "evidence_id": "ev_data_job_title",
+                  "source_text": "Data Engineer",
+                  "span": {
+                    "start": 0,
+                    "end": 13
+                  },
+                  "lines": {
+                    "start": 1,
+                    "end": 1
+                  }
+                }
+              ],
+              "confidence": 0.9,
+              "normalized": "data engineering"
+            }
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_data_req_airflow",
+              "source_text": "Airflow experience.",
+              "span": {
+                "start": 211,
+                "end": 230
+              },
+              "lines": {
+                "start": 8,
+                "end": 8
+              }
+            }
+          ],
+          "confidence": 0.9
+        }
+      ],
+      "terminology": [
+        {
+          "surface": "Apache Spark",
+          "canonical": "spark",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_data_req_python_spark",
+              "source_text": "Build Python data pipelines with Apache Spark.",
+              "span": {
+                "start": 43,
+                "end": 89
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "surface": "Kafka streaming jobs",
+          "canonical": "kafka",
+          "source": "requirement",
+          "weight": 1.0,
+          "evidence": [
+            {
+              "evidence_id": "ev_data_req_kafka",
+              "source_text": "Operate Kafka streaming jobs for analytics events.",
+              "span": {
+                "start": 92,
+                "end": 142
+              },
+              "lines": {
+                "start": 5,
+                "end": 5
+              }
+            }
+          ],
+          "confidence": 0.94
+        },
+        {
+          "surface": "workflow orchestration",
+          "canonical": "workflow orchestration",
+          "source": "requirement",
+          "weight": 0.8,
+          "evidence": [
+            {
+              "evidence_id": "ev_data_req_sql",
+              "source_text": "Maintain SQL data models and workflow orchestration.",
+              "span": {
+                "start": 145,
+                "end": 197
+              },
+              "lines": {
+                "start": 6,
+                "end": 6
+              }
+            }
+          ],
+          "confidence": 0.9
+        }
+      ],
+      "source_evidence": [
+        {
+          "evidence_id": "ev_data_job_title",
+          "source_text": "Data Engineer",
+          "span": {
+            "start": 0,
+            "end": 13
+          },
+          "lines": {
+            "start": 1,
+            "end": 1
+          }
+        },
+        {
+          "evidence_id": "ev_data_job_company",
+          "source_text": "StreamWorks Labs",
+          "span": {
+            "start": 14,
+            "end": 30
+          },
+          "lines": {
+            "start": 2,
+            "end": 2
+          }
+        },
+        {
+          "evidence_id": "ev_data_req_python_spark",
+          "source_text": "Build Python data pipelines with Apache Spark.",
+          "span": {
+            "start": 43,
+            "end": 89
+          },
+          "lines": {
+            "start": 4,
+            "end": 4
+          }
+        },
+        {
+          "evidence_id": "ev_data_req_kafka",
+          "source_text": "Operate Kafka streaming jobs for analytics events.",
+          "span": {
+            "start": 92,
+            "end": 142
+          },
+          "lines": {
+            "start": 5,
+            "end": 5
+          }
+        },
+        {
+          "evidence_id": "ev_data_req_sql",
+          "source_text": "Maintain SQL data models and workflow orchestration.",
+          "span": {
+            "start": 145,
+            "end": 197
+          },
+          "lines": {
+            "start": 6,
+            "end": 6
+          }
+        },
+        {
+          "evidence_id": "ev_data_req_airflow",
+          "source_text": "Airflow experience.",
+          "span": {
+            "start": 211,
+            "end": 230
+          },
+          "lines": {
+            "start": 8,
+            "end": 8
+          }
+        }
+      ],
+      "uncertainty": [],
+      "metadata": {
+        "fixture_source_id": "job-c-data-engineer.txt"
+      }
+    }
+  }
+}

@@ -78,8 +78,48 @@
         "PostgreSQL",
         "SaaS"
       ]
+    },
+    {
+      "id": "job-c-data-engineer",
+      "path": "jobs/job-c-data-engineer.txt",
+      "title": "Data Engineer",
+      "required_terms": [
+        "Python",
+        "Apache Spark",
+        "Kafka",
+        "SQL",
+        "workflow orchestration"
+      ],
+      "preferred_terms": [
+        "Airflow"
+      ]
     }
   ],
+  "off_fixture_ingest_fixture": {
+    "id": "off-fixture-data-engineer",
+    "resume_path": "resumes/off-fixture-data-engineer.txt",
+    "job_path": "jobs/job-c-data-engineer.txt",
+    "expected_base_path": "ingest-expected/off-fixture-data-engineer-base.json",
+    "expected_job_path": "ingest-expected/off-fixture-data-engineer-job.json",
+    "required_fact_ids": [
+      "fact_data_jordan_name",
+      "fact_data_platform_title",
+      "fact_data_python",
+      "fact_data_spark",
+      "fact_data_kafka",
+      "fact_data_airflow",
+      "fact_data_sql",
+      "fact_data_northwind_role",
+      "fact_data_pipeline_highlight",
+      "fact_data_quality_highlight",
+      "fact_data_education"
+    ],
+    "must_not_depend_on_terms": [
+      "React",
+      "TypeScript",
+      "Azure"
+    ]
+  },
   "answer_fixtures": [
     {
       "id": "answer-aws",

@@ -1,0 +1,55 @@
+{
+  "fixture_id": "off-fixture-data-engineer-base",
+  "schema_version": "expected-ingest-artifact.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Resume ingest produces a faithful base artifact from the off-fixture data-engineer source.",
+    "Every persisted fact comes from the pinned fake-adapter extraction fixture and source text."
+  ],
+  "comment": "Stable subset for RKIT-T-0130 off-fixture resume ingest; path-derived volatile IDs are intentionally excluded.",
+  "data": {
+    "title": "Data Platform Engineer",
+    "basics": {
+      "name": "Jordan Lee"
+    },
+    "skills": [
+      "Python",
+      "Spark",
+      "Kafka",
+      "Airflow",
+      "SQL"
+    ],
+    "experience": [
+      {
+        "title": "Data Platform Engineer",
+        "company": "Northwind Analytics",
+        "start_date": "2020",
+        "end_date": "present",
+        "bullets": [
+          "Built Python ETL jobs with Spark batch processing and Kafka streaming pipelines for product analytics.",
+          "Improved data quality checks in Airflow and SQL marts for finance reporting."
+        ]
+      }
+    ],
+    "education": [
+      {
+        "degree": "B.S.",
+        "field": "Information Systems"
+      }
+    ],
+    "persisted_fact_ids": [
+      "fact_data_airflow",
+      "fact_data_education",
+      "fact_data_jordan_name",
+      "fact_data_kafka",
+      "fact_data_northwind_role",
+      "fact_data_pipeline_highlight",
+      "fact_data_platform_title",
+      "fact_data_python",
+      "fact_data_quality_highlight",
+      "fact_data_spark",
+      "fact_data_sql"
+    ]
+  }
+}

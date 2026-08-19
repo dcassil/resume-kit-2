@@ -1,0 +1,10 @@
+Jordan Lee
+Data Platform Engineer
+
+Skills: Python, Spark, Kafka, Airflow, SQL.
+Experience
+Data Platform Engineer, Northwind Analytics, 2020-Present
+Built Python ETL jobs with Spark batch processing and Kafka streaming pipelines for product analytics.
+Improved data quality checks in Airflow and SQL marts for finance reporting.
+Education
+B.S. Information Systems, State University, 2016

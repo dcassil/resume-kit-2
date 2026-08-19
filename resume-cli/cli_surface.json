@@ -119,6 +119,7 @@
       ],
       "must_not": [
         "allow_agent_generated_unsupported_content_into_base",
+        "fabricate_default_title_company_role_or_experience",
         "mutate_existing_base_without_explicit_reingest",
         "write_career_db_tables_directly"
       ]
@@ -140,7 +141,9 @@
       ],
       "must_not": [
         "drop_requirement_source_text",
-        "duplicate_core_job_schema"
+        "duplicate_core_job_schema",
+        "restrict_job_input_to_files_only",
+        "construct_job_schema_in_cli"
       ]
     },
     {

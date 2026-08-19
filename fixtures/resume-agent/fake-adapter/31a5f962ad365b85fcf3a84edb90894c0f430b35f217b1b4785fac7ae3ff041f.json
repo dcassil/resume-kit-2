@@ -1,0 +1,422 @@
+{
+  "fixture_id": "resume-agent-extraction-off-fixture-data-engineer-resume",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Off-fixture resume uses Python, Spark, Kafka, Airflow, SQL, and data platform vocabulary independent of the smoke fixture.",
+    "Payload declares stable source-stated fact IDs for end-to-end career-store persistence assertions."
+  ],
+  "comment": "RKIT-T-0130 off-fixture source resume extraction for fixtures/resumes/off-fixture-data-engineer.txt.",
+  "data": {
+    "key": {
+      "sha256": "31a5f962ad365b85fcf3a84edb90894c0f430b35f217b1b4785fac7ae3ff041f",
+      "prompt_template_id": "resume-agent.resume-extraction@v1",
+      "output_schema_id": "resume-agent.resume-extraction.v1",
+      "canonical_input_json": "{\"resume_text\":\"Jordan Lee\\nData Platform Engineer\\n\\nSkills: Python, Spark, Kafka, Airflow, SQL.\\nExperience\\nData Platform Engineer, Northwind Analytics, 2020-Present\\nBuilt Python ETL jobs with Spark batch processing and Kafka streaming pipelines for product analytics.\\nImproved data quality checks in Airflow and SQL marts for finance reporting.\\nEducation\\nB.S. Information Systems, State University, 2016\\n\",\"schema_id\":\"resume-agent.resume-extraction.v1\",\"source\":{\"kind\":\"raw_text\",\"sha256\":\"9a47a6d3342c2d73ad28b8558061d9dde4884a5edb4f012b8383d8515dddbda8\",\"source_id\":\"off-fixture-data-engineer.txt\"}}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.resume-extraction.v1",
+      "proposal_type": "resume_extraction",
+      "requires_validation": true,
+      "resume_id": "off_fixture_data_engineer_resume",
+      "source": {
+        "kind": "raw_text",
+        "source_id": "off-fixture-data-engineer.txt",
+        "sha256": "9a47a6d3342c2d73ad28b8558061d9dde4884a5edb4f012b8383d8515dddbda8"
+      },
+      "basics": {
+        "name": {
+          "fact_id": "fact_data_jordan_name",
+          "value": "Jordan Lee",
+          "evidence": [
+            {
+              "evidence_id": "ev_data_name",
+              "source_text": "Jordan Lee",
+              "span": {
+                "start": 0,
+                "end": 10
+              },
+              "lines": {
+                "start": 1,
+                "end": 1
+              }
+            }
+          ],
+          "confidence": 0.98,
+          "verification_state": "source_stated",
+          "normalized": "jordan lee"
+        },
+        "title": {
+          "fact_id": "fact_data_platform_title",
+          "value": "Data Platform Engineer",
+          "evidence": [
+            {
+              "evidence_id": "ev_data_title",
+              "source_text": "Data Platform Engineer",
+              "span": {
+                "start": 11,
+                "end": 33
+              },
+              "lines": {
+                "start": 2,
+                "end": 2
+              }
+            }
+          ],
+          "confidence": 0.97,
+          "verification_state": "source_stated",
+          "normalized": "data platform engineer"
+        }
+      },
+      "skills": [
+        {
+          "fact_id": "fact_data_python",
+          "name": "Python",
+          "category": "language",
+          "normalized_terms": [
+            "python"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_data_skills",
+              "source_text": "Skills: Python, Spark, Kafka, Airflow, SQL.",
+              "span": {
+                "start": 35,
+                "end": 78
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.95,
+          "verification_state": "source_stated"
+        },
+        {
+          "fact_id": "fact_data_spark",
+          "name": "Spark",
+          "category": "data",
+          "normalized_terms": [
+            "spark"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_data_skills",
+              "source_text": "Skills: Python, Spark, Kafka, Airflow, SQL.",
+              "span": {
+                "start": 35,
+                "end": 78
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.95,
+          "verification_state": "source_stated"
+        },
+        {
+          "fact_id": "fact_data_kafka",
+          "name": "Kafka",
+          "category": "streaming",
+          "normalized_terms": [
+            "kafka"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_data_skills",
+              "source_text": "Skills: Python, Spark, Kafka, Airflow, SQL.",
+              "span": {
+                "start": 35,
+                "end": 78
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.95,
+          "verification_state": "source_stated"
+        },
+        {
+          "fact_id": "fact_data_airflow",
+          "name": "Airflow",
+          "category": "orchestration",
+          "normalized_terms": [
+            "airflow"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_data_skills",
+              "source_text": "Skills: Python, Spark, Kafka, Airflow, SQL.",
+              "span": {
+                "start": 35,
+                "end": 78
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.95,
+          "verification_state": "source_stated"
+        },
+        {
+          "fact_id": "fact_data_sql",
+          "name": "SQL",
+          "category": "data",
+          "normalized_terms": [
+            "sql"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_data_skills",
+              "source_text": "Skills: Python, Spark, Kafka, Airflow, SQL.",
+              "span": {
+                "start": 35,
+                "end": 78
+              },
+              "lines": {
+                "start": 4,
+                "end": 4
+              }
+            }
+          ],
+          "confidence": 0.95,
+          "verification_state": "source_stated"
+        }
+      ],
+      "experience": [
+        {
+          "fact_id": "fact_data_northwind_role",
+          "role": "Data Platform Engineer",
+          "organization": "Northwind Analytics",
+          "employment": {
+            "organization": "Northwind Analytics",
+            "role": "Data Platform Engineer",
+            "start_date": "2020",
+            "end_date": null,
+            "current": true,
+            "evidence": [
+              {
+                "evidence_id": "ev_data_job",
+                "source_text": "Data Platform Engineer, Northwind Analytics, 2020-Present",
+                "span": {
+                  "start": 90,
+                  "end": 147
+                },
+                "lines": {
+                  "start": 6,
+                  "end": 6
+                }
+              }
+            ],
+            "confidence": 0.94,
+            "verification_state": "source_stated"
+          },
+          "location": null,
+          "highlights": [
+            {
+              "fact_id": "fact_data_pipeline_highlight",
+              "text": "Built Python ETL jobs with Spark batch processing and Kafka streaming pipelines for product analytics.",
+              "normalized_terms": [
+                "python",
+                "spark",
+                "kafka",
+                "etl",
+                "streaming pipelines"
+              ],
+              "evidence": [
+                {
+                  "evidence_id": "ev_data_pipeline",
+                  "source_text": "Built Python ETL jobs with Spark batch processing and Kafka streaming pipelines for product analytics.",
+                  "span": {
+                    "start": 148,
+                    "end": 250
+                  },
+                  "lines": {
+                    "start": 7,
+                    "end": 7
+                  }
+                }
+              ],
+              "confidence": 0.94,
+              "verification_state": "source_stated"
+            },
+            {
+              "fact_id": "fact_data_quality_highlight",
+              "text": "Improved data quality checks in Airflow and SQL marts for finance reporting.",
+              "normalized_terms": [
+                "airflow",
+                "sql",
+                "data quality"
+              ],
+              "evidence": [
+                {
+                  "evidence_id": "ev_data_quality",
+                  "source_text": "Improved data quality checks in Airflow and SQL marts for finance reporting.",
+                  "span": {
+                    "start": 251,
+                    "end": 327
+                  },
+                  "lines": {
+                    "start": 8,
+                    "end": 8
+                  }
+                }
+              ],
+              "confidence": 0.93,
+              "verification_state": "source_stated"
+            }
+          ],
+          "skills": [
+            "Python",
+            "Spark",
+            "Kafka",
+            "Airflow",
+            "SQL"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_data_job",
+              "source_text": "Data Platform Engineer, Northwind Analytics, 2020-Present",
+              "span": {
+                "start": 90,
+                "end": 147
+              },
+              "lines": {
+                "start": 6,
+                "end": 6
+              }
+            }
+          ],
+          "confidence": 0.94,
+          "verification_state": "source_stated"
+        }
+      ],
+      "education": [
+        {
+          "fact_id": "fact_data_education",
+          "institution": "State University",
+          "degree": "B.S.",
+          "field": "Information Systems",
+          "graduation_date": "2016",
+          "evidence": [
+            {
+              "evidence_id": "ev_data_education",
+              "source_text": "B.S. Information Systems, State University, 2016",
+              "span": {
+                "start": 338,
+                "end": 386
+              },
+              "lines": {
+                "start": 10,
+                "end": 10
+              }
+            }
+          ],
+          "confidence": 0.92,
+          "verification_state": "source_stated"
+        }
+      ],
+      "certifications": [],
+      "projects": [],
+      "employment": [],
+      "source_evidence": [
+        {
+          "evidence_id": "ev_data_name",
+          "source_text": "Jordan Lee",
+          "span": {
+            "start": 0,
+            "end": 10
+          },
+          "lines": {
+            "start": 1,
+            "end": 1
+          }
+        },
+        {
+          "evidence_id": "ev_data_title",
+          "source_text": "Data Platform Engineer",
+          "span": {
+            "start": 11,
+            "end": 33
+          },
+          "lines": {
+            "start": 2,
+            "end": 2
+          }
+        },
+        {
+          "evidence_id": "ev_data_skills",
+          "source_text": "Skills: Python, Spark, Kafka, Airflow, SQL.",
+          "span": {
+            "start": 35,
+            "end": 78
+          },
+          "lines": {
+            "start": 4,
+            "end": 4
+          }
+        },
+        {
+          "evidence_id": "ev_data_job",
+          "source_text": "Data Platform Engineer, Northwind Analytics, 2020-Present",
+          "span": {
+            "start": 90,
+            "end": 147
+          },
+          "lines": {
+            "start": 6,
+            "end": 6
+          }
+        },
+        {
+          "evidence_id": "ev_data_pipeline",
+          "source_text": "Built Python ETL jobs with Spark batch processing and Kafka streaming pipelines for product analytics.",
+          "span": {
+            "start": 148,
+            "end": 250
+          },
+          "lines": {
+            "start": 7,
+            "end": 7
+          }
+        },
+        {
+          "evidence_id": "ev_data_quality",
+          "source_text": "Improved data quality checks in Airflow and SQL marts for finance reporting.",
+          "span": {
+            "start": 251,
+            "end": 327
+          },
+          "lines": {
+            "start": 8,
+            "end": 8
+          }
+        },
+        {
+          "evidence_id": "ev_data_education",
+          "source_text": "B.S. Information Systems, State University, 2016",
+          "span": {
+            "start": 338,
+            "end": 386
+          },
+          "lines": {
+            "start": 10,
+            "end": 10
+          }
+        }
+      ],
+      "uncertainty": [],
+      "metadata": {
+        "fixture_source_id": "off-fixture-data-engineer.txt"
+      }
+    }
+  }
+}

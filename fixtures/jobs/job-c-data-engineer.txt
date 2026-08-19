@@ -1,0 +1,8 @@
+Data Engineer
+StreamWorks Labs
+Required:
+- Build Python data pipelines with Apache Spark.
+- Operate Kafka streaming jobs for analytics events.
+- Maintain SQL data models and workflow orchestration.
+Preferred:
+- Airflow experience.

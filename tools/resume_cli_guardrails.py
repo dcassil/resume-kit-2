@@ -80,6 +80,35 @@ DIRECT_DB_PATTERNS = [
     r"\bconnect\s*\(\s*['\"][^'\"]*career\.db['\"]",
 ]
 
+MONTH_NAME_TERMS = {
+    "jan",
+    "january",
+    "feb",
+    "february",
+    "mar",
+    "march",
+    "apr",
+    "april",
+    "may",
+    "jun",
+    "june",
+    "jul",
+    "july",
+    "aug",
+    "august",
+    "sep",
+    "sept",
+    "september",
+    "oct",
+    "october",
+    "nov",
+    "november",
+    "dec",
+    "december",
+}
+REQUIREMENT_VOCAB_NAMES = ("requirement", "keyword", "vocab", "topic", "term", "skill")
+CLI_OWNED_SCHEMA_VERSIONS = {"canonical-resume.v1", "job-model.v1"}
+
 CODE_SUFFIXES = {".py", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"}
 IGNORED_DIRS = {"__pycache__", ".pytest_cache", "node_modules", ".venv", "venv", "dist", "build"}
 
@@ -257,6 +286,137 @@ def scan_python_imports(path: Path, text: str) -> list[Failure]:
     return failures
 
 
+def scan_python_domain_regrowth(path: Path, text: str) -> list[Failure]:
+    try:
+        tree = ast.parse(text, filename=str(path))
+    except SyntaxError as exc:
+        return [
+            Failure(
+                path,
+                f"Python source cannot be parsed: {exc.msg}.",
+                "Fix syntax before boundary guardrails can classify CLI-owned domain logic.",
+                exc.lineno,
+            )
+        ]
+
+    failures: list[Failure] = []
+    for node in ast.walk(tree):
+        strings = _literal_strings(node)
+        assigned_strings = _assigned_literal_strings(node)
+        if isinstance(node, (ast.Assign, ast.AnnAssign)) and _looks_like_month_table(assigned_strings):
+            failures.append(
+                Failure(
+                    path,
+                    "CLI defines a month-name/date parsing table.",
+                    "Date parsing belongs to resume-core dates.py; call the core normalization/validation API instead.",
+                    getattr(node, "lineno", None),
+                )
+            )
+        if isinstance(node, ast.Call) and _is_re_compile(node) and _looks_like_date_regex(strings):
+            failures.append(
+                Failure(
+                    path,
+                    "CLI defines a date-parsing regular expression.",
+                    "Date parsing belongs to resume-core dates.py; remove the regex and call core date normalization/validation.",
+                    getattr(node, "lineno", None),
+                )
+            )
+        if isinstance(node, (ast.Assign, ast.AnnAssign)) and _looks_like_requirement_vocab_assignment(node, assigned_strings):
+            failures.append(
+                Failure(
+                    path,
+                    "CLI defines a requirement-keyword vocabulary list.",
+                    "Requirement extraction and terminology belong to resume-agent proposals and resume-core normalization; CLI may pass through validated requirement DTOs only.",
+                    getattr(node, "lineno", None),
+                )
+            )
+        if isinstance(node, ast.Dict) and _constructs_core_schema_version(node):
+            failures.append(
+                Failure(
+                    path,
+                    "CLI constructs a canonical resume/job schema_version literal.",
+                    "CanonicalResume and JobModel schema construction belongs to resume-core; CLI may read persisted schema_version values or pass extraction input to core.",
+                    getattr(node, "lineno", None),
+                )
+            )
+    return failures
+
+
+def _assigned_literal_strings(node: ast.AST) -> list[str]:
+    if isinstance(node, ast.Assign):
+        return _collection_literal_strings(node.value)
+    if isinstance(node, ast.AnnAssign):
+        return _collection_literal_strings(node.value) if node.value is not None else []
+    return []
+
+
+def _collection_literal_strings(node: ast.AST) -> list[str]:
+    if isinstance(node, (ast.List, ast.Tuple, ast.Set, ast.Dict)):
+        return _literal_strings(node)
+    return []
+
+
+def _literal_strings(node: ast.AST) -> list[str]:
+    values: list[str] = []
+    for child in ast.walk(node):
+        if isinstance(child, ast.Constant) and isinstance(child.value, str):
+            values.append(child.value)
+    return values
+
+
+def _looks_like_month_table(strings: list[str]) -> bool:
+    lowered = {item.strip().lower() for item in strings}
+    return len(lowered & MONTH_NAME_TERMS) >= 3
+
+
+def _is_re_compile(node: ast.Call) -> bool:
+    func = node.func
+    return (
+        isinstance(func, ast.Attribute)
+        and func.attr == "compile"
+        and isinstance(func.value, ast.Name)
+        and func.value.id == "re"
+    )
+
+
+def _looks_like_date_regex(strings: list[str]) -> bool:
+    pattern = " ".join(strings).lower()
+    if any(month in pattern for month in MONTH_NAME_TERMS):
+        return True
+    return bool(re.search(r"\\d\{4\}.*\\d\{1,2\}|\\d\{1,2\}.*\\d\{4\}", pattern))
+
+
+def _looks_like_requirement_vocab_assignment(node: ast.Assign | ast.AnnAssign, strings: list[str]) -> bool:
+    if len([item for item in strings if item.strip()]) < 3:
+        return False
+    targets: list[ast.AST]
+    if isinstance(node, ast.Assign):
+        targets = list(node.targets)
+    else:
+        targets = [node.target]
+    target_names = " ".join(_target_name(target) for target in targets).lower()
+    return any(name in target_names for name in REQUIREMENT_VOCAB_NAMES)
+
+
+def _target_name(target: ast.AST) -> str:
+    if isinstance(target, ast.Name):
+        return target.id
+    if isinstance(target, ast.Attribute):
+        return target.attr
+    if isinstance(target, (ast.Tuple, ast.List)):
+        return " ".join(_target_name(item) for item in target.elts)
+    return ""
+
+
+def _constructs_core_schema_version(node: ast.Dict) -> bool:
+    for key, value in zip(node.keys, node.values):
+        if not (isinstance(key, ast.Constant) and key.value == "schema_version"):
+            continue
+        if isinstance(value, ast.Constant) and value.value in CLI_OWNED_SCHEMA_VERSIONS:
+            return True
+    return False
+
+
 def scan_text(path: Path, text: str) -> list[Failure]:
     failures: list[Failure] = []
     lowered = text.lower()
@@ -338,6 +498,7 @@ def run(root: Path) -> list[Failure]:
         text = path.read_text(encoding="utf-8")
         if path.suffix == ".py":
             failures.extend(scan_python_imports(path, text))
+            failures.extend(scan_python_domain_regrowth(path, text))
             failures.extend(scan_python_architecture("resume-cli", path, text))
         failures.extend(scan_text(path, text))
     return failures
@@ -353,7 +514,7 @@ def main(argv: list[str] | None = None) -> int:
     if failures:
         print("resume-cli guardrails failed.\n")
         print("The CLI package may orchestrate public APIs and persist workflow artifacts only.")
-        print("Independent scoring, direct career DB writes, private mutation logic, renderer semantic changes, plugin behavior, and checkpoint skips are hard-blocked.\n")
+        print("Independent scoring, direct career DB writes, private mutation logic, renderer semantic changes, plugin behavior, checkpoint skips, and CLI-owned ingest domain logic are hard-blocked.\n")
         for failure in failures:
             print(failure.format(root))
         return 1

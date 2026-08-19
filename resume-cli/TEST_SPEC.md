@@ -75,16 +75,20 @@ Required command surface:
 - Runs canonical validation.
 - Runs ATS sanitation.
 - Persists candidate career facts through career-store from core-validated extraction `fact_proposals`, not CLI keyword lists or substring searches.
-- Off-fixture fake-adapter resume input persists exactly the proposed facts and does not persist unproposed fixture facts such as `fact_azure`.
+- Off-fixture fake-adapter resume input persists exactly the proposed facts and does not persist unproposed fixture facts such as `fact_azure`; observable coverage:
+  `tests/integration/test_resume_ingest_fact_proposals_integration.py::ResumeIngestFactProposalPersistenceTests::test_off_fixture_resume_and_job_ingest_persist_fixture_defined_facts_and_artifacts`.
+- Off-fixture ingest is independent of original smoke vocabulary: Python/Spark/Kafka data-engineer fixtures must ingest without requiring React, TypeScript, or Azure terms.
 - Empty or failed extraction returns the typed ingest error envelope with `status`, `exit_code`, `errors[]`, `extraction`, `validation`, `sanitation`, `career_facts`, and `checkpoints`; it must not construct fallback resume content.
-- Does not allow agent-generated unsupported content into base.
+- Does not allow agent-generated unsupported content into base; observable fabrication guard coverage:
+  `tests/integration/test_resume_ingest_fact_proposals_integration.py::ResumeIngestFactProposalPersistenceTests::test_resume_without_stated_title_or_experience_does_not_fabricate_base_content`.
 - Does not fabricate default title, company, role, or experience values when the source/extraction omits them.
 
 ### job ingest
 
 - Accepts `<file-or-url-text>` as exactly one positional argument.
-- Resolves existing paths before URL detection, fetches `http://`/`https://` input through an injectable stdlib URL seam, and otherwise treats the argument as pasted JD text.
-- Sanitizes file, URL, and pasted-text input before extraction; URL tests stub the fetcher and gates use no live network.
+- URL input case: `http://`/`https://` arguments fetch text through the injectable stdlib URL seam; URL tests stub the fetcher and gates use no live network.
+- Pasted-text input case and precedence: existing paths are resolved before URL detection, and any non-path non-URL argument is treated as pasted JD text before sanitation/extraction.
+- Sanitizes file, URL, and pasted-text input before extraction.
 - Accepts fixture JD input.
 - Persists `job/current.json`.
 - Classifies required/preferred/contextual requirements.
