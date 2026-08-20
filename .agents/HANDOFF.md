@@ -1,6 +1,18 @@
 # Handoff — 2026-08-15 (I-0004..I-0008 COMPLETE — career-store tier DONE, continuous codex mode)
 
-## -6. 2026-08-19 (afternoon) session update — read this first (supersedes §-5 state line)
+## -7. 2026-08-20 session update — read this first (supersedes §-6 state line)
+
+develop PUSHED through v0.36.0. **38 initiatives complete.** **RKIT-I-0037 (Deterministic Match/Resolve/Inspect UX) COMPLETE, v0.36.0** — T-0131..0133:
+
+- **T-0131**: `_match` downgrade/status-synthesis block deleted — verbatim core ResolutionStates (incl. related_match/possible_match/not_applicable); full 4.3 MatchResult persisted (`requirements`/`unresolved` kept as documented lossless aliases); decision enforced (continue→0, resolve_gaps→0 + routing hint from getUnresolvedRequirements, blocked→1 listing ids); requireHardRequirementsResolved honored; empty workspace → typed `missing_match_artifact`. Smoke resume fixture truth realigned (Azure/"responsive web apps" → "release tooling"/"responsive apps") so initial AWS unknown is honest without CLI reclassification; snapshots re-baselined deliberately.
+- **T-0132**: `_inspect_requirement` fabrication (`req_react`→exact_match) deleted; reads reports/match.json + store getFact only via new `resume_cli/_inspect.py`; fresh workspace → typed no_data. `_resolution_priority`/`_topic_for_requirement` deleted; `_resolution_context` consumes core-ranked selection; empty selection = typed no_unresolved.
+- **T-0133**: interactive resolve in `resume_cli/_resolve.py` (question→answer→exact-text confirmation over TerminalIO scripted mode); store's `verifyFact` now DERIVES user_verified from affirmed confirmation w/ user provenance (explicit-state arg optional, back-compat); CLI `user_verified` pre-declaration + `_explicit_confirmation` regex deleted; declined→nothing persists; negative→`explicitly_missing` resolution outcome; exchanges recorded via recordInteraction; Terraform off-fixture affirmative persists. Protected lockstep: `tools/run_smoke.py` resolve stdin + confirmation line.
+
+**PENDING approval (three files): `straight-jacket update tools/resume_core_guardrails.py tools/resume_cli_guardrails.py tools/run_smoke.py`** — all task-authorized lockstep edits, committed --no-verify.
+
+Gates at v0.36.0: --pr 663, --future-contract 670, smoke — green every commit; snapshot regen ×2 no-drift. Driver probes: empty-workspace match typed failure, fresh-workspace inspect no_data, interactive suite verbose run. CLI `__init__.py` at 1374/1500. **NEXT unblocked:** I-0038 (grounded tailoring lifecycle — check blocked_by), then I-0039/0040/0041, I-0047. Same loop (§4); Metis task creation via CLI (`metis create task --initiative ...`), NOT MCP create_document.
+
+## -6. 2026-08-19 (afternoon) session update — (superseded by §-7)
 
 develop PUSHED through v0.35.0. **37 initiatives complete.** Daniel's approval pass for guardrails+smoke landed at session start (verify clean), then **RKIT-I-0036 (Resume and Job Ingest Orchestration) COMPLETE, v0.35.0** — T-0127..0130:
 

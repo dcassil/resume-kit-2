@@ -4,14 +4,14 @@ level: task
 title: "Interactive resolve loop over TerminalIO with agent phrasing/interpretation, store-gated persistence, interaction recording; TEST_SPEC; close-out"
 short_code: "RKIT-T-0133"
 created_at: 2026-08-19T19:01:07.737931+00:00
-updated_at: 2026-08-20T20:40:58.486201+00:00
+updated_at: 2026-08-20T20:52:29.843002+00:00
 parent: deterministic-match-resolve-and
 blocked_by: [RKIT-T-0131, RKIT-T-0132]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0037
 ## Objective **[REQUIRED]**
 
 Make `resume resolve` genuinely interactive per vision 14.D: question → answer → explicit confirmation exchange over the I-0035 TerminalIO seam, with agent phrasing/interpretation and career-store-owned verification. Today `_resolve` consumes one pre-supplied stdin string, `_explicit_confirmation` is a keyword regex, the CLI pre-declares `verification_state: "user_verified"` before store validation, and an off-fixture "Yes, I have used Terraform for four years" persists nothing. Close out RKIT-I-0037.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 
