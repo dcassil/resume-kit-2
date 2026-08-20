@@ -112,10 +112,14 @@ Required command surface:
 ### resolve
 
 - Delegates unresolved requirement/topic selection to `resume-core.getUnresolvedRequirements` without CLI ordering, tie-breaking, or fallback requirement IDs.
-- Uses agent only to phrase questions.
-- Accepts simulated answers through the `TerminalIO` seam.
-- Interprets answers into structured proposals.
-- Persists verified facts through career-store only after explicit confirmation.
+- Uses agent to phrase questions and interpret answers into structured proposals.
+- Accepts simulated exchange scripts through the `TerminalIO` seam: question answer first, then explicit confirmation responses for each proposed fact.
+- Displays the exact fact text before confirmation and persists facts through career-store only after explicit affirmative confirmation.
+- Lets career-store assign the final verification state from the confirmation exchange; the CLI must not pre-declare `user_verified`.
+- Declined confirmations persist no fact and record the declined outcome.
+- Negative or unknown answers record requirement-resolution outcomes such as `explicitly_missing` or `unknown`; absence is not represented as a verification state.
+- Records question, answer, and confirmation exchanges through career-store interactions, including `question_asked` and `answer_recorded`.
+- Persists substantive off-fixture affirmative answers, including Terraform answers backed by deterministic fake-adapter interpretation fixtures.
 - Re-runs match after each resolution.
 - Returns a typed no-unresolved result when core has no selected unresolved requirement.
 

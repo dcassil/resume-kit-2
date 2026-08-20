@@ -25,7 +25,9 @@ from ._config import (
     stable_config_hash as _stable_config_hash,
 )
 from ._inspect import inspect_requirement as _inspect_requirement_from_artifacts
-from resume_agent import extractJobSemantics, extractResumeSemantics, generateClarificationQuestion, interpretUserAnswer, proposeRewrite
+from ._resolve import resolution_context as _resolution_context
+from ._resolve import resolve as _resolve_interactive
+from resume_agent import extractJobSemantics, extractResumeSemantics, proposeRewrite
 from resume_core import applyChange, canonicalResumeFromExtraction, getUnresolvedRequirements, normalizeJobModel, normalizeResume, rankResumeContent, sanitizeText, scoreMatch, toRenderableResume, validateChange, validateFinalResume, validateGrounding, validateResume
 from resume_render import renderDocx, renderMarkdown, renderPdf, validateRenderedOutput
 from workflow import CHECKPOINT_ORDER, UnknownRunError, createRun, reconstructRunManifest, recordCheckpointResult
@@ -727,54 +729,17 @@ def _blocking_requirement_ids(selection: JsonObject, match_result: JsonObject) -
 
 
 def _resolve(workspace: Path, terminal_io: TerminalIO) -> JsonObject:
-    _init(workspace)
-    match_result = _match(workspace)["match_result"]
-    context = _resolution_context(match_result, _all_facts(workspace), _config(workspace))
-    if context.get("status") != "ok":
-        return context
-    question = generateClarificationQuestion(context)
-    answer = terminal_io.ask(str(question.get("question") or ""))
-    interpretation_context = {**context, "question": question.get("question")}
-    interpretation = interpretUserAnswer(answer, interpretation_context)
-    store = openCareerStore(str(_paths(workspace)["career_db"]))
-    stored_facts = []
-    for proposal in _fact_proposals(interpretation, context):
-        stored = store.upsertFact(
-            proposal,
-            {"source": "user_answer", "text": answer, "metadata": {"selected_requirement_ids": context["selected_requirement_ids"]}},
-            source="user_answer",
-            policy={},
-        )
-        interpretation_proposal = _interpretation_proposal(stored["fact_id"], interpretation, context, answer)
-        verified = store.verifyFact(
-            stored["fact_id"],
-            "user_verified",
-            confirmation=interpretation_proposal,
-            source="user_answer",
-        )
-        stored_fact = {"fact_id": stored["fact_id"], "verification_state": verified["verification_state"], "text": proposal["text"]}
-        stored_facts.append(stored_fact)
-        if verified["verification_state"] == "user_verified":
-            for requirement_id in context["selected_requirement_ids"]:
-                store.recordJobMatch(_current_job_id(workspace), requirement_id, [stored["fact_id"]], "verified_fact_match")
-    match_result = _match(workspace)["match_result"]
-    _record_latest_run_snapshot(
+    return _resolve_interactive(
         workspace,
-        "RESOLVE_GAPS",
-        {
-            "facts_verified": [fact["fact_id"] for fact in stored_facts if fact.get("verification_state") == "user_verified"],
-            "question_answer_log_refs": [f"career-store/facts/{fact['fact_id']}" for fact in stored_facts if fact.get("fact_id")],
-        },
+        terminal_io,
+        init_workspace=_init,
+        run_match=_match,
+        load_facts=_all_facts,
+        load_config=_config,
+        paths_for_workspace=_paths,
+        record_latest_run_snapshot=_record_latest_run_snapshot,
+        current_job_id=_current_job_id,
     )
-    return {
-        "status": "ok",
-        "exit_code": 0,
-        "question": question.get("question"),
-        "interpretation": interpretation,
-        "fact": stored_facts[0] if stored_facts else {},
-        "facts": stored_facts,
-        "match_result": match_result,
-    }
 
 
 def _tailor(workspace: Path) -> JsonObject:
@@ -1191,87 +1156,6 @@ def _write_docx_artifact(path: Path, render_result: JsonObject) -> Path | None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
     return path
-
-
-def _resolution_context(match_result: JsonObject, facts: list[JsonObject], config: JsonObject) -> JsonObject:
-    selection = getUnresolvedRequirements(match_result, config)
-    if selection.get("status") != "ok":
-        return {
-            "status": "error",
-            "exit_code": DOMAIN_VALIDATION_EXIT,
-            "errors": _core_errors_or_default(selection, "unresolved_selection_failed", "core unresolved requirement selection failed", "match.requirements"),
-        }
-    ranked = selection.get("ranked_unresolved_requirements") or selection.get("unresolved_requirements") or []
-    selected = selection.get("selected_requirement") if isinstance(selection.get("selected_requirement"), dict) else None
-    if selected is None and ranked:
-        selected = ranked[0]
-    if not isinstance(selected, dict):
-        return {
-            "status": "no_unresolved",
-            "exit_code": SUCCESS_EXIT,
-            "selected_requirement_ids": [],
-            "requirement": None,
-            "selection": selection,
-            "already_verified_fact_ids": [str(fact.get("fact_id")) for fact in facts if fact.get("fact_id")],
-        }
-    requirement_id = str(selected.get("requirement_id") or "")
-    topic = selected.get("topic") if selected.get("topic") else selected.get("concept")
-    if not requirement_id or not topic:
-        return _error("validation_error", "core selected requirement must include requirement_id and topic or concept", ref="match.requirements")
-    return {
-        "status": "ok",
-        "exit_code": SUCCESS_EXIT,
-        "selected_requirement_ids": [requirement_id],
-        "topic": topic,
-        "concept": selected.get("concept"),
-        "requirement": selected,
-        "selection": selection,
-        "unresolved_requirements": ranked,
-        "already_verified_fact_ids": [str(fact.get("fact_id")) for fact in facts if fact.get("fact_id")],
-    }
-
-
-def _fact_proposals(interpretation: JsonObject, context: JsonObject) -> list[JsonObject]:
-    proposals = []
-    for proposal in interpretation.get("fact_proposals", []):
-        if not isinstance(proposal, dict):
-            continue
-        text = str(proposal.get("text") or context.get("topic") or "")
-        normalized_terms = [str(term).lower() for term in proposal.get("normalized_terms", []) if str(term).strip()]
-        if not normalized_terms and context.get("topic"):
-            normalized_terms = [str(context["topic"]).lower()]
-        proposals.append(
-            {
-                "fact_id": str(proposal.get("fact_id") or _stable_short_id("fact", text)),
-                "type": str(proposal.get("category") or proposal.get("type") or "experience"),
-                "text": text,
-                "normalized_terms": normalized_terms,
-                "verification_state": "inferred",
-                "metadata": {"agent_proposal": proposal, "selected_requirement_ids": context.get("selected_requirement_ids", [])},
-            }
-        )
-    return proposals
-
-
-def _interpretation_proposal(fact_id: str, interpretation: JsonObject, context: JsonObject, answer: str) -> JsonObject:
-    evidence = interpretation.get("evidence_proposals", [])
-    source_id = None
-    if evidence and isinstance(evidence[0], dict):
-        source_id = evidence[0].get("evidence_id")
-    return {
-        "factId": fact_id,
-        "questionId": ",".join(str(item) for item in context.get("selected_requirement_ids", [])) or None,
-        "outcome": str(interpretation.get("outcome") or "unclear"),
-        "confirmedValue": {"answer": answer},
-        "provenance": [
-            {
-                "source": "user_answer",
-                "source_id": source_id,
-                "text": answer,
-                "metadata": {"selected_requirement_ids": context.get("selected_requirement_ids", [])},
-            }
-        ],
-    }
 
 
 def _current_job_id(workspace: Path) -> str:

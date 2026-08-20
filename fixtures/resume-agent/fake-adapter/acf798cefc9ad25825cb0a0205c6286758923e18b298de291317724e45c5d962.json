@@ -1,0 +1,82 @@
+{
+  "fixture_id": "resume-agent-answer-interpretation-terraform-four-years-affirmed",
+  "schema_version": "resume-agent.fake-adapter-fixture.v1",
+  "config_hash": "fixture-config-v1",
+  "reviewed": true,
+  "expected_observations": [
+    "Off-fixture Terraform affirmative answer with substantive duration produces a persistable fact proposal."
+  ],
+  "comment": "RKIT-T-0133 deterministic fixture for the resolve loop off-fixture persistence regression.",
+  "data": {
+    "key": {
+      "sha256": "acf798cefc9ad25825cb0a0205c6286758923e18b298de291317724e45c5d962",
+      "prompt_template_id": "resume-agent.answer-interpretation@v1",
+      "output_schema_id": "resume-agent.answer-interpretation.v1",
+      "canonical_input_json": "{\"answer_text\":\"Yes, I have used Terraform for four years.\",\"question\":\"What Terraform infrastructure-as-code experience do you have?\",\"schema_id\":\"resume-agent.answer-interpretation.v1\",\"topic\":\"Terraform\"}"
+    },
+    "payload": {
+      "schema_version": "resume-agent.answer-interpretation.v1",
+      "proposal_type": "answer_interpretation",
+      "requires_validation": true,
+      "polarity": "affirmed",
+      "requirementResolutions": [
+        {
+          "requirement_id": "req_terraform",
+          "suggested_state": "possible_match",
+          "confidence": 0.91,
+          "hedge_or_qualifier": "four years",
+          "evidence": [
+            {
+              "evidence_id": "ev_answer_terraform_four_years",
+              "source_text": "Yes, I have used Terraform for four years.",
+              "span": {
+                "start": 0,
+                "end": 42
+              }
+            }
+          ]
+        }
+      ],
+      "factProposals": [
+        {
+          "fact_id": "fact_terraform_four_years",
+          "category": "skill",
+          "text": "Used Terraform for four years",
+          "normalized_terms": [
+            "terraform",
+            "four years"
+          ],
+          "source_evidence_ids": [
+            "ev_answer_terraform_four_years"
+          ],
+          "evidence": [
+            {
+              "evidence_id": "ev_answer_terraform_four_years",
+              "source_text": "Yes, I have used Terraform for four years.",
+              "span": {
+                "start": 0,
+                "end": 42
+              }
+            }
+          ],
+          "verification_state": "inferred",
+          "confidence": 0.91,
+          "hedge_or_qualifier": "four years"
+        }
+      ],
+      "evidenceProposals": [
+        {
+          "evidence_id": "ev_answer_terraform_four_years",
+          "kind": "user_answer",
+          "text": "Yes, I have used Terraform for four years.",
+          "span": {
+            "start": 0,
+            "end": 42
+          },
+          "confidence": 1.0
+        }
+      ],
+      "uncertainty": []
+    }
+  }
+}

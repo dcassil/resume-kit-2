@@ -189,7 +189,7 @@ def run_smoke(root: Path, workspace: Path, keep_workspace: bool) -> None:
     require(initial_result.get("explanations"), "match result must include explanations")
 
     answer = answer_file.read_text(encoding="utf-8")
-    resolved = run_cli(resume_cli, ["resolve"], workspace, stdin=answer)
+    resolved = run_cli(resume_cli, ["resolve"], workspace, stdin=f"{answer.rstrip()}\nyes\n")
     require_ok(resolved, "resume resolve")
     require(resolved.get("fact", {}).get("verification_state") == "user_verified", "confirmed AWS fact was not user_verified")
     aws_fact = store.getFact(resolved["fact"]["fact_id"])

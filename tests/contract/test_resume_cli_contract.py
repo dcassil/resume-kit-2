@@ -307,7 +307,7 @@ class ResumeCliCommandContractTests(unittest.TestCase):
         run_cli(self.cli, ["init"], self.workspace)
         run_cli(self.cli, ["ingest", str(self.resume_file)], self.workspace)
         run_cli(self.cli, ["job", "ingest", str(self.job_file)], self.workspace)
-        answer = "Yes. I have about six years of AWS experience, mainly EC2, S3, Lambda, RDS, and IAM.\n"
+        answer = "Yes. I have about six years of AWS experience, mainly EC2, S3, Lambda, RDS, and IAM.\nyes\n"
         result = normalize_result(run_cli(self.cli, ["resolve"], self.workspace, stdin=answer))
         self.assertIn(result.get("exit_code", 0), {0, None})
         serialized = json.dumps(result, sort_keys=True).lower()
@@ -322,7 +322,7 @@ class ResumeCliCommandContractTests(unittest.TestCase):
         run_cli(self.cli, ["ingest", str(self.resume_file)], self.workspace)
         base_before = (self.workspace / "resume" / "base.json").read_text(encoding="utf-8")
         run_cli(self.cli, ["job", "ingest", str(self.job_file)], self.workspace)
-        run_cli(self.cli, ["resolve"], self.workspace, stdin="Yes. I have about six years of AWS experience, mainly EC2, S3, Lambda, RDS, and IAM.\n")
+        run_cli(self.cli, ["resolve"], self.workspace, stdin="Yes. I have about six years of AWS experience, mainly EC2, S3, Lambda, RDS, and IAM.\nyes\n")
         result = normalize_result(run_cli(self.cli, ["tailor"], self.workspace))
         self.assertIn(result.get("exit_code", 0), {0, None})
         self.assertEqual((self.workspace / "resume" / "base.json").read_text(encoding="utf-8"), base_before)

@@ -10,6 +10,7 @@ from unittest import mock
 class ResumeCliResolutionContextUnitTests(unittest.TestCase):
     def setUp(self) -> None:
         self.cli = importlib.import_module("resume_cli")
+        self.resolve_module = importlib.import_module("resume_cli._resolve")
 
     def test_resolution_context_uses_first_core_ranked_selection_verbatim(self) -> None:
         core_first = {
@@ -36,7 +37,7 @@ class ResumeCliResolutionContextUnitTests(unittest.TestCase):
             "can_continue": False,
         }
 
-        with mock.patch.object(self.cli, "getUnresolvedRequirements", return_value=selection) as unresolved:
+        with mock.patch.object(self.resolve_module, "getUnresolvedRequirements", return_value=selection) as unresolved:
             context = self.cli._resolution_context(
                 {"requirement_results": [core_second, core_first]},
                 [{"fact_id": "fact_react"}],
@@ -61,7 +62,7 @@ class ResumeCliResolutionContextUnitTests(unittest.TestCase):
             "can_continue": True,
         }
 
-        with mock.patch.object(self.cli, "getUnresolvedRequirements", return_value=selection):
+        with mock.patch.object(self.resolve_module, "getUnresolvedRequirements", return_value=selection):
             context = self.cli._resolution_context({"requirement_results": []}, [], {})
 
         self.assertEqual(context["status"], "no_unresolved")

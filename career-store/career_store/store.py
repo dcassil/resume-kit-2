@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable
 
-from .confirmations import proposal_evidence, validate_interpretation_proposal
+from .confirmations import proposal_evidence, proposal_has_user_provenance, validate_interpretation_proposal
 from .conflict_lifecycle import _adjudicate_conflict
 from .interactions import _list_interactions_result, _record_interaction_result
 from .migrations import (
@@ -82,6 +82,12 @@ _RESOLUTION_RANK = {"not_applicable": 0, "unknown": 1, "explicitly_missing": 2, 
 
 
 JsonObject = dict[str, Any]
+
+
+def _verification_state_from_confirmation(proposal: Any, current_state: str) -> str:
+    if proposal.outcome == "affirmed" and proposal_has_user_provenance(proposal):
+        return VerificationState.USER_VERIFIED.value
+    return current_state
 
 
 class CareerStore:
@@ -455,13 +461,10 @@ class CareerStore:
     def verifyFact(
         self,
         fact_id: str,
-        verification_state: str,
-        confirmation: JsonObject | None,
-        source: str,
+        verification_state: str | None = None,
+        confirmation: JsonObject | None = None,
+        source: str = "",
     ) -> JsonObject:
-        requested_state = _state_value(verification_state)
-        if requested_state not in _VERIFICATION_STATES:
-            return self._mutation_error("verifyFact", fact_id, "unknown", "invalid_verification_state", True)
         now = self._clock()
         mutation_status = "updated"
         with self._transaction("verifyFact", mutation_status) as txn:
@@ -477,7 +480,15 @@ class CareerStore:
                 result = self._interpretation_proposal_error(fact_id, current_state, exc, source)
                 result["transaction_result"] = None
             else:
-                if proposal.outcome != "affirmed":
+                if verification_state is None:
+                    requested_state = _verification_state_from_confirmation(proposal, current_state)
+                else:
+                    requested_state = _state_value(verification_state)
+                if requested_state not in _VERIFICATION_STATES:
+                    txn.set_mutation_status("rejected")
+                    result = self._mutation_error("verifyFact", fact_id, current_state, "invalid_verification_state", True)
+                    result["transaction_result"] = None
+                elif proposal.outcome != "affirmed":
                     txn.set_mutation_status("evidence_only")
                     for evidence in proposal_evidence(proposal, requested_state, source):
                         evidence_id = self._insert_evidence(conn, fact_id, evidence, source, now)
