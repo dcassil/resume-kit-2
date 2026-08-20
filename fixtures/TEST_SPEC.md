@@ -103,10 +103,10 @@ The main resume fixture should include:
 - TypeScript.
 - Node.js.
 - PostgreSQL.
-- Azure.
 - REST/API work.
 - Workflow automation.
-- Responsive web apps.
+- Release tooling.
+- Responsive apps.
 - Small-team leadership where source text supports it.
 - Formatting noise: smart quotes, non-breaking space, odd bullet, inconsistent dates.
 
@@ -170,7 +170,7 @@ Expected:
 - generated base/job subset artifacts match
   `fixtures/ingest-expected/off-fixture-data-engineer-base.json` and
   `fixtures/ingest-expected/off-fixture-data-engineer-job.json`,
-- no behavior depends on React, TypeScript, Azure, or any other original smoke
+- no behavior depends on React, TypeScript, release tooling, or any other original smoke
   fixture keyword.
 
 ## Required Answer Fixtures

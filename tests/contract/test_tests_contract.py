@@ -120,6 +120,22 @@ class TestsSuiteContractTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stdout)
 
+    def test_cli_match_decision_integration_module_is_bridged_into_current_gate(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "unittest",
+                "tests.integration.test_cli_match_decision_integration",
+            ],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+
     def test_resume_cli_domain_regrowth_boundary_module_is_bridged_into_current_gate(self):
         result = subprocess.run(
             [

@@ -25,7 +25,7 @@ from ._config import (
     stable_config_hash as _stable_config_hash,
 )
 from resume_agent import extractJobSemantics, extractResumeSemantics, generateClarificationQuestion, interpretUserAnswer, proposeRewrite
-from resume_core import applyChange, canonicalResumeFromExtraction, normalizeJobModel, normalizeResume, rankResumeContent, sanitizeText, scoreMatch, toRenderableResume, validateChange, validateFinalResume, validateGrounding, validateResume
+from resume_core import applyChange, canonicalResumeFromExtraction, getUnresolvedRequirements, normalizeJobModel, normalizeResume, rankResumeContent, sanitizeText, scoreMatch, toRenderableResume, validateChange, validateFinalResume, validateGrounding, validateResume
 from resume_render import renderDocx, renderMarkdown, renderPdf, validateRenderedOutput
 from workflow import CHECKPOINT_ORDER, UnknownRunError, createRun, reconstructRunManifest, recordCheckpointResult
 
@@ -314,16 +314,33 @@ def _report_for_result(
         )
     if command == "match" and isinstance(result.get("match_result"), dict):
         match_result = result["match_result"]
+        requirement_lines = []
+        for item in match_result.get("requirement_results", []):
+            if not isinstance(item, dict):
+                continue
+            requirement_id = str(item.get("requirement_id") or "requirement")
+            state = str(item.get("resolution_state") or "unknown")
+            suffix = " blocking" if item.get("blocking") else ""
+            requirement_lines.append(f"{requirement_id}: {state}{suffix}")
+        match_lines = [
+            f"score: {match_result.get('score', 'unknown')}",
+            f"threshold: {match_result.get('threshold', 'unknown')}",
+            f"decision: {match_result.get('decision', 'unknown')}",
+            f"hardRequirementsResolved: {match_result.get('hardRequirementsResolved', 'unknown')}",
+            f"requirements: {len(match_result.get('requirement_results', []))}",
+            f"unresolved: {len(match_result.get('unresolved_requirement_ids', match_result.get('unresolved', [])))}",
+        ]
+        routing_hint = result.get("routing_hint")
+        if isinstance(routing_hint, dict) and routing_hint.get("requirement_id"):
+            match_lines.append(f"route_to_resolve: {routing_hint['requirement_id']}")
         sections.append(
             {
                 "heading": "Match",
-                "lines": [
-                    f"score: {match_result.get('score', 'unknown')}",
-                    f"requirements: {len(match_result.get('requirements', []))}",
-                    f"unresolved: {len(match_result.get('unresolved', []))}",
-                ],
+                "lines": match_lines,
             }
         )
+        if requirement_lines:
+            sections.append({"heading": "Requirements", "lines": requirement_lines})
     if command == "resolve":
         sections.append({"heading": "Question", "lines": [str(result.get("question") or "")]})
     if command == "export":
@@ -607,22 +624,105 @@ def _match(workspace: Path) -> JsonObject:
     paths = _paths(workspace)
     resume = _read_json(paths["resume_working"], {})
     job = _read_json(paths["job_current"], {})
+    artifact_errors = _missing_match_artifact_errors(paths, resume, job)
+    if artifact_errors:
+        return {
+            "status": "error",
+            "exit_code": DOMAIN_VALIDATION_EXIT,
+            "errors": artifact_errors,
+        }
     facts = _all_facts(workspace)
-    result = scoreMatch(resume, job, facts, _config(workspace))
-    match_result = dict(result.get("match_result", {}))
-    requirements = []
-    for item in match_result.get("requirement_results", []):
-        copied = dict(item)
-        if copied.get("resolution_state") in {"related_match", "possible_match"}:
-            copied["raw_resolution_state"] = copied["resolution_state"]
-            copied["resolution_state"] = "unknown"
-        copied["status"] = "unresolved" if copied.get("blocking") else copied.get("resolution_state", "unknown")
-        requirements.append(copied)
-    match_result["requirements"] = requirements
-    match_result["unresolved"] = match_result.get("unresolved_requirement_ids", [])
+    config = _config(workspace)
+    result = scoreMatch(resume, job, facts, config)
+    match_result = _match_result_with_aliases(result.get("match_result", {}))
+    if result.get("status") != "ok":
+        return {
+            "status": "error",
+            "exit_code": DOMAIN_VALIDATION_EXIT,
+            "match_result": match_result,
+            "errors": _core_errors_or_default(result, "match_failed", "core match scoring failed", "match"),
+        }
     _write_json(paths["reports_dir"] / "match.json", match_result)
     _record_latest_run_snapshot(workspace, "MATCH_BASE", {"match_result": match_result})
-    return {"status": "ok", "exit_code": 0, "match_result": match_result}
+    selection = getUnresolvedRequirements(match_result, config)
+    decision = str(match_result.get("decision") or "unknown")
+    if decision == "continue":
+        return {"status": "ok", "exit_code": SUCCESS_EXIT, "match_result": match_result}
+    if decision == "resolve_gaps":
+        routing_hint = _routing_hint(selection)
+        return {
+            "status": "ok",
+            "exit_code": SUCCESS_EXIT,
+            "match_result": match_result,
+            "routing_hint": routing_hint,
+        }
+    if decision == "blocked":
+        blocking_ids = _blocking_requirement_ids(selection, match_result)
+        return {
+            "status": "error",
+            "exit_code": DOMAIN_VALIDATION_EXIT,
+            "match_result": match_result,
+            "blocking_requirement_ids": blocking_ids,
+            "errors": [
+                {
+                    "code": "match_blocked",
+                    "message": f"blocked by unresolved required requirements: {', '.join(blocking_ids) if blocking_ids else 'unknown'}",
+                    "ref": "match.requirements",
+                }
+            ],
+        }
+    return {"status": "error", "exit_code": DOMAIN_VALIDATION_EXIT, "match_result": match_result, "errors": [{"code": "invalid_match_decision", "message": f"unknown match decision: {decision}", "ref": "match.decision"}]}
+
+
+def _missing_match_artifact_errors(paths: dict[str, Path], resume: Any, job: Any) -> list[JsonObject]:
+    errors = []
+    if not isinstance(resume, dict) or not resume:
+        ref = paths["resume_working"].relative_to(paths["config"].parent).as_posix()
+        errors.append({"code": "missing_match_artifact", "message": "missing resume artifact: run `resume ingest <file>` before `resume match`", "ref": ref})
+    if not isinstance(job, dict) or not job:
+        ref = paths["job_current"].relative_to(paths["config"].parent).as_posix()
+        errors.append({"code": "missing_match_artifact", "message": "missing job artifact: run `resume job ingest <file-or-url-text>` before `resume match`", "ref": ref})
+    return errors
+
+
+def _match_result_with_aliases(raw_match_result: Any) -> JsonObject:
+    match_result = dict(raw_match_result) if isinstance(raw_match_result, dict) else {}
+    requirement_results = [dict(item) for item in match_result.get("requirement_results", []) if isinstance(item, dict)]
+    match_result["requirement_results"] = requirement_results
+    match_result["requirements"] = [dict(item) for item in requirement_results]
+    match_result["unresolved"] = list(match_result.get("unresolved_requirement_ids", []))
+    return match_result
+
+
+def _core_errors_or_default(result: JsonObject, code: str, message: str, ref: str) -> list[JsonObject]:
+    errors = result.get("errors")
+    if isinstance(errors, list) and errors:
+        return [error for error in errors if isinstance(error, dict)]
+    return [{"code": code, "message": message, "ref": ref}]
+
+
+def _routing_hint(selection: JsonObject) -> JsonObject:
+    selected = selection.get("selected_requirement") if isinstance(selection, dict) else None
+    if not isinstance(selected, dict):
+        return {}
+    requirement_id = str(selected.get("requirement_id") or "")
+    if not requirement_id:
+        return {}
+    return {"action": "resolve_requirement", "requirement_id": requirement_id, "resolution_state": selected.get("resolution_state"), "blocking": bool(selected.get("blocking", False))}
+
+
+def _blocking_requirement_ids(selection: JsonObject, match_result: JsonObject) -> list[str]:
+    if isinstance(selection, dict):
+        blocking = selection.get("blocking_requirements")
+        if isinstance(blocking, list):
+            ids = [str(item.get("requirement_id")) for item in blocking if isinstance(item, dict) and item.get("requirement_id")]
+            if ids:
+                return ids
+    return [
+        str(item.get("requirement_id"))
+        for item in match_result.get("requirement_results", [])
+        if isinstance(item, dict) and item.get("blocking") and item.get("requirement_id")
+    ]
 
 
 def _resolve(workspace: Path, terminal_io: TerminalIO) -> JsonObject:
@@ -851,11 +951,19 @@ def _run(workspace: Path, resume_file: Path, job_file: Path) -> JsonObject:
     _init(workspace)
     _ingest_resume(workspace, resume_file)
     _ingest_job(workspace, job_file)
-    _match(workspace)
+    match = _match(workspace)
+    if _run_can_export_resume_only(match):
+        _export(workspace, "docx")
+        return {"status": "ok", "exit_code": 0, "checkpoints": list(CHECKPOINT_ORDER), "warnings": ["job ingest produced no matchable artifact; exported ingested resume only"]}
     _tailor(workspace)
     _validate(workspace)
     _export(workspace, "docx")
     return {"status": "ok", "exit_code": 0, "checkpoints": list(CHECKPOINT_ORDER)}
+
+
+def _run_can_export_resume_only(match: JsonObject) -> bool:
+    errors = match.get("errors")
+    return match.get("status") == "error" and isinstance(errors, list) and any(isinstance(error, dict) and error.get("ref") == "job/current.json" for error in errors)
 
 
 def _inspect_fact(workspace: Path, fact_id: str) -> JsonObject:

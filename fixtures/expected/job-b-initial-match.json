@@ -64,7 +64,7 @@
           "weight": 0.1
         },
         {
-          "contribution": 0.04026,
+          "contribution": 0.037662,
           "evidence": [
             {
               "matched_form": "surface",
@@ -164,7 +164,7 @@
               ]
             },
             {
-              "matched_form": "surface",
+              "matched_form": "none",
               "term": {
                 "canonical": "web",
                 "source": "requirement",
@@ -172,20 +172,7 @@
                 "weight": 10.0
               },
               "term_ref": "terminology/6",
-              "where": [
-                {
-                  "claim_id": "summary_main",
-                  "field_path": "summary"
-                },
-                {
-                  "claim_id": "skill_responsive_web_apps",
-                  "field_path": "skills/8"
-                },
-                {
-                  "claim_id": "experience_1_bullet_4",
-                  "field_path": "experience/0/bullets/3"
-                }
-              ]
+              "where": []
             },
             {
               "matched_form": "none",
@@ -363,7 +350,7 @@
                 },
                 {
                   "claim_id": "skill_rest_apis",
-                  "field_path": "skills/5"
+                  "field_path": "skills/4"
                 },
                 {
                   "claim_id": "experience_1_bullet_2",
@@ -480,7 +467,7 @@
                 },
                 {
                   "claim_id": "skill_rest_apis",
-                  "field_path": "skills/5"
+                  "field_path": "skills/4"
                 },
                 {
                   "claim_id": "experience_1_bullet_2",
@@ -641,7 +628,7 @@
                 },
                 {
                   "claim_id": "skill_saas",
-                  "field_path": "skills/6"
+                  "field_path": "skills/5"
                 },
                 {
                   "field_path": "experience/0/company"
@@ -787,7 +774,7 @@
               ]
             },
             {
-              "matched_form": "surface",
+              "matched_form": "none",
               "term": {
                 "canonical": "web",
                 "source": "description",
@@ -795,20 +782,7 @@
                 "weight": 1.0
               },
               "term_ref": "terminology/48",
-              "where": [
-                {
-                  "claim_id": "summary_main",
-                  "field_path": "summary"
-                },
-                {
-                  "claim_id": "skill_responsive_web_apps",
-                  "field_path": "skills/8"
-                },
-                {
-                  "claim_id": "experience_1_bullet_4",
-                  "field_path": "experience/0/bullets/3"
-                }
-              ]
+              "where": []
             },
             {
               "matched_form": "surface",
@@ -956,7 +930,7 @@
                 },
                 {
                   "claim_id": "skill_saas",
-                  "field_path": "skills/6"
+                  "field_path": "skills/5"
                 },
                 {
                   "field_path": "experience/0/company"
@@ -1027,7 +1001,7 @@
                 },
                 {
                   "claim_id": "skill_rest_apis",
-                  "field_path": "skills/5"
+                  "field_path": "skills/4"
                 },
                 {
                   "claim_id": "experience_1_bullet_2",
@@ -1212,7 +1186,7 @@
                 },
                 {
                   "claim_id": "skill_rest_apis",
-                  "field_path": "skills/5"
+                  "field_path": "skills/4"
                 },
                 {
                   "claim_id": "experience_1_bullet_2",
@@ -1233,7 +1207,7 @@
             }
           ],
           "name": "terminology",
-          "score": 0.402597,
+          "score": 0.376623,
           "weight": 0.1
         }
       ],
@@ -1242,7 +1216,7 @@
       ],
       "hardRequirementsResolved": true,
       "job_id": "job-b",
-      "match_id": "match_1fd0d9894626",
+      "match_id": "match_19c7fde288a2",
       "max_score": 46.0,
       "preferred_unresolved_requirement_ids": [],
       "requirement_results": [
@@ -1254,8 +1228,7 @@
             {
               "source": "resume",
               "terms": [
-                "react",
-                "web"
+                "react"
               ]
             }
           ],
@@ -1281,8 +1254,7 @@
               "terms": [
                 "js",
                 "node",
-                "node js",
-                "service"
+                "node js"
               ]
             }
           ],
@@ -1420,8 +1392,8 @@
       ],
       "resume_id": "resume-main",
       "schema_version": "match-result.v1",
-      "score": 41.4199,
-      "score_percent": 90.04,
+      "score": 41.2208,
+      "score_percent": 89.61,
       "threshold": 7.5,
       "unresolved_requirement_ids": []
     },

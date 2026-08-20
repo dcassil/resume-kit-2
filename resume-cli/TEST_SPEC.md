@@ -105,6 +105,9 @@ Required command surface:
 - Produces deterministic output for identical state/config.
 - Shows missing/preferred/unresolved requirements distinctly.
 - Blocks or routes to resolve when hard requirement policy demands it.
+- Persists the full section-4.3 MatchResult fields: `score`, `threshold`, `hardRequirementsResolved`, `dimensions`, `requirement_results`, and tri-state `decision`.
+- Passes core `resolution_state` vocabulary through verbatim in persisted JSON and the stdout report, including `related_match`, `possible_match`, and `not_applicable`.
+- Treats an empty workspace without resume/job artifacts as a typed failure naming the missing artifact, not an ok zero-score match.
 
 ### resolve
 

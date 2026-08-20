@@ -22,10 +22,10 @@
       "TypeScript",
       "Node.js",
       "PostgreSQL",
-      "Azure",
       "REST APIs",
       "workflow automation",
-      "responsive web apps",
+      "release tooling",
+      "responsive apps",
       "small team"
     ],
     "must_not_include": [

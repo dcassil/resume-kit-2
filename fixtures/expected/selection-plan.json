@@ -58,24 +58,24 @@
       },
       {
         "fact_ids": [],
-        "id": "skill_5",
+        "id": "skill_4",
         "kind": "skill",
         "requirement_ids": [
           "fixture_req_2_e55af3cd",
           "fixture_req_6_3ef16ea5"
         ],
         "score": 3.0,
-        "source_index": 5
+        "source_index": 4
       },
       {
         "fact_ids": [],
-        "id": "skill_6",
+        "id": "skill_5",
         "kind": "skill",
         "requirement_ids": [
           "fixture_req_4_8f8157ef"
         ],
         "score": 3.0,
-        "source_index": 6
+        "source_index": 5
       },
       {
         "fact_ids": [],
@@ -135,11 +135,11 @@
       },
       {
         "fact_ids": [],
-        "id": "skill_4",
+        "id": "skill_6",
         "kind": "skill",
         "requirement_ids": [],
         "score": 1.0,
-        "source_index": 4
+        "source_index": 6
       },
       {
         "fact_ids": [],
@@ -284,7 +284,7 @@
         {
           "action": "keep",
           "fact_ids": [],
-          "path": "/skills/5",
+          "path": "/skills/4",
           "reason": "match_relevance_keep",
           "relevance": 3.0,
           "requirement_ids": [
@@ -295,7 +295,7 @@
         {
           "action": "keep",
           "fact_ids": [],
-          "path": "/skills/6",
+          "path": "/skills/5",
           "reason": "match_relevance_keep",
           "relevance": 3.0,
           "requirement_ids": [
@@ -361,7 +361,7 @@
         {
           "action": "keep",
           "fact_ids": [],
-          "path": "/skills/4",
+          "path": "/skills/6",
           "reason": "unlinked_fill",
           "relevance": 1.0,
           "requirement_ids": []

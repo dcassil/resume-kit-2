@@ -60,4 +60,4 @@ Recommended Agent: opus + high
 
 ## Status Updates **[REQUIRED]**
 
-*To be added during implementation*
+- 2026-08-19: Implemented `resume match` passthrough and tri-state decision mapping in `resume-cli/resume_cli/__init__.py`. Removed CLI resolution-state downgrades/status synthesis; persisted full core MatchResult with lossless `requirements` and `unresolved` aliases retained for smoke/legacy consumers; added resolve_gaps routing via `getUnresolvedRequirements`; blocked decisions now exit 1 with blocking requirement ids; empty match artifacts now return typed failures. Added bridged integration coverage and strengthened match TEST_SPEC. Updated smoke fixture/fake-adapter baselines so AWS is genuinely unknown before the AWS answer while preserving smoke flow. Verification: `python3 tools/run_gate.py --pr --root .` PASS, `python3 tools/run_gate.py --smoke --root .` PASS, snapshot regeneration pair PASS with zero drift between regenerations.

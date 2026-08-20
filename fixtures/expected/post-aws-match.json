@@ -391,7 +391,7 @@
                 },
                 {
                   "claim_id": "skill_rest_apis",
-                  "field_path": "skills/5"
+                  "field_path": "skills/4"
                 },
                 {
                   "claim_id": "experience_1_bullet_2",
@@ -486,7 +486,7 @@
                 },
                 {
                   "claim_id": "skill_rest_apis",
-                  "field_path": "skills/5"
+                  "field_path": "skills/4"
                 },
                 {
                   "claim_id": "experience_1_bullet_2",
@@ -588,7 +588,7 @@
                   "field_path": "summary"
                 },
                 {
-                  "claim_id": "skill_responsive_web_apps",
+                  "claim_id": "skill_responsive_apps",
                   "field_path": "skills/8"
                 },
                 {
@@ -598,7 +598,7 @@
               ]
             },
             {
-              "matched_form": "none",
+              "matched_form": "surface",
               "term": {
                 "canonical": "responsive apps",
                 "source": "requirement",
@@ -606,7 +606,20 @@
                 "weight": 10.0
               },
               "term_ref": "terminology/35",
-              "where": []
+              "where": [
+                {
+                  "claim_id": "summary_main",
+                  "field_path": "summary"
+                },
+                {
+                  "claim_id": "skill_responsive_apps",
+                  "field_path": "skills/8"
+                },
+                {
+                  "claim_id": "experience_1_bullet_4",
+                  "field_path": "experience/0/bullets/3"
+                }
+              ]
             },
             {
               "matched_form": "none",
@@ -631,7 +644,7 @@
               "where": []
             },
             {
-              "matched_form": "surface",
+              "matched_form": "none",
               "term": {
                 "canonical": "responsive web apps",
                 "source": "requirement",
@@ -639,20 +652,7 @@
                 "weight": 10.0
               },
               "term_ref": "terminology/38",
-              "where": [
-                {
-                  "claim_id": "summary_main",
-                  "field_path": "summary"
-                },
-                {
-                  "claim_id": "skill_responsive_web_apps",
-                  "field_path": "skills/8"
-                },
-                {
-                  "claim_id": "experience_1_bullet_4",
-                  "field_path": "experience/0/bullets/3"
-                }
-              ]
+              "where": []
             },
             {
               "matched_form": "none",
@@ -712,7 +712,7 @@
                 },
                 {
                   "claim_id": "skill_saas",
-                  "field_path": "skills/6"
+                  "field_path": "skills/5"
                 },
                 {
                   "field_path": "experience/0/company"
@@ -1197,7 +1197,7 @@
                   "field_path": "summary"
                 },
                 {
-                  "claim_id": "skill_responsive_web_apps",
+                  "claim_id": "skill_responsive_apps",
                   "field_path": "skills/8"
                 },
                 {
@@ -1285,7 +1285,7 @@
                 },
                 {
                   "claim_id": "skill_saas",
-                  "field_path": "skills/6"
+                  "field_path": "skills/5"
                 },
                 {
                   "field_path": "experience/0/company"
@@ -1465,7 +1465,7 @@
                 },
                 {
                   "claim_id": "skill_rest_apis",
-                  "field_path": "skills/5"
+                  "field_path": "skills/4"
                 },
                 {
                   "claim_id": "experience_1_bullet_2",
@@ -1656,7 +1656,7 @@
               ]
             },
             {
-              "matched_form": "none",
+              "matched_form": "surface",
               "term": {
                 "canonical": "responsive apps",
                 "source": "description",
@@ -1664,7 +1664,20 @@
                 "weight": 1.0
               },
               "term_ref": "terminology/110",
-              "where": []
+              "where": [
+                {
+                  "claim_id": "summary_main",
+                  "field_path": "summary"
+                },
+                {
+                  "claim_id": "skill_responsive_apps",
+                  "field_path": "skills/8"
+                },
+                {
+                  "claim_id": "experience_1_bullet_4",
+                  "field_path": "experience/0/bullets/3"
+                }
+              ]
             },
             {
               "matched_form": "none",
@@ -1689,7 +1702,7 @@
               "where": []
             },
             {
-              "matched_form": "surface",
+              "matched_form": "none",
               "term": {
                 "canonical": "responsive web apps",
                 "source": "description",
@@ -1697,20 +1710,7 @@
                 "weight": 1.0
               },
               "term_ref": "terminology/113",
-              "where": [
-                {
-                  "claim_id": "summary_main",
-                  "field_path": "summary"
-                },
-                {
-                  "claim_id": "skill_responsive_web_apps",
-                  "field_path": "skills/8"
-                },
-                {
-                  "claim_id": "experience_1_bullet_4",
-                  "field_path": "experience/0/bullets/3"
-                }
-              ]
+              "where": []
             },
             {
               "matched_form": "none",
@@ -1750,7 +1750,7 @@
                 },
                 {
                   "claim_id": "skill_rest_apis",
-                  "field_path": "skills/5"
+                  "field_path": "skills/4"
                 },
                 {
                   "claim_id": "experience_1_bullet_2",
@@ -1995,7 +1995,7 @@
                 "desktop and mobile",
                 "mobile",
                 "responsive",
-                "responsive web apps"
+                "responsive apps"
               ]
             }
           ],

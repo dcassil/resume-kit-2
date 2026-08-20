@@ -112,10 +112,10 @@
                     {
                       "claim_id": "experience_1_bullet_4",
                       "source": "resume",
-                      "text": "Improved front-end reliability for responsive web apps across desktop and mobile browsers."
+                      "text": "Improved front-end reliability for responsive apps across desktop and mobile browsers."
                     }
                   ],
-                  "value": "Improved front-end reliability for responsive web apps across desktop and mobile browsers.",
+                  "value": "Improved front-end reliability for responsive apps across desktop and mobile browsers.",
                   "verification_state": "source_stated"
                 }
               ],
@@ -133,10 +133,10 @@
                     {
                       "claim_id": "experience_2_bullet_1",
                       "source": "resume",
-                      "text": "Built Node.js services backed by PostgreSQL for workflow automation and data-processing tools."
+                      "text": "Built Node.js applications backed by PostgreSQL for workflow automation and data-processing tools."
                     }
                   ],
-                  "value": "Built Node.js services backed by PostgreSQL for workflow automation and data-processing tools.",
+                  "value": "Built Node.js applications backed by PostgreSQL for workflow automation and data-processing tools.",
                   "verification_state": "source_stated"
                 },
                 {
@@ -145,10 +145,10 @@
                     {
                       "claim_id": "experience_2_bullet_2",
                       "source": "resume",
-                      "text": "Integrated Azure services for deployment, monitoring, and application operations."
+                      "text": "Integrated release tooling for monitoring and application operations."
                     }
                   ],
-                  "value": "Integrated Azure services for deployment, monitoring, and application operations.",
+                  "value": "Integrated release tooling for monitoring and application operations.",
                   "verification_state": "source_stated"
                 },
                 {
@@ -175,7 +175,7 @@
             {
               "claim_id": "summary_main",
               "source": "resume",
-              "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+              "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing product platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, REST APIs, release tooling, and responsive apps."
             }
           ],
           "resume_id": "resume-main",
@@ -230,18 +230,6 @@
               "verification_state": "source_stated"
             },
             {
-              "claim_id": "skill_azure",
-              "provenance": [
-                {
-                  "claim_id": "skill_azure",
-                  "source": "resume",
-                  "text": "Azure"
-                }
-              ],
-              "value": "Azure",
-              "verification_state": "source_stated"
-            },
-            {
               "claim_id": "skill_rest_apis",
               "provenance": [
                 {
@@ -278,15 +266,27 @@
               "verification_state": "source_stated"
             },
             {
-              "claim_id": "skill_responsive_web_apps",
+              "claim_id": "skill_release_tooling",
               "provenance": [
                 {
-                  "claim_id": "skill_responsive_web_apps",
+                  "claim_id": "skill_release_tooling",
                   "source": "resume",
-                  "text": "responsive web apps"
+                  "text": "release tooling"
                 }
               ],
-              "value": "responsive web apps",
+              "value": "release tooling",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_responsive_apps",
+              "provenance": [
+                {
+                  "claim_id": "skill_responsive_apps",
+                  "source": "resume",
+                  "text": "responsive apps"
+                }
+              ],
+              "value": "responsive apps",
               "verification_state": "source_stated"
             },
             {
@@ -314,15 +314,15 @@
                 "claim_id": "summary_main",
                 "fact_id": "fact_summary_12_years",
                 "source": "resume",
-                "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+                "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing product platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, REST APIs, release tooling, and responsive apps."
               },
               {
                 "claim_id": "summary_main",
                 "source": "resume",
-                "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+                "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing product platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, REST APIs, release tooling, and responsive apps."
               }
             ],
-            "value": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps.",
+            "value": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing product platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, REST APIs, release tooling, and responsive apps.",
             "verification_state": "source_stated"
           },
           "verification_state": "source_stated"
@@ -425,10 +425,10 @@
                     {
                       "claim_id": "experience_1_bullet_4",
                       "source": "resume",
-                      "text": "Improved front-end reliability for responsive web apps across desktop and mobile browsers."
+                      "text": "Improved front-end reliability for responsive apps across desktop and mobile browsers."
                     }
                   ],
-                  "value": "Improved front-end reliability for responsive web apps across desktop and mobile browsers.",
+                  "value": "Improved front-end reliability for responsive apps across desktop and mobile browsers.",
                   "verification_state": "source_stated"
                 }
               ],
@@ -446,10 +446,10 @@
                     {
                       "claim_id": "experience_2_bullet_1",
                       "source": "resume",
-                      "text": "Built Node.js services backed by PostgreSQL for workflow automation and data-processing tools."
+                      "text": "Built Node.js applications backed by PostgreSQL for workflow automation and data-processing tools."
                     }
                   ],
-                  "value": "Built Node.js services backed by PostgreSQL for workflow automation and data-processing tools.",
+                  "value": "Built Node.js applications backed by PostgreSQL for workflow automation and data-processing tools.",
                   "verification_state": "source_stated"
                 },
                 {
@@ -458,10 +458,10 @@
                     {
                       "claim_id": "experience_2_bullet_2",
                       "source": "resume",
-                      "text": "Integrated Azure services for deployment, monitoring, and application operations."
+                      "text": "Integrated release tooling for monitoring and application operations."
                     }
                   ],
-                  "value": "Integrated Azure services for deployment, monitoring, and application operations.",
+                  "value": "Integrated release tooling for monitoring and application operations.",
                   "verification_state": "source_stated"
                 },
                 {
@@ -488,7 +488,7 @@
             {
               "claim_id": "summary_main",
               "source": "resume",
-              "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+              "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing product platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, REST APIs, release tooling, and responsive apps."
             }
           ],
           "resume_id": "resume-main",
@@ -543,18 +543,6 @@
               "verification_state": "source_stated"
             },
             {
-              "claim_id": "skill_azure",
-              "provenance": [
-                {
-                  "claim_id": "skill_azure",
-                  "source": "resume",
-                  "text": "Azure"
-                }
-              ],
-              "value": "Azure",
-              "verification_state": "source_stated"
-            },
-            {
               "claim_id": "skill_rest_apis",
               "provenance": [
                 {
@@ -591,15 +579,27 @@
               "verification_state": "source_stated"
             },
             {
-              "claim_id": "skill_responsive_web_apps",
+              "claim_id": "skill_release_tooling",
               "provenance": [
                 {
-                  "claim_id": "skill_responsive_web_apps",
+                  "claim_id": "skill_release_tooling",
                   "source": "resume",
-                  "text": "responsive web apps"
+                  "text": "release tooling"
                 }
               ],
-              "value": "responsive web apps",
+              "value": "release tooling",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_responsive_apps",
+              "provenance": [
+                {
+                  "claim_id": "skill_responsive_apps",
+                  "source": "resume",
+                  "text": "responsive apps"
+                }
+              ],
+              "value": "responsive apps",
               "verification_state": "source_stated"
             },
             {
@@ -628,15 +628,15 @@
                 "claim_id": "summary_main",
                 "fact_id": "fact_summary_12_years",
                 "source": "resume",
-                "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+                "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing product platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, REST APIs, release tooling, and responsive apps."
               },
               {
                 "claim_id": "summary_main",
                 "source": "resume",
-                "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+                "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing product platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, REST APIs, release tooling, and responsive apps."
               }
             ],
-            "value": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps.",
+            "value": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing product platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, REST APIs, release tooling, and responsive apps.",
             "verification_state": "source_stated"
           },
           "verification_state": "source_stated"
@@ -783,10 +783,10 @@
                     {
                       "claim_id": "experience_1_bullet_4",
                       "source": "resume",
-                      "text": "Improved front-end reliability for responsive web apps across desktop and mobile browsers."
+                      "text": "Improved front-end reliability for responsive apps across desktop and mobile browsers."
                     }
                   ],
-                  "value": "Improved front-end reliability for responsive web apps across desktop and mobile browsers.",
+                  "value": "Improved front-end reliability for responsive apps across desktop and mobile browsers.",
                   "verification_state": "source_stated"
                 }
               ],
@@ -804,10 +804,10 @@
                     {
                       "claim_id": "experience_2_bullet_1",
                       "source": "resume",
-                      "text": "Built Node.js services backed by PostgreSQL for workflow automation and data-processing tools."
+                      "text": "Built Node.js applications backed by PostgreSQL for workflow automation and data-processing tools."
                     }
                   ],
-                  "value": "Built Node.js services backed by PostgreSQL for workflow automation and data-processing tools.",
+                  "value": "Built Node.js applications backed by PostgreSQL for workflow automation and data-processing tools.",
                   "verification_state": "source_stated"
                 },
                 {
@@ -816,10 +816,10 @@
                     {
                       "claim_id": "experience_2_bullet_2",
                       "source": "resume",
-                      "text": "Integrated Azure services for deployment, monitoring, and application operations."
+                      "text": "Integrated release tooling for monitoring and application operations."
                     }
                   ],
-                  "value": "Integrated Azure services for deployment, monitoring, and application operations.",
+                  "value": "Integrated release tooling for monitoring and application operations.",
                   "verification_state": "source_stated"
                 },
                 {
@@ -846,7 +846,7 @@
             {
               "claim_id": "summary_main",
               "source": "resume",
-              "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+              "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing product platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, REST APIs, release tooling, and responsive apps."
             }
           ],
           "resume_id": "resume-main",
@@ -901,18 +901,6 @@
               "verification_state": "source_stated"
             },
             {
-              "claim_id": "skill_azure",
-              "provenance": [
-                {
-                  "claim_id": "skill_azure",
-                  "source": "resume",
-                  "text": "Azure"
-                }
-              ],
-              "value": "Azure",
-              "verification_state": "source_stated"
-            },
-            {
               "claim_id": "skill_rest_apis",
               "provenance": [
                 {
@@ -949,15 +937,27 @@
               "verification_state": "source_stated"
             },
             {
-              "claim_id": "skill_responsive_web_apps",
+              "claim_id": "skill_release_tooling",
               "provenance": [
                 {
-                  "claim_id": "skill_responsive_web_apps",
+                  "claim_id": "skill_release_tooling",
                   "source": "resume",
-                  "text": "responsive web apps"
+                  "text": "release tooling"
                 }
               ],
-              "value": "responsive web apps",
+              "value": "release tooling",
+              "verification_state": "source_stated"
+            },
+            {
+              "claim_id": "skill_responsive_apps",
+              "provenance": [
+                {
+                  "claim_id": "skill_responsive_apps",
+                  "source": "resume",
+                  "text": "responsive apps"
+                }
+              ],
+              "value": "responsive apps",
               "verification_state": "source_stated"
             },
             {
@@ -986,15 +986,15 @@
                 "claim_id": "summary_main",
                 "fact_id": "fact_summary_12_years",
                 "source": "resume",
-                "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+                "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing product platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, REST APIs, release tooling, and responsive apps."
               },
               {
                 "claim_id": "summary_main",
                 "source": "resume",
-                "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+                "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing product platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, REST APIs, release tooling, and responsive apps."
               }
             ],
-            "value": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps.",
+            "value": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing product platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, REST APIs, release tooling, and responsive apps.",
             "verification_state": "source_stated"
           },
           "verification_state": "source_stated"
@@ -1308,10 +1308,10 @@
                 {
                   "claim_id": "experience_1_bullet_4",
                   "source": "resume",
-                  "text": "Improved front-end reliability for responsive web apps across desktop and mobile browsers."
+                  "text": "Improved front-end reliability for responsive apps across desktop and mobile browsers."
                 }
               ],
-              "value": "Improved front-end reliability for responsive web apps across desktop and mobile browsers.",
+              "value": "Improved front-end reliability for responsive apps across desktop and mobile browsers.",
               "verification_state": "source_stated"
             }
           ],
@@ -1329,10 +1329,10 @@
                 {
                   "claim_id": "experience_2_bullet_1",
                   "source": "resume",
-                  "text": "Built Node.js services backed by PostgreSQL for workflow automation and data-processing tools."
+                  "text": "Built Node.js applications backed by PostgreSQL for workflow automation and data-processing tools."
                 }
               ],
-              "value": "Built Node.js services backed by PostgreSQL for workflow automation and data-processing tools.",
+              "value": "Built Node.js applications backed by PostgreSQL for workflow automation and data-processing tools.",
               "verification_state": "source_stated"
             },
             {
@@ -1341,10 +1341,10 @@
                 {
                   "claim_id": "experience_2_bullet_2",
                   "source": "resume",
-                  "text": "Integrated Azure services for deployment, monitoring, and application operations."
+                  "text": "Integrated release tooling for monitoring and application operations."
                 }
               ],
-              "value": "Integrated Azure services for deployment, monitoring, and application operations.",
+              "value": "Integrated release tooling for monitoring and application operations.",
               "verification_state": "source_stated"
             },
             {
@@ -1371,7 +1371,7 @@
         {
           "claim_id": "summary_main",
           "source": "resume",
-          "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+          "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing product platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, REST APIs, release tooling, and responsive apps."
         }
       ],
       "resume_id": "resume-main",
@@ -1426,18 +1426,6 @@
           "verification_state": "source_stated"
         },
         {
-          "claim_id": "skill_azure",
-          "provenance": [
-            {
-              "claim_id": "skill_azure",
-              "source": "resume",
-              "text": "Azure"
-            }
-          ],
-          "value": "Azure",
-          "verification_state": "source_stated"
-        },
-        {
           "claim_id": "skill_rest_apis",
           "provenance": [
             {
@@ -1474,15 +1462,27 @@
           "verification_state": "source_stated"
         },
         {
-          "claim_id": "skill_responsive_web_apps",
+          "claim_id": "skill_release_tooling",
           "provenance": [
             {
-              "claim_id": "skill_responsive_web_apps",
+              "claim_id": "skill_release_tooling",
               "source": "resume",
-              "text": "responsive web apps"
+              "text": "release tooling"
             }
           ],
-          "value": "responsive web apps",
+          "value": "release tooling",
+          "verification_state": "source_stated"
+        },
+        {
+          "claim_id": "skill_responsive_apps",
+          "provenance": [
+            {
+              "claim_id": "skill_responsive_apps",
+              "source": "resume",
+              "text": "responsive apps"
+            }
+          ],
+          "value": "responsive apps",
           "verification_state": "source_stated"
         },
         {
@@ -1511,15 +1511,15 @@
             "claim_id": "summary_main",
             "fact_id": "fact_summary_12_years",
             "source": "resume",
-            "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+            "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing product platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, REST APIs, release tooling, and responsive apps."
           },
           {
             "claim_id": "summary_main",
             "source": "resume",
-            "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps."
+            "text": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing product platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, REST APIs, release tooling, and responsive apps."
           }
         ],
-        "value": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing web platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, Azure, REST APIs, and responsive web apps.",
+        "value": "Senior Software Developer with 12 years of full-stack software development experience across multi-tenant SaaS products, workflow automation, and customer-facing product platforms. Known for building \"clean, reliable\" product experiences with React, TypeScript, Node.js, PostgreSQL, REST APIs, release tooling, and responsive apps.",
         "verification_state": "source_stated"
       },
       "verification_state": "source_stated"
