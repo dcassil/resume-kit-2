@@ -166,7 +166,7 @@
       "argv": [
         "resolve"
       ],
-      "description": "Use deterministic code ranking for unresolved topics, agent phrasing only, structured answer interpretation, career-store persistence after explicit confirmation, and match reruns.",
+      "description": "Use resume-core unresolved-topic selection, agent phrasing only, structured answer interpretation, career-store persistence after explicit confirmation, and match reruns.",
       "checkpoints": [
         "RESOLVE_GAPS",
         "MATCH_BASE"

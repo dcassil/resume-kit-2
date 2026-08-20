@@ -111,12 +111,13 @@ Required command surface:
 
 ### resolve
 
-- Selects unresolved requirement/topic by deterministic code ranking.
+- Delegates unresolved requirement/topic selection to `resume-core.getUnresolvedRequirements` without CLI ordering, tie-breaking, or fallback requirement IDs.
 - Uses agent only to phrase questions.
 - Accepts simulated answers through the `TerminalIO` seam.
 - Interprets answers into structured proposals.
 - Persists verified facts through career-store only after explicit confirmation.
 - Re-runs match after each resolution.
+- Returns a typed no-unresolved result when core has no selected unresolved requirement.
 
 ### TerminalIO seam
 
@@ -162,7 +163,8 @@ Required command surface:
 ### inspect and audit
 
 - `inspect fact` shows fact, verification state, evidence, relationships, and conflicts.
-- `inspect requirement` shows requirement source text, normalized terms, resolution state, and evidence.
+- `inspect requirement` reads persisted artifacts only: `reports/match.json` for the requirement `resolution_state` and evidence, plus store `getFact` lookups for referenced fact IDs.
+- `inspect requirement` never computes or defaults a requirement resolution state; a fresh workspace or missing persisted match state returns `status: no_data` with `exit_code: 0`.
 - `audit` reconstructs run identity, config hash, schema/model versions, scores, questions, facts, operations, validations, and outputs.
 
 ## Boundary Tests

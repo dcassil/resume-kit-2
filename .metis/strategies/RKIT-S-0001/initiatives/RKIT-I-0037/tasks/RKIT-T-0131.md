@@ -4,14 +4,14 @@ level: task
 title: "Match passthrough and decision enforcement: full 4.3 MatchResult persistence, verbatim states, blocked/resolve_gaps mapping"
 short_code: "RKIT-T-0131"
 created_at: 2026-08-19T19:01:07.600274+00:00
-updated_at: 2026-08-19T19:02:48.039698+00:00
+updated_at: 2026-08-20T20:32:51.808980+00:00
 parent: deterministic-match-resolve-and
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/active"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0037
 ## Objective **[REQUIRED]**
 
 `resume match` must present and persist core's MatchResult verbatim and enforce its tri-state `decision`. Today `_match` (`resume-cli/resume_cli/__init__.py:606`) downgrades `related_match`/`possible_match` to `unknown`, rewrites per-requirement `status`, never consults `decision`/`hardRequirementsResolved`, and returns ok/0.0 even on an empty workspace. Delete the downgrade block; map `decision` to CLI behavior; honor `matching.requireHardRequirementsResolved`.
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

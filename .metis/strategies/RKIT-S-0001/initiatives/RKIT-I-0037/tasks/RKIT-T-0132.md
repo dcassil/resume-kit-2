@@ -4,14 +4,14 @@ level: task
 title: "Inspect from persisted artifacts with typed no_data; topic delegation to getUnresolvedRequirements"
 short_code: "RKIT-T-0132"
 created_at: 2026-08-19T19:01:07.671685+00:00
-updated_at: 2026-08-19T19:01:07.671685+00:00
+updated_at: 2026-08-20T20:32:52.159917+00:00
 parent: deterministic-match-resolve-and
-blocked_by: ["RKIT-T-0131"]
+blocked_by: [RKIT-T-0131]
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/active"
 
 
 exit_criteria_met: false
@@ -28,6 +28,8 @@ initiative_id: RKIT-I-0037
 ## Objective **[REQUIRED]**
 
 `inspect requirement <id>` must report only persisted, code-owned state. Today `_inspect_requirement` (`resume-cli/resume_cli/__init__.py:867-872`) fabricates `resolution_state: "exact_match" if requirement_id == "req_react" else "unknown"` — verified to return exact_match with no match ever run. Delete the fabrication; read persisted artifacts only. Also complete topic-selection delegation: `_resolution_context` must take its selected requirement from `resume_core.getUnresolvedRequirements` instead of the CLI's local ordering (`_resolution_priority`/`_topic_for_requirement` remnants — T-0130 de-fixture-ized them but they still re-implement selection the responsibility matrix assigns to core).
+
+## Acceptance Criteria
 
 ## Acceptance Criteria **[REQUIRED]**
 
@@ -56,4 +58,5 @@ Recommended Agent: opus + medium
 
 ## Status Updates **[REQUIRED]**
 
-*To be added during implementation*
+- 2026-08-20: Implemented persisted-only requirement inspect through `resume_cli._inspect`, returning `status: no_data`/`exit_code: 0` when `reports/match.json` has no persisted state. Removed CLI resolution priority/topic helpers and delegated `_resolution_context` to `resume_core.getUnresolvedRequirements`; empty core selection returns `status: no_unresolved`. Added bridged integration/unit tests and updated CLI TEST_SPEC/cli_surface metadata. Focused tests pass: `tests.integration.test_cli_inspect_requirement_integration`, `tests.unit.test_resume_cli_resolution_context_unit`, `tests.contract.test_resume_cli_contract`, `tests.contract.test_tests_contract`.
+- 2026-08-20: Verification complete: `python3 tools/run_gate.py --pr --root .` passed 662 tests; `python3 tools/run_gate.py --smoke --root .` passed installed smoke. Snapshot regeneration run twice with zero diff between passes and no `fixtures/expected` baseline changes. Fresh-workspace probe for `inspect requirement req_react` returned `status: no_data`, `exit_code: 0`. Straight Jacket final verify still reports only the known pending `tools/resume_cli_guardrails.py` and `tools/resume_core_guardrails.py` checksum mismatches called out in the task.

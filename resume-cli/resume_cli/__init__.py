@@ -24,6 +24,7 @@ from ._config import (
     load_workspace_config as _load_workspace_config,
     stable_config_hash as _stable_config_hash,
 )
+from ._inspect import inspect_requirement as _inspect_requirement_from_artifacts
 from resume_agent import extractJobSemantics, extractResumeSemantics, generateClarificationQuestion, interpretUserAnswer, proposeRewrite
 from resume_core import applyChange, canonicalResumeFromExtraction, getUnresolvedRequirements, normalizeJobModel, normalizeResume, rankResumeContent, sanitizeText, scoreMatch, toRenderableResume, validateChange, validateFinalResume, validateGrounding, validateResume
 from resume_render import renderDocx, renderMarkdown, renderPdf, validateRenderedOutput
@@ -728,7 +729,9 @@ def _blocking_requirement_ids(selection: JsonObject, match_result: JsonObject) -
 def _resolve(workspace: Path, terminal_io: TerminalIO) -> JsonObject:
     _init(workspace)
     match_result = _match(workspace)["match_result"]
-    context = _resolution_context(match_result, _all_facts(workspace))
+    context = _resolution_context(match_result, _all_facts(workspace), _config(workspace))
+    if context.get("status") != "ok":
+        return context
     question = generateClarificationQuestion(context)
     answer = terminal_io.ask(str(question.get("question") or ""))
     interpretation_context = {**context, "question": question.get("question")}
@@ -973,11 +976,7 @@ def _inspect_fact(workspace: Path, fact_id: str) -> JsonObject:
 
 
 def _inspect_requirement(workspace: Path, requirement_id: str) -> JsonObject:
-    job = _read_json(_paths(workspace)["job_current"], {})
-    found = next((item for item in job.get("requirements", []) if item.get("requirement_id") == requirement_id), None)
-    if found is None:
-        return _error("not_found", "requirement not found")
-    return {"status": "ok", "exit_code": 0, **found, "resolution_state": "exact_match" if requirement_id == "req_react" else "unknown"}
+    return _inspect_requirement_from_artifacts(workspace, requirement_id)
 
 
 def _audit_report(workspace: Path) -> JsonObject:
@@ -1194,42 +1193,42 @@ def _write_docx_artifact(path: Path, render_result: JsonObject) -> Path | None:
     return path
 
 
-def _resolution_context(match_result: JsonObject, facts: list[JsonObject]) -> JsonObject:
-    unresolved = [
-        item
-        for item in match_result.get("requirements", match_result.get("requirement_results", []))
-        if isinstance(item, dict) and item.get("resolution_state") not in {"exact_match", "alias_match", "verified_fact_match"}
-    ]
-    unresolved.sort(key=lambda item: (_resolution_priority(item), str(item.get("requirement_id", ""))))
-    selected = unresolved[0] if unresolved else {}
-    requirement_id = str(selected.get("requirement_id") or "requirement_unresolved")
-    topic = _topic_for_requirement(selected)
+def _resolution_context(match_result: JsonObject, facts: list[JsonObject], config: JsonObject) -> JsonObject:
+    selection = getUnresolvedRequirements(match_result, config)
+    if selection.get("status") != "ok":
+        return {
+            "status": "error",
+            "exit_code": DOMAIN_VALIDATION_EXIT,
+            "errors": _core_errors_or_default(selection, "unresolved_selection_failed", "core unresolved requirement selection failed", "match.requirements"),
+        }
+    ranked = selection.get("ranked_unresolved_requirements") or selection.get("unresolved_requirements") or []
+    selected = selection.get("selected_requirement") if isinstance(selection.get("selected_requirement"), dict) else None
+    if selected is None and ranked:
+        selected = ranked[0]
+    if not isinstance(selected, dict):
+        return {
+            "status": "no_unresolved",
+            "exit_code": SUCCESS_EXIT,
+            "selected_requirement_ids": [],
+            "requirement": None,
+            "selection": selection,
+            "already_verified_fact_ids": [str(fact.get("fact_id")) for fact in facts if fact.get("fact_id")],
+        }
+    requirement_id = str(selected.get("requirement_id") or "")
+    topic = selected.get("topic") if selected.get("topic") else selected.get("concept")
+    if not requirement_id or not topic:
+        return _error("validation_error", "core selected requirement must include requirement_id and topic or concept", ref="match.requirements")
     return {
+        "status": "ok",
+        "exit_code": SUCCESS_EXIT,
         "selected_requirement_ids": [requirement_id],
         "topic": topic,
+        "concept": selected.get("concept"),
         "requirement": selected,
+        "selection": selection,
+        "unresolved_requirements": ranked,
         "already_verified_fact_ids": [str(fact.get("fact_id")) for fact in facts if fact.get("fact_id")],
     }
-
-
-def _resolution_priority(requirement: JsonObject) -> tuple[int, int]:
-    classification = str(requirement.get("classification", "contextual"))
-    importance = str(requirement.get("importance", "")).lower()
-    importance_rank = {"critical": 0, "high": 1, "medium": 2, "low": 3}.get(importance, 4)
-    return (0 if classification == "required" else 1, importance_rank)
-
-
-def _topic_for_requirement(requirement: JsonObject) -> str:
-    topic = str(requirement.get("concept") or requirement.get("source_text") or "").strip()
-    if topic:
-        return topic
-    terms = requirement.get("normalized_terms")
-    if isinstance(terms, list):
-        for term in terms:
-            text = str(term).strip()
-            if text:
-                return text
-    return "requirement"
 
 
 def _fact_proposals(interpretation: JsonObject, context: JsonObject) -> list[JsonObject]:

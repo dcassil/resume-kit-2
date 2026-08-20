@@ -392,6 +392,7 @@ class ResumeCliCommandContractTests(unittest.TestCase):
         run_cli(self.cli, ["init"], self.workspace)
         run_cli(self.cli, ["ingest", str(self.resume_file)], self.workspace)
         run_cli(self.cli, ["job", "ingest", str(self.job_file)], self.workspace)
+        run_cli(self.cli, ["match"], self.workspace)
         fact = normalize_result(run_cli(self.cli, ["inspect", "fact", "fact_react"], self.workspace))
         self.assertIn("verification_state", json.dumps(fact, sort_keys=True))
         self.assertIn("evidence", json.dumps(fact, sort_keys=True))
@@ -408,12 +409,12 @@ class ResumeCliCommandContractTests(unittest.TestCase):
 
     def test_result_envelope_wraps_domain_error_with_stable_ref(self):
         result = normalize_result(run_cli(self.cli, ["inspect", "requirement", "missing"], self.workspace))
-        self.assertEqual(result.get("status"), "error")
-        self.assertEqual(result.get("exit_code"), 1)
+        self.assertEqual(result.get("status"), "no_data")
+        self.assertEqual(result.get("exit_code"), 0)
         self.assertIn("artifacts", result)
         self.assertIn("report", result)
-        self.assertEqual(result["errors"][0]["code"], "not_found")
-        self.assertEqual(result["errors"][0]["ref"], "input")
+        self.assertEqual(result.get("reason"), "missing_match_report")
+        self.assertEqual(result.get("errors"), [])
 
     def test_terminal_io_scripted_mode_is_deterministic(self):
         scripted = self.cli.ScriptedTerminalIO(["first answer", "yes", "unused"])
